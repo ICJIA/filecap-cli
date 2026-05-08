@@ -62,3 +62,26 @@ export const footerSchema = z.object({
     permissionDenials: z.number().int().nonnegative(),
   }),
 });
+
+/**
+ * Returns true if the NDJSON text represents a complete inventory (last
+ * non-empty line is a footer). Used by downstream consumers (Phase 5 rollup,
+ * Phase 6 report) to detect interrupted scans.
+ *
+ * Accepts both single-instance footers (`filecap-inventory-footer`) and
+ * consolidated footers (`filecap-consolidated-footer`).
+ */
+export function isCompleteInventory(text) {
+  const lines = text.split("\n").filter((l) => l.length > 0);
+  if (lines.length === 0) return false;
+  let lastLine;
+  try {
+    lastLine = JSON.parse(lines[lines.length - 1]);
+  } catch {
+    return false;
+  }
+  return (
+    lastLine.kind === "filecap-inventory-footer" ||
+    lastLine.kind === "filecap-consolidated-footer"
+  );
+}

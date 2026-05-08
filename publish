@@ -24,9 +24,12 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
-git fetch origin main
+# Tolerate first-time publish where origin/main doesn't exist yet.
+# In that case treat local as "in sync" with itself; the actual push
+# happens later via `git push origin v$VERSION` or `git push origin main --follow-tags`.
+git fetch origin main 2>/dev/null || true
 LOCAL=$(git rev-parse main)
-REMOTE=$(git rev-parse origin/main)
+REMOTE=$(git rev-parse origin/main 2>/dev/null || echo "$LOCAL")
 if [ "$LOCAL" != "$REMOTE" ]; then
     echo "Refusing to publish: local main is not in sync with origin/main" >&2
     exit 1
@@ -47,7 +50,17 @@ if [ "$BUMP" = "first" ]; then
     # tagged in git" holds. If publish fails, the tag is recoverable
     # (delete and retry); the alternative ordering can leave npm with a
     # released version that has no corresponding git tag.
-    git tag "v$VERSION"
+    if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
+        # Tag already exists locally (e.g., from the implementation plan's Step 15.7).
+        # Verify it points at HEAD; if so, just push it. If not, that's an error.
+        if [ "$(git rev-list -n 1 "v$VERSION")" != "$(git rev-parse HEAD)" ]; then
+            echo "Refusing to publish: tag v$VERSION exists but does not point at HEAD" >&2
+            exit 1
+        fi
+    else
+        git tag "v$VERSION"
+    fi
+    git push origin main
     git push origin "v$VERSION"
     npm publish --access public
 else

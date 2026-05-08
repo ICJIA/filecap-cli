@@ -3,6 +3,7 @@ import {
   headerSchema,
   entrySchema,
   footerSchema,
+  isCompleteInventory,
   SCHEMA_VERSION,
 } from "../src/schema/inventory.js";
 
@@ -101,5 +102,56 @@ describe("inventory schemas", () => {
       },
     };
     expect(() => footerSchema.parse(bad)).toThrow();
+  });
+});
+
+describe("isCompleteInventory", () => {
+  it("returns true for a complete inventory (header + entries + footer)", () => {
+    const text = [
+      JSON.stringify({ kind: "filecap-inventory-header", schemaVersion: 1, metadata: {} }),
+      JSON.stringify({ filename: "a.pdf", sizeBytes: 1 }),
+      JSON.stringify({ kind: "filecap-inventory-footer", stats: {} }),
+    ].join("\n");
+    expect(isCompleteInventory(text)).toBe(true);
+  });
+
+  it("returns true for a consolidated footer", () => {
+    const text = [
+      JSON.stringify({ kind: "filecap-consolidated-header" }),
+      JSON.stringify({ kind: "filecap-consolidated-footer", stats: {} }),
+    ].join("\n");
+    expect(isCompleteInventory(text)).toBe(true);
+  });
+
+  it("returns false when footer is missing (interrupted scan)", () => {
+    const text = [
+      JSON.stringify({ kind: "filecap-inventory-header", schemaVersion: 1, metadata: {} }),
+      JSON.stringify({ filename: "a.pdf", sizeBytes: 1 }),
+      JSON.stringify({ filename: "b.pdf", sizeBytes: 2 }),
+      // no footer
+    ].join("\n");
+    expect(isCompleteInventory(text)).toBe(false);
+  });
+
+  it("returns false for an empty string", () => {
+    expect(isCompleteInventory("")).toBe(false);
+  });
+
+  it("returns false when the last line is malformed JSON", () => {
+    const text = [
+      JSON.stringify({ kind: "filecap-inventory-header", schemaVersion: 1, metadata: {} }),
+      "not-json-{{{",
+    ].join("\n");
+    expect(isCompleteInventory(text)).toBe(false);
+  });
+
+  it("ignores trailing empty lines", () => {
+    const text = [
+      JSON.stringify({ kind: "filecap-inventory-header", schemaVersion: 1, metadata: {} }),
+      JSON.stringify({ kind: "filecap-inventory-footer", stats: {} }),
+      "",
+      "",
+    ].join("\n");
+    expect(isCompleteInventory(text)).toBe(true);
   });
 });
