@@ -1508,7 +1508,12 @@ export async function runScan({
   }
 
   const startedAt = Date.now();
-  const writeStream = createWriteStream(output, { encoding: "utf8" });
+
+  // Output target: "-" means stdout (Unix convention); anything else is a file path.
+  // The SSH-piped workflow uses `filecap scan <dir> -o -` to stream NDJSON back to
+  // the local machine. When writing to stdout, we use process.stdout directly so
+  // the NDJSON appears on stdout while progress lines go to stderr (separated streams).
+  const writeStream = output === "-" ? process.stdout : createWriteStream(output, { encoding: "utf8" });
 
   function writeLine(obj) {
     return new Promise((resolve, reject) => {
@@ -1617,9 +1622,14 @@ export async function runScan({
   footerSchema.parse(footer);
   await writeLine(footer);
 
-  await new Promise((resolve, reject) => {
-    writeStream.end((err) => (err ? reject(err) : resolve()));
-  });
+  // Close the file stream so the OS flushes to disk. Do NOT call .end() on
+  // process.stdout — closing stdout would prevent any further output (including
+  // the progress reporter's final summary line).
+  if (output !== "-") {
+    await new Promise((resolve, reject) => {
+      writeStream.end((err) => (err ? reject(err) : resolve()));
+    });
+  }
 
   reporter.end(`${stats.fileCount} entries, ${stats.totalBytes} bytes`);
 
