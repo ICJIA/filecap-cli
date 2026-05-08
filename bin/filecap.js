@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { runScan } from "../src/commands/scan.js";
+import { runRollup } from "../src/commands/rollup.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
 
@@ -77,11 +78,22 @@ program
   });
 
 program
-  .command("rollup")
-  .description("(Phase 5 — not yet implemented in v0.1.0)")
-  .action(() => {
-    process.stderr.write("filecap rollup is not implemented in v0.1.0 (Phase 5).\n");
-    process.exit(1);
+  .command("rollup <files...>")
+  .description("Merge multiple single-instance inventories into a consolidated inventory")
+  .option("-o, --output <path>", "output path", "consolidated.ndjson")
+  .option("--strict", "fail on schema mismatch or missing footer", false)
+  .action(async (files, opts) => {
+    try {
+      const result = await runRollup({
+        inputs: files,
+        output: opts.output,
+        strict: opts.strict,
+      });
+      process.exit(result.exitCode);
+    } catch (err) {
+      process.stderr.write(`filecap: ${err.message}\n`);
+      process.exit(1);
+    }
   });
 
 program
