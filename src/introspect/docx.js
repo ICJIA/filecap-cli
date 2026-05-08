@@ -73,7 +73,7 @@ export async function introspectDocx(filePath) {
     const ppr = p?.["w:pPr"];
     const pStyle = ppr?.["w:pStyle"];
     const styleVal = pStyle?.["@_w:val"] || "";
-    if (/^Heading[1-9]/i.test(styleVal) || /^heading[1-9]/i.test(styleVal)) {
+    if (/^Heading[1-9]/i.test(styleVal)) {
       hasHeadings = true;
       break;
     }
@@ -131,15 +131,19 @@ export async function introspectDocx(filePath) {
   let documentLanguage;
   const stylesXml = zip.file("word/styles.xml");
   if (stylesXml) {
-    const stylesText = await stylesXml.async("string");
-    const stylesTree = parser.parse(stylesText);
-    const langs = collectByTag(stylesTree, "w:lang");
-    for (const lang of langs) {
-      const val = lang?.["@_w:val"] || "";
-      if (val) {
-        documentLanguage = val;
-        break;
+    try {
+      const stylesText = await stylesXml.async("string");
+      const stylesTree = parser.parse(stylesText);
+      const langs = collectByTag(stylesTree, "w:lang");
+      for (const lang of langs) {
+        const val = lang?.["@_w:val"] || "";
+        if (val) {
+          documentLanguage = val;
+          break;
+        }
       }
+    } catch {
+      // Best-effort: corrupt styles.xml falls through to the document.xml fallback below.
     }
   }
   if (!documentLanguage) {

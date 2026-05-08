@@ -98,6 +98,39 @@ describe("introspectDocx", () => {
 
     const result = await introspectDocx(file);
     expect(result.tableCount).toBe(2);
+    expect(result.tablesHaveHeaders).toBe(false); // neither table marked as header
+  });
+
+  it("flags tablesHaveHeaders when at least one table has a header row", async () => {
+    const file = path.join(tmpRoot, "tables-with-headers.docx");
+    const headerRow = new TableRow({
+      tableHeader: true,
+      children: [
+        new TableCell({ children: [new Paragraph("H1")] }),
+        new TableCell({ children: [new Paragraph("H2")] }),
+      ],
+    });
+    const dataRow = new TableRow({
+      children: [
+        new TableCell({ children: [new Paragraph("d1")] }),
+        new TableCell({ children: [new Paragraph("d2")] }),
+      ],
+    });
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: "Document with header-marked table." }),
+            new Table({ rows: [headerRow, dataRow] }),
+          ],
+        },
+      ],
+    });
+    await writeDocx(file, doc);
+
+    const result = await introspectDocx(file);
+    expect(result.tableCount).toBe(1);
+    expect(result.tablesHaveHeaders).toBe(true);
   });
 
   it("counts hyperlinks and detects vague link text", async () => {
