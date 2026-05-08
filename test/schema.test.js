@@ -5,6 +5,9 @@ import {
   footerSchema,
   isCompleteInventory,
   pdfIntrospectionSchema,
+  consolidatedHeaderSchema,
+  consolidatedEntrySchema,
+  consolidatedFooterSchema,
   SCHEMA_VERSION,
 } from "../src/schema/inventory.js";
 
@@ -304,6 +307,114 @@ describe("inventory schemas", () => {
       },
     };
     expect(() => entrySchema.parse(entry)).toThrow();
+  });
+
+  it("validates a consolidated header with sources array", () => {
+    const header = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: {
+        consolidatedAt: "2026-05-08T15:00:00.000Z",
+        filecapVersion: "0.5.0",
+        nodeVersion: "v20.11.1",
+        sources: [
+          {
+            serverName: "strapi-prod-01",
+            hostname: "strapi-prod-01.icjia.local",
+            serverIp: "10.42.7.18",
+            scannedPath: "/var/strapi/uploads",
+            scannedAt: "2026-05-08T14:23:11.000Z",
+            filecapVersion: "0.4.0",
+            nodeVersion: "v20.11.1",
+            options: {
+              introspect: true,
+              hash: true,
+              maxIntrospectMb: 200,
+              concurrency: 4,
+            },
+            stats: {
+              fileCount: 100,
+              totalBytes: 1024000,
+              scanDurationMs: 5000,
+              introspectionFailures: 0,
+              permissionDenials: 0,
+            },
+          },
+        ],
+      },
+    };
+    expect(() => consolidatedHeaderSchema.parse(header)).not.toThrow();
+  });
+
+  it("validates a consolidated entry with serverName and duplicateOf null", () => {
+    const entry = {
+      path: "case.pdf",
+      absolutePath: "/var/strapi/uploads/case.pdf",
+      filename: "case.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      flags: [],
+      serverName: "strapi-prod-01",
+      duplicateOf: null,
+    };
+    expect(() => consolidatedEntrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("validates a consolidated entry with duplicateOf set", () => {
+    const entry = {
+      path: "case-copy.pdf",
+      absolutePath: "/var/strapi/uploads/archive/case-copy.pdf",
+      filename: "case-copy.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-08-01T00:00:00.000Z",
+      sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      flags: [],
+      serverName: "strapi-prod-02",
+      duplicateOf: {
+        serverName: "strapi-prod-01",
+        path: "case.pdf",
+      },
+    };
+    expect(() => consolidatedEntrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("validates a consolidated footer with cross-instance stats", () => {
+    const footer = {
+      kind: "filecap-consolidated-footer",
+      stats: {
+        fileCount: 1500,
+        totalBytes: 1500000000,
+        consolidationDurationMs: 200,
+        totalUniqueHashes: 1200,
+        totalDuplicateGroups: 50,
+        bytesSavedIfDeduped: 100000000,
+      },
+    };
+    expect(() => consolidatedFooterSchema.parse(footer)).not.toThrow();
+  });
+
+  it("rejects a consolidated entry without serverName", () => {
+    const entry = {
+      path: "case.pdf",
+      absolutePath: "/x/case.pdf",
+      filename: "case.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      duplicateOf: null,
+    };
+    expect(() => consolidatedEntrySchema.parse(entry)).toThrow();
   });
 });
 

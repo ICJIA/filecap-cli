@@ -26,6 +26,35 @@ export const headerSchema = z.object({
   }),
 });
 
+const sourceBlockSchema = z.object({
+  serverName: z.string(),
+  hostname: z.string(),
+  serverIp: z.string(),
+  scannedPath: z.string(),
+  scannedAt: isoDate,
+  filecapVersion: z.string(),
+  nodeVersion: z.string(),
+  options: optionsSchema,
+  stats: z.object({
+    fileCount: z.number().int().nonnegative(),
+    totalBytes: z.number().int().nonnegative(),
+    scanDurationMs: z.number().int().nonnegative(),
+    introspectionFailures: z.number().int().nonnegative(),
+    permissionDenials: z.number().int().nonnegative(),
+  }),
+});
+
+export const consolidatedHeaderSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  kind: z.literal("filecap-consolidated-header"),
+  metadata: z.object({
+    consolidatedAt: isoDate,
+    filecapVersion: z.string(),
+    nodeVersion: z.string(),
+    sources: z.array(sourceBlockSchema),
+  }),
+});
+
 const categoryEnum = z.enum([
   "pdf",
   "office-document",
@@ -107,6 +136,16 @@ export const entrySchema = z.object({
     .optional(),
 });
 
+export const consolidatedEntrySchema = entrySchema.extend({
+  serverName: z.string(),
+  duplicateOf: z
+    .object({
+      serverName: z.string(),
+      path: z.string(),
+    })
+    .nullable(),
+});
+
 export const footerSchema = z.object({
   kind: z.literal("filecap-inventory-footer"),
   stats: z.object({
@@ -115,6 +154,18 @@ export const footerSchema = z.object({
     scanDurationMs: z.number().int().nonnegative(),
     introspectionFailures: z.number().int().nonnegative(),
     permissionDenials: z.number().int().nonnegative(),
+  }),
+});
+
+export const consolidatedFooterSchema = z.object({
+  kind: z.literal("filecap-consolidated-footer"),
+  stats: z.object({
+    fileCount: z.number().int().nonnegative(),
+    totalBytes: z.number().int().nonnegative(),
+    consolidationDurationMs: z.number().int().nonnegative(),
+    totalUniqueHashes: z.number().int().nonnegative(),
+    totalDuplicateGroups: z.number().int().nonnegative(),
+    bytesSavedIfDeduped: z.number().int().nonnegative(),
   }),
 });
 
