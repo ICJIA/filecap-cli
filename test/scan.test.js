@@ -202,7 +202,7 @@ describe("filecap CLI end-to-end", () => {
     expect(lines[3].stats.fileCount).toBe(2);
   });
 
-  it("returns exit code 1 with an error message when the directory does not exist", async () => {
+  it("returns exit code 2 when the directory does not exist", async () => {
     const outPath = path.join(outDir, "x.ndjson");
     const result = await runCli(
       ["scan", path.join(tmpRoot, "no-such-dir"), "-o", outPath, "--no-hash"],
