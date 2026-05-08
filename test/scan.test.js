@@ -240,6 +240,48 @@ describe("runScan", () => {
     const pdfEntry = lines.find((l) => l.filename === "doc.pdf");
     expect(pdfEntry.introspection).toBeUndefined();
   });
+
+  it("populates flags for filenames matching scanner patterns", async () => {
+    await fs.writeFile(path.join(tmpRoot, "Scan_001.pdf"), "x");
+    await fs.writeFile(path.join(tmpRoot, "regular-name.pdf"), "x");
+
+    const outPath = path.join(outDir, "scanflags.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      introspect: false,
+      maxIntrospectMb: 200,
+    });
+    const lines = await readNdjson(outPath);
+    const scanEntry = lines.find((l) => l.filename === "Scan_001.pdf");
+    const cleanEntry = lines.find((l) => l.filename === "regular-name.pdf");
+    expect(scanEntry.flags).toContain("scanned-name-pattern");
+    expect(cleanEntry.flags).toEqual([]);
+  });
+
+  it("populates multiple flags for problematic filenames", async () => {
+    const problematic = "Scan 001 résumé.pdf";
+    await fs.writeFile(path.join(tmpRoot, problematic), "x");
+
+    const outPath = path.join(outDir, "multiflags.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      introspect: false,
+      maxIntrospectMb: 200,
+    });
+    const lines = await readNdjson(outPath);
+    const entry = lines.find((l) => l.filename === problematic);
+    expect(entry.flags).toContain("scanned-name-pattern");
+    expect(entry.flags).toContain("filename-has-spaces");
+    expect(entry.flags).toContain("filename-non-ascii");
+  });
 });
 
 function runCli(args, cwd) {

@@ -11,6 +11,7 @@ import { getHostname, getFirstIPv4 } from "../util/server-id.js";
 import { headerSchema, entrySchema, footerSchema, SCHEMA_VERSION } from "../schema/inventory.js";
 import { FILECAP_VERSION } from "../version.js";
 import { introspect } from "../introspect/index.js";
+import { computeFilenameFlags } from "../flag/filename.js";
 
 export async function runScan({
   directory,
@@ -153,7 +154,7 @@ export async function runScan({
           sizeBytes: fileStats.sizeBytes,
           modifiedAt: fileStats.modifiedAt,
           sha256,
-          flags: [],
+          flags: computeFilenameFlags(path.basename(filePath)),
         };
         if (introspectionResult !== null && introspectionResult !== undefined) {
           entry.introspection = introspectionResult;
