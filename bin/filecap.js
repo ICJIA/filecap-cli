@@ -34,6 +34,13 @@ program
   .option("-s, --server-name <name>", "override server identifier in metadata")
   .option("--server-ip <ip>", "override server IP in metadata")
   .option("--no-hash", "skip SHA-256 hashing")
+  .option("--no-introspect", "skip PDF/Office introspection (filesystem stats only)")
+  .option(
+    "--max-introspect-mb <n>",
+    "skip introspection for files larger than this (MB)",
+    (v) => positiveInt(v, "--max-introspect-mb"),
+    200,
+  )
   .option("--include-ext <list>", "comma-separated extensions to include", commaList)
   .option("--exclude-ext <list>", "comma-separated extensions to exclude", commaList)
   .option(
@@ -56,6 +63,8 @@ program
         serverIp: opts.serverIp,
         includeExt: opts.includeExt,
         excludeExt: opts.excludeExt,
+        introspect: opts.introspect,
+        maxIntrospectMb: opts.maxIntrospectMb,
       });
       if (result.error) {
         process.stderr.write(`${result.error}\n`);
