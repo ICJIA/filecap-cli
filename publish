@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# publish — release @icjia/filecap to npm
+#
+# Usage:
+#   ./publish              # patch bump (default)
+#   ./publish patch        # patch bump
+#   ./publish minor        # minor bump
+#   ./publish major        # major bump
+#   ./publish first        # first-time publish (uses version in package.json as-is)
+
+set -euo pipefail
+
+BUMP="${1:-patch}"
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" != "main" ]; then
+    echo "Refusing to publish: not on main (currently on $BRANCH)" >&2
+    exit 1
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Refusing to publish: working tree not clean" >&2
+    git status --short >&2
+    exit 1
+fi
+
+git fetch origin main
+LOCAL=$(git rev-parse main)
+REMOTE=$(git rev-parse origin/main)
+if [ "$LOCAL" != "$REMOTE" ]; then
+    echo "Refusing to publish: local main is not in sync with origin/main" >&2
+    exit 1
+fi
+
+if ! npm whoami >/dev/null 2>&1; then
+    echo "Not logged in to npm. Run: npm login" >&2
+    exit 1
+fi
+
+echo "==> Running tests"
+npm test
+
+if [ "$BUMP" = "first" ]; then
+    VERSION=$(node -p "require('./package.json').version")
+    echo "==> First-time publish at v$VERSION"
+    npm publish --access public
+    git tag "v$VERSION"
+    git push origin "v$VERSION"
+else
+    echo "==> Bumping version ($BUMP)"
+    NEW_VERSION=$(npm version "$BUMP" -m "Release v%s")
+    echo "==> Publishing $NEW_VERSION"
+    npm publish --access public
+    git push origin main --follow-tags
+fi
+
+echo
+echo "==> Done."
+echo "    npm:    https://www.npmjs.com/package/@icjia/filecap"
+echo "    GitHub: https://github.com/ICJIA/filecap-cli"
