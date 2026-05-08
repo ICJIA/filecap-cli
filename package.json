@@ -45,11 +45,15 @@
   },
   "dependencies": {
     "commander": "^12.1.0",
+    "exceljs": "^4.4.0",
+    "fast-xml-parser": "^4.5.6",
+    "jszip": "^3.10.1",
     "p-limit": "^5.0.0",
     "pdfjs-dist": "^4.10.38",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "docx": "^9.6.1",
     "eslint": "^9.0.0",
     "pdf-lib": "^1.17.1",
     "prettier": "^3.2.0",
