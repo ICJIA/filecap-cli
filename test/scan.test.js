@@ -291,4 +291,53 @@ describe("filecap CLI end-to-end", () => {
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
   });
+
+  it("introspects PDFs in a real CLI subprocess invocation", async () => {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const page = pdfDoc.addPage([300, 200]);
+    page.drawText("end-to-end PDF test", { x: 20, y: 100, size: 12, font });
+    await fs.writeFile(path.join(tmpRoot, "e2e.pdf"), await pdfDoc.save());
+
+    const outPath = path.join(outDir, "e2e.ndjson");
+    const result = await runCli(
+      ["scan", tmpRoot, "-o", outPath, "--no-hash"],
+      outDir,
+    );
+    expect(result.code).toBe(0);
+    const text = await fs.readFile(outPath, "utf8");
+    const lines = text
+      .split("\n")
+      .filter((l) => l.length > 0)
+      .map((l) => JSON.parse(l));
+    const pdfEntry = lines.find((l) => l.filename === "e2e.pdf");
+    expect(pdfEntry).toBeDefined();
+    expect(pdfEntry.introspection).toBeDefined();
+    expect(pdfEntry.introspection.kind).toBe("pdf");
+    expect(pdfEntry.introspection.pageCount).toBe(1);
+  });
+
+  it("respects --no-introspect in a real CLI subprocess invocation", async () => {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    pdfDoc.addPage().drawText("x", { x: 10, y: 10, size: 8, font });
+    await fs.writeFile(path.join(tmpRoot, "no-intro.pdf"), await pdfDoc.save());
+
+    const outPath = path.join(outDir, "no-intro.ndjson");
+    const result = await runCli(
+      ["scan", tmpRoot, "-o", outPath, "--no-hash", "--no-introspect"],
+      outDir,
+    );
+    expect(result.code).toBe(0);
+    const text = await fs.readFile(outPath, "utf8");
+    const lines = text
+      .split("\n")
+      .filter((l) => l.length > 0)
+      .map((l) => JSON.parse(l));
+    const pdfEntry = lines.find((l) => l.filename === "no-intro.pdf");
+    expect(pdfEntry).toBeDefined();
+    expect(pdfEntry.introspection).toBeUndefined();
+  });
 });
