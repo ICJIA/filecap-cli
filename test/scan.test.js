@@ -340,4 +340,58 @@ describe("filecap CLI end-to-end", () => {
     expect(pdfEntry).toBeDefined();
     expect(pdfEntry.introspection).toBeUndefined();
   });
+
+  it("introspects DOCX via the CLI", async () => {
+    const { Document, Packer, Paragraph, HeadingLevel } = await import("docx");
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: "Title", heading: HeadingLevel.HEADING_1 }),
+            new Paragraph({ text: "Body content." }),
+          ],
+        },
+      ],
+    });
+    await fs.writeFile(path.join(tmpRoot, "e2e.docx"), await Packer.toBuffer(doc));
+
+    const outPath = path.join(outDir, "docx-e2e.ndjson");
+    const result = await runCli(
+      ["scan", tmpRoot, "-o", outPath, "--no-hash"],
+      outDir,
+    );
+    expect(result.code).toBe(0);
+    const text = await fs.readFile(outPath, "utf8");
+    const lines = text.split("\n").filter((l) => l.length > 0).map((l) => JSON.parse(l));
+    const docxEntry = lines.find((l) => l.filename === "e2e.docx");
+    expect(docxEntry).toBeDefined();
+    expect(docxEntry.introspection).toBeDefined();
+    expect(docxEntry.introspection.kind).toBe("docx");
+    expect(docxEntry.introspection.hasHeadings).toBe(true);
+  });
+
+  it("introspects XLSX via the CLI", async () => {
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("DataSheet");
+    ws.addRow(["Header1", "Header2"]);
+    ws.getRow(1).font = { bold: true };
+    ws.addRow([1, 2]);
+    await wb.xlsx.writeFile(path.join(tmpRoot, "e2e.xlsx"));
+
+    const outPath = path.join(outDir, "xlsx-e2e.ndjson");
+    const result = await runCli(
+      ["scan", tmpRoot, "-o", outPath, "--no-hash"],
+      outDir,
+    );
+    expect(result.code).toBe(0);
+    const text = await fs.readFile(outPath, "utf8");
+    const lines = text.split("\n").filter((l) => l.length > 0).map((l) => JSON.parse(l));
+    const xlsxEntry = lines.find((l) => l.filename === "e2e.xlsx");
+    expect(xlsxEntry).toBeDefined();
+    expect(xlsxEntry.introspection).toBeDefined();
+    expect(xlsxEntry.introspection.kind).toBe("xlsx");
+    expect(xlsxEntry.introspection.sheetCount).toBe(1);
+    expect(xlsxEntry.introspection.hasHeaderRows).toBe(true);
+  });
 });
