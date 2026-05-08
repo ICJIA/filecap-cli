@@ -15,4 +15,5 @@ export { introspectPdf } from "./introspect/pdf.js";
 export { introspectDocx } from "./introspect/docx.js";
 export { introspectXlsx } from "./introspect/xlsx.js";
 export { introspectLegacyOffice } from "./introspect/office-legacy.js";
+export { computeFilenameFlags } from "./flag/filename.js";
 export { FILECAP_VERSION } from "./version.js";
