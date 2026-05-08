@@ -1,4 +1,5 @@
 export { runScan } from "./commands/scan.js";
+export { runRollup } from "./commands/rollup.js";
 export {
   headerSchema,
   entrySchema,
@@ -7,6 +8,9 @@ export {
   docxIntrospectionSchema,
   xlsxIntrospectionSchema,
   legacyOfficeIntrospectionSchema,
+  consolidatedHeaderSchema,
+  consolidatedEntrySchema,
+  consolidatedFooterSchema,
   isCompleteInventory,
   SCHEMA_VERSION,
 } from "./schema/inventory.js";
@@ -16,4 +20,6 @@ export { introspectDocx } from "./introspect/docx.js";
 export { introspectXlsx } from "./introspect/xlsx.js";
 export { introspectLegacyOffice } from "./introspect/office-legacy.js";
 export { computeFilenameFlags } from "./flag/filename.js";
+export { rollupInventories } from "./rollup/merge.js";
+export { pickCanonical } from "./rollup/canonical.js";
 export { FILECAP_VERSION } from "./version.js";
