@@ -10,6 +10,7 @@ import { Progress } from "../util/progress.js";
 import { getHostname, getFirstIPv4 } from "../util/server-id.js";
 import { headerSchema, entrySchema, footerSchema, SCHEMA_VERSION } from "../schema/inventory.js";
 import { FILECAP_VERSION } from "../version.js";
+import { introspect } from "../introspect/index.js";
 
 export async function runScan({
   directory,
@@ -21,6 +22,8 @@ export async function runScan({
   serverIp,
   includeExt,
   excludeExt,
+  introspect: introspectEnabled = false,
+  maxIntrospectMb = 200,
 }) {
   const absoluteRoot = path.resolve(directory);
 
@@ -64,9 +67,9 @@ export async function runScan({
         filecapVersion: FILECAP_VERSION,
         nodeVersion: process.version,
         options: {
-          introspect: false,
+          introspect: introspectEnabled,
           hash,
-          maxIntrospectMb: 200,
+          maxIntrospectMb,
           concurrency,
         },
       },
@@ -123,6 +126,22 @@ export async function runScan({
             throw err;
           }
         }
+
+        let introspectionResult;
+        if (introspectEnabled && isRemediable(categorize(fileStats.extension))) {
+          try {
+            introspectionResult = await introspect({
+              filePath,
+              extension: fileStats.extension,
+              sizeBytes: fileStats.sizeBytes,
+              maxIntrospectMb,
+            });
+          } catch {
+            // Empty-on-failure rule: omit the introspection key entirely.
+            introspectionResult = undefined;
+            stats.introspectionFailures++;
+          }
+        }
         const category = categorize(fileStats.extension);
         const entry = {
           path: path.relative(absoluteRoot, filePath),
@@ -136,6 +155,9 @@ export async function runScan({
           sha256,
           flags: [],
         };
+        if (introspectionResult) {
+          entry.introspection = introspectionResult;
+        }
         entrySchema.parse(entry);
         await writeLine(entry);
         stats.fileCount++;

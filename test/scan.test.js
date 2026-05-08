@@ -165,6 +165,78 @@ describe("runScan", () => {
     const filenames = lines.slice(1, -1).map((e) => e.filename);
     expect(filenames).toEqual(["a.pdf"]);
   });
+
+  it("attaches an introspection block to PDF entries when introspect: true", async () => {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const page = pdfDoc.addPage([300, 200]);
+    page.drawText("text", { x: 20, y: 100, size: 12, font });
+    await fs.writeFile(path.join(tmpRoot, "doc.pdf"), await pdfDoc.save());
+
+    const outPath = path.join(outDir, "intro.ndjson");
+    const result = await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      introspect: true,
+      maxIntrospectMb: 200,
+    });
+    expect(result.exitCode).toBe(0);
+    const lines = await readNdjson(outPath);
+    const pdfEntry = lines.find((l) => l.filename === "doc.pdf");
+    expect(pdfEntry.introspection).toBeDefined();
+    expect(pdfEntry.introspection.kind).toBe("pdf");
+    expect(pdfEntry.introspection.pageCount).toBe(1);
+  });
+
+  it("omits the introspection field on a malformed PDF and counts the failure in the footer", async () => {
+    await fs.writeFile(path.join(tmpRoot, "good.txt"), "x");
+    await fs.writeFile(path.join(tmpRoot, "bad.pdf"), "not a real pdf");
+
+    const outPath = path.join(outDir, "intro-fail.ndjson");
+    const result = await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      introspect: true,
+      maxIntrospectMb: 200,
+    });
+    expect(result.exitCode).toBe(0);
+    const lines = await readNdjson(outPath);
+    const badEntry = lines.find((l) => l.filename === "bad.pdf");
+    expect(badEntry).toBeDefined();
+    expect(badEntry.introspection).toBeUndefined();
+    const footer = lines[lines.length - 1];
+    expect(footer.stats.introspectionFailures).toBeGreaterThanOrEqual(1);
+  });
+
+  it("skips introspection when introspect: false (default Phase 1 behavior)", async () => {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const page = pdfDoc.addPage([300, 200]);
+    page.drawText("text", { x: 20, y: 100, size: 12, font });
+    await fs.writeFile(path.join(tmpRoot, "doc.pdf"), await pdfDoc.save());
+
+    const outPath = path.join(outDir, "no-intro.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      introspect: false,
+      maxIntrospectMb: 200,
+    });
+    const lines = await readNdjson(outPath);
+    const pdfEntry = lines.find((l) => l.filename === "doc.pdf");
+    expect(pdfEntry.introspection).toBeUndefined();
+  });
 });
 
 function runCli(args, cwd) {
