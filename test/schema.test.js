@@ -184,6 +184,35 @@ describe("inventory schemas", () => {
     };
     expect(() => entrySchema.parse(entry)).not.toThrow();
   });
+
+  it("pdfIntrospectionSchema parses a minimal valid block directly", () => {
+    const intro = {
+      kind: "pdf",
+      pageCount: 1,
+      hasTextLayer: true,
+      isImageOnly: false,
+      hasTags: false,
+      hasFormFields: false,
+      hasSignatures: false,
+      encrypted: false,
+    };
+    expect(() => pdfIntrospectionSchema.parse(intro)).not.toThrow();
+  });
+
+  it("pdfIntrospectionSchema rejects textLayerCoverage outside [0,1]", () => {
+    const intro = {
+      kind: "pdf",
+      pageCount: 1,
+      hasTextLayer: true,
+      textLayerCoverage: 1.5,
+      isImageOnly: false,
+      hasTags: false,
+      hasFormFields: false,
+      hasSignatures: false,
+      encrypted: false,
+    };
+    expect(() => pdfIntrospectionSchema.parse(intro)).toThrow();
+  });
 });
 
 describe("isCompleteInventory", () => {
