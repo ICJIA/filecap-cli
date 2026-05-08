@@ -6,7 +6,7 @@
 
 ## Status
 
-**Phase 3 shipped (v0.3.0).** Office introspection is functional. Each Office entry now carries format-specific accessibility signals: DOCX (headings, image alt-text coverage, table headers, hyperlink anti-patterns, language); XLSX (sheet count, default-name detection, header rows, merged cells, charts, images); legacy `.doc/.ppt/.xls` flagged by extension. PDFs continue to carry the full Phase 2 introspection block.
+**Phase 4 shipped (v0.4.0).** Filename-based heuristic flags now populate the `flags[]` array on every entry, surfacing scanned-original patterns (`Scan_*`, `IMG_*`, `Untitled*`, all-digit names), filenames with spaces, non-ASCII characters, or excessive length. Phase 3's Office introspection (DOCX, XLSX, legacy stubs) and Phase 2's PDF introspection both continue unchanged.
 
 The full design specification lives at [`docs/filecap-design.md`](docs/filecap-design.md).
 
@@ -14,8 +14,8 @@ The full design specification lives at [`docs/filecap-design.md`](docs/filecap-d
 |---|---|---|---|
 | 1 | v0.1.0 | shipped | Core scan — recursive walk, hashing, NDJSON output |
 | 2 | v0.2.0 | shipped | PDF introspection (image-only, tags, producer, signatures, language) |
-| 3 | v0.3.0 | **shipped** | Office introspection (DOCX, XLSX, legacy flag) |
-| 4 | v0.4.0 | next | Filename flagging |
+| 3 | v0.3.0 | shipped | Office introspection (DOCX, XLSX, legacy flag) |
+| 4 | v0.4.0 | **shipped** | Filename flagging |
 | 5 | v0.5.0 | planned | Multi-server rollup |
 | 6 | v0.6.0 | planned | CSV reporter and summary artifacts |
 | 7 | v1.0.0 | planned | MCP server entry point |
@@ -191,6 +191,21 @@ Flagged by extension only — `kind: "office-legacy"` with the specific format. 
 When introspection fails (corrupt file, unsupported variant, parse exception), the `introspection` field is omitted from the entry. The file row still appears with full filesystem stats.
 
 Files larger than `--max-introspect-mb` (default 200) skip introspection regardless of type.
+
+## Filename flags (Phase 4)
+
+Every entry's `flags[]` array is populated with applicable filename-heuristic flags. Vendors filter and sort the inventory CSV by these flags during triage:
+
+| Flag | When applied |
+|---|---|
+| `scanned-name-pattern` | Filename matches scanner / photo / default-output naming: `Scan_001.pdf`, `IMG_4567.jpg`, `Document1.docx`, `Untitled-1.pdf`, `12345.tiff`, `DOC001.pdf`, `FAX-2024-04-12.pdf`, `Microsoft Word - draft.pdf`, etc. Strong signal that the file is an unprocessed export from a scanner, phone camera, or default save-as. |
+| `filename-has-spaces` | Basename contains whitespace. URL-encoded spaces (`%20`) are a common source of CMS friction and copy-paste bugs. |
+| `filename-non-ascii` | Basename contains characters outside the printable ASCII range (e.g., `résumé.pdf`, `文件.docx`). Web-server URL handling and some legacy systems still mishandle these. |
+| `filename-long` | Basename exceeds 200 characters. Long names cause filesystem truncation and URL length issues. |
+
+Flags are emitted as a sorted array; the CSV reporter (Phase 6) will join them with `|` for spreadsheet consumption.
+
+A file with no triggered flags has `flags: []` (empty array).
 
 ## What filecap does not do
 
