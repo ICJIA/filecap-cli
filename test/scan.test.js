@@ -436,4 +436,33 @@ describe("filecap CLI end-to-end", () => {
     expect(xlsxEntry.introspection.sheetCount).toBe(1);
     expect(xlsxEntry.introspection.hasHeaderRows).toBe(true);
   });
+
+  it("populates filename flags via the CLI", async () => {
+    await fs.writeFile(path.join(tmpRoot, "Scan_001.pdf"), "x");
+    await fs.writeFile(path.join(tmpRoot, "Untitled-1.docx"), "x");
+    await fs.writeFile(path.join(tmpRoot, "spaced name.txt"), "x");
+    await fs.writeFile(path.join(tmpRoot, "résumé.pdf"), "x");
+    await fs.writeFile(path.join(tmpRoot, "ok.pdf"), "x");
+
+    const outPath = path.join(outDir, "cli-flags.ndjson");
+    const result = await runCli(
+      ["scan", tmpRoot, "-o", outPath, "--no-hash", "--no-introspect"],
+      outDir,
+    );
+    expect(result.code).toBe(0);
+    const text = await fs.readFile(outPath, "utf8");
+    const lines = text.split("\n").filter((l) => l.length > 0).map((l) => JSON.parse(l));
+
+    const scan = lines.find((l) => l.filename === "Scan_001.pdf");
+    const untitled = lines.find((l) => l.filename === "Untitled-1.docx");
+    const spaced = lines.find((l) => l.filename === "spaced name.txt");
+    const resume = lines.find((l) => l.filename === "résumé.pdf");
+    const ok = lines.find((l) => l.filename === "ok.pdf");
+
+    expect(scan.flags).toContain("scanned-name-pattern");
+    expect(untitled.flags).toContain("scanned-name-pattern");
+    expect(spaced.flags).toContain("filename-has-spaces");
+    expect(resume.flags).toContain("filename-non-ascii");
+    expect(ok.flags).toEqual([]);
+  });
 });
