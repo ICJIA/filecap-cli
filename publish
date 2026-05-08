@@ -43,15 +43,19 @@ npm test
 if [ "$BUMP" = "first" ]; then
     VERSION=$(node -p "require('./package.json').version")
     echo "==> First-time publish at v$VERSION"
-    npm publish --access public
+    # Tag and push BEFORE npm publish so the invariant "if it's on npm, it's
+    # tagged in git" holds. If publish fails, the tag is recoverable
+    # (delete and retry); the alternative ordering can leave npm with a
+    # released version that has no corresponding git tag.
     git tag "v$VERSION"
     git push origin "v$VERSION"
+    npm publish --access public
 else
     echo "==> Bumping version ($BUMP)"
-    NEW_VERSION=$(npm version "$BUMP" -m "Release v%s")
-    echo "==> Publishing $NEW_VERSION"
-    npm publish --access public
+    NEW_TAG=$(npm version "$BUMP" -m "Release v%s")
+    echo "==> Publishing $NEW_TAG"
     git push origin main --follow-tags
+    npm publish --access public
 fi
 
 echo
