@@ -213,6 +213,98 @@ describe("inventory schemas", () => {
     };
     expect(() => pdfIntrospectionSchema.parse(intro)).toThrow();
   });
+
+  it("validates an entry with docx introspection", () => {
+    const entry = {
+      path: "report.docx",
+      absolutePath: "/uploads/report.docx",
+      filename: "report.docx",
+      extension: "docx",
+      category: "office-document",
+      remediable: true,
+      sizeBytes: 50000,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      introspection: {
+        kind: "docx",
+        hasHeadings: true,
+        imageCount: 3,
+        altTextCoverage: 0.667,
+        tableCount: 2,
+        tablesHaveHeaders: true,
+        hyperlinkCount: 5,
+        vagueLinkCount: 1,
+        documentLanguage: "en-US",
+      },
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("validates an entry with xlsx introspection", () => {
+    const entry = {
+      path: "data.xlsx",
+      absolutePath: "/uploads/data.xlsx",
+      filename: "data.xlsx",
+      extension: "xlsx",
+      category: "spreadsheet",
+      remediable: true,
+      sizeBytes: 25000,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      introspection: {
+        kind: "xlsx",
+        sheetCount: 3,
+        sheetNames: ["Summary", "Details", "Sheet3"],
+        defaultSheetNameCount: 1,
+        hasHeaderRows: true,
+        mergedCellCount: 4,
+        hasCharts: false,
+        hasImages: true,
+      },
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("validates an entry with office-legacy introspection", () => {
+    const entry = {
+      path: "old.doc",
+      absolutePath: "/uploads/old.doc",
+      filename: "old.doc",
+      extension: "doc",
+      category: "office-document",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      introspection: {
+        kind: "office-legacy",
+        format: "doc",
+      },
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("rejects an introspection block with an unknown kind", () => {
+    const entry = {
+      path: "x.pdf",
+      absolutePath: "/uploads/x.pdf",
+      filename: "x.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      introspection: {
+        kind: "unknown-format",
+      },
+    };
+    expect(() => entrySchema.parse(entry)).toThrow();
+  });
 });
 
 describe("isCompleteInventory", () => {

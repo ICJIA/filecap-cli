@@ -58,6 +58,34 @@ export const pdfIntrospectionSchema = z.object({
   creationDate: isoDate.optional(),
 });
 
+export const docxIntrospectionSchema = z.object({
+  kind: z.literal("docx"),
+  hasHeadings: z.boolean(),
+  imageCount: z.number().int().nonnegative(),
+  altTextCoverage: z.number().min(0).max(1).optional(),
+  tableCount: z.number().int().nonnegative(),
+  tablesHaveHeaders: z.boolean().optional(),
+  hyperlinkCount: z.number().int().nonnegative(),
+  vagueLinkCount: z.number().int().nonnegative(),
+  documentLanguage: z.string().optional(),
+});
+
+export const xlsxIntrospectionSchema = z.object({
+  kind: z.literal("xlsx"),
+  sheetCount: z.number().int().nonnegative(),
+  sheetNames: z.array(z.string()),
+  defaultSheetNameCount: z.number().int().nonnegative(),
+  hasHeaderRows: z.boolean(),
+  mergedCellCount: z.number().int().nonnegative(),
+  hasCharts: z.boolean(),
+  hasImages: z.boolean(),
+});
+
+export const legacyOfficeIntrospectionSchema = z.object({
+  kind: z.literal("office-legacy"),
+  format: z.enum(["doc", "ppt", "xls"]),
+});
+
 export const entrySchema = z.object({
   path: z.string(),
   absolutePath: z.string(),
@@ -69,7 +97,14 @@ export const entrySchema = z.object({
   modifiedAt: isoDate,
   sha256: z.string(),
   flags: z.array(z.string()),
-  introspection: pdfIntrospectionSchema.optional(),
+  introspection: z
+    .discriminatedUnion("kind", [
+      pdfIntrospectionSchema,
+      docxIntrospectionSchema,
+      xlsxIntrospectionSchema,
+      legacyOfficeIntrospectionSchema,
+    ])
+    .optional(),
 });
 
 export const footerSchema = z.object({
