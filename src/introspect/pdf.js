@@ -1,10 +1,5 @@
 import fs from "node:fs/promises";
 
-// pdfjs-dist v4 ships a legacy build for non-browser environments. The default
-// build references DOM globals via worker URLs that don't resolve in Node.
-const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-const { getDocument } = pdfjsLib;
-
 /**
  * Introspect a PDF file and return its accessibility-relevant metadata.
  *
@@ -16,6 +11,11 @@ const { getDocument } = pdfjsLib;
  * @returns {Promise<object>} the `introspection` block per pdfIntrospectionSchema
  */
 export async function introspectPdf(filePath) {
+  // pdfjs-dist v4 ships a legacy build for non-browser environments. The
+  // default build references DOM globals via worker URLs that don't resolve
+  // in Node. Importing inside the function keeps load failures catchable at
+  // the call site rather than at module-load time.
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const data = await fs.readFile(filePath);
   const uint8 = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   const loadingTask = getDocument({
@@ -77,12 +77,8 @@ export async function introspectPdf(filePath) {
       hasOutline = false;
     }
 
-    const encrypted = !!(doc._pdfInfo && doc._pdfInfo.encrypted);
-    const isLinearized =
-      doc._pdfInfo && typeof doc._pdfInfo.IsLinearized === "boolean"
-        ? doc._pdfInfo.IsLinearized
-        : undefined;
-
+    let encryptedDetected = false;
+    let isLinearizedDetected;
     let producer;
     let creator;
     let creationDateRaw;
@@ -91,6 +87,12 @@ export async function introspectPdf(filePath) {
     try {
       const metadata = await doc.getMetadata();
       const info = metadata.info ?? {};
+      // pdfjs-dist v4 surfaces these via metadata.info, not via doc._pdfInfo.
+      // EncryptFilterName is null on unencrypted PDFs and a non-empty string
+      // (e.g., "Standard", "AES-256") when encrypted.
+      encryptedDetected = !!info.EncryptFilterName;
+      isLinearizedDetected =
+        typeof info.IsLinearized === "boolean" ? info.IsLinearized : undefined;
       producer = info.Producer || undefined;
       creator = info.Creator || undefined;
       creationDateRaw = info.CreationDate || undefined;
@@ -108,11 +110,11 @@ export async function introspectPdf(filePath) {
       hasTags,
       hasFormFields,
       hasSignatures,
-      encrypted,
+      encrypted: encryptedDetected,
     };
     if (pageCount > 0) result.textLayerCoverage = textLayerCoverage;
     if (typeof hasOutline === "boolean") result.hasOutline = hasOutline;
-    if (typeof isLinearized === "boolean") result.isLinearized = isLinearized;
+    if (typeof isLinearizedDetected === "boolean") result.isLinearized = isLinearizedDetected;
     if (pdfVersion) result.pdfVersion = pdfVersion;
     if (documentLanguage) result.documentLanguage = documentLanguage;
     if (producer) result.producer = producer;
