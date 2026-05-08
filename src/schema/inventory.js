@@ -39,6 +39,25 @@ const categoryEnum = z.enum([
   "other",
 ]);
 
+export const pdfIntrospectionSchema = z.object({
+  kind: z.literal("pdf"),
+  pageCount: z.number().int().nonnegative(),
+  hasTextLayer: z.boolean(),
+  textLayerCoverage: z.number().min(0).max(1).optional(),
+  isImageOnly: z.boolean(),
+  hasOutline: z.boolean().optional(),
+  hasTags: z.boolean(),
+  hasFormFields: z.boolean(),
+  hasSignatures: z.boolean(),
+  encrypted: z.boolean(),
+  isLinearized: z.boolean().optional(),
+  pdfVersion: z.string().optional(),
+  documentLanguage: z.string().optional(),
+  producer: z.string().optional(),
+  creator: z.string().optional(),
+  creationDate: isoDate.optional(),
+});
+
 export const entrySchema = z.object({
   path: z.string(),
   absolutePath: z.string(),
@@ -50,6 +69,7 @@ export const entrySchema = z.object({
   modifiedAt: isoDate,
   sha256: z.string(),
   flags: z.array(z.string()),
+  introspection: pdfIntrospectionSchema.optional(),
 });
 
 export const footerSchema = z.object({

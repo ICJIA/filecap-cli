@@ -4,6 +4,7 @@ import {
   entrySchema,
   footerSchema,
   isCompleteInventory,
+  pdfIntrospectionSchema,
   SCHEMA_VERSION,
 } from "../src/schema/inventory.js";
 
@@ -102,6 +103,86 @@ describe("inventory schemas", () => {
       },
     };
     expect(() => footerSchema.parse(bad)).toThrow();
+  });
+
+  it("validates an entry that includes a pdf introspection block", () => {
+    const entry = {
+      path: "case.pdf",
+      absolutePath: "/var/strapi/uploads/case.pdf",
+      filename: "case.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      flags: [],
+      introspection: {
+        kind: "pdf",
+        pageCount: 47,
+        hasTextLayer: true,
+        textLayerCoverage: 0.94,
+        isImageOnly: false,
+        hasOutline: false,
+        hasTags: false,
+        hasFormFields: false,
+        hasSignatures: false,
+        encrypted: false,
+        documentLanguage: "en-US",
+        producer: "Microsoft Word",
+        creator: "Microsoft Word",
+        creationDate: "2024-01-01T00:00:00.000Z",
+        pdfVersion: "1.6",
+      },
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("rejects an introspection block with the wrong kind", () => {
+    const entry = {
+      path: "case.pdf",
+      absolutePath: "/var/strapi/uploads/case.pdf",
+      filename: "case.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      introspection: {
+        kind: "wrong-kind",
+        pageCount: 1,
+      },
+    };
+    expect(() => entrySchema.parse(entry)).toThrow();
+  });
+
+  it("allows introspection.textLayerCoverage to be undefined when isImageOnly is true", () => {
+    // For image-only PDFs we may not bother computing coverage.
+    const entry = {
+      path: "scan.pdf",
+      absolutePath: "/var/strapi/uploads/scan.pdf",
+      filename: "scan.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      introspection: {
+        kind: "pdf",
+        pageCount: 1,
+        hasTextLayer: false,
+        isImageOnly: true,
+        hasTags: false,
+        hasFormFields: false,
+        hasSignatures: false,
+        encrypted: false,
+      },
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
   });
 });
 
