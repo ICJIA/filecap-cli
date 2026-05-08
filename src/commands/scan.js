@@ -127,8 +127,9 @@ export async function runScan({
           }
         }
 
+        const category = categorize(fileStats.extension);
         let introspectionResult;
-        if (introspectEnabled && isRemediable(categorize(fileStats.extension))) {
+        if (introspectEnabled && isRemediable(category)) {
           try {
             introspectionResult = await introspect({
               filePath,
@@ -142,7 +143,6 @@ export async function runScan({
             stats.introspectionFailures++;
           }
         }
-        const category = categorize(fileStats.extension);
         const entry = {
           path: path.relative(absoluteRoot, filePath),
           absolutePath: filePath,
@@ -155,7 +155,7 @@ export async function runScan({
           sha256,
           flags: [],
         };
-        if (introspectionResult) {
+        if (introspectionResult !== null && introspectionResult !== undefined) {
           entry.introspection = introspectionResult;
         }
         entrySchema.parse(entry);

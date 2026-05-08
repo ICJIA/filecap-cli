@@ -190,6 +190,8 @@ describe("runScan", () => {
     expect(pdfEntry.introspection).toBeDefined();
     expect(pdfEntry.introspection.kind).toBe("pdf");
     expect(pdfEntry.introspection.pageCount).toBe(1);
+    expect(lines[0].metadata.options.introspect).toBe(true);
+    expect(lines[0].metadata.options.maxIntrospectMb).toBe(200);
   });
 
   it("omits the introspection field on a malformed PDF and counts the failure in the footer", async () => {
@@ -224,7 +226,7 @@ describe("runScan", () => {
     await fs.writeFile(path.join(tmpRoot, "doc.pdf"), await pdfDoc.save());
 
     const outPath = path.join(outDir, "no-intro.ndjson");
-    await runScan({
+    const result = await runScan({
       directory: tmpRoot,
       output: outPath,
       hash: false,
@@ -233,6 +235,7 @@ describe("runScan", () => {
       introspect: false,
       maxIntrospectMb: 200,
     });
+    expect(result.exitCode).toBe(0);
     const lines = await readNdjson(outPath);
     const pdfEntry = lines.find((l) => l.filename === "doc.pdf");
     expect(pdfEntry.introspection).toBeUndefined();
