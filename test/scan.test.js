@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { runScan } from "../src/commands/scan.js";
 import { headerSchema, entrySchema, footerSchema } from "../src/schema/inventory.js";
 
@@ -162,5 +164,56 @@ describe("runScan", () => {
     const lines = await readNdjson(outPath);
     const filenames = lines.slice(1, -1).map((e) => e.filename);
     expect(filenames).toEqual(["a.pdf"]);
+  });
+});
+
+function runCli(args, cwd) {
+  const cliPath = fileURLToPath(new URL("../bin/filecap.js", import.meta.url));
+  return new Promise((resolve) => {
+    const child = spawn("node", [cliPath, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", (d) => stdout.push(d));
+    child.stderr.on("data", (d) => stderr.push(d));
+    child.on("close", (code) => {
+      resolve({
+        code,
+        stdout: Buffer.concat(stdout).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8"),
+      });
+    });
+  });
+}
+
+describe("filecap CLI end-to-end", () => {
+  it("scans a directory and writes a valid NDJSON file", async () => {
+    await fs.writeFile(path.join(tmpRoot, "a.pdf"), "x");
+    await fs.writeFile(path.join(tmpRoot, "b.txt"), "y");
+    const outPath = path.join(outDir, "cli.ndjson");
+
+    const result = await runCli(["scan", tmpRoot, "-o", outPath, "--no-hash"], outDir);
+    expect(result.code).toBe(0);
+
+    const text = await fs.readFile(outPath, "utf8");
+    const lines = text.split("\n").filter((l) => l.length > 0).map((l) => JSON.parse(l));
+    expect(lines).toHaveLength(4); // header + 2 entries + footer
+    expect(lines[0].kind).toBe("filecap-inventory-header");
+    expect(lines[3].kind).toBe("filecap-inventory-footer");
+    expect(lines[3].stats.fileCount).toBe(2);
+  });
+
+  it("returns exit code 1 with an error message when the directory does not exist", async () => {
+    const outPath = path.join(outDir, "x.ndjson");
+    const result = await runCli(
+      ["scan", path.join(tmpRoot, "no-such-dir"), "-o", outPath, "--no-hash"],
+      outDir,
+    );
+    expect(result.code).toBe(2);
+  });
+
+  it("prints version and exits 0", async () => {
+    const result = await runCli(["--version"], outDir);
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
