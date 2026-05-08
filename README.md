@@ -6,7 +6,7 @@
 
 ## Status
 
-**Phase 4 shipped (v0.4.0).** Filename-based heuristic flags now populate the `flags[]` array on every entry, surfacing scanned-original patterns (`Scan_*`, `IMG_*`, `Untitled*`, all-digit names), filenames with spaces, non-ASCII characters, or excessive length. Phase 3's Office introspection (DOCX, XLSX, legacy stubs) and Phase 2's PDF introspection both continue unchanged.
+**Phase 5 shipped (v0.5.0).** Multi-server rollup is functional: `filecap rollup *.ndjson -o consolidated.ndjson` merges per-server inventories into one consolidated file with content-duplicate detection (entries sharing a SHA-256 get a `duplicateOf` link to the canonical entry — oldest `modifiedAt`, alphabetical tiebreaker on `serverName`). Phase 4's filename flagging, Phase 3's Office introspection, and Phase 2's PDF introspection all continue unchanged.
 
 The full design specification lives at [`docs/filecap-design.md`](docs/filecap-design.md).
 
@@ -15,8 +15,8 @@ The full design specification lives at [`docs/filecap-design.md`](docs/filecap-d
 | 1 | v0.1.0 | shipped | Core scan — recursive walk, hashing, NDJSON output |
 | 2 | v0.2.0 | shipped | PDF introspection (image-only, tags, producer, signatures, language) |
 | 3 | v0.3.0 | shipped | Office introspection (DOCX, XLSX, legacy flag) |
-| 4 | v0.4.0 | **shipped** | Filename flagging |
-| 5 | v0.5.0 | planned | Multi-server rollup |
+| 4 | v0.4.0 | shipped | Filename flagging |
+| 5 | v0.5.0 | **shipped** | Multi-server rollup |
 | 6 | v0.6.0 | planned | CSV reporter and summary artifacts |
 | 7 | v1.0.0 | planned | MCP server entry point |
 | 8 | vNext | deferred | Strapi-aware mode (separate package) |
@@ -206,6 +206,67 @@ Every entry's `flags[]` array is populated with applicable filename-heuristic fl
 Flags are emitted as a sorted array; the CSV reporter (Phase 6) will join them with `|` for spreadsheet consumption.
 
 A file with no triggered flags has `flags: []` (empty array).
+
+## Rollup workflow (Phase 5)
+
+After scanning N servers, merge the per-server NDJSONs into a consolidated inventory:
+
+```bash
+filecap rollup ./inventories/*.ndjson -o consolidated.ndjson
+```
+
+The consolidated NDJSON has the same line-delimited structure as a single-instance inventory but with three differences:
+
+1. **Header.** `kind: "filecap-consolidated-header"` and `metadata.sources` is an array with one entry per source inventory (each carrying the original server identity, scan options, and stats).
+2. **Entries.** Each entry gains `serverName: string` (which source it came from) and `duplicateOf: {serverName, path} | null`. Content-duplicates (identical SHA-256 across servers) get `duplicateOf` set to the canonical copy. The canonical entry has `duplicateOf: null`.
+3. **Footer.** `kind: "filecap-consolidated-footer"` with cross-instance stats: `totalUniqueHashes`, `totalDuplicateGroups`, `bytesSavedIfDeduped` (bytes that could be reclaimed by deleting non-canonical duplicates).
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `-o, --output <path>` | `consolidated.ndjson` | Output path |
+| `--strict` | (off) | Fail on schema mismatch or missing footer in any input (default: warn and skip) |
+
+**Why one row per physical copy?** Each duplicate entry in the consolidated CSV (Phase 6) represents real disk space someone has to decide to keep or delete. The `duplicateOf` link tells the consumer "this is the same content as `<serverName>:<path>`" so a vendor can group by hash for de-dup analysis OR filter to canonicals only for remediation work. Both views are one query away.
+
+**Canonical-pick rule.** When two or more entries share a SHA-256, the canonical is the one with the oldest `modifiedAt`. Ties are broken alphabetically by `serverName`. The canonical entry has `duplicateOf: null`; all others have `duplicateOf: {serverName, path}` pointing at it.
+
+**Example consolidated entry (canonical):**
+
+```json
+{
+  "path": "2024/case-001.pdf",
+  "filename": "case-001.pdf",
+  "extension": "pdf",
+  "category": "pdf",
+  "remediable": true,
+  "sizeBytes": 4827193,
+  "modifiedAt": "2024-03-12T09:14:22.000Z",
+  "sha256": "e3b0c44...",
+  "flags": [],
+  "serverName": "strapi-prod-01",
+  "duplicateOf": null
+}
+```
+
+**Example consolidated entry (duplicate):**
+
+```json
+{
+  "path": "archive/case-001-copy.pdf",
+  "filename": "case-001-copy.pdf",
+  "extension": "pdf",
+  "category": "pdf",
+  "remediable": true,
+  "sizeBytes": 4827193,
+  "modifiedAt": "2024-08-01T12:30:00.000Z",
+  "sha256": "e3b0c44...",
+  "flags": [],
+  "serverName": "strapi-prod-02",
+  "duplicateOf": { "serverName": "strapi-prod-01", "path": "2024/case-001.pdf" }
+}
+```
 
 ## What filecap does not do
 
