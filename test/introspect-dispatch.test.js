@@ -75,4 +75,67 @@ describe("introspect dispatcher", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("routes docx to the docx introspector", async () => {
+    const { Document, Packer, Paragraph } = await import("docx");
+    const docxFile = path.join(tmpRoot, "x.docx");
+    const doc = new Document({
+      sections: [{ children: [new Paragraph({ text: "hi" })] }],
+    });
+    await fs.writeFile(docxFile, await Packer.toBuffer(doc));
+
+    const result = await introspect({
+      filePath: docxFile,
+      extension: "docx",
+      sizeBytes: 1024,
+      maxIntrospectMb: 200,
+    });
+    expect(result).not.toBe(null);
+    expect(result.kind).toBe("docx");
+  });
+
+  it("routes xlsx to the xlsx introspector", async () => {
+    const ExcelJS = (await import("exceljs")).default;
+    const xlsxFile = path.join(tmpRoot, "x.xlsx");
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet("Sheet1");
+    await wb.xlsx.writeFile(xlsxFile);
+
+    const result = await introspect({
+      filePath: xlsxFile,
+      extension: "xlsx",
+      sizeBytes: 1024,
+      maxIntrospectMb: 200,
+    });
+    expect(result).not.toBe(null);
+    expect(result.kind).toBe("xlsx");
+  });
+
+  it("routes doc/ppt/xls to the legacy office stub", async () => {
+    for (const ext of ["doc", "ppt", "xls"]) {
+      const file = path.join(tmpRoot, `x.${ext}`);
+      await fs.writeFile(file, "legacy bytes");
+      const result = await introspect({
+        filePath: file,
+        extension: ext,
+        sizeBytes: 12,
+        maxIntrospectMb: 200,
+      });
+      expect(result).not.toBe(null);
+      expect(result.kind).toBe("office-legacy");
+      expect(result.format).toBe(ext);
+    }
+  });
+
+  it("returns null for pptx (Phase 3 deferred)", async () => {
+    const file = path.join(tmpRoot, "x.pptx");
+    await fs.writeFile(file, "x");
+    const result = await introspect({
+      filePath: file,
+      extension: "pptx",
+      sizeBytes: 1,
+      maxIntrospectMb: 200,
+    });
+    expect(result).toBe(null);
+  });
 });
