@@ -299,13 +299,7 @@ The CSV is pure inventory — there are NO vendor-fill columns. Vendors return r
 
 ## MCP server (Phase 7)
 
-filecap can run as an stdio MCP server, exposing its commands as tools that AI agents (Claude Desktop, Claude Code, etc.) can call during conversational audits:
-
-```bash
-filecap mcp
-```
-
-When invoked from an MCP client, the server exposes four tools:
+`filecap mcp` starts an stdio MCP server that exposes four tools AI agents can call during conversational audits:
 
 | Tool | What it does |
 |---|---|
@@ -314,42 +308,130 @@ When invoked from an MCP client, the server exposes four tools:
 | `filecap_report` | Generate vendor handoff package (CSV + summary + flagged lists) |
 | `filecap_query_inventory` | Filter/sort entries in an existing NDJSON by size, extension, flags, isImageOnly, etc. |
 
-### Claude Desktop config
+### Always-latest config (recommended)
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or the equivalent on your platform:
+Pin to `@latest` (or omit the version tag entirely) so the host re-checks the npm registry each time it spawns the MCP process. This guarantees you pick up new tool definitions and bug fixes without touching your config file:
+
+```json
+"args": ["--yes", "@icjia/filecap@latest", "mcp"]
+```
+
+All client snippets below use this form.
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows. Restart Claude Desktop after saving.
 
 ```json
 {
   "mcpServers": {
     "filecap": {
       "command": "npx",
-      "args": ["--yes", "@icjia/filecap@1.0.0", "mcp"]
+      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
     }
   }
 }
 ```
 
-After restarting Claude Desktop, you can ask things like:
+### Claude Code
+
+`.claude/mcp.json` in your project root for project-scoped access, or `~/.claude/mcp.json` for user-global access:
+
+```json
+{
+  "mcpServers": {
+    "filecap": {
+      "command": "npx",
+      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
+    }
+  }
+}
+```
+
+### Cursor
+
+`~/.cursor/mcp.json` (also configurable in-app at Settings → Features → MCP):
+
+```json
+{
+  "mcpServers": {
+    "filecap": {
+      "command": "npx",
+      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
+    }
+  }
+}
+```
+
+### Windsurf (Codeium)
+
+`~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "filecap": {
+      "command": "npx",
+      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
+    }
+  }
+}
+```
+
+### Continue
+
+`~/.continue/config.json` for user-global access, or `.continue/config.json` in your project root for project-scoped access. Continue uses a different shape — MCP servers go under `experimental.modelContextProtocolServers`:
+
+```json
+{
+  "experimental": {
+    "modelContextProtocolServers": [
+      {
+        "transport": {
+          "type": "stdio",
+          "command": "npx",
+          "args": ["--yes", "@icjia/filecap@latest", "mcp"]
+        }
+      }
+    ]
+  }
+}
+```
+
+### How auto-update works
+
+When you use `@latest`, npx checks the npm registry on each spawn. If a newer version has been published, npx downloads it before starting the server — typically 1–3 seconds of additional startup time. If the installed version is already current, npx reuses the cached package with no network round-trip.
+
+For zero startup overhead with explicit update control, install globally instead:
+
+```bash
+npm install -g @icjia/filecap
+```
+
+Then reference the binary directly in your client config:
+
+```json
+{
+  "mcpServers": {
+    "filecap": {
+      "command": "filecap",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+To update: `npm install -g @icjia/filecap@latest`.
+
+### Verifying it works
+
+After wiring up your client, ask the AI agent:
+
 - "Run filecap_scan on /var/strapi/uploads with introspection enabled, write to /tmp/strapi.ndjson"
 - "Use filecap_query_inventory on /tmp/consolidated.ndjson to find PDFs over 100 MB on server strapi-prod-02"
 - "Generate a report from /tmp/consolidated.ndjson into /tmp/report-2026-Q2/"
 
-### Claude Code config
-
-`.claude/mcp.json` in your project (or `~/.claude/mcp.json` for user-global):
-
-```json
-{
-  "mcpServers": {
-    "filecap": {
-      "command": "npx",
-      "args": ["--yes", "@icjia/filecap@1.0.0", "mcp"]
-    }
-  }
-}
-```
-
-The four tools become available as `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory` in any Claude Code session in that project.
+If the tools are registered correctly, the agent will call them directly rather than suggesting you run the CLI manually.
 
 ## What filecap does not do
 
