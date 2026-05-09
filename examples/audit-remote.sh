@@ -319,6 +319,110 @@ else
   HTML_FLAG="--html"
 fi
 
+# ── audit-enrich prompt (asked early so it's part of the config review) ──────
+RUN_AUDIT_ENRICH="${RUN_AUDIT_ENRICH:-}"
+if [[ -z "$RUN_AUDIT_ENRICH" ]]; then
+  echo
+  read -r -p "Enrich inventory with audit.icjia.app scores after the scan? [y/N]: " RUN_AUDIT_ENRICH
+fi
+
+# ── config review — loop until user confirms or aborts ──────────────────────
+while :; do
+  # Enforce required: HOST must not be empty
+  while [[ -z "$HOST" ]]; do
+    warn "Server IP/hostname is required."
+    read -r -p "  Server IP or hostname: " HOST
+  done
+
+  echo
+  echo "══════════════════════════════════════════════════════════════════════════"
+  echo "  AUDIT CONFIGURATION — please review"
+  echo "══════════════════════════════════════════════════════════════════════════"
+  echo
+  printf "  1. %-22s %s\n" "SSH user:"             "$SSH_USER"
+  printf "  2. %-22s %s\n" "Server IP/hostname:"   "$HOST"
+  printf "  3. %-22s %s\n" "Remote path:"          "$REMOTE_PATH"
+  printf "  4. %-22s %s\n" "Friendly server name:" "$SERVER_NAME"
+  printf "  5. %-22s %s\n" "Website nickname:"     "${SITE_NAME:-(none)}"
+  printf "  6. %-22s %s\n" "Public URL prefix:"    "${PUBLIC_URL_BASE:-(none)}"
+  printf "  7. %-22s %s\n" "Audit link template:"  "${AUDIT_LINK_PATTERN:-(none)}"
+  if [[ -n "$HTML_FLAG" ]]; then
+    printf "  8. %-22s %s\n" "HTML report:"        "Yes (always)"
+  else
+    printf "  8. %-22s %s\n" "HTML report:"        "No (AUDIT_HTML=0)"
+  fi
+  if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
+    printf "  9. %-22s %s\n" "Enrich audit scores:" "Yes (will call audit.icjia.app — adds ~15-30 min)"
+  else
+    printf "  9. %-22s %s\n" "Enrich audit scores:" "No"
+  fi
+  echo
+  printf "     %-22s %s\n" "Output destination:"   "${HOME}/filecap-audits/${HOST}/runs/<this run>/"
+  echo
+  echo "══════════════════════════════════════════════════════════════════════════"
+  echo "  Press Enter (or y) to proceed."
+  echo "  Type a number 1-9 to edit that value."
+  echo "  Type q to abort."
+  read -r -p "  Choice: " CONFIRM_CONFIG
+  case "$CONFIRM_CONFIG" in
+    ""|y|Y|yes|YES) break ;;
+    q|Q|quit|QUIT|abort|ABORT) die "Aborted." ;;
+    1)
+      read -r -p "  SSH user [${SSH_USER}]: " _new
+      SSH_USER="${_new:-$SSH_USER}"
+      ;;
+    2)
+      _new=""
+      while [[ -z "$_new" ]]; do
+        read -r -p "  Server IP or hostname: " _new
+        [[ -z "$_new" ]] && echo "  (required — please type a value)" >&2
+      done
+      HOST="$_new"
+      ;;
+    3)
+      _new=""
+      while [[ -z "$_new" ]]; do
+        read -r -p "  Remote path on server: " _new
+        [[ -z "$_new" ]] && echo "  (required — please type a value)" >&2
+      done
+      REMOTE_PATH="$_new"
+      ;;
+    4)
+      read -r -p "  Friendly server name [${SERVER_NAME}]: " _new
+      SERVER_NAME="${_new:-$SERVER_NAME}"
+      ;;
+    5)
+      read -r -p "  Website nickname (Enter to clear) [${SITE_NAME}]: " _new
+      SITE_NAME="$_new"
+      ;;
+    6)
+      read -r -p "  Public URL prefix (e.g. https://example.com/uploads, Enter to clear) [${PUBLIC_URL_BASE}]: " _new
+      PUBLIC_URL_BASE="$_new"
+      ;;
+    7)
+      echo "  Placeholders: {publicUrl} {sha256} {filename} {path} {serverIp} {siteName}"
+      read -r -p "  Audit link template (Enter to clear) [${AUDIT_LINK_PATTERN}]: " _new
+      AUDIT_LINK_PATTERN="$_new"
+      ;;
+    8)
+      if [[ -n "$HTML_FLAG" ]]; then
+        HTML_FLAG=""
+        info "HTML report disabled."
+      else
+        HTML_FLAG="--html"
+        info "HTML report enabled."
+      fi
+      ;;
+    9)
+      read -r -p "  Enrich audit scores after scan? [y/N]: " _new
+      RUN_AUDIT_ENRICH="$_new"
+      ;;
+    *)
+      warn "Unrecognized: '${CONFIRM_CONFIG}'. Type 1-9, Enter, or q."
+      ;;
+  esac
+done
+
 # ── work directory ────────────────────────────────────────────────────────────
 WORK_DIR="${HOME}/filecap-audits/${HOST}"
 MIRROR_DIR="${WORK_DIR}/mirror"
