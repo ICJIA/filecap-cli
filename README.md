@@ -222,6 +222,19 @@ Generate vendor handoff package (CSV + summary + flagged lists) from an inventor
 | `-o, --output <dir>` | `./filecap-report-<ts>/` | Output directory |
 | `--html` | (off) | Also write a self-contained sortable HTML report (`audit-file-list.html`) |
 
+### `filecap audit-enrich <inventory>`
+
+Enrich an inventory NDJSON with per-file accessibility scores from audit.icjia.app's bulk endpoint. Rewrites the NDJSON in place (or to a specified output) by adding an `audit` block to each PDF entry that the service could score.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-o, --output <path>` | input path (in-place) | Write enriched NDJSON here |
+| `--api-base <url>` | `https://audit.icjia.app` | Audit service base URL |
+| `--auth-token <token>` | `$FILECAP_AUDIT_TOKEN` | Bearer token for the audit service |
+| `--verbose` | (off) | Print per-file progress to stderr |
+
+After enrichment, run `filecap report` again to regenerate the CSV/HTML with the three new audit columns: **Audit score**, **Audit grade**, and **Audit report** (clickable link to the saved report on audit.icjia.app).
+
 ### `filecap mcp`
 
 Starts an stdio MCP server for use with AI agent clients (Claude Desktop, Claude Code, Cursor, etc.). No flags — configuration is handled by the client.
@@ -541,13 +554,14 @@ Column headers are human-facing labels (not raw field names). The `flags` / `DOC
 
 ## MCP server (Phase 7)
 
-`filecap mcp` starts an stdio MCP server that exposes four tools AI agents can call during conversational audits:
+`filecap mcp` starts an stdio MCP server that exposes five tools AI agents can call during conversational audits:
 
 | Tool | What it does |
 |---|---|
 | `filecap_scan` | Walk a directory, produce an NDJSON inventory at the specified path |
 | `filecap_rollup` | Merge multiple per-server NDJSONs into a consolidated inventory |
 | `filecap_report` | Generate vendor handoff package (CSV + summary + flagged lists) |
+| `filecap_audit_enrich` | Enrich an inventory NDJSON with audit.icjia.app accessibility scores (score, grade, reportUrl per PDF) |
 | `filecap_query_inventory` | Filter/sort entries in an existing NDJSON by size, extension, flags, isImageOnly, etc. |
 
 ### Always-latest config (recommended)
@@ -674,6 +688,36 @@ After wiring up your client, ask the AI agent:
 - "Generate a report from /tmp/consolidated.ndjson into /tmp/report-2026-Q2/"
 
 If the tools are registered correctly, the agent will call them directly rather than suggesting you run the CLI manually.
+
+## Accessibility scores via audit.icjia.app
+
+filecap can optionally enrich an inventory with per-file accessibility scores from [audit.icjia.app](https://audit.icjia.app), the ICJIA-built tool that scores PDFs against WCAG 2.1 / ADA Title II requirements.
+
+### One-command workflow
+
+The audit scripts will prompt you ("Enrich inventory with audit.icjia.app scores? [y/N]"). If you say yes, they call audit.icjia.app's bulk endpoint, get a score and grade for every PDF whose `publicUrl` is reachable, and regenerate the report. The CSV and HTML now include **Audit score** (`84%`), **Audit grade** (**B**), and **Audit report** (clickable link to the saved report on audit.icjia.app) columns.
+
+### Direct CLI use
+
+```bash
+filecap audit-enrich inventory.ndjson \
+  --api-base https://audit.icjia.app \
+  --auth-token "$FILECAP_AUDIT_TOKEN"
+# (rewrites inventory.ndjson in place, adds audit blocks to PDF entries)
+
+filecap report inventory.ndjson -o ./report/ --html
+# (now produces report with audit score columns)
+```
+
+### Authentication
+
+You'll need a personal access token from audit.icjia.app. Set it as an env var:
+
+```bash
+export FILECAP_AUDIT_TOKEN="fap_yourtokenhere"
+```
+
+Best practice: store in macOS Keychain or a `~/.filecap/credentials` file with mode 600. **Never commit the token to git or paste it in chat/email.** filecap reads it only via env var.
 
 ## For auditors: self-contained audit scripts
 

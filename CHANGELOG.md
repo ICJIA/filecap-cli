@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] — 2026-05-09
+
+### Added
+
+- **`filecap audit-enrich` subcommand.** New command that calls audit.icjia.app's `/api/bulk-from-inventory` endpoint (POST NDJSON, `Content-Type: text/plain`, `Authorization: Bearer <token>`) and writes per-file accessibility scores back into the inventory NDJSON in place (or to a specified `-o` output path). Each matched PDF entry gains an `audit` block with `score` (0–100), `grade` (A–F scale), `reportId`, `reportUrl` (user-facing `https://audit.icjia.app/report/<id>` — the subcommand constructs this itself from `<apiBase>/report/<reportId>`, ignoring the raw `/api/reports/` URL returned by the endpoint), and `enrichedAt` (ISO timestamp). Matching is by SHA-256 hash with path as fallback. Entries the audit service could not score (not publicly reachable, service error) are left unchanged.
+- **Three new report columns: Audit score, Audit grade, Audit report.** When `filecap report` encounters entries with an `audit` block, it adds three columns at the end of the CSV and HTML: the score formatted as a percentage (`84%`), the grade letter (`B`), and the audit report URL. In the HTML report the Audit report cell renders as a "View report →" link that opens the saved accessibility report on audit.icjia.app. Entries without an `audit` block emit empty cells — the columns are always present in the output regardless.
+- **`audit` block in `entrySchema` and `consolidatedEntrySchema`.** The Zod schema now accepts an optional `audit` object with `score` (int 0–100), `grade` (regex `^[A-F][+-]?$`), `reportId` (32 hex chars), `reportUrl` (URL), and `enrichedAt` (ISO datetime). Schema change is non-breaking: existing inventories without audit blocks remain valid.
+- **`filecap_audit_enrich` MCP tool.** Same enrichment workflow available to AI agent clients: accepts `input` (required), `output` (optional, defaults to `input`), `apiBase` (optional, defaults to `https://audit.icjia.app`), and `authToken` (optional, falls back to `FILECAP_AUDIT_TOKEN` env var).
+- **Optional audit-enrich step in `audit-remote.sh` and `audit-fleet.sh`.** After generating the initial report, both scripts now prompt "Enrich inventory with audit.icjia.app scores? [y/N]". If yes, they call `filecap audit-enrich`, then regenerate the report so the CSV/HTML include the audit columns. The prompt can be suppressed by setting `RUN_AUDIT_ENRICH=y` (or `=n`) before running. `audit-fleet.sh` also enriches the consolidated inventory after the per-server audits complete.
+
+[1.0.7]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.7
+
 ## [1.0.6] — 2026-05-09
 
 ### Fixed
