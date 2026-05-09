@@ -88,6 +88,10 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
     const serverIp = meta.serverIp ?? "";
     const scannedPath = meta.scannedPath ?? "";
     const auditDate = (meta.scannedAt ?? "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+    const siteName = meta.siteName ?? "";
+    if (siteName !== "") {
+      lines.push(`Website:          ${siteName}`);
+    }
     lines.push(`Server:           ${serverName}${serverIp ? ` (${serverIp})` : ""}`);
     lines.push(`Source location:  ${scannedPath}`);
     lines.push(`Audit date:       ${auditDate}`);
@@ -132,9 +136,16 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
 
   // ── Per-server breakdown (consolidated only) ─────────────────────────────────
   if (isConsolidated && sources && sources.length > 0) {
+    // Build a map from serverName → siteName for the per-server table
+    const siteNameByServer = new Map();
+    for (const s of sources) {
+      siteNameByServer.set(s.serverName, s.siteName ?? "");
+    }
+
     const srvStats = new Map();
     for (const s of sources) {
       srvStats.set(s.serverName, {
+        site: s.siteName ?? "",
         ip: s.serverIp ?? "",
         files: 0,
         bytes: 0,
@@ -145,7 +156,7 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
     }
     for (const e of entries) {
       const name = e.serverName ?? "";
-      if (!srvStats.has(name)) srvStats.set(name, { ip: "", files: 0, bytes: 0, remediable: 0, pdfs: 0, imageOnly: 0 });
+      if (!srvStats.has(name)) srvStats.set(name, { site: siteNameByServer.get(name) ?? "", ip: "", files: 0, bytes: 0, remediable: 0, pdfs: 0, imageOnly: 0 });
       const s = srvStats.get(name);
       s.files++;
       s.bytes += e.sizeBytes ?? 0;
@@ -154,20 +165,21 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
       if (e.introspection?.kind === "pdf" && e.introspection.isImageOnly === true) s.imageOnly++;
     }
 
-    const C = [22, 18, 8, 12, 12, 8, 16];
+    const C = [14, 22, 18, 8, 12, 12, 8, 16];
     const hr = "─".repeat(C.reduce((a, b) => a + b + 2, 0) + 2);
 
     lines.push("Per-server breakdown");
     lines.push("--------------------");
     lines.push(
       "  " +
-      padR("Server", C[0]) + "  " +
-      padR("IP", C[1]) + "  " +
-      padL("Files", C[2]) + "  " +
-      padL("Size", C[3]) + "  " +
-      padL("Needs remed.", C[4]) + "  " +
-      padL("PDFs", C[5]) + "  " +
-      padL("Image-only PDFs", C[6])
+      padR("Site", C[0]) + "  " +
+      padR("Server", C[1]) + "  " +
+      padR("IP", C[2]) + "  " +
+      padL("Files", C[3]) + "  " +
+      padL("Size", C[4]) + "  " +
+      padL("Needs remed.", C[5]) + "  " +
+      padL("PDFs", C[6]) + "  " +
+      padL("Image-only PDFs", C[7])
     );
     lines.push("  " + hr);
 
@@ -175,26 +187,28 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
     for (const [name, s] of srvStats) {
       lines.push(
         "  " +
-        padR(name, C[0]) + "  " +
-        padR(s.ip, C[1]) + "  " +
-        padL(s.files, C[2]) + "  " +
-        padL(humanizeBytes(s.bytes), C[3]) + "  " +
-        padL(s.remediable, C[4]) + "  " +
-        padL(s.pdfs, C[5]) + "  " +
-        padL(s.imageOnly, C[6])
+        padR(s.site, C[0]) + "  " +
+        padR(name, C[1]) + "  " +
+        padR(s.ip, C[2]) + "  " +
+        padL(s.files, C[3]) + "  " +
+        padL(humanizeBytes(s.bytes), C[4]) + "  " +
+        padL(s.remediable, C[5]) + "  " +
+        padL(s.pdfs, C[6]) + "  " +
+        padL(s.imageOnly, C[7])
       );
       tFiles += s.files; tBytes += s.bytes; tRem += s.remediable; tPdfs += s.pdfs; tImgOnly += s.imageOnly;
     }
     lines.push("  " + hr);
     lines.push(
       "  " +
-      padR("Fleet totals", C[0]) + "  " +
-      padR("", C[1]) + "  " +
-      padL(tFiles, C[2]) + "  " +
-      padL(humanizeBytes(tBytes), C[3]) + "  " +
-      padL(tRem, C[4]) + "  " +
-      padL(tPdfs, C[5]) + "  " +
-      padL(tImgOnly, C[6])
+      padR("", C[0]) + "  " +
+      padR("Fleet totals", C[1]) + "  " +
+      padR("", C[2]) + "  " +
+      padL(tFiles, C[3]) + "  " +
+      padL(humanizeBytes(tBytes), C[4]) + "  " +
+      padL(tRem, C[5]) + "  " +
+      padL(tPdfs, C[6]) + "  " +
+      padL(tImgOnly, C[7])
     );
     lines.push("");
   }

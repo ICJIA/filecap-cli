@@ -104,6 +104,26 @@ describe("writeSummary — single-server", () => {
   });
 });
 
+describe("writeSummary — siteName", () => {
+  it("shows 'Website: DVFR' at top when siteName is set in single-server header", () => {
+    const headerWithSite = {
+      ...singleHeader,
+      metadata: { ...singleHeader.metadata, siteName: "DVFR" },
+    };
+    const text = writeSummary({ entries: makeEntries(), sources: null, header: headerWithSite });
+    expect(text).toContain("Website:          DVFR");
+    // Website line should appear before Server line
+    const websiteIdx = text.indexOf("Website:");
+    const serverIdx = text.indexOf("Server:");
+    expect(websiteIdx).toBeLessThan(serverIdx);
+  });
+
+  it("omits Website line when siteName is not set", () => {
+    const text = writeSummary({ entries: makeEntries(), sources: null, header: singleHeader });
+    expect(text).not.toContain("Website:");
+  });
+});
+
 describe("writeSummary — fleet consolidated", () => {
   it("contains per-server breakdown section", () => {
     const consolidatedHeader = {
@@ -157,5 +177,49 @@ describe("writeSummary — fleet consolidated", () => {
     expect(text).toContain("srv-a");
     expect(text).toContain("srv-b");
     expect(text).toContain("Servers audited:  2");
+  });
+
+  it("per-server breakdown has Site column header", () => {
+    const consolidatedHeader = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: {
+        consolidatedAt: "2026-05-09T12:00:00.000Z",
+        filecapVersion: "1.0.3",
+        nodeVersion: "v20.18.0",
+        sources: [
+          {
+            siteName: "DVFR",
+            serverName: "srv-a",
+            hostname: "srv-a.example.com",
+            serverIp: "10.0.0.1",
+            scannedPath: "/uploads",
+            scannedAt: "2026-05-09T12:00:00.000Z",
+            filecapVersion: "1.0.3",
+            nodeVersion: "v20.18.0",
+            options: { introspect: true, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+            stats: { fileCount: 1, totalBytes: 1000, scanDurationMs: 50, introspectionFailures: 0, permissionDenials: 0 },
+          },
+          {
+            serverName: "srv-b",
+            hostname: "srv-b.example.com",
+            serverIp: "10.0.0.2",
+            scannedPath: "/var/www",
+            scannedAt: "2026-05-09T12:01:00.000Z",
+            filecapVersion: "1.0.3",
+            nodeVersion: "v20.18.0",
+            options: { introspect: true, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+            stats: { fileCount: 1, totalBytes: 1000, scanDurationMs: 50, introspectionFailures: 0, permissionDenials: 0 },
+          },
+        ],
+      },
+    };
+    const entries = [
+      { serverName: "srv-a", category: "pdf", remediable: true, sizeBytes: 1000, sha256: "p1", flags: [] },
+      { serverName: "srv-b", category: "image", remediable: false, sizeBytes: 1000, sha256: "i1", flags: [] },
+    ];
+    const text = writeSummary({ entries, sources: consolidatedHeader.metadata.sources, header: consolidatedHeader });
+    expect(text).toContain("Site");
+    expect(text).toContain("DVFR");
   });
 });

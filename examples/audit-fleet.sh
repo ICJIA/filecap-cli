@@ -572,6 +572,12 @@ sources_list = []
 if is_consolidated:
     sources_list = header.get('metadata', {}).get('sources', [])
 
+# Build serverName → siteName lookup
+site_by_server = {}
+for s in sources_list:
+    sname = s.get('serverName', '')
+    site_by_server[sname] = s.get('siteName', '')
+
 # ── aggregate totals ──────────────────────────────────────────────────────────
 total_files      = len(entries)
 total_bytes      = sum(e.get('sizeBytes', 0) for e in entries)
@@ -606,6 +612,7 @@ srv_counts = {}
 for s in sources_list:
     sname = s.get('serverName', 'unknown')
     srv_counts[sname] = {
+        'site': s.get('siteName', ''),
         'ip': s.get('serverIp', ''),
         'files': 0, 'remediable': 0, 'pdfs': 0,
         'image_only': 0, 'bytes': 0,
@@ -614,7 +621,7 @@ for s in sources_list:
 for e in entries:
     sname = e.get('serverName', 'unknown')
     if sname not in srv_counts:
-        srv_counts[sname] = {'ip': '', 'files': 0, 'remediable': 0, 'pdfs': 0, 'image_only': 0, 'bytes': 0}
+        srv_counts[sname] = {'site': site_by_server.get(sname, ''), 'ip': '', 'files': 0, 'remediable': 0, 'pdfs': 0, 'image_only': 0, 'bytes': 0}
     sc = srv_counts[sname]
     sc['files'] += 1
     sc['bytes'] += e.get('sizeBytes', 0)
@@ -709,42 +716,45 @@ lines.append(f"  Bytes saved if deduped:     {humanize_bytes(dup_bytes)}")
 lines.append("")
 
 # Per-server breakdown
-C = [22, 18, 8, 12, 12, 8, 16]
+C = [14, 22, 18, 8, 12, 12, 8, 16]
 hr = "─" * (sum(C) + 2 * len(C) + 2)
 lines.append("Per-server breakdown")
 lines.append("--------------------")
 lines.append(
-    "  " + pad_r("Server", C[0]) + "  " +
-    pad_r("IP", C[1]) + "  " +
-    pad_l("Files", C[2]) + "  " +
-    pad_l("Size", C[3]) + "  " +
-    pad_l("Needs remed.", C[4]) + "  " +
-    pad_l("PDFs", C[5]) + "  " +
-    pad_l("Image-only PDFs", C[6])
+    "  " + pad_r("Site", C[0]) + "  " +
+    pad_r("Server", C[1]) + "  " +
+    pad_r("IP", C[2]) + "  " +
+    pad_l("Files", C[3]) + "  " +
+    pad_l("Size", C[4]) + "  " +
+    pad_l("Needs remed.", C[5]) + "  " +
+    pad_l("PDFs", C[6]) + "  " +
+    pad_l("Image-only PDFs", C[7])
 )
 lines.append("  " + hr)
 t_files = t_bytes = t_rem = t_pdfs = t_img = 0
 for sname, sc in sorted(srv_counts.items()):
     lines.append(
-        "  " + pad_r(sname, C[0]) + "  " +
-        pad_r(sc['ip'], C[1]) + "  " +
-        pad_l(sc['files'], C[2]) + "  " +
-        pad_l(humanize_bytes(sc['bytes']), C[3]) + "  " +
-        pad_l(sc['remediable'], C[4]) + "  " +
-        pad_l(sc['pdfs'], C[5]) + "  " +
-        pad_l(sc['image_only'], C[6])
+        "  " + pad_r(sc['site'], C[0]) + "  " +
+        pad_r(sname, C[1]) + "  " +
+        pad_r(sc['ip'], C[2]) + "  " +
+        pad_l(sc['files'], C[3]) + "  " +
+        pad_l(humanize_bytes(sc['bytes']), C[4]) + "  " +
+        pad_l(sc['remediable'], C[5]) + "  " +
+        pad_l(sc['pdfs'], C[6]) + "  " +
+        pad_l(sc['image_only'], C[7])
     )
     t_files += sc['files']; t_bytes += sc['bytes']; t_rem += sc['remediable']
     t_pdfs  += sc['pdfs'];  t_img   += sc['image_only']
 lines.append("  " + hr)
 lines.append(
-    "  " + pad_r("Fleet totals", C[0]) + "  " +
-    pad_r("", C[1]) + "  " +
-    pad_l(t_files, C[2]) + "  " +
-    pad_l(humanize_bytes(t_bytes), C[3]) + "  " +
-    pad_l(t_rem, C[4]) + "  " +
-    pad_l(t_pdfs, C[5]) + "  " +
-    pad_l(t_img, C[6])
+    "  " + pad_r("", C[0]) + "  " +
+    pad_r("Fleet totals", C[1]) + "  " +
+    pad_r("", C[2]) + "  " +
+    pad_l(t_files, C[3]) + "  " +
+    pad_l(humanize_bytes(t_bytes), C[4]) + "  " +
+    pad_l(t_rem, C[5]) + "  " +
+    pad_l(t_pdfs, C[6]) + "  " +
+    pad_l(t_img, C[7])
 )
 lines.append("")
 
