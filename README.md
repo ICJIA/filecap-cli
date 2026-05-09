@@ -433,6 +433,104 @@ After wiring up your client, ask the AI agent:
 
 If the tools are registered correctly, the agent will call them directly rather than suggesting you run the CLI manually.
 
+## For auditors: self-contained audit scripts
+
+Two bash scripts ship with the repo at `examples/` that automate the full audit workflow for accessibility remediation vendors and managers. Auditors can `curl` them directly without cloning the repo or installing filecap globally — `npx` handles filecap auto-fetch.
+
+### Single-server audit: `audit-remote.sh`
+
+Walks the auditor through a single remote server, produces `~/filecap-audits/<server-ip>/report/files.csv` (a 32-column vendor work-order with one row per file, plus introspection-derived columns like page count, has-text-layer, alt-text presence, image-only flag).
+
+```bash
+curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+chmod +x audit-remote.sh
+./audit-remote.sh
+```
+
+Or non-interactive:
+
+```bash
+./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-strapi-prod
+```
+
+The script auto-detects Node version on the remote: if Node ≥20, it scans natively over SSH (CPU work happens on the remote). If Node <20 (common on older Ubuntu Strapi servers), it falls back to rsync-down-and-scan-locally — the resulting CSV still carries the *remote* server's IP and path so vendors can ssh in and locate any flagged file.
+
+**Inputs the script asks for** (interactive mode):
+- SSH username on the target server (e.g., `forge`, `deploy`, `ubuntu`)
+- Server IP or hostname
+- Full path to the uploads directory on the remote
+- Friendly server name (used in report headers; defaults to `strapi-<IP>` if blank)
+
+**Output structure:**
+
+```
+~/filecap-audits/<server-ip>/
+├── SOURCE_INFO.txt        Provenance — server, path, audit timestamp, find-a-file recipe
+├── inventory.ndjson       Raw scan output (one entry per file)
+├── mirror/                Local rsync mirror (only created in local-scan mode)
+└── report/
+    ├── files.csv          The vendor work-order, 32 columns × N rows
+    ├── SUMMARY.txt        Counts by category (PDFs, images, Office docs)
+    ├── largest_files.txt  Top files by size
+    ├── flagged_filenames.txt  Files with name patterns suggesting scanned/IMG-prefixed origin
+    ├── duplicate_hashes.txt   Content-identical files (by SHA-256)
+    └── pdf_image_only.txt     PDFs with no text layer (require OCR before remediation)
+```
+
+### Fleet audit: `audit-fleet.sh`
+
+For managers who need a cross-server consolidated report. Runs `audit-remote.sh` against every server in a fleet, then produces:
+- A consolidated CSV with one row per file across all servers (cross-server duplicates linked via the `duplicateOf` column)
+- A `MANAGER_SUMMARY.txt` with per-server breakdowns and fleet-wide totals — designed to hand to remediation auditors
+
+```bash
+curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
+curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+chmod +x audit-fleet.sh audit-remote.sh
+./audit-fleet.sh
+```
+
+Or batch mode with a CSV of servers:
+
+```bash
+./audit-fleet.sh servers.csv
+```
+
+The servers.csv format (no header row, `#` comments allowed):
+
+```
+server_name,user,host,remote_path
+dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads
+another-server,deploy,10.0.0.5,/var/strapi/uploads
+```
+
+Output goes to `~/filecap-audits/_fleet/<timestamp>/`:
+
+```
+~/filecap-audits/_fleet/20260509-134500/
+├── servers.txt              List of servers audited
+├── failed_servers.txt       (only if any audits failed)
+├── inventories/             Per-server NDJSON inventories
+├── consolidated.ndjson      Cross-server consolidated NDJSON
+├── consolidated-report/     Full report directory
+│   └── files.csv            One row per file across the entire fleet
+└── MANAGER_SUMMARY.txt      Top-level summary for handoff
+```
+
+### Requirements
+
+- bash 3.2+ (default on macOS; default on Linux)
+- python3 (default on macOS 12+; default on most Linux distros)
+- ssh (with keys configured for the target server[s])
+- rsync
+- npx (comes with Node.js 18+; install Node from https://nodejs.org)
+
+The scripts run a tool-presence preflight at startup and abort with clear remediation messages if anything is missing.
+
+### Why local-mode scanning matters
+
+Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The audit-remote.sh script sidesteps this by detecting Node 16 and pulling the files down via rsync, then running filecap on the auditor's mac/laptop. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
+
 ## What filecap does not do
 
 - Perform full WCAG conformance auditing (that's [audit.icjia.app](https://audit.icjia.app)'s job, per-file)
