@@ -204,6 +204,10 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     isLegacy ? intro.format : "",
     // Audit link
     auditLink,
+    // Audit enrichment columns
+    entry.audit?.score !== undefined ? `${entry.audit.score}%` : "",
+    entry.audit?.grade ?? "",
+    entry.audit?.reportUrl ?? "",
   ];
 
   return raw.map(formatCellValue);
@@ -268,6 +272,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
   // ── build table rows ─────────────────────────────────────────────────────────
   const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
   const auditLinkColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditLink");
+  const auditReportColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditReport");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -288,6 +293,9 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
       }
       if (i === auditLinkColIdx && v !== "" && v !== null && v !== undefined) {
         return `<td><a href="${htmlEscape(v)}" target="_blank" rel="noopener noreferrer" class="audit-link">View audit &#x2192;</a></td>`;
+      }
+      if (i === auditReportColIdx && v !== "" && v !== null && v !== undefined) {
+        return `<td><a href="${htmlEscape(v)}" target="_blank" rel="noopener noreferrer" class="audit-link">View report &#x2192;</a></td>`;
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");

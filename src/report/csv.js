@@ -63,6 +63,9 @@ export const CSV_COLUMNS = [
   { name: "xlsxTotalCells",        label: "XLSX: total cells" },
   { name: "officeLegacyFormat",    label: "Legacy Office format" },
   { name: "auditLink",             label: "Audit Link" },
+  { name: "auditScore",            label: "Audit score" },
+  { name: "auditGrade",            label: "Audit grade" },
+  { name: "auditReport",           label: "Audit report" },
 ];
 
 /**
@@ -229,6 +232,10 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     isLegacy ? intro.format : "",
     // Audit link
     auditLink,
+    // Audit enrichment columns
+    entry.audit?.score !== undefined ? `${entry.audit.score}%` : "",
+    entry.audit?.grade ?? "",
+    entry.audit?.reportUrl ?? "",
   ];
 }
 

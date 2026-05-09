@@ -417,3 +417,54 @@ describe("writeCsv auditLink column", () => {
     expect(cells[colIndex("auditLink")]).toContain("https://audit.example.com");
   });
 });
+
+describe("writeCsv audit enrichment columns", () => {
+  const auditEntry = {
+    ...baseEntry,
+    audit: {
+      score: 84,
+      grade: "B",
+      reportId: "f06b5abc05c1f280a4975a1c0c95ce8d",
+      reportUrl: "https://audit.icjia.app/report/f06b5abc05c1f280a4975a1c0c95ce8d",
+      enrichedAt: "2026-05-09T12:00:00.000Z",
+    },
+  };
+
+  it("includes Audit score, Audit grade, and Audit report column headers", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
+    const headerRow = csv.split("\n")[0];
+    expect(headerRow).toContain("Audit score");
+    expect(headerRow).toContain("Audit grade");
+    expect(headerRow).toContain("Audit report");
+  });
+
+  it("renders score as '84%' when audit block is present", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [auditEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("auditScore")]).toBe("84%");
+  });
+
+  it("renders grade as 'B' when audit block is present", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [auditEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("auditGrade")]).toBe("B");
+  });
+
+  it("renders reportUrl in the Audit report column", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [auditEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("auditReport")]).toBe("https://audit.icjia.app/report/f06b5abc05c1f280a4975a1c0c95ce8d");
+  });
+
+  it("renders empty cells for all three audit columns when audit block is absent", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("auditScore")]).toBe("");
+    expect(cells[colIndex("auditGrade")]).toBe("");
+    expect(cells[colIndex("auditReport")]).toBe("");
+  });
+});
