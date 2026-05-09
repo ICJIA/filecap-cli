@@ -1,6 +1,9 @@
 export { runScan } from "./commands/scan.js";
 export { runRollup } from "./commands/rollup.js";
 export { runReport } from "./commands/report.js";
+export { runMcp } from "./commands/mcp.js";
+export { TOOL_DEFINITIONS, dispatchTool } from "./mcp/tools.js";
+export { queryInventory } from "./mcp/query.js";
 export {
   headerSchema,
   entrySchema,
