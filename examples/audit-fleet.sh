@@ -955,9 +955,18 @@ print(f"  -> wrote {len(lines)} lines to manager summary")
 PYMANAGER
 
 # ── update _fleet/latest symlink ─────────────────────────────────────────────
+# Use rm-then-ln inside a subshell to avoid macOS mv-symlink quirks.
+# The subshell cd ensures the relative target resolves correctly regardless of
+# the caller's cwd.
 FLEET_LATEST_LINK="${HOME}/filecap-audits/_fleet/latest"
-ln -sfn "${FLEET_TS}" "${FLEET_LATEST_LINK}.tmp" && mv -f "${FLEET_LATEST_LINK}.tmp" "${FLEET_LATEST_LINK}"
-info "Updated '_fleet/latest' symlink → ${FLEET_TS}"
+if [[ -L "${FLEET_LATEST_LINK}" || -e "${FLEET_LATEST_LINK}" ]]; then
+  rm -f "${FLEET_LATEST_LINK}"
+fi
+if (cd "${HOME}/filecap-audits/_fleet" && ln -s "${FLEET_TS}" "latest"); then
+  info "Updated '_fleet/latest' symlink → ${FLEET_TS}"
+else
+  warn "Failed to update '_fleet/latest' symlink (run output is at ${FLEET_TS} regardless)"
+fi
 
 # ── final output ──────────────────────────────────────────────────────────────
 printf "\n${G}Fleet audit complete${N}\n\n"

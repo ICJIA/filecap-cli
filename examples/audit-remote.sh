@@ -526,12 +526,17 @@ if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" ${
 fi
 
 # ── update 'latest' symlink ───────────────────────────────────────────────────
-# Atomic symlink update: create temp -> rename into place.
-# ln -sfn: -s symbolic, -f force (remove existing), -n treat existing symlink
-# target as the link itself (not a dir to descend into). Supported on both
-# macOS ln and GNU ln.
-ln -sfn "runs/${RUN_TS}" "${LATEST_LINK}.tmp" && mv -f "${LATEST_LINK}.tmp" "${LATEST_LINK}"
-info "Updated 'latest' symlink → runs/${RUN_TS}"
+# Use rm-then-ln inside a subshell to avoid macOS mv-symlink quirks.
+# The subshell cd ensures the relative target "runs/${RUN_TS}" resolves correctly
+# regardless of the caller's cwd.
+if [[ -L "${LATEST_LINK}" || -e "${LATEST_LINK}" ]]; then
+  rm -f "${LATEST_LINK}"
+fi
+if (cd "${WORK_DIR}" && ln -s "runs/${RUN_TS}" "latest"); then
+  info "Updated 'latest' symlink → runs/${RUN_TS}"
+else
+  warn "Failed to update 'latest' symlink (run output is at runs/${RUN_TS} regardless)"
+fi
 
 # ── summary ───────────────────────────────────────────────────────────────────
 printf "\n${G}Audit complete${N} — ${SERVER_NAME} (${HOST})\n\n"
