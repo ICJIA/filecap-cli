@@ -6,7 +6,7 @@
 
 ## Status
 
-**Phase 6 shipped (v0.6.0).** Report command is functional: `filecap report consolidated.ndjson -o ./report/` produces the vendor handoff package — `files.csv` (32-column work-order), `SUMMARY.txt` with file-count breakdowns, plus four flagged-list `.txt` files (largest, flagged-names, duplicate-hashes, image-only PDFs). The full inventory pipeline `scan → rollup → report` is now end-to-end functional. Phases 5, 4, 3, and 2 all continue unchanged.
+**Phase 7 shipped (v1.0.0) — v1.0 milestone reached.** MCP server entry point is live: `filecap mcp` starts an stdio MCP server exposing `filecap_scan`, `filecap_rollup`, `filecap_report`, and `filecap_query_inventory` as tools callable by AI agents (Claude Desktop, Claude Code, etc.). The full inventory pipeline `scan → rollup → report` remains end-to-end functional. All prior phases continue unchanged.
 
 The full design specification lives at [`docs/filecap-design.md`](docs/filecap-design.md).
 
@@ -18,7 +18,7 @@ The full design specification lives at [`docs/filecap-design.md`](docs/filecap-d
 | 4 | v0.4.0 | shipped | Filename flagging |
 | 5 | v0.5.0 | shipped | Multi-server rollup |
 | 6 | v0.6.0 | **shipped** | CSV reporter and summary artifacts |
-| 7 | v1.0.0 | planned | MCP server entry point |
+| 7 | v1.0.0 | **shipped** | MCP server entry point |
 | 8 | vNext | deferred | Strapi-aware mode (separate package) |
 
 ## Quick start
@@ -296,6 +296,60 @@ The CSV is pure inventory — there are NO vendor-fill columns. Vendors return r
 `flags` is pipe-separated (e.g., `scanned-name-pattern|filename-has-spaces`). Empty cells indicate the field doesn't apply to this file's type.
 
 **Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). For consolidated inputs, the per-entry `serverName` is used and `serverIp`/`hostname` are looked up from the header's `metadata.sources[]` array. Both input shapes produce the same 32-column CSV — the consumer doesn't need to know which scanner/rollup pipeline produced the data.
+
+## MCP server (Phase 7)
+
+filecap can run as an stdio MCP server, exposing its commands as tools that AI agents (Claude Desktop, Claude Code, etc.) can call during conversational audits:
+
+```bash
+filecap mcp
+```
+
+When invoked from an MCP client, the server exposes four tools:
+
+| Tool | What it does |
+|---|---|
+| `filecap_scan` | Walk a directory, produce an NDJSON inventory at the specified path |
+| `filecap_rollup` | Merge multiple per-server NDJSONs into a consolidated inventory |
+| `filecap_report` | Generate vendor handoff package (CSV + summary + flagged lists) |
+| `filecap_query_inventory` | Filter/sort entries in an existing NDJSON by size, extension, flags, isImageOnly, etc. |
+
+### Claude Desktop config
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or the equivalent on your platform:
+
+```json
+{
+  "mcpServers": {
+    "filecap": {
+      "command": "npx",
+      "args": ["--yes", "@icjia/filecap@1.0.0", "mcp"]
+    }
+  }
+}
+```
+
+After restarting Claude Desktop, you can ask things like:
+- "Run filecap_scan on /var/strapi/uploads with introspection enabled, write to /tmp/strapi.ndjson"
+- "Use filecap_query_inventory on /tmp/consolidated.ndjson to find PDFs over 100 MB on server strapi-prod-02"
+- "Generate a report from /tmp/consolidated.ndjson into /tmp/report-2026-Q2/"
+
+### Claude Code config
+
+`.claude/mcp.json` in your project (or `~/.claude/mcp.json` for user-global):
+
+```json
+{
+  "mcpServers": {
+    "filecap": {
+      "command": "npx",
+      "args": ["--yes", "@icjia/filecap@1.0.0", "mcp"]
+    }
+  }
+}
+```
+
+The four tools become available as `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory` in any Claude Code session in that project.
 
 ## What filecap does not do
 
