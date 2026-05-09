@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] — 2026-05-09
+
+### Fixed
+
+- **Excel auto-converts SHA-256 hash column to scientific notation (data loss).** Excel detects 64-character hex strings as numeric and offers conversion that truncates to ~15 digits, breaking cross-server duplicate detection. SHA-256 cells are now wrapped in Excel text-formula syntax (`="<hash>"`) so Excel preserves them as literal strings. Other CSV consumers (Numbers, Google Sheets, programmatic parsers) see the formula syntax and parse correctly.
+- **`latest/` symlink not updating after successful runs.** The atomic `ln -sfn ... && mv -f ...` pattern was failing silently on macOS (`mv -f` has historical quirks with symlink replacement). Replaced with a more robust `rm -f ... && ln -s ...` sequence inside a subshell that `cd`s to the workdir first so the relative target resolves correctly. Same fix applied to `audit-fleet.sh`'s `_fleet/latest` symlink.
+- **CSV header row had unquoted commas and quotes inside column labels** like `XLSX: default sheet names (Sheet1, Sheet2, …)` and `DOCX: vague hyperlinks ("click here")`. Naive CSV parsers (e.g., `awk -F,` or non-text-qualified Excel imports) mis-split the header. Now properly escaped per RFC 4180.
+
+[1.0.6]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.6
+
 ## [1.0.5] — 2026-05-09
 
 ### Added
