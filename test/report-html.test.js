@@ -224,4 +224,60 @@ describe("writeHtml", () => {
     expect(html).toContain("Website:");
     expect(html).toContain("DVFR");
   });
+
+  // ── Category filter chips ────────────────────────────────────────────────────
+
+  it("includes a filter bar with category chips", async () => {
+    const out = path.join(tmpDir, "chips.html");
+    const mixedEntries = [
+      { ...sampleEntries[0], category: "pdf" },
+      { ...sampleEntries[1], category: "image", filename: "photo.png", path: "photo.png", extension: "png" },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: mixedEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("filter-bar");
+    expect(html).toContain('class="chip"');
+    expect(html).toMatch(/data-category="pdf"/);
+  });
+
+  it("rows have data-category attribute matching their entry", async () => {
+    const out = path.join(tmpDir, "row-cats.html");
+    const mixedEntries = [
+      { ...sampleEntries[0], category: "pdf" },
+      { ...sampleEntries[1], category: "image", filename: "photo.png", path: "photo.png", extension: "png" },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: mixedEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/<tr[^>]*data-category="pdf"/);
+    expect(html).toMatch(/<tr[^>]*data-category="image"/);
+  });
+
+  it("includes the All chip with total count", async () => {
+    const out = path.join(tmpDir, "all-chip.html");
+    const fiveEntries = [
+      { ...sampleEntries[0], sha256: "h1", path: "a.pdf", filename: "a.pdf" },
+      { ...sampleEntries[0], sha256: "h2", path: "b.pdf", filename: "b.pdf" },
+      { ...sampleEntries[0], sha256: "h3", path: "c.pdf", filename: "c.pdf" },
+      { ...sampleEntries[0], sha256: "h4", path: "d.pdf", filename: "d.pdf" },
+      { ...sampleEntries[0], sha256: "h5", path: "e.pdf", filename: "e.pdf" },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: fiveEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/All \(5\)/);
+  });
+
+  it("counts each category correctly in chip labels", async () => {
+    const out = path.join(tmpDir, "chip-counts.html");
+    const threeAndTwo = [
+      { ...sampleEntries[0], sha256: "p1", path: "a.pdf", filename: "a.pdf", category: "pdf" },
+      { ...sampleEntries[0], sha256: "p2", path: "b.pdf", filename: "b.pdf", category: "pdf" },
+      { ...sampleEntries[0], sha256: "p3", path: "c.pdf", filename: "c.pdf", category: "pdf" },
+      { ...sampleEntries[1], sha256: "i1", path: "d.png", filename: "d.png", extension: "png", category: "image", introspection: undefined },
+      { ...sampleEntries[1], sha256: "i2", path: "e.png", filename: "e.png", extension: "png", category: "image", introspection: undefined },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: threeAndTwo, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/PDF[^(]*\(3\)/i);
+    expect(html).toMatch(/Image[^(]*\(2\)/i);
+  });
 });

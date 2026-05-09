@@ -9,6 +9,23 @@ function formatCellValue(v) {
   return v;
 }
 
+const CATEGORY_LABELS = {
+  "pdf": "PDF",
+  "office-document": "Office docs",
+  "spreadsheet": "Spreadsheet",
+  "presentation": "Presentation",
+  "image": "Image",
+  "archive": "Archive",
+  "text": "Text",
+  "web": "Web",
+  "audio-video": "Audio/Video",
+  "other": "Other",
+};
+
+function formatCategory(cat) {
+  return CATEGORY_LABELS[cat] ?? cat;
+}
+
 /**
  * Escape a value for safe insertion into HTML.
  * @param {*} s
@@ -189,6 +206,20 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
 
   const totalFiles = entries.length;
 
+  // ── filter bar (category chips) ──────────────────────────────────────────────
+  const CHIP_ORDER = ["pdf", "office-document", "spreadsheet", "presentation", "image", "archive", "text", "web", "audio-video", "other"];
+  const chipsHtml = CHIP_ORDER
+    .filter((cat) => categoryCounts[cat])
+    .map((cat) => `<button class="chip" data-category="${htmlEscape(cat)}">${htmlEscape(formatCategory(cat))} (${categoryCounts[cat]})</button>`)
+    .join(" ");
+
+  const filterBarHtml = `
+  <section class="filter-bar">
+    <strong>Filter by type:</strong>
+    <button class="chip chip-active" data-category="">All (${totalFiles})</button>
+    ${chipsHtml}
+  </section>`;
+
   // ── build table rows ─────────────────────────────────────────────────────────
   const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
 
@@ -203,6 +234,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
     if (isFlagged) classes.push("flagged");
 
     const classAttr = classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
+    const categoryAttr = ` data-category="${htmlEscape(entry.category ?? "other")}"`;
     const cells = values.map((v, i) => {
       if (i === publicUrlColIdx && v !== "" && v !== null && v !== undefined) {
         const escaped = htmlEscape(v);
@@ -210,7 +242,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
-    return `<tr${classAttr}>${cells}</tr>`;
+    return `<tr${classAttr}${categoryAttr}>${cells}</tr>`;
   }).join("\n");
 
   // ── category breakdown ───────────────────────────────────────────────────────
@@ -291,6 +323,45 @@ p { margin: 0 0 0.5rem; }
 .cat-table { border-collapse: collapse; font-size: 13px; margin-bottom: 1rem; }
 .cat-table td { padding: 0.2rem 0.75rem 0.2rem 0; }
 .cat-table td:last-child { text-align: right; font-weight: 600; }
+
+/* ── filter bar / chips ────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 0.5em;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 1em 0;
+  padding: 0.5em;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.4em 0.9em;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chip:hover {
+  border-color: #888;
+  background: #f0f0f0;
+}
+
+.chip-active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.chip-active:hover {
+  background: #1d4ed8;
+}
 
 /* ── controls ──────────────────────────────────────────────── */
 .controls {
@@ -408,6 +479,7 @@ footer {
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
   .controls { display: none; }
+  .filter-bar { display: none; }
   .table-wrap { max-height: none; overflow: visible; border: none; }
   thead { position: static; }
   body { padding: 0; font-size: 10px; }
@@ -455,6 +527,7 @@ ${categoryRows}
 </table>
 
 <h2>File inventory</h2>
+${filterBarHtml}
 <div class="controls">
   <input type="search" id="search" placeholder="Filter by filename, path, server…" aria-label="Filter table rows">
   <span id="row-count"></span>
@@ -493,22 +566,39 @@ ${rowsHtml}
       : \`\${visible.toLocaleString()} of \${allRows.length.toLocaleString()} rows\`;
   }
 
-  function filterRows() {
-    const q = searchInput.value.trim().toLowerCase();
+  let activeCategory = "";
+
+  function applyFilters() {
+    const q = (searchInput ? searchInput.value.trim().toLowerCase() : "");
     let visible = 0;
     allRows.forEach(function (row, i) {
+      const matchCategory = !activeCategory || row.dataset.category === activeCategory;
       const rowData = data[i];
-      const match = !q || (rowData && rowData.some(function (v) {
+      const matchSearch = !q || (rowData && rowData.some(function (v) {
         return v !== null && v !== undefined && String(v).toLowerCase().includes(q);
       }));
-      row.style.display = match ? "" : "none";
-      if (match) visible++;
+      const show = matchCategory && matchSearch;
+      row.style.display = show ? "" : "none";
+      if (show) visible++;
     });
     updateRowCount(visible);
   }
 
-  searchInput.addEventListener("input", filterRows);
-  updateRowCount(allRows.length);
+  // ── chip click handler ───────────────────────────────────────────────────────
+  const chips = document.querySelectorAll(".chip");
+  chips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      chips.forEach(function (c) { c.classList.remove("chip-active"); });
+      chip.classList.add("chip-active");
+      activeCategory = chip.dataset.category;
+      applyFilters();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener("input", applyFilters);
+  }
+  applyFilters();
 
   // ── sort ────────────────────────────────────────────────────────────────────
   const headers = Array.from(document.querySelectorAll("#inventory-table thead th"));
