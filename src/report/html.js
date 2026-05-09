@@ -279,9 +279,14 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
     .join(" ");
 
   const filterBarHtml = `
-  <section class="filter-bar">
-    <strong>Filter by type:</strong>
-    <button class="chip chip-active" data-category="">All (${totalFiles})</button>
+  <section class="filter-bar filter-bar-primary">
+    <strong>Show:</strong>
+    <button class="chip chip-active" data-filter="remediable">Remediable only (${remediableCount})</button>
+    <button class="chip" data-filter="reference">Reference only (${nonRemediableCount})</button>
+    <button class="chip" data-filter="all">All (${totalFiles})</button>
+  </section>
+  <section class="filter-bar filter-bar-secondary">
+    <strong>Or by type:</strong>
     ${chipsHtml}
   </section>`;
 
@@ -560,6 +565,11 @@ footer {
   padding-top: 0.5rem;
 }
 
+/* ── primary / secondary filter bars ───────────────────────── */
+.filter-bar-primary .chip { font-weight: 600; }
+.filter-bar-secondary { margin-top: 0.25em; background: transparent; font-size: 0.95em; }
+.filter-bar-secondary .chip { font-size: 0.85em; }
+
 /* ── audit-stats two-column summary ────────────────────────── */
 .audit-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin: 1em 0; }
 .stat-card { padding: 1em; border-radius: 6px; border: 1px solid; }
@@ -692,31 +702,58 @@ ${rowsHtml}
       : \`\${visible.toLocaleString()} of \${allRows.length.toLocaleString()} rows\`;
   }
 
+  let activeFilter = "remediable";
   let activeCategory = "";
+
+  const REMEDIABLE_CATS = ["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"];
 
   function applyFilters() {
     const q = (searchInput ? searchInput.value.trim().toLowerCase() : "");
     let visible = 0;
     allRows.forEach(function (row, i) {
-      const matchCategory = !activeCategory || row.dataset.category === activeCategory;
+      const cat = row.dataset.category || "other";
+      let matchFilter;
+      if (activeFilter === "all") matchFilter = true;
+      else if (activeFilter === "remediable") matchFilter = REMEDIABLE_CATS.indexOf(cat) >= 0;
+      else if (activeFilter === "reference") matchFilter = REMEDIABLE_CATS.indexOf(cat) < 0;
+      else matchFilter = true;
+      const matchCategory = !activeCategory || cat === activeCategory;
       const rowData = data[i];
       const matchSearch = !q || (rowData && rowData.some(function (v) {
         return v !== null && v !== undefined && String(v).toLowerCase().includes(q);
       }));
-      const show = matchCategory && matchSearch;
+      const show = matchFilter && matchCategory && matchSearch;
       row.style.display = show ? "" : "none";
       if (show) visible++;
     });
     updateRowCount(visible);
   }
 
-  // ── chip click handler ───────────────────────────────────────────────────────
-  const chips = document.querySelectorAll(".chip");
-  chips.forEach(function (chip) {
+  // ── primary chip click handler ───────────────────────────────────────────────
+  const primaryChips = document.querySelectorAll(".filter-bar-primary .chip");
+  primaryChips.forEach(function (chip) {
     chip.addEventListener("click", function () {
-      chips.forEach(function (c) { c.classList.remove("chip-active"); });
+      primaryChips.forEach(function (c) { c.classList.remove("chip-active"); });
+      chip.classList.add("chip-active");
+      activeFilter = chip.dataset.filter;
+      activeCategory = "";
+      document.querySelectorAll(".filter-bar-secondary .chip").forEach(function (c) {
+        c.classList.remove("chip-active");
+      });
+      applyFilters();
+    });
+  });
+
+  // ── secondary chip click handler ─────────────────────────────────────────────
+  const secondaryChips = document.querySelectorAll(".filter-bar-secondary .chip");
+  secondaryChips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      secondaryChips.forEach(function (c) { c.classList.remove("chip-active"); });
       chip.classList.add("chip-active");
       activeCategory = chip.dataset.category;
+      activeFilter = "all";
+      primaryChips.forEach(function (c) { c.classList.remove("chip-active"); });
+      if (primaryChips[2]) primaryChips[2].classList.add("chip-active");
       applyFilters();
     });
   });

@@ -400,6 +400,32 @@ describe("writeHtml", () => {
     expect(html).toContain('<th data-col="auditReport">Audit report</th>');
   });
 
+  // ── Section 3: two-row chip filter ──────────────────────────────────────────
+
+  it("includes filter-bar-primary and filter-bar-secondary sections", async () => {
+    const out = path.join(tmpDir, "two-row-chips.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("filter-bar-primary");
+    expect(html).toContain("filter-bar-secondary");
+  });
+
+  it("primary chips have data-filter attributes (remediable, reference, all)", async () => {
+    const out = path.join(tmpDir, "primary-chips.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain('data-filter="remediable"');
+    expect(html).toContain('data-filter="reference"');
+    expect(html).toContain('data-filter="all"');
+  });
+
+  it("Remediable only primary chip has chip-active class on initial render", async () => {
+    const out = path.join(tmpDir, "remediable-active.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/data-filter="remediable"[^>]*class="chip chip-active"|class="chip chip-active"[^>]*data-filter="remediable"/);
+  });
+
   // ── Section 2: two-stat summary box ─────────────────────────────────────────
 
   it("renders stat-card remediable and stat-card reference boxes", async () => {
