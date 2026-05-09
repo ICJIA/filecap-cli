@@ -72,6 +72,15 @@
 #    Tilde paths such as ~/uploads are supported (the remote shell expands them).
 #    For paths with spaces, use the absolute path instead.
 #
+#  SAVED SITES (NEW)
+#    On startup, the script offers a menu of previously-audited sites stored
+#    in ~/.filecap/sites.json. Pick a number to skip re-typing the SSH user,
+#    server IP, remote path, etc. New sites can be added; existing ones can
+#    be edited or deleted via the same menu.
+#
+#    The audit token is NEVER stored in this file. Keep it in env or your
+#    keychain (FILECAP_AUDIT_TOKEN env var).
+#
 # ============================================================================
 
 set -euo pipefail
@@ -231,6 +240,139 @@ check_script_version() {
   fi
 }
 
+# ── saved-sites manager ──────────────────────────────────────────────────────
+SITES_FILE="${FILECAP_SITES_FILE:-${HOME}/.filecap/sites.json}"
+
+ensure_sites_file() {
+  local dir
+  dir="$(dirname "$SITES_FILE")"
+  if [[ ! -d "$dir" ]]; then
+    mkdir -p "$dir"
+    chmod 700 "$dir" 2>/dev/null || true
+  fi
+  if [[ ! -f "$SITES_FILE" ]]; then
+    echo '{"version": 1, "sites": []}' > "$SITES_FILE"
+    chmod 600 "$SITES_FILE" 2>/dev/null || true
+  fi
+}
+
+list_saved_sites() {
+  ensure_sites_file
+  python3 - <<'PYLIST' "$SITES_FILE"
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError):
+    sys.exit(0)
+sites = data.get("sites", [])
+if not sites:
+    sys.exit(0)
+for i, s in enumerate(sites, 1):
+    nick = s.get("siteName") or "(no nickname)"
+    name = s.get("name") or "(unnamed)"
+    user = s.get("user") or "?"
+    host = s.get("host") or "?"
+    print(f"  {i}. {nick} ({name}) — {user}@{host}")
+PYLIST
+}
+
+count_saved_sites() {
+  ensure_sites_file
+  python3 - <<'PYCOUNT' "$SITES_FILE"
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    print(len(data.get("sites", [])))
+except Exception:
+    print(0)
+PYCOUNT
+}
+
+# Load a saved site by 1-based index. Prints shell-eval-able assignments.
+# Caller does:  eval "$(load_saved_site 1)"
+load_saved_site() {
+  local idx="$1"
+  ensure_sites_file
+  python3 - <<'PYLOAD' "$SITES_FILE" "$idx"
+import json, sys, shlex
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+i = int(sys.argv[2]) - 1
+sites = data.get("sites", [])
+if not (0 <= i < len(sites)):
+    sys.exit(1)
+s = sites[i]
+fields = [
+    ("USER_ARG", "user"),
+    ("HOST_ARG", "host"),
+    ("REMOTE_PATH_ARG", "remotePath"),
+    ("SERVER_NAME_ARG", "name"),
+    ("SITE_NAME_ARG", "siteName"),
+    ("PUBLIC_URL_BASE_ARG", "publicUrlBase"),
+    ("AUDIT_LINK_PATTERN_ARG", "auditLinkPattern"),
+]
+for var, key in fields:
+    val = s.get(key) or ""
+    print(f"{var}={shlex.quote(val)}")
+PYLOAD
+}
+
+save_or_update_site() {
+  ensure_sites_file
+  python3 - <<'PYSAVE' "$SITES_FILE" "$SERVER_NAME" "$SITE_NAME" "$SSH_USER" "$HOST" "$REMOTE_PATH" "$PUBLIC_URL_BASE" "$AUDIT_LINK_PATTERN"
+import json, sys
+file_path = sys.argv[1]
+new_site = {
+    "name":             sys.argv[2],
+    "siteName":         sys.argv[3],
+    "user":             sys.argv[4],
+    "host":             sys.argv[5],
+    "remotePath":       sys.argv[6],
+    "publicUrlBase":    sys.argv[7],
+    "auditLinkPattern": sys.argv[8],
+}
+# Strip empty optional fields for cleanliness
+for k in ["siteName", "publicUrlBase", "auditLinkPattern"]:
+    if not new_site.get(k):
+        new_site.pop(k, None)
+with open(file_path) as f:
+    data = json.load(f)
+sites = data.setdefault("sites", [])
+# Update if name matches an existing site, else append
+for i, s in enumerate(sites):
+    if s.get("name") == new_site["name"]:
+        sites[i] = new_site
+        break
+else:
+    sites.append(new_site)
+with open(file_path, "w") as f:
+    json.dump(data, f, indent=2)
+print(f"Saved to {file_path}")
+PYSAVE
+}
+
+delete_saved_site() {
+  local idx="$1"
+  ensure_sites_file
+  python3 - <<'PYDEL' "$SITES_FILE" "$idx"
+import json, sys
+file_path = sys.argv[1]
+i = int(sys.argv[2]) - 1
+with open(file_path) as f:
+    data = json.load(f)
+sites = data.setdefault("sites", [])
+if not (0 <= i < len(sites)):
+    sys.exit(1)
+removed = sites.pop(i)
+with open(file_path, "w") as f:
+    json.dump(data, f, indent=2)
+nick = removed.get("siteName") or removed.get("name", "?")
+print(f"Removed site: {nick}")
+PYDEL
+}
+
 # ── strip --no-version-check from args before positional parsing ──────────────
 NEW_ARGS=()
 for a in "$@"; do
@@ -245,6 +387,103 @@ set -- "${NEW_ARGS[@]+"${NEW_ARGS[@]}"}"
 
 check_required_tools
 check_script_version
+
+# Default: don't auto-save the run's config
+SAVE_AFTER_RUN="${SAVE_AFTER_RUN:-no}"
+
+# ── saved-sites menu ─────────────────────────────────────────────────────────
+# Skip the menu when invoked with positional args (auditor knows what they want)
+# OR when SKIP_SITES_MENU=1 (e.g., from audit-fleet.sh).
+SHOULD_SHOW_MENU=1
+if [[ -n "${1:-}" ]] || [[ "${SKIP_SITES_MENU:-0}" == "1" ]]; then
+  SHOULD_SHOW_MENU=0
+fi
+
+if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
+  ensure_sites_file
+  while :; do
+    saved_count=$(count_saved_sites)
+    echo
+    if [[ "$saved_count" -gt 0 ]]; then
+      echo "Saved sites:"
+      list_saved_sites
+      echo
+      echo "  Type a number 1-${saved_count} to select a saved site"
+    fi
+    echo "    a  →  add a new site"
+    if [[ "$saved_count" -gt 0 ]]; then
+      echo "    e  →  edit a saved site"
+      echo "    d  →  delete a saved site"
+    fi
+    echo "    s  →  skip (one-off prompts, don't save)"
+    echo "    q  →  quit"
+    read -r -p "  Select: " menu_choice
+    case "$menu_choice" in
+      [0-9]*)
+        if [[ "$menu_choice" -lt 1 || "$menu_choice" -gt "$saved_count" ]]; then
+          warn "Invalid number. Pick 1-${saved_count}."
+          continue
+        fi
+        if loaded=$(load_saved_site "$menu_choice"); then
+          eval "$loaded"
+          info "Loaded site: $(list_saved_sites | sed -n "${menu_choice}p" | sed 's/^[ ]*[0-9]*\. //')"
+          break
+        else
+          warn "Failed to load site $menu_choice."
+          continue
+        fi
+        ;;
+      a|A)
+        info "Adding a new site — answer the prompts; you'll be asked to save at the end."
+        SAVE_AFTER_RUN=ask
+        break
+        ;;
+      e|E)
+        if [[ "$saved_count" -eq 0 ]]; then
+          warn "No saved sites to edit."
+          continue
+        fi
+        read -r -p "  Edit which site number? " edit_idx
+        if [[ "$edit_idx" -lt 1 || "$edit_idx" -gt "$saved_count" ]]; then
+          warn "Invalid number."
+          continue
+        fi
+        if loaded=$(load_saved_site "$edit_idx"); then
+          eval "$loaded"
+          info "Loaded site for editing — current values shown as defaults; press Enter to keep."
+          SAVE_AFTER_RUN=force
+          break
+        fi
+        ;;
+      d|D)
+        if [[ "$saved_count" -eq 0 ]]; then
+          warn "No saved sites to delete."
+          continue
+        fi
+        read -r -p "  Delete which site number? " del_idx
+        if [[ "$del_idx" -lt 1 || "$del_idx" -gt "$saved_count" ]]; then
+          warn "Invalid number."
+          continue
+        fi
+        read -r -p "  Are you sure? [y/N]: " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+          delete_saved_site "$del_idx"
+        fi
+        # Loop again — show the updated menu
+        ;;
+      s|S)
+        info "Skipping saved-sites menu — running with one-off prompts."
+        break
+        ;;
+      q|Q)
+        die "Aborted by user."
+        ;;
+      *)
+        warn "Unrecognized: '${menu_choice}'."
+        ;;
+    esac
+  done
+fi
 
 # ── parse / prompt for arguments ─────────────────────────────────────────────
 USER_ARG="${1:-}"
@@ -422,6 +661,21 @@ while :; do
       ;;
   esac
 done
+
+# ── optionally save site config for next time ────────────────────────────────
+if [[ "$SAVE_AFTER_RUN" == "ask" ]]; then
+  echo
+  read -r -p "Save these settings as a named site for next time? [y/N]: " ans
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    if save_or_update_site; then
+      info "Site '${SERVER_NAME}' saved to ${SITES_FILE}"
+    fi
+  fi
+elif [[ "$SAVE_AFTER_RUN" == "force" ]]; then
+  if save_or_update_site; then
+    info "Site '${SERVER_NAME}' updated in ${SITES_FILE}"
+  fi
+fi
 
 # ── work directory ────────────────────────────────────────────────────────────
 WORK_DIR="${HOME}/filecap-audits/${HOST}"
