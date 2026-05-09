@@ -10,6 +10,10 @@
 #    and by file category. Useful when your organization hosts content on
 #    multiple servers and you need one combined work-order for remediation.
 #
+#    Optionally also writes a self-contained HTML report (files.html) for
+#    both per-server and consolidated reports — a sortable, filterable,
+#    print-friendly version of the same data that opens in any browser.
+#
 #  HOW TO GET BOTH SCRIPTS
 #    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
 #    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
@@ -210,6 +214,19 @@ SERVERS_TXT="${FLEET_DIR}/servers.txt"
 } > "$SERVERS_TXT"
 info "Wrote ${SERVERS_TXT}"
 
+# ── HTML report flag ──────────────────────────────────────────────────────────
+# When set, audit-remote.sh will also generate files.html for each server,
+# and the final consolidated report will include files.html as well.
+# audit-remote.sh reads AUDIT_HTML=1 so we don't need to pass --html on its CLI.
+read -r -p "Also generate self-contained HTML reports? [y/N]: " HTML_ANS
+if [[ "${HTML_ANS}" == "y" || "${HTML_ANS}" == "Y" ]]; then
+  export AUDIT_HTML=1
+  HTML_FLAG="--html"
+else
+  export AUDIT_HTML=0
+  HTML_FLAG=""
+fi
+
 # ── per-server audits ─────────────────────────────────────────────────────────
 FAILED_SERVERS_TXT="${FLEET_DIR}/failed_servers.txt"
 SUCCESS_COUNT=0
@@ -270,7 +287,7 @@ info "Rollup complete"
 # ── consolidated report ───────────────────────────────────────────────────────
 step "Generating consolidated report → ${CONSOLIDATED_REPORT_DIR}/"
 if ! npx --yes @icjia/filecap@latest report "${CONSOLIDATED}" \
-    -o "${CONSOLIDATED_REPORT_DIR}" \
+    -o "${CONSOLIDATED_REPORT_DIR}" ${HTML_FLAG} \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap report generation failed."
 fi
@@ -484,6 +501,9 @@ printf "  Server manifest  : %s\n" "${SERVERS_TXT}"
 printf "  Fleet inventories: %s\n" "${INVENTORIES_DIR}/"
 printf "  Consolidated     : %s\n" "${CONSOLIDATED}"
 printf "  Consolidated rpt : %s\n" "${CONSOLIDATED_REPORT_DIR}/"
+if [[ -n "$HTML_FLAG" ]]; then
+  printf "  HTML report      : %s\n" "${CONSOLIDATED_REPORT_DIR}/files.html"
+fi
 printf "  Manager summary  : %s\n" "${MANAGER_SUMMARY}"
 
 if [[ -f "${FAILED_SERVERS_TXT}" ]]; then
@@ -493,3 +513,8 @@ fi
 printf "\n${Y}Hint:${N} open the manager summary at:\n"
 printf "  %s\n" "${MANAGER_SUMMARY}"
 xopen "${MANAGER_SUMMARY}"
+if [[ -n "$HTML_FLAG" ]]; then
+  printf "\n${Y}Hint:${N} open the consolidated HTML report at:\n"
+  printf "  %s\n" "${CONSOLIDATED_REPORT_DIR}/files.html"
+  xopen "${CONSOLIDATED_REPORT_DIR}/files.html"
+fi

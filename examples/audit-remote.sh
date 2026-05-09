@@ -10,6 +10,10 @@
 #    (page counts, has-text-layer, alt-text presence, etc.) so remediation
 #    vendors know exactly what they are working with.
 #
+#    Optionally also writes a self-contained HTML report (files.html) — a
+#    sortable, filterable, print-friendly version of the same data that opens
+#    in any browser with no external dependencies.
+#
 #  HOW TO GET THIS SCRIPT
 #    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
 #    chmod +x audit-remote.sh
@@ -30,6 +34,7 @@
 #    - Server IP or hostname
 #    - Full path to the uploads directory on the remote
 #    - A friendly name for the server (used in the report header)
+#    - Whether to also generate a self-contained HTML report (optional)
 #
 #  WHERE OUTPUT GOES
 #    ~/filecap-audits/<server-ip>/
@@ -37,6 +42,7 @@
 #      ├── inventory.ndjson   (raw scan output)
 #      └── report/
 #          ├── files.csv      (32-column vendor work-order)
+#          ├── files.html     (only if --html or "yes" answered at the prompt)
 #          ├── SUMMARY.txt    (counts by category)
 #          └── ...
 #
@@ -131,6 +137,19 @@ SSH_USER="$USER_ARG"
 HOST="$HOST_ARG"
 REMOTE_PATH="$REMOTE_PATH_ARG"
 SERVER_NAME="$SERVER_NAME_ARG"
+
+# ── HTML report flag ──────────────────────────────────────────────────────────
+# The env var AUDIT_HTML=1 lets audit-fleet.sh propagate the choice without
+# re-prompting. When running standalone, ask interactively.
+HTML_FLAG=""
+if [[ "${AUDIT_HTML:-0}" == "1" ]]; then
+  HTML_FLAG="--html"
+else
+  read -r -p "Also generate self-contained HTML report? [y/N]: " HTML_ANS
+  if [[ "${HTML_ANS}" == "y" || "${HTML_ANS}" == "Y" ]]; then
+    HTML_FLAG="--html"
+  fi
+fi
 
 # ── work directory ────────────────────────────────────────────────────────────
 WORK_DIR="${HOME}/filecap-audits/${HOST}"
@@ -281,7 +300,7 @@ PYREWRITE
 
 # ── generate report ───────────────────────────────────────────────────────────
 step "Generating filecap report ..."
-if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" \
+if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" ${HTML_FLAG} \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap report generation failed."
 fi
@@ -297,8 +316,16 @@ printf "\n${G}Files generated:${N}\n"
 printf "  Source info : %s\n" "${WORK_DIR}/SOURCE_INFO.txt"
 printf "  Inventory   : %s\n" "${INVENTORY}"
 printf "  CSV report  : %s\n" "${REPORT_DIR}/files.csv"
+if [[ -n "$HTML_FLAG" ]]; then
+  printf "  HTML report : %s\n" "${REPORT_DIR}/files.html"
+fi
 printf "  Full report : %s\n" "${REPORT_DIR}/"
 
 printf "\n${Y}Hint:${N} open the CSV report at:\n"
 printf "  %s\n" "${REPORT_DIR}/files.csv"
 xopen "${REPORT_DIR}/files.csv"
+if [[ -n "$HTML_FLAG" ]]; then
+  printf "\n${Y}Hint:${N} open the HTML report at:\n"
+  printf "  %s\n" "${REPORT_DIR}/files.html"
+  xopen "${REPORT_DIR}/files.html"
+fi

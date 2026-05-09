@@ -27,6 +27,7 @@ export { computeFilenameFlags } from "./flag/filename.js";
 export { rollupInventories } from "./rollup/merge.js";
 export { pickCanonical } from "./rollup/canonical.js";
 export { writeCsv, CSV_COLUMNS } from "./report/csv.js";
+export { writeHtml } from "./report/html.js";
 export { writeSummary } from "./report/summary.js";
 export {
   writeLargestFiles,

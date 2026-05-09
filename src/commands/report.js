@@ -10,6 +10,7 @@ import {
   writeDuplicateHashes,
   writePdfImageOnly,
 } from "../report/flagged.js";
+import { writeHtml } from "../report/html.js";
 
 /**
  * Orchestrate the report generation: read the inventory NDJSON line-by-line,
@@ -20,7 +21,7 @@ import {
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir }) {
+export async function runReport({ input, outputDir, html = false }) {
   let header;
   const entries = [];
 
@@ -69,6 +70,15 @@ export async function runReport({ input, outputDir }) {
   await fs.writeFile(path.join(outputDir, "flagged_filenames.txt"), writeFlaggedFilenames({ entries }));
   await fs.writeFile(path.join(outputDir, "duplicate_hashes.txt"), writeDuplicateHashes({ entries }));
   await fs.writeFile(path.join(outputDir, "pdf_image_only.txt"), writePdfImageOnly({ entries }));
+
+  if (html) {
+    await writeHtml({
+      sourceHeader: header,
+      entries,
+      sources,
+      outputPath: path.join(outputDir, "files.html"),
+    });
+  }
 
   return { exitCode: 0 };
 }

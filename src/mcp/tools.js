@@ -46,6 +46,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         input: { type: "string", description: "Inventory NDJSON path" },
         outputDir: { type: "string", description: "Output directory" },
+        html: { type: "boolean", description: "Also write a self-contained HTML report (default false)" },
       },
       required: ["input", "outputDir"],
     },
@@ -112,6 +113,7 @@ export async function dispatchTool(name, args) {
       const result = await runReport({
         input: args.input,
         outputDir: args.outputDir,
+        html: args.html ?? false,
       });
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }

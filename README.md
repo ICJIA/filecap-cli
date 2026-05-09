@@ -274,6 +274,7 @@ Generate the vendor handoff package from an inventory NDJSON (single-instance or
 
 ```bash
 filecap report consolidated.ndjson -o ./report-2026-Q2/
+filecap report consolidated.ndjson -o ./report-2026-Q2/ --html   # also writes files.html
 ```
 
 Output directory contents:
@@ -439,7 +440,7 @@ Two bash scripts ship with the repo at `examples/` that automate the full audit 
 
 ### Single-server audit: `audit-remote.sh`
 
-Walks the auditor through a single remote server, produces `~/filecap-audits/<server-ip>/report/files.csv` (a 32-column vendor work-order with one row per file, plus introspection-derived columns like page count, has-text-layer, alt-text presence, image-only flag).
+Walks the auditor through a single remote server, produces `~/filecap-audits/<server-ip>/report/files.csv` (a 32-column vendor work-order with one row per file, plus introspection-derived columns like page count, has-text-layer, alt-text presence, image-only flag). Optionally also writes `files.html` — a self-contained HTML report with the same 32 columns, built-in sort/filter/search, and clean print styles.
 
 ```bash
 curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
@@ -460,6 +461,7 @@ The script auto-detects Node version on the remote: if Node ≥20, it scans nati
 - Server IP or hostname
 - Full path to the uploads directory on the remote
 - Friendly server name (used in report headers; defaults to `strapi-<IP>` if blank)
+- Whether to also generate a self-contained HTML report (optional; defaults to no)
 
 **Output structure:**
 
@@ -470,12 +472,15 @@ The script auto-detects Node version on the remote: if Node ≥20, it scans nati
 ├── mirror/                Local rsync mirror (only created in local-scan mode)
 └── report/
     ├── files.csv          The vendor work-order, 32 columns × N rows
+    ├── files.html         (only if --html or "yes" answered at the prompt)
     ├── SUMMARY.txt        Counts by category (PDFs, images, Office docs)
     ├── largest_files.txt  Top files by size
     ├── flagged_filenames.txt  Files with name patterns suggesting scanned/IMG-prefixed origin
     ├── duplicate_hashes.txt   Content-identical files (by SHA-256)
     └── pdf_image_only.txt     PDFs with no text layer (require OCR before remediation)
 ```
+
+The optional `files.html` is a fully self-contained single file — no external stylesheets, fonts, or scripts. It opens in any browser, includes the same 32 columns as the CSV, supports client-side column sort (click any header) and full-text search/filter across all fields, visually highlights image-only PDFs and flagged filenames, and renders cleanly when printed.
 
 ### Fleet audit: `audit-fleet.sh`
 

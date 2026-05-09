@@ -102,9 +102,10 @@ program
   .command("report <inventory>")
   .description("Generate vendor handoff package (CSV + summary + flagged lists) from an inventory NDJSON")
   .option("-o, --output <dir>", "output directory", `./filecap-report-${Date.now()}/`)
+  .option("--html", "also write a self-contained sortable HTML report (files.html)", false)
   .action(async (inventory, opts) => {
     try {
-      const result = await runReport({ input: inventory, outputDir: opts.output });
+      const result = await runReport({ input: inventory, outputDir: opts.output, html: opts.html });
       if (result.error) process.stderr.write(`${result.error}\n`);
       process.exit(result.exitCode);
     } catch (err) {
