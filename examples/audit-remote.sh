@@ -66,6 +66,10 @@
 #    ./audit-remote.sh --no-version-check                                 # skip update check
 #    SKIP_VERSION_CHECK=1 ./audit-remote.sh                               # same, via env var
 #
+#  NOTE: REMOTE_PATH must not contain spaces or shell metacharacters.
+#    Tilde paths such as ~/uploads are supported (the remote shell expands them).
+#    For paths with spaces, use the absolute path instead.
+#
 # ============================================================================
 
 set -euo pipefail
@@ -330,11 +334,15 @@ fi
 info "SSH OK"
 
 # ── verify remote path ────────────────────────────────────────────────────────
+# NOTE: REMOTE_PATH must not contain spaces or shell metacharacters.
+# We intentionally omit inner single-quotes around ${REMOTE_PATH} so the remote
+# shell can expand tilde paths (e.g. ~/uploads). Paths with spaces should be
+# given as absolute paths instead.
 step "Verifying remote path exists: ${REMOTE_PATH}"
-if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -d '${REMOTE_PATH}'" 2>/dev/null; then
+if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -d ${REMOTE_PATH}" 2>/dev/null; then
   die "Remote path '${REMOTE_PATH}' does not exist or is not a directory on ${HOST}."
 fi
-if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -r '${REMOTE_PATH}'" 2>/dev/null; then
+if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -r ${REMOTE_PATH}" 2>/dev/null; then
   die "Remote path '${REMOTE_PATH}' exists but is not readable by user '${SSH_USER}'."
 fi
 info "Remote path confirmed and readable"
@@ -342,9 +350,9 @@ info "Remote path confirmed and readable"
 # ── remote size / file count ──────────────────────────────────────────────────
 step "Checking remote upload size ..."
 REMOTE_SIZE=$(ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" \
-  "LC_ALL=C du -sh '${REMOTE_PATH}' 2>/dev/null | tr -s ' \t' ' ' | cut -d' ' -f1" 2>/dev/null || echo "unknown")
+  "LC_ALL=C du -sh ${REMOTE_PATH} 2>/dev/null | tr -s ' \t' ' ' | cut -d' ' -f1" 2>/dev/null || echo "unknown")
 REMOTE_COUNT=$(ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" \
-  "LC_ALL=C find '${REMOTE_PATH}' -type f 2>/dev/null | wc -l | tr -d ' \t'" 2>/dev/null || echo "?")
+  "LC_ALL=C find ${REMOTE_PATH} -type f 2>/dev/null | wc -l | tr -d ' \t'" 2>/dev/null || echo "?")
 info "Remote: ${REMOTE_COUNT} files, ${REMOTE_SIZE} total on disk"
 
 # ── local disk-space check ────────────────────────────────────────────────────
