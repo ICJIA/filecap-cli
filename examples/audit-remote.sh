@@ -373,6 +373,109 @@ print(f"Removed site: {nick}")
 PYDEL
 }
 
+# Preflight every saved site. Verifies SSH connectivity, remote path existence
+# and readability, and counts files. Prints a status table; does not modify
+# any state. Useful for catching issues before running a full audit.
+preflight_all_sites() {
+  ensure_sites_file
+
+  local sites_tsv
+  sites_tsv=$(python3 - <<'PYTSV' "$SITES_FILE"
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+for s in data.get("sites", []):
+    print("\t".join([
+        s.get("siteName") or "(no nickname)",
+        s.get("name") or "?",
+        s.get("user") or "?",
+        s.get("host") or "?",
+        s.get("remotePath") or "",
+    ]))
+PYTSV
+)
+
+  if [[ -z "$sites_tsv" ]]; then
+    warn "No saved sites to preflight."
+    return 0
+  fi
+
+  echo
+  step "Preflight check on every saved site (a few seconds per site) ..."
+  echo
+
+  printf "  %-18s %-22s %-18s %-8s %-8s %-8s %s\n" \
+    "Nickname" "Server name" "Host" "SSH" "Path" "Files" "Notes"
+  printf "  %-18s %-22s %-18s %-8s %-8s %-8s %s\n" \
+    "------------------" "----------------------" "------------------" "--------" "--------" "--------" "----------------"
+
+  local fail_count=0
+  local warn_count=0
+  local total_count=0
+
+  while IFS=$'\t' read -r nick name user host rpath; do
+    [[ -z "$nick" && -z "$name" ]] && continue
+    total_count=$((total_count + 1))
+
+    if [[ -z "$host" || "$host" == "?" || -z "$rpath" ]]; then
+      printf "  %-18s %-22s %-18s ${R}%-8s${N} %-8s %-8s %s\n" \
+        "$nick" "$name" "${host:-?}" "MISSING" "-" "-" "missing host or path"
+      fail_count=$((fail_count + 1))
+      continue
+    fi
+
+    # SSH connectivity check
+    if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "${user}@${host}" true 2>/dev/null; then
+      printf "  %-18s %-22s %-18s ${R}%-8s${N} %-8s %-8s %s\n" \
+        "$nick" "$name" "$host" "FAIL" "-" "-" "SSH connect failed"
+      fail_count=$((fail_count + 1))
+      continue
+    fi
+
+    # Remote path existence + readability
+    if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d ${rpath} && test -r ${rpath}" 2>/dev/null; then
+      printf "  %-18s %-22s %-18s ${G}%-8s${N} ${R}%-8s${N} %-8s %s\n" \
+        "$nick" "$name" "$host" "OK" "FAIL" "-" "path missing or unreadable"
+      fail_count=$((fail_count + 1))
+      continue
+    fi
+
+    # File count (find -type f)
+    local file_count
+    file_count=$(ssh -o ConnectTimeout=10 "${user}@${host}" "find ${rpath} -type f 2>/dev/null | wc -l" 2>/dev/null | tr -d '[:space:]')
+    if [[ -z "$file_count" || ! "$file_count" =~ ^[0-9]+$ ]]; then
+      printf "  %-18s %-22s %-18s ${G}%-8s${N} ${G}%-8s${N} ${Y}%-8s${N} %s\n" \
+        "$nick" "$name" "$host" "OK" "OK" "?" "couldn't count files"
+      warn_count=$((warn_count + 1))
+    elif [[ "$file_count" -eq 0 ]]; then
+      printf "  %-18s %-22s %-18s ${G}%-8s${N} ${G}%-8s${N} ${Y}%-8s${N} %s\n" \
+        "$nick" "$name" "$host" "OK" "OK" "0" "directory is empty"
+      warn_count=$((warn_count + 1))
+    else
+      printf "  %-18s %-22s %-18s ${G}%-8s${N} ${G}%-8s${N} %-8s %s\n" \
+        "$nick" "$name" "$host" "OK" "OK" "$file_count" ""
+    fi
+  done <<< "$sites_tsv"
+
+  echo
+  local ok_count=$((total_count - fail_count - warn_count))
+  if [[ "$fail_count" -eq 0 && "$warn_count" -eq 0 ]]; then
+    info "All ${total_count} site(s) OK."
+  else
+    if [[ "$fail_count" -gt 0 ]]; then
+      warn "${fail_count} of ${total_count} site(s) FAILED preflight (see above)."
+    fi
+    if [[ "$warn_count" -gt 0 ]]; then
+      warn "${warn_count} of ${total_count} site(s) have warnings (empty dir or count failure)."
+    fi
+    if [[ "$ok_count" -gt 0 ]]; then
+      info "${ok_count} of ${total_count} site(s) passed cleanly."
+    fi
+  fi
+  echo
+  read -r -p "  Press Enter to return to the menu..." _
+}
+
 # ── strip --no-version-check from args before positional parsing ──────────────
 NEW_ARGS=()
 for a in "$@"; do
@@ -414,6 +517,7 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
     if [[ "$saved_count" -gt 0 ]]; then
       echo "    e  →  edit a saved site"
       echo "    d  →  delete a saved site"
+      echo "    p  →  preflight all saved sites (verify SSH + path + file count)"
     fi
     echo "    s  →  skip (one-off prompts, don't save)"
     echo "    q  →  quit"
@@ -470,6 +574,13 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
           delete_saved_site "$del_idx"
         fi
         # Loop again — show the updated menu
+        ;;
+      p|P)
+        if [[ "$saved_count" -eq 0 ]]; then
+          warn "No saved sites to preflight."
+          continue
+        fi
+        preflight_all_sites
         ;;
       s|S)
         info "Skipping saved-sites menu — running with one-off prompts."
