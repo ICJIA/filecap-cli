@@ -159,4 +159,41 @@ describe("writeHtml", () => {
     const html = await fs.readFile(out, "utf8");
     expect(html).toMatch(/<input[^>]*type=["']search["']/i);
   });
+
+  it("sets <title> to site name when siteName is present in header", async () => {
+    const headerWithSite = {
+      ...sampleHeader,
+      metadata: { ...sampleHeader.metadata, siteName: "DVFR" },
+    };
+    const out = path.join(tmpDir, "title-site.html");
+    await writeHtml({ sourceHeader: headerWithSite, entries: sampleEntries, sources: [headerWithSite], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("<title>filecap audit — DVFR</title>");
+  });
+
+  it("sets <title> to server name when siteName is absent", async () => {
+    const out = path.join(tmpDir, "title-server.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("<title>filecap audit — test-server</title>");
+  });
+
+  it("includes Website column header in the table", async () => {
+    const out = path.join(tmpDir, "website-col.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("Website");
+  });
+
+  it("shows Website in the summary meta-grid when siteName is set", async () => {
+    const headerWithSite = {
+      ...sampleHeader,
+      metadata: { ...sampleHeader.metadata, siteName: "DVFR" },
+    };
+    const out = path.join(tmpDir, "site-meta.html");
+    await writeHtml({ sourceHeader: headerWithSite, entries: sampleEntries, sources: [headerWithSite], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("Website:");
+    expect(html).toContain("DVFR");
+  });
 });

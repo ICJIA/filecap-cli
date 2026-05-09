@@ -35,15 +35,17 @@ function htmlEscape(s) {
  * @returns {Array<string|number>}
  */
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
-  let serverName, serverIp, scannedPath;
+  let serverName, siteName, serverIp, scannedPath;
   if (isConsolidated) {
     serverName = entry.serverName;
     const src = sourceMap.get(entry.serverName);
+    siteName = src?.siteName ?? "";
     serverIp = src?.serverIp ?? "";
     scannedPath = src?.scannedPath ?? "";
   } else {
     const m = sourceHeader.metadata;
     serverName = m.serverName;
+    siteName = m.siteName ?? "";
     serverIp = m.serverIp;
     scannedPath = m.scannedPath;
   }
@@ -60,6 +62,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const raw = [
     serverName,
+    siteName,
     serverIp,
     scannedPath,
     entry.path,
@@ -196,10 +199,12 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
 
   // ── server/scan metadata display ─────────────────────────────────────────────
   const serverName = meta?.serverName ?? "";
+  const siteName = meta?.siteName ?? "";
   const serverIp = meta?.serverIp ?? "";
   const hostname = meta?.hostname ?? "";
   const scannedPath = meta?.scannedPath ?? "";
   const scannedAt = meta?.scannedAt ?? "";
+  const titleSuffix = siteName !== "" ? siteName : serverName;
 
   // ── embed data as JSON for client-side search/sort ────────────────────────────
   // Safe JSON embedding: prevent </script> from ending the script block early
@@ -213,7 +218,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>filecap report — ${htmlEscape(serverName)}</title>
+<title>filecap audit — ${htmlEscape(titleSuffix)}</title>
 <style>
 /* ── base ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -367,6 +372,7 @@ footer {
 <h1>filecap inventory report</h1>
 
 <div class="meta-grid">
+  ${siteName !== "" ? `<span class="meta-label">Website:</span>      <span>${htmlEscape(siteName)}</span>` : ""}
   <span class="meta-label">Server:</span>      <span>${htmlEscape(serverName)}</span>
   <span class="meta-label">IP:</span>           <span>${htmlEscape(serverIp)}</span>
   <span class="meta-label">Hostname:</span>     <span>${htmlEscape(hostname)}</span>

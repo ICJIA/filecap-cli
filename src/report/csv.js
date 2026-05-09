@@ -2,6 +2,7 @@ import { csvCell, boolToYesNo } from "./format.js";
 
 export const CSV_COLUMNS = [
   { name: "serverName",            label: "Server" },
+  { name: "siteName",              label: "Website" },
   { name: "serverIp",              label: "Server IP" },
   { name: "scannedPath",           label: "Source folder on server" },
   { name: "path",                  label: "File location (relative to source folder)" },
@@ -95,15 +96,17 @@ function formatValue(v) {
 }
 
 function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
-  let serverName, serverIp, scannedPath;
+  let serverName, siteName, serverIp, scannedPath;
   if (isConsolidated) {
     serverName = entry.serverName;
     const src = sourceMap.get(entry.serverName);
+    siteName = src?.siteName ?? "";
     serverIp = src?.serverIp ?? "";
     scannedPath = src?.scannedPath ?? "";
   } else {
     const m = sourceHeader.metadata;
     serverName = m.serverName;
+    siteName = m.siteName ?? "";
     serverIp = m.serverIp;
     scannedPath = m.scannedPath;
   }
@@ -120,6 +123,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   return [
     serverName,
+    siteName,
     serverIp,
     scannedPath,
     entry.path,

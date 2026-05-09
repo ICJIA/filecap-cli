@@ -48,6 +48,11 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[0].label).toBe("Server");
   });
 
+  it("second column is siteName with label Website", () => {
+    expect(CSV_COLUMNS[1].name).toBe("siteName");
+    expect(CSV_COLUMNS[1].label).toBe("Website");
+  });
+
   it("includes new metadata columns for PDF, DOCX, XLSX", () => {
     const names = CSV_COLUMNS.map((c) => c.name);
     expect(names).toContain("pdfTitle");
@@ -154,6 +159,56 @@ describe("writeCsv (single-instance input)", () => {
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
     expect(cells[colIndex("flags")]).toBe("scanned-name-pattern|filename-has-spaces");
+  });
+});
+
+describe("writeCsv siteName column", () => {
+  it("renders Website column as empty for a source without siteName", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
+    const headerRow = csv.trim().split("\n")[0];
+    expect(headerRow).toContain("Website");
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("siteName")]).toBe("");
+  });
+
+  it("renders Website column with siteName from single-instance header", () => {
+    const headerWithSite = {
+      ...baseHeader,
+      metadata: { ...baseHeader.metadata, siteName: "DVFR" },
+    };
+    const csv = writeCsv({ sourceHeader: headerWithSite, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("siteName")]).toBe("DVFR");
+  });
+
+  it("renders Website column from source's siteName in consolidated inventory", () => {
+    const consolidatedHeader = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: {
+        consolidatedAt: "2024-01-01T00:00:00.000Z",
+        filecapVersion: "1.0.3",
+        nodeVersion: "v20.11.1",
+        sources: [
+          {
+            siteName: "DVFR",
+            ...baseHeader.metadata,
+            stats: { fileCount: 1, totalBytes: 0, scanDurationMs: 0, introspectionFailures: 0, permissionDenials: 0 },
+          },
+        ],
+      },
+    };
+    const entry = { ...baseEntry, serverName: "strapi-prod-01", duplicateOf: null };
+    const csv = writeCsv({
+      sourceHeader: consolidatedHeader,
+      entries: [entry],
+      sources: consolidatedHeader.metadata.sources,
+    });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("siteName")]).toBe("DVFR");
   });
 });
 
