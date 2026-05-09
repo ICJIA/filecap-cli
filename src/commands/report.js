@@ -120,7 +120,7 @@ export async function runReport({ input, outputDir, html = false }) {
   const csv = writeCsv({ sourceHeader: header, entries, sources });
   await fs.writeFile(path.join(outputDir, "audit-file-list.csv"), csv);
 
-  const summary = writeSummary({ entries, sources });
+  const summary = writeSummary({ entries, sources, header });
   await fs.writeFile(path.join(outputDir, "audit-summary.txt"), summary);
 
   await fs.writeFile(path.join(outputDir, "largest_files.txt"), writeLargestFiles({ entries }));

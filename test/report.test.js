@@ -106,6 +106,53 @@ describe("filecap report CLI", () => {
     expect(flagged).not.toContain("ok.pdf");
   });
 
+  it("populates Server, Website, and Source location fields in audit-summary.txt from the inventory header", async () => {
+    const ndjson = path.join(tmpRoot, "header-test.ndjson");
+    const headerWithSite = JSON.stringify({
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        serverName: "my-test-server",
+        hostname: "my-test-server.local",
+        serverIp: "10.1.2.3",
+        scannedPath: "/var/uploads/media",
+        scannedAt: "2026-01-15T08:00:00.000Z",
+        siteName: "MySite",
+        filecapVersion: "1.0.3",
+        nodeVersion: "v20.11.1",
+        options: { introspect: false, hash: false, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    });
+    await fs.writeFile(ndjson, [
+      headerWithSite,
+      JSON.stringify({
+        path: "file.pdf",
+        absolutePath: "/var/uploads/media/file.pdf",
+        filename: "file.pdf",
+        extension: "pdf",
+        category: "pdf",
+        remediable: true,
+        sizeBytes: 512,
+        modifiedAt: "2026-01-01T00:00:00.000Z",
+        sha256: "abc",
+        flags: [],
+      }),
+      JSON.stringify({
+        kind: "filecap-inventory-footer",
+        stats: { fileCount: 1, totalBytes: 512, scanDurationMs: 1, introspectionFailures: 0, permissionDenials: 0 },
+      }),
+    ].join("\n") + "\n");
+
+    const reportDir = path.join(outDir, "header-report");
+    const result = await runCli(["report", ndjson, "-o", reportDir], outDir);
+    expect(result.code).toBe(0);
+
+    const summary = await fs.readFile(path.join(reportDir, "audit-summary.txt"), "utf8");
+    expect(summary).toMatch(/Server:\s+my-test-server/);
+    expect(summary).toMatch(/Website:\s+MySite/);
+    expect(summary).toMatch(/Source location:\s+\/var\/uploads\/media/);
+  });
+
   it("returns exit code 2 when input file does not exist", async () => {
     const result = await runCli(["report", path.join(tmpRoot, "no-such.ndjson"), "-o", path.join(outDir, "x")], outDir);
     expect(result.code).toBe(2);
