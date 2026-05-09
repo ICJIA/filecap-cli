@@ -34,6 +34,20 @@ function htmlEscape(s) {
  * @param {boolean} isConsolidated
  * @returns {Array<string|number>}
  */
+function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
+  let base;
+  if (isConsolidated) {
+    const src = sourceMap.get(entry.serverName);
+    base = src?.publicUrlBase ?? "";
+  } else {
+    base = sourceHeader.metadata?.publicUrlBase ?? "";
+  }
+  if (!base) return "";
+  const cleanBase = base.replace(/\/+$/, "");
+  const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
+  return `${cleanBase}/${cleanPath}`;
+}
+
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
   let serverName, siteName, serverIp, scannedPath;
   if (isConsolidated) {
@@ -49,6 +63,8 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     serverIp = m.serverIp;
     scannedPath = m.scannedPath;
   }
+
+  const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
 
   const intro = entry.introspection ?? null;
   const isPdf = intro?.kind === "pdf";
@@ -67,6 +83,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     scannedPath,
     entry.path,
     entry.absolutePath,
+    publicUrl,
     entry.filename,
     entry.extension,
     entry.category,
@@ -173,6 +190,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
   const totalFiles = entries.length;
 
   // ── build table rows ─────────────────────────────────────────────────────────
+  const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
+
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
     const intro = entry.introspection ?? null;
@@ -184,7 +203,13 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
     if (isFlagged) classes.push("flagged");
 
     const classAttr = classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
-    const cells = values.map((v) => `<td>${htmlEscape(v)}</td>`).join("");
+    const cells = values.map((v, i) => {
+      if (i === publicUrlColIdx && v !== "" && v !== null && v !== undefined) {
+        const escaped = htmlEscape(v);
+        return `<td><a href="${escaped}" target="_blank" rel="noopener noreferrer">${escaped}</a></td>`;
+      }
+      return `<td>${htmlEscape(v)}</td>`;
+    }).join("");
     return `<tr${classAttr}>${cells}</tr>`;
   }).join("\n");
 

@@ -185,6 +185,26 @@ describe("writeHtml", () => {
     expect(html).toContain("Website");
   });
 
+  it("renders Public URL as a clickable link when publicUrlBase is set in header", async () => {
+    const headerWithUrl = {
+      ...sampleHeader,
+      metadata: { ...sampleHeader.metadata, publicUrlBase: "https://cdn.example.com/uploads" },
+    };
+    const out = path.join(tmpDir, "puburl.html");
+    await writeHtml({ sourceHeader: headerWithUrl, entries: sampleEntries, sources: [headerWithUrl], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/<a\s[^>]*href="https:\/\/cdn\.example\.com\/uploads\/doc\.pdf"/);
+    expect(html).toContain('target="_blank"');
+  });
+
+  it("renders Public URL as plain empty cell when publicUrlBase is absent", async () => {
+    const out = path.join(tmpDir, "no-puburl.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    // No link to cdn
+    expect(html).not.toMatch(/href="https:\/\/cdn\.example\.com/);
+  });
+
   it("shows Website in the summary meta-grid when siteName is set", async () => {
     const headerWithSite = {
       ...sampleHeader,

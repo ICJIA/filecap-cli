@@ -22,6 +22,7 @@ export async function runScan({
   serverName,
   serverIp,
   siteName,
+  publicUrlBase,
   includeExt,
   excludeExt,
   introspect: introspectEnabled = false,
@@ -74,6 +75,9 @@ export async function runScan({
     };
     if (siteName && siteName !== "") {
       headerMetadata.siteName = siteName;
+    }
+    if (publicUrlBase && publicUrlBase !== "") {
+      headerMetadata.publicUrlBase = publicUrlBase;
     }
     const header = {
       schemaVersion: SCHEMA_VERSION,

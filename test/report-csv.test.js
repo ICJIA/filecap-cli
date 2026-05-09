@@ -212,6 +212,66 @@ describe("writeCsv siteName column", () => {
   });
 });
 
+describe("writeCsv publicUrl column", () => {
+  it("emits an empty Public URL when no publicUrlBase is set", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("publicUrl")]).toBe("");
+  });
+
+  it("builds a Public URL from header publicUrlBase + entry path", () => {
+    const headerWithUrl = {
+      ...baseHeader,
+      metadata: { ...baseHeader.metadata, publicUrlBase: "https://example.com/uploads" },
+    };
+    const csv = writeCsv({ sourceHeader: headerWithUrl, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("publicUrl")]).toBe("https://example.com/uploads/case.pdf");
+  });
+
+  it("strips trailing slash from base and leading slash from path when building URL", () => {
+    const headerWithUrl = {
+      ...baseHeader,
+      metadata: { ...baseHeader.metadata, publicUrlBase: "https://example.com/uploads/" },
+    };
+    const entryWithLeadingSlash = { ...baseEntry, path: "/case.pdf" };
+    const csv = writeCsv({ sourceHeader: headerWithUrl, entries: [entryWithLeadingSlash], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("publicUrl")]).toBe("https://example.com/uploads/case.pdf");
+  });
+
+  it("builds Public URL from consolidated source publicUrlBase", () => {
+    const consolidatedHeader = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: {
+        consolidatedAt: "2024-01-01T00:00:00.000Z",
+        filecapVersion: "1.0.4",
+        nodeVersion: "v20.11.1",
+        sources: [
+          {
+            ...baseHeader.metadata,
+            publicUrlBase: "https://prod.example.com/uploads",
+            stats: { fileCount: 1, totalBytes: 0, scanDurationMs: 0, introspectionFailures: 0, permissionDenials: 0 },
+          },
+        ],
+      },
+    };
+    const entry = { ...baseEntry, serverName: "strapi-prod-01", duplicateOf: null };
+    const csv = writeCsv({
+      sourceHeader: consolidatedHeader,
+      entries: [entry],
+      sources: consolidatedHeader.metadata.sources,
+    });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("publicUrl")]).toBe("https://prod.example.com/uploads/case.pdf");
+  });
+});
+
 describe("writeCsv (consolidated input)", () => {
   it("uses per-entry serverName and looks up serverIp from sources", () => {
     const consolidatedHeader = {

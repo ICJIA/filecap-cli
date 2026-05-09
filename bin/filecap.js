@@ -37,6 +37,7 @@ program
   .option("-s, --server-name <name>", "override server identifier in metadata")
   .option("--server-ip <ip>", "override server IP in metadata")
   .option("--site-name <name>", "Optional human-friendly website nickname (e.g., DVFR, i2i, vpp). Different from --server-name (the operational identifier).")
+  .option("--public-url-base <url>", "Base URL where uploaded files are publicly served (e.g., https://example.com/uploads). Added to the CSV and HTML reports as a clickable Public URL column.")
   .option("--no-hash", "skip SHA-256 hashing")
   .option("--no-introspect", "skip PDF/Office introspection (filesystem stats only)")
   .option(
@@ -66,6 +67,7 @@ program
         serverName: opts.serverName,
         serverIp: opts.serverIp,
         siteName: opts.siteName,
+        publicUrlBase: opts.publicUrlBase,
         includeExt: opts.includeExt,
         excludeExt: opts.excludeExt,
         introspect: opts.introspect,

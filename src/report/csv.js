@@ -7,6 +7,7 @@ export const CSV_COLUMNS = [
   { name: "scannedPath",           label: "Source folder on server" },
   { name: "path",                  label: "File location (relative to source folder)" },
   { name: "absolutePath",          label: "Full file path on server" },
+  { name: "publicUrl",             label: "Public URL" },
   { name: "filename",              label: "File name" },
   { name: "extension",             label: "File extension" },
   { name: "category",              label: "File type" },
@@ -95,6 +96,20 @@ function formatValue(v) {
   return v;
 }
 
+function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
+  let base;
+  if (isConsolidated) {
+    const src = sourceMap.get(entry.serverName);
+    base = src?.publicUrlBase ?? "";
+  } else {
+    base = sourceHeader.metadata?.publicUrlBase ?? "";
+  }
+  if (!base) return "";
+  const cleanBase = base.replace(/\/+$/, "");
+  const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
+  return `${cleanBase}/${cleanPath}`;
+}
+
 function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
   let serverName, siteName, serverIp, scannedPath;
   if (isConsolidated) {
@@ -110,6 +125,8 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     serverIp = m.serverIp;
     scannedPath = m.scannedPath;
   }
+
+  const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
 
   const intro = entry.introspection ?? null;
   const isPdf = intro?.kind === "pdf";
@@ -128,6 +145,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     scannedPath,
     entry.path,
     entry.absolutePath,
+    publicUrl,
     entry.filename,
     entry.extension,
     entry.category,

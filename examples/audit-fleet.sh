@@ -38,12 +38,12 @@
 #
 #  CSV INPUT FORMAT (batch mode)
 #    No header row; lines starting with # are comments.
-#    Columns: server_name,user,host,remote_path[,site_name]
+#    Columns: server_name,user,host,remote_path[,site_name[,public_url_base]]
 #    Examples:
-#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR
+#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads
 #      i2i-strapi-prod,forge,10.0.0.5,/var/strapi/uploads,i2i
 #      vpp-strapi-prod,forge,10.0.0.6,/var/strapi/uploads
-#                  (the third row has no site_name — that's allowed)
+#                  (4-column and 5-column rows still work — public_url_base is optional)
 #
 #  WHERE OUTPUT GOES
 #    Per-server results land in timestamped run dirs (preserved across re-runs):
@@ -265,12 +265,13 @@ step "Fleet output dir: ${FLEET_DIR}"
 mkdir -p "${INVENTORIES_DIR}" "${CONSOLIDATED_REPORT_DIR}"
 
 # ── parse server list ─────────────────────────────────────────────────────────
-# Arrays: names, users, hosts, paths, sites (parallel indexed)
+# Arrays: names, users, hosts, paths, sites, urlbases (parallel indexed)
 declare -a SRV_NAMES=()
 declare -a SRV_USERS=()
 declare -a SRV_HOSTS=()
 declare -a SRV_PATHS=()
 declare -a SRV_SITES=()
+declare -a SRV_URLBASES=()
 
 CSV_FILE="${1:-}"
 
@@ -284,7 +285,7 @@ if [[ -n "$CSV_FILE" ]]; then
     [[ -z "$line" ]]       && continue
     [[ "$line" == \#* ]]   && continue
 
-    IFS=',' read -r _name _user _host _path _site <<< "$line"
+    IFS=',' read -r _name _user _host _path _site _urlbase <<< "$line"
     # trim whitespace
     _name="${_name// /}"
     _user="${_user// /}"
@@ -294,6 +295,9 @@ if [[ -n "$CSV_FILE" ]]; then
     # site_name is optional; trim leading/trailing whitespace only
     _site="${_site:-}"
     _site="$(echo "${_site}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    # public_url_base is optional (6th column)
+    _urlbase="${_urlbase:-}"
+    _urlbase="$(echo "${_urlbase}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$_name" || -z "$_user" || -z "$_host" || -z "$_path" ]]; then
       warn "Skipping malformed CSV line: ${line}"
@@ -305,6 +309,7 @@ if [[ -n "$CSV_FILE" ]]; then
     SRV_HOSTS+=("$_host")
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
+    SRV_URLBASES+=("$_urlbase")
   done < "$CSV_FILE"
 
   if [[ "${#SRV_NAMES[@]}" -eq 0 ]]; then
@@ -329,12 +334,14 @@ else
     read -r -p "  Server IP or hostname (e.g. 192.168.1.1): " _host
     read -r -p "  Full path to uploads directory on the remote (e.g. ~/uploads): " _path
     read -r -p "  Website nickname (e.g. DVFR, i2i, vpp; press Enter to skip): " _site
+    read -r -p "  Public URL prefix (e.g. https://dvfr.icjia-api.cloud/uploads; press Enter to skip): " _urlbase
 
     SRV_NAMES+=("$_name")
     SRV_USERS+=("$_user")
     SRV_HOSTS+=("$_host")
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
+    SRV_URLBASES+=("$_urlbase")
   done
 fi
 
@@ -388,7 +395,9 @@ for i in "${!SRV_NAMES[@]}"; do
     continue
   fi
 
-  if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d '${path_}' && test -r '${path_}'" 2>/dev/null; then
+  # Note: inner single-quotes omitted so remote shell can expand tilde paths.
+  # Paths with spaces should use absolute paths instead.
+  if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d ${path_} && test -r ${path_}" 2>/dev/null; then
     printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s\n" "$name" "$host" "PATH ERROR" "-" "$path_"
     SKIPPED_REASONS+=("$name: path missing or unreadable")
     continue
@@ -401,7 +410,7 @@ for i in "${!SRV_NAMES[@]}"; do
     node_label="$node_ver"
   fi
 
-  remote_size=$(ssh -o ConnectTimeout=10 "${user}@${host}" "du -sh '${path_}' 2>/dev/null | cut -f1" 2>/dev/null || echo "?")
+  remote_size=$(ssh -o ConnectTimeout=10 "${user}@${host}" "du -sh ${path_} 2>/dev/null | cut -f1" 2>/dev/null || echo "?")
   if [[ "$remote_size" != "?" ]]; then
     remote_bytes=$(size_to_bytes "$remote_size")
     TOTAL_REMOTE_BYTES=$((TOTAL_REMOTE_BYTES + remote_bytes))
@@ -446,10 +455,11 @@ for i in "${VALID_INDEXES[@]}"; do
   SRV_HOST="${SRV_HOSTS[$i]}"
   SRV_PATH="${SRV_PATHS[$i]}"
   SRV_SITE="${SRV_SITES[$i]:-}"
+  SRV_URLBASE="${SRV_URLBASES[$i]:-}"
 
   printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
 
-  if SITE_NAME_ARG="${SRV_SITE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+  if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
     # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
     # Fall back to scanning runs/ directly in case the symlink is missing.
     SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/latest/inventory.ndjson"

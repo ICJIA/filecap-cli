@@ -289,6 +289,33 @@ describe("runScan", () => {
     expect(Object.prototype.hasOwnProperty.call(lines[0].metadata, "siteName")).toBe(false);
   });
 
+  it("includes publicUrlBase in header metadata when provided", async () => {
+    const outPath = path.join(outDir, "puburl.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      publicUrlBase: "https://example.com/uploads",
+    });
+    const lines = await readNdjson(outPath);
+    expect(lines[0].metadata.publicUrlBase).toBe("https://example.com/uploads");
+  });
+
+  it("omits publicUrlBase from header when not provided", async () => {
+    const outPath = path.join(outDir, "no-puburl.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+    });
+    const lines = await readNdjson(outPath);
+    expect(Object.prototype.hasOwnProperty.call(lines[0].metadata, "publicUrlBase")).toBe(false);
+  });
+
   it("omits siteName from header when empty string", async () => {
     const outPath = path.join(outDir, "empty-sitename.ndjson");
     await runScan({
