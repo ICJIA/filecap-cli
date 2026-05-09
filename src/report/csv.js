@@ -1,4 +1,4 @@
-import { humanizeBytes, csvCell, boolToYesNo } from "./format.js";
+import { csvCell, boolToYesNo } from "./format.js";
 
 export const CSV_COLUMNS = [
   { name: "serverName",            label: "Server" },
