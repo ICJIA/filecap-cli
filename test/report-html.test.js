@@ -399,4 +399,44 @@ describe("writeHtml", () => {
     expect(html).toContain('<th data-col="auditGrade">Audit grade</th>');
     expect(html).toContain('<th data-col="auditReport">Audit report</th>');
   });
+
+  // ── Section 2: two-stat summary box ─────────────────────────────────────────
+
+  it("renders stat-card remediable and stat-card reference boxes", async () => {
+    const out = path.join(tmpDir, "stat-cards.html");
+    const mixedEntries = [
+      { ...sampleEntries[0], category: "pdf", remediable: true },
+      { ...sampleEntries[1], category: "image", filename: "photo.png", path: "photo.png", extension: "png", remediable: false, introspection: undefined },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: mixedEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain('class="stat-card remediable"');
+    expect(html).toContain('class="stat-card reference"');
+  });
+
+  it("stat-card remediable shows correct remediable count", async () => {
+    const out = path.join(tmpDir, "stat-card-counts.html");
+    const mixedEntries = [
+      { ...sampleEntries[0], sha256: "p1", path: "a.pdf", filename: "a.pdf", category: "pdf", remediable: true },
+      { ...sampleEntries[0], sha256: "p2", path: "b.pdf", filename: "b.pdf", category: "pdf", remediable: true },
+      { ...sampleEntries[1], sha256: "i1", path: "c.png", filename: "c.png", extension: "png", category: "image", remediable: false, introspection: undefined },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: mixedEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    // 2 remediable PDFs
+    expect(html).toMatch(/class="stat-card remediable"[\s\S]*?class="stat-number">2</);
+    // 1 reference image
+    expect(html).toMatch(/class="stat-card reference"[\s\S]*?class="stat-number">1/);
+  });
+
+  it("stat-detail lists PDF count when PDFs are present", async () => {
+    const out = path.join(tmpDir, "stat-detail-pdfs.html");
+    const pdfEntries = [
+      { ...sampleEntries[0], sha256: "p1", path: "a.pdf", filename: "a.pdf", category: "pdf", remediable: true },
+      { ...sampleEntries[0], sha256: "p2", path: "b.pdf", filename: "b.pdf", category: "pdf", remediable: true },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: pdfEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/2 PDFs/);
+  });
 });

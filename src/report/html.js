@@ -255,6 +255,22 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
 
   const totalFiles = entries.length;
 
+  // ── remediable vs reference breakdown ────────────────────────────────────────
+  const REMEDIABLE_CATEGORIES = ["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"];
+  function entryIsRemediable(category) {
+    return REMEDIABLE_CATEGORIES.includes(category);
+  }
+  const pdfCount = categoryCounts["pdf"] ?? 0;
+  const officeCount = categoryCounts["office-document"] ?? 0;
+  const spreadsheetCount = categoryCounts["spreadsheet"] ?? 0;
+  const presentationCount = categoryCounts["presentation"] ?? 0;
+  const legacyCount = categoryCounts["legacy-office"] ?? 0;
+  const remediableCount = pdfCount + officeCount + spreadsheetCount + presentationCount + legacyCount;
+  const nonRemediableCount = totalFiles - remediableCount;
+  const imageCount = categoryCounts["image"] ?? 0;
+  const textCount = (categoryCounts["text"] ?? 0) + (categoryCounts["web"] ?? 0);
+  const otherNonRemCount = nonRemediableCount - imageCount - textCount;
+
   // ── filter bar (category chips) ──────────────────────────────────────────────
   const CHIP_ORDER = ["pdf", "office-document", "spreadsheet", "presentation", "image", "archive", "text", "web", "audio-video", "other"];
   const chipsHtml = CHIP_ORDER
@@ -544,6 +560,19 @@ footer {
   padding-top: 0.5rem;
 }
 
+/* ── audit-stats two-column summary ────────────────────────── */
+.audit-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin: 1em 0; }
+.stat-card { padding: 1em; border-radius: 6px; border: 1px solid; }
+.stat-card.remediable { background: #fef3c7; border-color: #d97706; }
+.stat-card.reference { background: #f3f4f6; border-color: #9ca3af; }
+.stat-card .stat-heading { text-transform: uppercase; font-size: 0.85em; letter-spacing: 0.05em; color: #444; margin-bottom: 0.5em; }
+.stat-card .stat-number { font-size: 2.5em; font-weight: 700; line-height: 1; }
+.stat-card .stat-label { font-size: 0.95em; margin-top: 0.25em; color: #555; }
+.stat-card .stat-detail { margin-top: 0.75em; font-size: 0.9em; color: #444; padding: 0; }
+.stat-card .stat-detail li { list-style: disc; margin-left: 1.5em; padding-left: 0.25em; }
+.audit-total { text-align: center; margin: 0.5em 0 1em; font-size: 0.9em; color: #666; }
+@media (max-width: 720px) { .audit-stats { grid-template-columns: 1fr; } }
+
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
   .controls { display: none; }
@@ -566,6 +595,34 @@ footer {
   <span class="meta-label">Hostname:</span>     <span>${htmlEscape(hostname)}</span>
   <span class="meta-label">Scanned path:</span> <span>${htmlEscape(scannedPath)}</span>
   <span class="meta-label">Scanned at:</span>   <span>${htmlEscape(scannedAt)}</span>
+</div>
+
+<section class="audit-stats">
+  <div class="stat-card remediable">
+    <div class="stat-heading">Audit work</div>
+    <div class="stat-number">${remediableCount}</div>
+    <div class="stat-label">files need remediation</div>
+    <ul class="stat-detail">
+      ${pdfCount > 0 ? `<li>${pdfCount} PDF${pdfCount === 1 ? "" : "s"}</li>` : ""}
+      ${officeCount > 0 ? `<li>${officeCount} Office doc${officeCount === 1 ? "" : "s"}</li>` : ""}
+      ${spreadsheetCount > 0 ? `<li>${spreadsheetCount} spreadsheet${spreadsheetCount === 1 ? "" : "s"}</li>` : ""}
+      ${presentationCount > 0 ? `<li>${presentationCount} presentation${presentationCount === 1 ? "" : "s"}</li>` : ""}
+      ${legacyCount > 0 ? `<li>${legacyCount} legacy Office</li>` : ""}
+    </ul>
+  </div>
+  <div class="stat-card reference">
+    <div class="stat-heading">Reference files</div>
+    <div class="stat-number">${nonRemediableCount}</div>
+    <div class="stat-label">no direct work needed</div>
+    <ul class="stat-detail">
+      ${imageCount > 0 ? `<li>${imageCount} image${imageCount === 1 ? "" : "s"}</li>` : ""}
+      ${textCount > 0 ? `<li>${textCount} text file${textCount === 1 ? "" : "s"}</li>` : ""}
+      ${otherNonRemCount > 0 ? `<li>${otherNonRemCount} other</li>` : ""}
+    </ul>
+  </div>
+</section>
+<div class="audit-total">
+  Total inventoried: ${totalFiles} files (${htmlEscape(humanizeBytes(totalBytes))})
 </div>
 
 <div class="summary-bar">
