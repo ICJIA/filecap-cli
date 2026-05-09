@@ -179,10 +179,12 @@ else
     die "Expected a positive integer, got: ${NUM_SERVERS}"
   fi
 
+  DEFAULT_SSH_USER="${FILECAP_DEFAULT_SSH_USER:-forge}"
   for (( i=1; i<=NUM_SERVERS; i++ )); do
     printf "\n${B}Server %d of %d:${N}\n" "$i" "$NUM_SERVERS"
     read -r -p "  Server name (e.g. dvfr-prod): " _name
-    read -r -p "  SSH username on the target server (e.g. forge, deploy, ubuntu): " _user
+    read -r -p "  SSH username [${DEFAULT_SSH_USER}]: " _user
+    _user="${_user:-$DEFAULT_SSH_USER}"
     read -r -p "  Server IP or hostname (e.g. 192.168.1.1): " _host
     read -r -p "  Full path to uploads directory on the remote (e.g. ~/uploads): " _path
 

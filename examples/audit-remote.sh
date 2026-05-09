@@ -25,7 +25,8 @@
 #    - npx        (comes with Node.js 18+; install Node from https://nodejs.org)
 #
 #  WHAT YOU WILL BE ASKED
-#    - SSH username on the target server (e.g. forge, deploy, ubuntu)
+#    - SSH username on the target server (defaults to "forge"; override with
+#      env var FILECAP_DEFAULT_SSH_USER or by typing a different name at the prompt)
 #    - Server IP or hostname
 #    - Full path to the uploads directory on the remote
 #    - A friendly name for the server (used in the report header)
@@ -108,8 +109,10 @@ HOST_ARG="${2:-}"
 REMOTE_PATH_ARG="${3:-}"
 SERVER_NAME_ARG="${4:-}"
 
+DEFAULT_SSH_USER="${FILECAP_DEFAULT_SSH_USER:-forge}"
 if [[ -z "$USER_ARG" ]]; then
-  read -r -p "SSH username on the target server (e.g. forge, deploy, ubuntu): " USER_ARG
+  read -r -p "SSH username on the target server [${DEFAULT_SSH_USER}]: " USER_ARG
+  USER_ARG="${USER_ARG:-$DEFAULT_SSH_USER}"
 fi
 if [[ -z "$HOST_ARG" ]]; then
   read -r -p "Server IP or hostname (e.g. 192.241.146.85): " HOST_ARG
