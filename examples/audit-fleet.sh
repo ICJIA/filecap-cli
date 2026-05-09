@@ -42,16 +42,15 @@
 #  WHERE OUTPUT GOES
 #    ~/filecap-audits/_fleet/<timestamp>/
 #      ├── servers.txt              (manifest of servers audited)
-#      ├── MANAGER_SUMMARY.txt      (rollup counts by server and category)
+#      ├── MANAGER_SUMMARY.txt      (full audit numbers, per-server breakdown)
 #      ├── consolidated.ndjson      (merged raw scan output)
 #      ├── consolidated-report/
-#      │   ├── files.csv            (32-column vendor work-order, all servers)
-#      │   └── SUMMARY.txt
+#      │   ├── audit-file-list.csv  (vendor work-order, all servers)
+#      │   ├── audit-file-list.html (only if HTML was requested)
+#      │   ├── audit-summary.txt    (plain-text summary)
+#      │   └── README.txt           (explains all artifacts)
 #      └── inventories/
 #          └── <server-name>.ndjson (per-server scan output)
-#
-#    Per-server reports also remain at:
-#      ~/filecap-audits/<server-ip>/report/
 #
 # ============================================================================
 
@@ -304,8 +303,8 @@ python3 - \
   "${#SRV_NAMES[@]}" \
   "${FLEET_TS}" \
   "${CONSOLIDATED_REPORT_DIR}" \
-  "${HOME}/filecap-audits" \
   "${FAILED_SERVERS_TXT}" \
+  "${INVENTORIES_DIR}" \
   <<'PYMANAGER'
 import sys, json, os
 
@@ -315,8 +314,8 @@ success_count       = int(sys.argv[3])
 total_count         = int(sys.argv[4])
 fleet_ts            = sys.argv[5]
 consolidated_report = sys.argv[6]
-audits_base         = sys.argv[7]   # ~/filecap-audits
-failed_txt          = sys.argv[8]
+failed_txt          = sys.argv[7]
+inventories_dir     = sys.argv[8]
 
 # ── parse consolidated NDJSON ────────────────────────────────────────────────
 header  = None
@@ -349,8 +348,16 @@ def humanize_bytes(n):
         n /= 1024
     return f"{n:.1f} PB"
 
-def thousands(n):
-    return f"{n:,}"
+def pad_r(s, w):
+    return str(s).ljust(w)
+
+def pad_l(s, w):
+    return str(s).rjust(w)
+
+def pct(n, total):
+    if not total:
+        return "0%"
+    return f"{round(n / total * 100)}%"
 
 # ── extract sources from header ───────────────────────────────────────────────
 is_consolidated = (header.get('kind') == 'filecap-consolidated-header')
@@ -358,131 +365,318 @@ sources_list = []
 if is_consolidated:
     sources_list = header.get('metadata', {}).get('sources', [])
 
-# Build per-server lookup: serverName → source metadata dict
-source_by_name = {s['serverName']: s for s in sources_list}
-
 # ── aggregate totals ──────────────────────────────────────────────────────────
-total_files       = len(entries)
-total_bytes       = sum(e.get('sizeBytes', 0) for e in entries)
-total_remediable  = sum(1 for e in entries if e.get('remediable', False))
+total_files      = len(entries)
+total_bytes      = sum(e.get('sizeBytes', 0) for e in entries)
+total_remediable = sum(1 for e in entries if e.get('remediable', False))
+not_remediable   = total_files - total_remediable
+
+# Deduplicate by SHA-256
+seen_hashes = {}
+dup_count = 0
+dup_bytes  = 0
+for e in entries:
+    h = e.get('sha256', '')
+    if not h:
+        continue
+    if h in seen_hashes:
+        dup_count += 1
+        dup_bytes  += e.get('sizeBytes', 0)
+    else:
+        seen_hashes[h] = True
+unique_count = total_files - dup_count
 
 # By category
 cat_counts = {}
+cat_bytes  = {}
 for e in entries:
     cat = e.get('category', 'other')
     cat_counts[cat] = cat_counts.get(cat, 0) + 1
+    cat_bytes[cat]  = cat_bytes.get(cat, 0) + e.get('sizeBytes', 0)
 
 # ── per-server counts ─────────────────────────────────────────────────────────
-srv_counts = {}   # serverName → {files, remediable, pdfs, image_only_pdfs, bytes, serverIp}
+srv_counts = {}
+for s in sources_list:
+    sname = s.get('serverName', 'unknown')
+    srv_counts[sname] = {
+        'ip': s.get('serverIp', ''),
+        'files': 0, 'remediable': 0, 'pdfs': 0,
+        'image_only': 0, 'bytes': 0,
+    }
+
 for e in entries:
     sname = e.get('serverName', 'unknown')
     if sname not in srv_counts:
-        srv_counts[sname] = {
-            'files': 0, 'remediable': 0, 'pdfs': 0,
-            'image_only_pdfs': 0, 'bytes': 0, 'serverIp': ''
-        }
-    srv_counts[sname]['files'] += 1
-    srv_counts[sname]['bytes'] += e.get('sizeBytes', 0)
+        srv_counts[sname] = {'ip': '', 'files': 0, 'remediable': 0, 'pdfs': 0, 'image_only': 0, 'bytes': 0}
+    sc = srv_counts[sname]
+    sc['files'] += 1
+    sc['bytes'] += e.get('sizeBytes', 0)
     if e.get('remediable', False):
-        srv_counts[sname]['remediable'] += 1
+        sc['remediable'] += 1
     if e.get('category') == 'pdf':
-        srv_counts[sname]['pdfs'] += 1
+        sc['pdfs'] += 1
     intro = e.get('introspection') or {}
     if intro.get('kind') == 'pdf' and intro.get('isImageOnly') is True:
-        srv_counts[sname]['image_only_pdfs'] += 1
+        sc['image_only'] += 1
 
-# Pull serverIp from entries (first occurrence per serverName)
-for e in entries:
-    sname = e.get('serverName', 'unknown')
-    if sname in srv_counts and not srv_counts[sname]['serverIp']:
-        # serverIp may be on the entry (consolidated schema adds serverName but not
-        # serverIp directly; pull from source header instead)
-        pass
+# ── PDF stats ─────────────────────────────────────────────────────────────────
+pdf_entries    = [e for e in entries if e.get('category') == 'pdf']
+pdf_intro      = [e for e in pdf_entries if (e.get('introspection') or {}).get('kind') == 'pdf']
+pdf_count      = len(pdf_entries)
+image_only_cnt = sum(1 for e in pdf_intro if e['introspection'].get('isImageOnly') is True)
+tagged_cnt     = sum(1 for e in pdf_intro if e['introspection'].get('hasTags') is True)
+encrypted_cnt  = sum(1 for e in pdf_intro if e['introspection'].get('encrypted') is True)
+signed_cnt     = sum(1 for e in pdf_intro if e['introspection'].get('hasSignatures') is True)
+form_cnt       = sum(1 for e in pdf_intro if e['introspection'].get('hasFormFields') is True)
+linear_cnt     = sum(1 for e in pdf_intro if e['introspection'].get('isLinearized') is True)
+total_pages    = sum(e['introspection'].get('pageCount', 0) for e in pdf_intro)
+avg_pages      = f"{total_pages / pdf_count:.1f}" if pdf_count > 0 else "0"
 
-# Fill serverIp from sources list (more reliable)
-for s in sources_list:
-    sname = s.get('serverName', '')
-    if sname in srv_counts:
-        srv_counts[sname]['serverIp'] = s.get('serverIp', '')
+# ── DOCX stats ────────────────────────────────────────────────────────────────
+docx_entries     = [e for e in entries if (e.get('introspection') or {}).get('kind') == 'docx']
+docx_count       = len(docx_entries)
+docx_headings    = sum(1 for e in docx_entries if e['introspection'].get('hasHeadings') is True)
+docx_no_headings = docx_count - docx_headings
+docx_with_imgs   = sum(1 for e in docx_entries if (e['introspection'].get('imageCount') or 0) > 0)
+alt_covs         = [e['introspection']['altTextCoverage'] for e in docx_entries if isinstance(e['introspection'].get('altTextCoverage'), (int, float))]
+avg_alt          = f"{round(sum(alt_covs) / len(alt_covs) * 100)}%" if alt_covs else "n/a"
+docx_with_tables = sum(1 for e in docx_entries if (e['introspection'].get('tableCount') or 0) > 0)
+tbl_no_hdr       = sum(1 for e in docx_entries if (e['introspection'].get('tableCount') or 0) > 0 and e['introspection'].get('tablesHaveHeaders') is False)
+vague_total      = sum(e['introspection'].get('vagueLinkCount', 0) for e in docx_entries)
+docx_words       = sum(e['introspection'].get('wordCount', 0) or 0 for e in docx_entries)
 
-# For entries that have serverIp directly (some builds embed it)
-for e in entries:
-    sname = e.get('serverName', 'unknown')
-    if sname in srv_counts and not srv_counts[sname]['serverIp']:
-        srv_counts[sname]['serverIp'] = e.get('serverIp', '')
+# ── XLSX stats ────────────────────────────────────────────────────────────────
+xlsx_entries    = [e for e in entries if (e.get('introspection') or {}).get('kind') == 'xlsx']
+xlsx_count      = len(xlsx_entries)
+xlsx_multi      = sum(1 for e in xlsx_entries if (e['introspection'].get('sheetCount') or 1) > 1)
+xlsx_merged     = sum(1 for e in xlsx_entries if (e['introspection'].get('mergedCellCount') or 0) > 0)
+xlsx_charts     = sum(1 for e in xlsx_entries if e['introspection'].get('hasCharts') is True)
+xlsx_images     = sum(1 for e in xlsx_entries if e['introspection'].get('hasImages') is True)
+xlsx_def_names  = sum(1 for e in xlsx_entries if (e['introspection'].get('defaultSheetNameCount') or 0) > 0)
 
-# ── failed servers ────────────────────────────────────────────────────────────
+# ── Legacy Office stats ───────────────────────────────────────────────────────
+legacy_entries = [e for e in entries if (e.get('introspection') or {}).get('kind') == 'office-legacy']
+legacy_counts  = {'doc': 0, 'xls': 0, 'ppt': 0}
+for e in legacy_entries:
+    fmt = e['introspection'].get('format', '')
+    if fmt in legacy_counts:
+        legacy_counts[fmt] += 1
+legacy_total = len(legacy_entries)
+
+# ── Filename quality ──────────────────────────────────────────────────────────
+flagged_files     = sum(1 for e in entries if (e.get('flags') or []))
+with_spaces       = sum(1 for e in entries if 'filename-has-spaces' in (e.get('flags') or []))
+with_non_ascii    = sum(1 for e in entries if 'filename-non-ascii' in (e.get('flags') or []))
+with_long_name    = sum(1 for e in entries if 'filename-long' in (e.get('flags') or []))
+with_scanned      = sum(1 for e in entries if 'scanned-name-pattern' in (e.get('flags') or []))
+
+# ── Top 5 largest ─────────────────────────────────────────────────────────────
+top5 = sorted(entries, key=lambda e: e.get('sizeBytes', 0), reverse=True)[:5]
+
+# ── Failed servers ────────────────────────────────────────────────────────────
 failed_lines = []
 if os.path.exists(failed_txt):
     with open(failed_txt, 'r', encoding='utf-8') as fh:
         failed_lines = [l.strip() for l in fh if l.strip()]
 
-# ── build the summary text ────────────────────────────────────────────────────
+# ── Build summary ─────────────────────────────────────────────────────────────
 lines = []
 lines.append("filecap fleet audit — manager summary")
 lines.append("=====================================")
 lines.append("")
-
-# Derive audit-run timestamp from consolidated header if present
 audit_run = header.get('metadata', {}).get('consolidatedAt', fleet_ts + 'Z')
-lines.append(f"Audit run:        {audit_run}")
+lines.append(f"Audit date:       {audit_run[:10]}")
 lines.append(f"Servers audited:  {success_count} of {total_count}")
-lines.append(f"Total files:      {thousands(total_files)}")
-lines.append(f"Total bytes:      {humanize_bytes(total_bytes)}")
-lines.append(f"Files needing remediation:  {thousands(total_remediable)}")
 lines.append("")
 
-# ── per-server table ──────────────────────────────────────────────────────────
-lines.append("By server:")
+# The numbers
+lines.append("The numbers")
+lines.append("-----------")
+lines.append(f"  Total files:                {total_files}")
+lines.append(f"  Total size:                 {humanize_bytes(total_bytes)}")
+lines.append(f"  Files needing remediation:  {total_remediable} ({pct(total_remediable, total_files)} of total)")
+lines.append(f"  Files not requiring work:   {not_remediable}")
+lines.append(f"  Unique files:               {unique_count}")
+lines.append(f"  Duplicate copies:           {dup_count}")
+lines.append(f"  Bytes saved if deduped:     {humanize_bytes(dup_bytes)}")
 lines.append("")
 
-C1, C2, C3, C4, C5, C6 = 28, 17, 12, 12, 7, 18
-hdr  = f"  {'Name':<{C1}} {'IP':<{C2}} {'File count':>{C3}} {'Remediable':>{C4}} {'PDFs':>{C5}} {'Image-only PDFs':>{C6}}"
-sep  = f"  {'─'*C1} {'─'*C2} {'─'*C3} {'─'*C4} {'─'*C5} {'─'*C6}"
-lines.append(hdr)
-lines.append(sep)
-
-for sname, sc in sorted(srv_counts.items(), key=lambda x: x[0]):
-    row = (
-        f"  {sname:<{C1}} "
-        f"{sc['serverIp']:<{C2}} "
-        f"{sc['files']:>{C3},} "
-        f"{sc['remediable']:>{C4},} "
-        f"{sc['pdfs']:>{C5},} "
-        f"{sc['image_only_pdfs']:>{C6},}"
+# Per-server breakdown
+C = [22, 18, 8, 12, 12, 8, 16]
+hr = "─" * (sum(C) + 2 * len(C) + 2)
+lines.append("Per-server breakdown")
+lines.append("--------------------")
+lines.append(
+    "  " + pad_r("Server", C[0]) + "  " +
+    pad_r("IP", C[1]) + "  " +
+    pad_l("Files", C[2]) + "  " +
+    pad_l("Size", C[3]) + "  " +
+    pad_l("Needs remed.", C[4]) + "  " +
+    pad_l("PDFs", C[5]) + "  " +
+    pad_l("Image-only PDFs", C[6])
+)
+lines.append("  " + hr)
+t_files = t_bytes = t_rem = t_pdfs = t_img = 0
+for sname, sc in sorted(srv_counts.items()):
+    lines.append(
+        "  " + pad_r(sname, C[0]) + "  " +
+        pad_r(sc['ip'], C[1]) + "  " +
+        pad_l(sc['files'], C[2]) + "  " +
+        pad_l(humanize_bytes(sc['bytes']), C[3]) + "  " +
+        pad_l(sc['remediable'], C[4]) + "  " +
+        pad_l(sc['pdfs'], C[5]) + "  " +
+        pad_l(sc['image_only'], C[6])
     )
-    lines.append(row)
-
+    t_files += sc['files']; t_bytes += sc['bytes']; t_rem += sc['remediable']
+    t_pdfs  += sc['pdfs'];  t_img   += sc['image_only']
+lines.append("  " + hr)
+lines.append(
+    "  " + pad_r("Fleet totals", C[0]) + "  " +
+    pad_r("", C[1]) + "  " +
+    pad_l(t_files, C[2]) + "  " +
+    pad_l(humanize_bytes(t_bytes), C[3]) + "  " +
+    pad_l(t_rem, C[4]) + "  " +
+    pad_l(t_pdfs, C[5]) + "  " +
+    pad_l(t_img, C[6])
+)
 lines.append("")
 
-# ── by category ───────────────────────────────────────────────────────────────
-lines.append("By file category (across fleet):")
-for cat, cnt in sorted(cat_counts.items(), key=lambda x: -x[1]):
-    lines.append(f"  {cat+':':<20} {thousands(cnt)}")
+# PDFs
+def s_label(n, singular, plural=None):
+    return singular if n == 1 else (plural or singular + "s")
+
+lines.append(f"PDFs ({pdf_count} {s_label(pdf_count, 'file')})")
+lines.append("-" * len(f"PDFs ({pdf_count} {s_label(pdf_count, 'file')})"))
+if pdf_count == 0:
+    lines.append("  None in this audit.")
+else:
+    lines.append(f"  Born-digital (text-based):    {pdf_count - image_only_cnt}")
+    lines.append(f"  Image-only (needs OCR):       {image_only_cnt}")
+    lines.append(f"  Already structurally tagged:  {tagged_cnt}")
+    lines.append(f"  Encrypted:                    {encrypted_cnt}")
+    lines.append(f"  Digitally signed:             {signed_cnt}")
+    lines.append(f"  Has form fields:              {form_cnt}")
+    lines.append(f"  Web-optimized (linearized):   {linear_cnt}")
+    lines.append(f"  Total pages across all PDFs:  {total_pages}")
+    lines.append(f"  Average pages per PDF:        {avg_pages}")
 lines.append("")
 
-# ── for auditors ──────────────────────────────────────────────────────────────
-lines.append("For auditors:")
-lines.append("")
-lines.append(f"  - Detailed file list (one row per file): {consolidated_report}/files.csv")
-lines.append("  - Each row has: serverName, serverIp, scannedPath, path, filename, sizeBytes,")
-lines.append("    sha256, category, remediable, plus introspection fields (where available).")
-lines.append("  - To locate any flagged file: ssh into the server listed in the row's serverIp column.")
+# Word documents
+lines.append(f"Word documents ({docx_count} {s_label(docx_count, 'file')})")
+lines.append("-" * len(f"Word documents ({docx_count} {s_label(docx_count, 'file')})"))
+if docx_count == 0:
+    lines.append("  None in this audit.")
+else:
+    lines.append(f"  With proper heading styles:   {docx_headings}")
+    lines.append(f"  Without heading styles:       {docx_no_headings}")
+    lines.append(f"  Documents with images:        {docx_with_imgs}")
+    lines.append(f"  Average alt-text coverage:    {avg_alt}")
+    lines.append(f"  Documents with tables:        {docx_with_tables}")
+    lines.append(f"  Tables without header rows:   {tbl_no_hdr}")
+    lines.append(f"  Total vague hyperlinks:       {vague_total}")
+    lines.append(f"  Total word count:             {docx_words}")
 lines.append("")
 
-# ── per-server report dirs ────────────────────────────────────────────────────
-lines.append("Per-server reports (each has its own SUMMARY.txt and files.csv):")
-for sname, sc in sorted(srv_counts.items(), key=lambda x: x[0]):
-    ip = sc['serverIp'] or sname
-    lines.append(f"  - {audits_base}/{ip}/report/")
+# Excel files
+lines.append(f"Excel files ({xlsx_count} {s_label(xlsx_count, 'file')})")
+lines.append("-" * len(f"Excel files ({xlsx_count} {s_label(xlsx_count, 'file')})"))
+if xlsx_count == 0:
+    lines.append("  None in this audit.")
+else:
+    lines.append(f"  Multi-sheet:                  {xlsx_multi}")
+    lines.append(f"  With merged cells:            {xlsx_merged}")
+    lines.append(f"  With charts:                  {xlsx_charts}")
+    lines.append(f"  With embedded images:         {xlsx_images}")
+    lines.append(f"  Sheets with default names:    {xlsx_def_names}")
 lines.append("")
 
-# ── failed servers ────────────────────────────────────────────────────────────
+# Legacy Office
+lines.append(f"Legacy Office files ({legacy_total} {s_label(legacy_total, 'file')})")
+lines.append("-" * len(f"Legacy Office files ({legacy_total} {s_label(legacy_total, 'file')})"))
+if legacy_total == 0:
+    lines.append("  None in this audit.")
+else:
+    lines.append(f"  .doc:                         {legacy_counts['doc']}")
+    lines.append(f"  .xls:                         {legacy_counts['xls']}")
+    lines.append(f"  .ppt:                         {legacy_counts['ppt']}")
+lines.append("")
+
+# By file type
+ALL_CATS = ['pdf', 'image', 'office-document', 'spreadsheet', 'presentation',
+            'archive', 'text', 'web', 'audio-video', 'other']
+lines.append("By file type")
+lines.append("------------")
+for cat in ALL_CATS:
+    if cat in cat_counts:
+        lines.append(f"  {(cat + ':'):<22} {cat_counts[cat]} {s_label(cat_counts[cat], 'file')}, {humanize_bytes(cat_bytes[cat])}")
+lines.append("")
+
+# Filename quality
+lines.append("Filename quality")
+lines.append("----------------")
+lines.append(f"  Files with name issues:           {flagged_files}")
+lines.append(f"  Files with spaces in name:        {with_spaces}")
+lines.append(f"  Files with non-ASCII chars:       {with_non_ascii}")
+lines.append(f"  Files with very long names:       {with_long_name}")
+lines.append(f"  Files with scanned-name pattern:  {with_scanned}")
+lines.append("")
+
+# Largest files
+lines.append("Largest files")
+lines.append("-------------")
+if not top5:
+    lines.append("  None in this audit.")
+else:
+    for i, e in enumerate(top5, 1):
+        lines.append(f"  {i}. {e.get('filename', '?')}  ({humanize_bytes(e.get('sizeBytes', 0))})")
+lines.append("")
+
+# What this means
+observations = []
+if pdf_count > 0:
+    if image_only_cnt == 0:
+        observations.append(f"All {pdf_count} PDFs are text-based — no OCR needed (good news, OCR is expensive)")
+    else:
+        observations.append(f"{image_only_cnt} of {pdf_count} PDFs are image-only — these need OCR before remediation")
+    if tagged_cnt == 0:
+        observations.append(f"No PDFs are tagged — all {pdf_count} need structural tagging")
+    elif tagged_cnt < pdf_count:
+        observations.append(f"{pdf_count - tagged_cnt} of {pdf_count} PDFs lack structural tags")
+if docx_count > 0:
+    if docx_no_headings > 0:
+        observations.append(f"{docx_no_headings} Word doc{'s' if docx_no_headings != 1 else ''} lack heading styles — need restructuring")
+    if tbl_no_hdr > 0:
+        observations.append(f"{tbl_no_hdr} Word doc table{'s' if tbl_no_hdr != 1 else ''} need header rows")
+    if vague_total > 0:
+        observations.append(f"{vague_total} vague hyperlink{'s' if vague_total != 1 else ''} across the Word docs — review for descriptive text")
+if legacy_total > 0:
+    observations.append(f"{legacy_total} legacy Office file{'s' if legacy_total != 1 else ''} (.doc/.xls/.ppt) need manual review or conversion")
+if observations:
+    lines.append("What this means for the audit")
+    lines.append("-----------------------------")
+    for obs in observations:
+        lines.append(f"  - {obs}")
+    lines.append("")
+
+# Where to find files
+lines.append("Where to find files")
+lines.append("-------------------")
+lines.append("  For per-server detail, see the inventories/ subfolder of this audit run.")
+lines.append("  The consolidated inventory is in:")
+lines.append("    consolidated-report/audit-file-list.csv")
+lines.append("")
+lines.append("  Each row in audit-file-list.csv has 'Server IP' and 'Full file path on")
+lines.append("  server' columns. To open or download a flagged file:")
+lines.append("    ssh <user>@<server-ip>")
+lines.append("    cat '<full-file-path>'")
+lines.append("")
+
+# Failed servers
 if failed_lines:
     lines.append("Failed servers:")
     for fl in failed_lines:
         lines.append(f"  - {fl}")
-    lines.append(f"  (see {failed_txt} for details)")
+    lines.append("  (see failed_servers.txt in this run directory for details)")
 else:
     lines.append("Failed servers: none")
 lines.append("")
@@ -502,7 +696,7 @@ printf "  Fleet inventories: %s\n" "${INVENTORIES_DIR}/"
 printf "  Consolidated     : %s\n" "${CONSOLIDATED}"
 printf "  Consolidated rpt : %s\n" "${CONSOLIDATED_REPORT_DIR}/"
 if [[ -n "$HTML_FLAG" ]]; then
-  printf "  HTML report      : %s\n" "${CONSOLIDATED_REPORT_DIR}/files.html"
+  printf "  HTML report      : %s\n" "${CONSOLIDATED_REPORT_DIR}/audit-file-list.html"
 fi
 printf "  Manager summary  : %s\n" "${MANAGER_SUMMARY}"
 
@@ -515,6 +709,6 @@ printf "  %s\n" "${MANAGER_SUMMARY}"
 xopen "${MANAGER_SUMMARY}"
 if [[ -n "$HTML_FLAG" ]]; then
   printf "\n${Y}Hint:${N} open the consolidated HTML report at:\n"
-  printf "  %s\n" "${CONSOLIDATED_REPORT_DIR}/files.html"
-  xopen "${CONSOLIDATED_REPORT_DIR}/files.html"
+  printf "  %s\n" "${CONSOLIDATED_REPORT_DIR}/audit-file-list.html"
+  xopen "${CONSOLIDATED_REPORT_DIR}/audit-file-list.html"
 fi
