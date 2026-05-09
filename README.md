@@ -527,6 +527,22 @@ another-server,deploy,10.0.0.5,/var/strapi/uploads
 
 Output lands in `~/filecap-audits/_fleet/<timestamp>/` and includes a per-server breakdown (`MANAGER_SUMMARY.txt`), a combined CSV (`audit-file-list.csv`) with one row per file across all servers, and a `duplicate_hashes.txt` that catches files that appear on multiple servers.
 
+### Staying current
+
+The audit scripts have a built-in version check. Each time you run them, they compare their content against the latest version on GitHub and warn you if your local copy is outdated. The check happens at startup, takes ~1 second, and is non-blocking — if it can't reach GitHub (e.g., you're offline), it just notes that and continues.
+
+If your script is out of date, you'll see a yellow warning telling you the exact `curl` command to run to get the latest version.
+
+To skip the check (e.g., on an air-gapped system or for faster startup):
+
+```bash
+./audit-remote.sh --no-version-check
+# or
+SKIP_VERSION_CHECK=1 ./audit-remote.sh
+```
+
+The `filecap` package itself (which the script invokes via `npx`) auto-updates separately on each run — it always pulls the latest from npm.
+
 ---
 
 ### Windows: the situation

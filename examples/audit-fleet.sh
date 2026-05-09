@@ -20,12 +20,15 @@
 #    chmod +x audit-fleet.sh audit-remote.sh
 #    ./audit-fleet.sh                  # interactive
 #    ./audit-fleet.sh servers.csv      # batch mode from CSV file
+#    ./audit-fleet.sh --no-version-check           # skip update check
+#    SKIP_VERSION_CHECK=1 ./audit-fleet.sh         # same, via env var
 #
 #  REQUIREMENTS
 #    - bash 3.2+  (ships with macOS; standard on Linux)
 #    - python3    (ships with macOS 12+; install via package manager on Linux)
 #    - ssh        (with keys configured for each target server)
 #    - rsync      (ships with macOS; install via package manager on Linux)
+#    - curl       (ships with macOS; install via package manager on Linux)
 #    - npx        (comes with Node.js 18+; install Node from https://nodejs.org)
 #    - audit-remote.sh must be in the same directory as this script
 #
@@ -137,7 +140,94 @@ check_required_tools() {
   fi
 }
 
+# ── self-version-check ────────────────────────────────────────────────────────
+# Compares the SHA-256 of this running script against the version on GitHub's
+# main branch. If they differ, warn the auditor that their copy is stale and
+# print the re-download command. Non-blocking: skipped silently if offline,
+# skipped explicitly if --no-version-check was passed or SKIP_VERSION_CHECK=1.
+
+# Portable SHA-256 wrapper
+sha256_of() {
+  local input="$1"
+  if [[ "$input" == "-" ]]; then
+    if command -v shasum >/dev/null 2>&1; then
+      shasum -a 256 | cut -d' ' -f1
+    elif command -v sha256sum >/dev/null 2>&1; then
+      sha256sum | cut -d' ' -f1
+    fi
+  else
+    if command -v shasum >/dev/null 2>&1; then
+      shasum -a 256 "$input" | cut -d' ' -f1
+    elif command -v sha256sum >/dev/null 2>&1; then
+      sha256sum "$input" | cut -d' ' -f1
+    fi
+  fi
+}
+
+check_script_version() {
+  # Skip if explicitly disabled
+  if [[ "${SKIP_VERSION_CHECK:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  # Determine script name for the GitHub URL.
+  # Use the BASH_SOURCE basename, not the user's invocation path, so a renamed
+  # local copy still checks against the canonical filename.
+  local script_basename
+  script_basename="$(basename "${BASH_SOURCE[0]}")"
+  local upstream_url="https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/${script_basename}"
+
+  # Compute local hash
+  local local_path
+  local_path="${BASH_SOURCE[0]}"
+  # If BASH_SOURCE is a relative path, normalize against the current dir
+  if [[ ! -f "$local_path" ]]; then
+    return 0  # cannot self-check; skip silently
+  fi
+  local local_hash
+  local_hash="$(sha256_of "$local_path")"
+  if [[ -z "$local_hash" ]]; then
+    return 0  # no SHA-256 tool available; skip silently
+  fi
+
+  # Fetch upstream hash with a short timeout. Suppress all curl output.
+  local upstream_hash
+  upstream_hash="$(curl -fsSL --connect-timeout 5 --max-time 10 "$upstream_url" 2>/dev/null | sha256_of -)"
+  if [[ -z "$upstream_hash" ]]; then
+    info "Skipped script version check (could not reach GitHub)."
+    return 0
+  fi
+
+  if [[ "$local_hash" != "$upstream_hash" ]]; then
+    echo
+    warn "This script is older than the version on GitHub."
+    echo "  Your copy:   ${local_hash:0:12}..." >&2
+    echo "  On GitHub:   ${upstream_hash:0:12}..." >&2
+    echo
+    echo "  To get the latest version:" >&2
+    echo "    curl -O ${upstream_url}" >&2
+    echo "    chmod +x ${script_basename}" >&2
+    echo
+    echo "  (Or pass --no-version-check / SKIP_VERSION_CHECK=1 to skip this check.)" >&2
+    echo
+    # Continue anyway — non-blocking
+  fi
+}
+
+# ── strip --no-version-check from args before positional parsing ──────────────
+NEW_ARGS=()
+for a in "$@"; do
+  if [[ "$a" == "--no-version-check" ]]; then
+    SKIP_VERSION_CHECK=1
+    export SKIP_VERSION_CHECK
+  else
+    NEW_ARGS+=("$a")
+  fi
+done
+set -- "${NEW_ARGS[@]+"${NEW_ARGS[@]}"}"
+
 check_required_tools
+check_script_version
 
 # ── locate sibling audit-remote.sh ───────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -337,7 +427,7 @@ for i in "${VALID_INDEXES[@]}"; do
 
   printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
 
-  if "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+  if SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
     SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/inventory.ndjson"
     DEST_INVENTORY="${INVENTORIES_DIR}/${SRV_NAME}.ndjson"
     if [[ -f "$SRC_INVENTORY" ]]; then
