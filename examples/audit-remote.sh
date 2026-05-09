@@ -66,6 +66,7 @@
 #    ./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-strapi-prod DVFR https://dvfr.icjia-api.cloud/uploads
 #    ./audit-remote.sh --no-version-check                                           # skip update check
 #    SKIP_VERSION_CHECK=1 ./audit-remote.sh                                         # same, via env var
+#    RUN_AUDIT_ENRICH=y FILECAP_AUDIT_TOKEN=fap_xxx ./audit-remote.sh              # non-interactive enrich
 #
 #  NOTE: REMOTE_PATH must not contain spaces or shell metacharacters.
 #    Tilde paths such as ~/uploads are supported (the remote shell expands them).
@@ -523,6 +524,34 @@ step "Generating filecap report ..."
 if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" ${HTML_FLAG} \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap report generation failed."
+fi
+
+# ── optional: enrich with audit scores from audit.icjia.app ─────────────────
+RUN_AUDIT_ENRICH="${RUN_AUDIT_ENRICH:-}"
+if [[ -z "$RUN_AUDIT_ENRICH" ]]; then
+  echo
+  read -r -p "Enrich inventory with audit.icjia.app scores? [y/N]: " RUN_AUDIT_ENRICH
+fi
+
+if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
+  if [[ -z "${FILECAP_AUDIT_TOKEN:-}" ]]; then
+    warn "FILECAP_AUDIT_TOKEN not set in env. Set it via: export FILECAP_AUDIT_TOKEN=fap_xxx"
+    read -r -s -p "Paste audit token (input hidden, used for this run only): " FILECAP_AUDIT_TOKEN
+    echo  # newline after silent read
+    export FILECAP_AUDIT_TOKEN
+  fi
+
+  step "Calling audit.icjia.app /api/bulk-from-inventory ..."
+  if npx --yes @icjia/filecap@latest audit-enrich "${INVENTORY}" -o "${INVENTORY}" \
+      2> >(grep -v 'Warning:' >&2); then
+    info "Audit scores merged into inventory"
+
+    step "Regenerating report with audit columns ..."
+    npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}/" ${HTML_FLAG} \
+        2> >(grep -v 'Warning:' >&2) || warn "Report regeneration failed (continuing)"
+  else
+    warn "audit-enrich failed (continuing without audit scores)"
+  fi
 fi
 
 # ── update 'latest' symlink ───────────────────────────────────────────────────

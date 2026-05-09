@@ -380,6 +380,25 @@ else
   HTML_FLAG=""
 fi
 
+# ── optional: enrich with audit.icjia.app scores ─────────────────────────────
+# Propagate the choice to per-server audit-remote.sh via env var so it doesn't
+# re-prompt for each server. The consolidated enrich step runs separately below.
+RUN_AUDIT_ENRICH="${RUN_AUDIT_ENRICH:-}"
+if [[ -z "$RUN_AUDIT_ENRICH" ]]; then
+  echo
+  read -r -p "Enrich inventories with audit.icjia.app scores? [y/N]: " RUN_AUDIT_ENRICH
+fi
+export RUN_AUDIT_ENRICH
+
+if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
+  if [[ -z "${FILECAP_AUDIT_TOKEN:-}" ]]; then
+    warn "FILECAP_AUDIT_TOKEN not set in env. Set it via: export FILECAP_AUDIT_TOKEN=fap_xxx"
+    read -r -s -p "Paste audit token (input hidden, used for this run only): " FILECAP_AUDIT_TOKEN
+    echo  # newline after silent read
+    export FILECAP_AUDIT_TOKEN
+  fi
+fi
+
 # ── fleet pre-validation ──────────────────────────────────────────────────────
 step "Pre-validating ${#SRV_NAMES[@]} server(s) before starting audit work ..."
 
@@ -547,6 +566,23 @@ if ! npx --yes @icjia/filecap@latest report "${CONSOLIDATED}" \
   die "filecap report generation failed."
 fi
 info "Report generated"
+
+# ── optional: enrich consolidated inventory with audit scores ─────────────────
+if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
+  CONSOLIDATED_NDJSON="${CONSOLIDATED}"
+  step "Enriching consolidated inventory with audit scores ..."
+  if npx --yes @icjia/filecap@latest audit-enrich "${CONSOLIDATED_NDJSON}" -o "${CONSOLIDATED_NDJSON}" \
+      2> >(grep -v 'Warning:' >&2); then
+    info "Audit scores merged into consolidated inventory"
+
+    step "Regenerating consolidated report with audit columns ..."
+    npx --yes @icjia/filecap@latest report "${CONSOLIDATED_NDJSON}" \
+        -o "${CONSOLIDATED_REPORT_DIR}" ${HTML_FLAG} \
+        2> >(grep -v 'Warning:' >&2) || warn "Consolidated report regeneration failed (continuing)"
+  else
+    warn "audit-enrich failed for consolidated inventory (continuing without audit scores)"
+  fi
+fi
 
 # ── MANAGER_SUMMARY.txt (python3) ─────────────────────────────────────────────
 MANAGER_SUMMARY="${FLEET_DIR}/MANAGER_SUMMARY.txt"
