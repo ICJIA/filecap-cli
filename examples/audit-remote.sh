@@ -61,11 +61,11 @@
 #    points to the most recent successful run for convenient access.
 #
 #  USAGE
-#    ./audit-remote.sh                                                         # interactive
-#    ./audit-remote.sh USER HOST REMOTE_PATH [SERVER_NAME] [SITE_NAME] [PUBLIC_URL_BASE]
+#    ./audit-remote.sh                                                              # interactive
+#    ./audit-remote.sh USER HOST REMOTE_PATH [SERVER_NAME] [SITE_NAME] [PUBLIC_URL_BASE] [AUDIT_LINK_PATTERN]
 #    ./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-strapi-prod DVFR https://dvfr.icjia-api.cloud/uploads
-#    ./audit-remote.sh --no-version-check                                      # skip update check
-#    SKIP_VERSION_CHECK=1 ./audit-remote.sh                                    # same, via env var
+#    ./audit-remote.sh --no-version-check                                           # skip update check
+#    SKIP_VERSION_CHECK=1 ./audit-remote.sh                                         # same, via env var
 #
 #  NOTE: REMOTE_PATH must not contain spaces or shell metacharacters.
 #    Tilde paths such as ~/uploads are supported (the remote shell expands them).
@@ -252,6 +252,7 @@ REMOTE_PATH_ARG="${3:-}"
 SERVER_NAME_ARG="${4:-}"
 SITE_NAME_ARG="${5:-${SITE_NAME_ARG:-}}"
 PUBLIC_URL_BASE_ARG="${6:-${PUBLIC_URL_BASE_ARG:-}}"
+AUDIT_LINK_PATTERN_ARG="${7:-${AUDIT_LINK_PATTERN_ARG:-}}"
 
 DEFAULT_SSH_USER="${FILECAP_DEFAULT_SSH_USER:-forge}"
 if [[ -z "$USER_ARG" ]]; then
@@ -284,6 +285,17 @@ if [[ -z "$PUBLIC_URL_BASE_ARG" ]]; then
   read -r -p "Public URL prefix (optional, e.g. https://dvfr.icjia-api.cloud/uploads; press Enter to skip): " PUBLIC_URL_BASE_ARG
 fi
 PUBLIC_URL_BASE="$PUBLIC_URL_BASE_ARG"
+
+# Optional: URL template for an external audit service
+# AUDIT_LINK_PATTERN_ARG may be pre-set by audit-fleet.sh via env var.
+if [[ -z "$AUDIT_LINK_PATTERN_ARG" ]]; then
+  echo
+  echo "Optional: a URL template for an external audit service (audit.icjia.app, etc.)"
+  echo "Placeholders: {publicUrl} {sha256} {filename} {path} {serverIp} {siteName}"
+  echo "Example: https://audit.icjia.app/?prefill={publicUrl}"
+  read -r -p "Audit link template (press Enter to skip): " AUDIT_LINK_PATTERN_ARG
+fi
+AUDIT_LINK_PATTERN="$AUDIT_LINK_PATTERN_ARG"
 
 SSH_USER="$USER_ARG"
 HOST="$HOST_ARG"
@@ -328,6 +340,7 @@ AUDIT_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   printf "SSH user     : %s\n" "${SSH_USER}"
   printf "Remote path  : %s\n" "${REMOTE_PATH}"
   [[ -n "$PUBLIC_URL_BASE" ]] && printf "Public URL base: %s\n" "${PUBLIC_URL_BASE}"
+  [[ -n "$AUDIT_LINK_PATTERN" ]] && printf "Audit link template: %s\n" "${AUDIT_LINK_PATTERN}"
   printf "Audit started: %s\n" "${AUDIT_TS}"
   printf "\n"
   printf "To locate a file on the remote:\n"
@@ -356,6 +369,19 @@ if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -r ${REMOTE_PATH}" 2>/
   die "Remote path '${REMOTE_PATH}' exists but is not readable by user '${SSH_USER}'."
 fi
 info "Remote path confirmed and readable"
+
+# ── preflight: verify public URL is reachable (non-blocking — auditor can override) ──
+if [[ -n "$PUBLIC_URL_BASE" ]]; then
+  step "Verifying public URL is reachable: ${PUBLIC_URL_BASE}"
+  if curl -fsSL --head --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" >/dev/null 2>&1; then
+    info "Public URL responded successfully"
+  else
+    warn "Public URL did not respond (HEAD ${PUBLIC_URL_BASE})."
+    warn "This may be due to a typo, network restrictions, or the site being temporarily down."
+    read -r -p "Continue anyway? [y/N]: " ans
+    [[ "$ans" =~ ^[Yy]$ ]] || die "Aborted by user."
+  fi
+fi
 
 # ── remote size / file count ──────────────────────────────────────────────────
 step "Checking remote upload size ..."
@@ -399,6 +425,8 @@ if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
   [[ -n "$SITE_NAME" ]] && NATIVE_SITE_ARGS="--site-name '${SITE_NAME}'"
   NATIVE_PUBURL_ARGS=""
   [[ -n "$PUBLIC_URL_BASE" ]] && NATIVE_PUBURL_ARGS="--public-url-base '${PUBLIC_URL_BASE}'"
+  NATIVE_AUDITLINK_ARGS=""
+  [[ -n "$AUDIT_LINK_PATTERN" ]] && NATIVE_AUDITLINK_ARGS="--audit-link-pattern '${AUDIT_LINK_PATTERN}'"
 
   # shellcheck disable=SC2029
   if ! ssh -o ConnectTimeout=30 "${SSH_USER}@${HOST}" \
@@ -407,6 +435,7 @@ if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
         --server-ip '${HOST}' \
         ${NATIVE_SITE_ARGS} \
         ${NATIVE_PUBURL_ARGS} \
+        ${NATIVE_AUDITLINK_ARGS} \
         -o -" \
       > "${INVENTORY}" 2> >(grep -v 'Warning:' >&2); then
     die "Remote filecap scan failed. Check stderr above for details."
@@ -425,10 +454,11 @@ else
   fi
 
   info "Step 2/2: scanning local mirror with filecap ..."
-  # Build scan args array; include --site-name and --public-url-base only when non-empty
+  # Build scan args array; include optional flags only when non-empty
   SCAN_ARGS=( "${MIRROR_DIR}" --server-name "${SERVER_NAME}" --server-ip "${HOST}" -o "${INVENTORY}" )
   [[ -n "$SITE_NAME" ]] && SCAN_ARGS+=( --site-name "${SITE_NAME}" )
   [[ -n "$PUBLIC_URL_BASE" ]] && SCAN_ARGS+=( --public-url-base "${PUBLIC_URL_BASE}" )
+  [[ -n "$AUDIT_LINK_PATTERN" ]] && SCAN_ARGS+=( --audit-link-pattern "$AUDIT_LINK_PATTERN" )
 
   if ! npx --yes @icjia/filecap@latest scan "${SCAN_ARGS[@]}" \
       2> >(grep -v 'Warning:' >&2); then

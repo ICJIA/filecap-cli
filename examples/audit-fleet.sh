@@ -38,12 +38,12 @@
 #
 #  CSV INPUT FORMAT (batch mode)
 #    No header row; lines starting with # are comments.
-#    Columns: server_name,user,host,remote_path[,site_name[,public_url_base]]
+#    Columns: server_name,user,host,remote_path[,site_name[,public_url_base[,audit_link_pattern]]]
 #    Examples:
-#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads
+#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads,https://audit.icjia.app/?prefill={publicUrl}
 #      i2i-strapi-prod,forge,10.0.0.5,/var/strapi/uploads,i2i
 #      vpp-strapi-prod,forge,10.0.0.6,/var/strapi/uploads
-#                  (4-column and 5-column rows still work — public_url_base is optional)
+#                  (4-column, 5-column, and 6-column rows still work — trailing columns are optional)
 #
 #  WHERE OUTPUT GOES
 #    Per-server results land in timestamped run dirs (preserved across re-runs):
@@ -265,13 +265,14 @@ step "Fleet output dir: ${FLEET_DIR}"
 mkdir -p "${INVENTORIES_DIR}" "${CONSOLIDATED_REPORT_DIR}"
 
 # ── parse server list ─────────────────────────────────────────────────────────
-# Arrays: names, users, hosts, paths, sites, urlbases (parallel indexed)
+# Arrays: names, users, hosts, paths, sites, urlbases, auditlinkpatterns (parallel indexed)
 declare -a SRV_NAMES=()
 declare -a SRV_USERS=()
 declare -a SRV_HOSTS=()
 declare -a SRV_PATHS=()
 declare -a SRV_SITES=()
 declare -a SRV_URLBASES=()
+declare -a SRV_AUDIT_LINK_PATTERNS=()
 
 CSV_FILE="${1:-}"
 
@@ -285,7 +286,7 @@ if [[ -n "$CSV_FILE" ]]; then
     [[ -z "$line" ]]       && continue
     [[ "$line" == \#* ]]   && continue
 
-    IFS=',' read -r _name _user _host _path _site _urlbase <<< "$line"
+    IFS=',' read -r _name _user _host _path _site _urlbase _auditlinkpattern <<< "$line"
     # trim whitespace
     _name="${_name// /}"
     _user="${_user// /}"
@@ -298,6 +299,9 @@ if [[ -n "$CSV_FILE" ]]; then
     # public_url_base is optional (6th column)
     _urlbase="${_urlbase:-}"
     _urlbase="$(echo "${_urlbase}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    # audit_link_pattern is optional (7th column)
+    _auditlinkpattern="${_auditlinkpattern:-}"
+    _auditlinkpattern="$(echo "${_auditlinkpattern}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$_name" || -z "$_user" || -z "$_host" || -z "$_path" ]]; then
       warn "Skipping malformed CSV line: ${line}"
@@ -310,6 +314,7 @@ if [[ -n "$CSV_FILE" ]]; then
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
     SRV_URLBASES+=("$_urlbase")
+    SRV_AUDIT_LINK_PATTERNS+=("$_auditlinkpattern")
   done < "$CSV_FILE"
 
   if [[ "${#SRV_NAMES[@]}" -eq 0 ]]; then
@@ -335,6 +340,7 @@ else
     read -r -p "  Full path to uploads directory on the remote (e.g. ~/uploads): " _path
     read -r -p "  Website nickname (e.g. DVFR, i2i, vpp; press Enter to skip): " _site
     read -r -p "  Public URL prefix (e.g. https://dvfr.icjia-api.cloud/uploads; press Enter to skip): " _urlbase
+    read -r -p "  Audit link template (e.g. https://audit.icjia.app/?prefill={publicUrl}; press Enter to skip): " _auditlinkpattern
 
     SRV_NAMES+=("$_name")
     SRV_USERS+=("$_user")
@@ -342,6 +348,7 @@ else
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
     SRV_URLBASES+=("$_urlbase")
+    SRV_AUDIT_LINK_PATTERNS+=("$_auditlinkpattern")
   done
 fi
 
@@ -378,19 +385,21 @@ step "Pre-validating ${#SRV_NAMES[@]} server(s) before starting audit work ..."
 
 declare -a VALID_INDEXES=()
 declare -a SKIPPED_REASONS=()
+declare -a URL_WARNINGS=()
 TOTAL_REMOTE_BYTES=0
 
-printf "\n  %-22s %-18s %-12s %-10s %-22s\n" "Name" "IP" "Status" "Node" "Source"
-printf "  %-22s %-18s %-12s %-10s %-22s\n" "----" "--" "------" "----" "------"
+printf "\n  %-22s %-18s %-12s %-10s %-22s %-8s\n" "Name" "IP" "Status" "Node" "Source" "URL"
+printf "  %-22s %-18s %-12s %-10s %-22s %-8s\n" "----" "--" "------" "----" "------" "---"
 
 for i in "${!SRV_NAMES[@]}"; do
   name="${SRV_NAMES[$i]}"
   user="${SRV_USERS[$i]}"
   host="${SRV_HOSTS[$i]}"
   path_="${SRV_PATHS[$i]}"
+  urlbase="${SRV_URLBASES[$i]:-}"
 
   if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "${user}@${host}" true 2>/dev/null; then
-    printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s\n" "$name" "$host" "UNREACHABLE" "-" "-"
+    printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s %-8s\n" "$name" "$host" "UNREACHABLE" "-" "-" "-"
     SKIPPED_REASONS+=("$name: SSH failed")
     continue
   fi
@@ -398,7 +407,7 @@ for i in "${!SRV_NAMES[@]}"; do
   # Note: inner single-quotes omitted so remote shell can expand tilde paths.
   # Paths with spaces should use absolute paths instead.
   if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d ${path_} && test -r ${path_}" 2>/dev/null; then
-    printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s\n" "$name" "$host" "PATH ERROR" "-" "$path_"
+    printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s %-8s\n" "$name" "$host" "PATH ERROR" "-" "$path_" "-"
     SKIPPED_REASONS+=("$name: path missing or unreadable")
     continue
   fi
@@ -416,7 +425,18 @@ for i in "${!SRV_NAMES[@]}"; do
     TOTAL_REMOTE_BYTES=$((TOTAL_REMOTE_BYTES + remote_bytes))
   fi
 
-  printf "  %-22s %-18s ${G}%-12s${N} %-10s %-22s\n" "$name" "$host" "OK" "$node_label" "$remote_size"
+  # HEAD-check the public URL base if one was given for this server
+  url_status="-"
+  if [[ -n "$urlbase" ]]; then
+    if curl -fsSL --head --connect-timeout 5 --max-time 10 "$urlbase" >/dev/null 2>&1; then
+      url_status="${G}OK${N}"
+    else
+      url_status="${R}FAILED${N}"
+      URL_WARNINGS+=("$name: public URL did not respond (HEAD ${urlbase})")
+    fi
+  fi
+
+  printf "  %-22s %-18s ${G}%-12s${N} %-10s %-22s %-8b\n" "$name" "$host" "OK" "$node_label" "$remote_size" "$url_status"
   VALID_INDEXES+=("$i")
 done
 
@@ -440,6 +460,13 @@ if [[ "$N_VALID" -lt "$N_TOTAL" ]]; then
     echo "  - $r" >&2
   done
 fi
+if [[ "${#URL_WARNINGS[@]}" -gt 0 ]]; then
+  warn "Public URL check failed for ${#URL_WARNINGS[@]} server(s):"
+  for w in "${URL_WARNINGS[@]}"; do
+    echo "  - $w" >&2
+  done
+  warn "This may be a typo, network restriction, or the site being temporarily down."
+fi
 echo
 read -r -p "Proceed with audit of $N_VALID server(s)? [y/N]: " ans
 [[ "$ans" =~ ^[Yy]$ ]] || die "Aborted by user."
@@ -456,10 +483,11 @@ for i in "${VALID_INDEXES[@]}"; do
   SRV_PATH="${SRV_PATHS[$i]}"
   SRV_SITE="${SRV_SITES[$i]:-}"
   SRV_URLBASE="${SRV_URLBASES[$i]:-}"
+  SRV_AUDIT_LINK_PATTERN="${SRV_AUDIT_LINK_PATTERNS[$i]:-}"
 
   printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
 
-  if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+  if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" AUDIT_LINK_PATTERN_ARG="${SRV_AUDIT_LINK_PATTERN}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
     # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
     # Fall back to scanning runs/ directly in case the symlink is missing.
     SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/latest/inventory.ndjson"
