@@ -88,15 +88,18 @@ describe("filecap report CLI", () => {
     const result = await runCli(["report", ndjson, "-o", reportDir], outDir);
     expect(result.code).toBe(0);
 
-    for (const f of ["files.csv", "SUMMARY.txt", "largest_files.txt", "flagged_filenames.txt", "duplicate_hashes.txt", "pdf_image_only.txt"]) {
+    for (const f of ["audit-file-list.csv", "audit-summary.txt", "largest_files.txt", "flagged_filenames.txt", "duplicate_hashes.txt", "pdf_image_only.txt", "README.txt"]) {
       const stat = await fs.stat(path.join(reportDir, f));
       expect(stat.isFile()).toBe(true);
     }
 
-    const csv = await fs.readFile(path.join(reportDir, "files.csv"), "utf8");
+    const csv = await fs.readFile(path.join(reportDir, "audit-file-list.csv"), "utf8");
     expect(csv.split("\n")[0]).toContain("Server");
     expect(csv).toContain("Scan_001.pdf");
     expect(csv).toContain("ok.pdf");
+
+    const readme = await fs.readFile(path.join(reportDir, "README.txt"), "utf8");
+    expect(readme).toContain("audit-file-list.csv");
 
     const flagged = await fs.readFile(path.join(reportDir, "flagged_filenames.txt"), "utf8");
     expect(flagged).toContain("Scan_001.pdf");
