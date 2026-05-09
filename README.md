@@ -487,7 +487,7 @@ In interactive mode, the script asks five questions. Here's what each one means 
 
 ### What you get
 
-After the script finishes, navigate to `~/filecap-audits/<server-ip>/report/`. You'll find:
+After the script finishes, navigate to `~/filecap-audits/<server-ip>/latest/report/`. You'll find:
 
 - **`audit-file-list.csv`** — The main deliverable. One row per file, 32 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
@@ -498,7 +498,7 @@ After the script finishes, navigate to `~/filecap-audits/<server-ip>/report/`. Y
 - **`duplicate_hashes.txt`** — Files that are byte-for-byte identical to another file on the server. Useful for identifying redundant copies before remediation.
 - **`pdf_image_only.txt`** — PDFs that contain no text layer — they're essentially photos of pages. These require OCR before any accessibility remediation can begin, and they're usually the cost driver in a vendor quote.
 
-The output directory also contains `inventory.ndjson` (the raw scan data used to generate the report) and `SOURCE_INFO.txt` (a provenance record: which server was scanned, when, and how to SSH in and locate a specific file).
+The run directory also contains `inventory.ndjson` (the raw scan data used to generate the report) and `SOURCE_INFO.txt` (a provenance record: which server was scanned, when, and how to SSH in and locate a specific file).
 
 ### How to use it (multiple servers / fleet mode)
 
@@ -526,6 +526,32 @@ another-server,deploy,10.0.0.5,/var/strapi/uploads
 ```
 
 Output lands in `~/filecap-audits/_fleet/<timestamp>/` and includes a per-server breakdown (`MANAGER_SUMMARY.txt`), a combined CSV (`audit-file-list.csv`) with one row per file across all servers, and a `duplicate_hashes.txt` that catches files that appear on multiple servers.
+
+### Re-running audits over time
+
+Running the audit against the same server multiple times preserves history. Each run lands in its own timestamped subdirectory under `~/filecap-audits/<server-ip>/runs/`, and a `latest/` symlink at the workdir root points to the most recent successful run.
+
+```
+~/filecap-audits/192.241.146.85/
+├── mirror/                              (shared local copy)
+├── runs/
+│   ├── 20260509-143000Z/                ← May 9 audit
+│   │   ├── inventory.ndjson
+│   │   └── report/
+│   ├── 20260516-093000Z/                ← May 16 audit
+│   └── 20260523-100000Z/                ← May 23 audit
+└── latest → runs/20260523-100000Z       (always points to most recent run)
+```
+
+Practical implications:
+
+- **The `mirror/` directory is shared across runs.** rsync handles incremental updates — only changed files transfer each time, so subsequent runs are fast.
+- **Each run is self-contained.** You can zip `runs/<timestamp>/` and email it without including any other run.
+- **The `latest/` symlink is your shortcut to "the current report":** `open ~/filecap-audits/<ip>/latest/report/audit-file-list.csv`.
+- **Old runs accumulate.** They're tiny (typically tens to hundreds of KB each) but if you're running daily over many months, you may want to occasionally `rm -rf` the oldest runs.
+- **No conflicts when re-running** — two runs in the same minute would land in distinct timestamped dirs (UTC seconds resolution).
+
+The fleet script (`audit-fleet.sh`) follows the same pattern: each fleet run goes to `~/filecap-audits/_fleet/<timestamp>/` and a `~/filecap-audits/_fleet/latest` symlink points to the most recent run.
 
 ### Staying current
 
@@ -648,38 +674,45 @@ For completeness, the full directory layout written by `audit-remote.sh`:
 
 ```
 ~/filecap-audits/<server-ip>/
-├── SOURCE_INFO.txt             Provenance — server, path, audit timestamp, find-a-file recipe
-├── inventory.ndjson            Raw scan output (one entry per file)
-├── mirror/                     Local rsync mirror (only created in local-scan mode)
-└── report/
-    ├── README.txt              Explains all artifacts (start here)
-    ├── audit-file-list.csv     The vendor work-order, one row per file
-    ├── audit-file-list.html    (only if --html or "yes" answered at the prompt)
-    ├── audit-summary.txt       Manager-friendly counts by category and PDF/DOCX/XLSX detail
-    ├── largest_files.txt       Top files by size
-    ├── flagged_filenames.txt   Files with name patterns suggesting scanned/IMG-prefixed origin
-    ├── duplicate_hashes.txt    Content-identical files (by SHA-256)
-    └── pdf_image_only.txt      PDFs with no text layer (require OCR before remediation)
+├── mirror/                     Local rsync copy of remote files (shared across runs)
+├── runs/
+│   ├── 20260509-143000Z/       Each run gets its own timestamped subdirectory (UTC)
+│   │   ├── SOURCE_INFO.txt     Provenance — server, path, audit timestamp, find-a-file recipe
+│   │   ├── inventory.ndjson    Raw scan output (one entry per file)
+│   │   └── report/
+│   │       ├── README.txt              Explains all artifacts (start here)
+│   │       ├── audit-file-list.csv     The vendor work-order, one row per file
+│   │       ├── audit-file-list.html    (only if --html or "yes" answered at the prompt)
+│   │       ├── audit-summary.txt       Manager-friendly counts by category and PDF/DOCX/XLSX detail
+│   │       ├── largest_files.txt       Top files by size
+│   │       ├── flagged_filenames.txt   Files with name patterns suggesting scanned/IMG-prefixed origin
+│   │       ├── duplicate_hashes.txt    Content-identical files (by SHA-256)
+│   │       └── pdf_image_only.txt      PDFs with no text layer (require OCR before remediation)
+│   ├── 20260516-093000Z/
+│   └── 20260523-100000Z/
+└── latest -> runs/20260523-100000Z    Symlink, always points to the most recent successful run
 ```
 
 And for `audit-fleet.sh`:
 
 ```
-~/filecap-audits/_fleet/20260509-134500/
-├── servers.txt                   List of servers audited
-├── failed_servers.txt            (only if any audits failed)
-├── MANAGER_SUMMARY.txt           Full audit numbers + per-server breakdown
-├── inventories/                  Per-server NDJSON inventories
-├── consolidated.ndjson           Cross-server consolidated NDJSON
-└── consolidated-report/
-    ├── README.txt                Explains all artifacts (start here)
-    ├── audit-file-list.csv       One row per file across the entire fleet
-    ├── audit-file-list.html      (only if HTML was requested)
-    ├── audit-summary.txt         Fleet-wide summary with per-server breakdown
-    ├── largest_files.txt
-    ├── flagged_filenames.txt
-    ├── duplicate_hashes.txt
-    └── pdf_image_only.txt
+~/filecap-audits/_fleet/
+├── 20260509-134500/
+│   ├── servers.txt                   List of servers audited
+│   ├── failed_servers.txt            (only if any audits failed)
+│   ├── MANAGER_SUMMARY.txt           Full audit numbers + per-server breakdown
+│   ├── inventories/                  Per-server NDJSON inventories
+│   ├── consolidated.ndjson           Cross-server consolidated NDJSON
+│   └── consolidated-report/
+│       ├── README.txt                Explains all artifacts (start here)
+│       ├── audit-file-list.csv       One row per file across the entire fleet
+│       ├── audit-file-list.html      (only if HTML was requested)
+│       ├── audit-summary.txt         Fleet-wide summary with per-server breakdown
+│       ├── largest_files.txt
+│       ├── flagged_filenames.txt
+│       ├── duplicate_hashes.txt
+│       └── pdf_image_only.txt
+└── latest -> 20260509-134500         Symlink, always points to the most recent fleet run
 ```
 
 ### Technical requirements

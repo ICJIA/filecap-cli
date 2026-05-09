@@ -43,17 +43,28 @@
 #      another-server,deploy,10.0.0.5,/var/strapi/uploads
 #
 #  WHERE OUTPUT GOES
-#    ~/filecap-audits/_fleet/<timestamp>/
-#      ├── servers.txt              (manifest of servers audited)
-#      ├── MANAGER_SUMMARY.txt      (full audit numbers, per-server breakdown)
-#      ├── consolidated.ndjson      (merged raw scan output)
-#      ├── consolidated-report/
-#      │   ├── audit-file-list.csv  (vendor work-order, all servers)
-#      │   ├── audit-file-list.html (only if HTML was requested)
-#      │   ├── audit-summary.txt    (plain-text summary)
-#      │   └── README.txt           (explains all artifacts)
-#      └── inventories/
-#          └── <server-name>.ndjson (per-server scan output)
+#    Per-server results land in timestamped run dirs (preserved across re-runs):
+#      ~/filecap-audits/<server-ip>/runs/<utc-timestamp>/
+#        ├── SOURCE_INFO.txt
+#        ├── inventory.ndjson
+#        └── report/
+#    A 'latest' symlink at ~/filecap-audits/<server-ip>/latest points to the
+#    most recent successful run for each server.
+#
+#    Fleet-consolidated output goes to a timestamped fleet dir:
+#      ~/filecap-audits/_fleet/<timestamp>/
+#        ├── servers.txt              (manifest of servers audited)
+#        ├── MANAGER_SUMMARY.txt      (full audit numbers, per-server breakdown)
+#        ├── consolidated.ndjson      (merged raw scan output)
+#        ├── consolidated-report/
+#        │   ├── audit-file-list.csv  (vendor work-order, all servers)
+#        │   ├── audit-file-list.html (only if HTML was requested)
+#        │   ├── audit-summary.txt    (plain-text summary)
+#        │   └── README.txt           (explains all artifacts)
+#        └── inventories/
+#            └── <server-name>.ndjson (per-server scan output)
+#    A '~/filecap-audits/_fleet/latest' symlink points to the most recent
+#    fleet run.
 #
 # ============================================================================
 
@@ -428,14 +439,22 @@ for i in "${VALID_INDEXES[@]}"; do
   printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
 
   if SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
-    SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/inventory.ndjson"
+    # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
+    # Fall back to scanning runs/ directly in case the symlink is missing.
+    SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/latest/inventory.ndjson"
+    if [[ ! -f "$SRC_INVENTORY" ]]; then
+      LATEST_RUN=$(ls -1t "${HOME}/filecap-audits/${SRV_HOST}/runs" 2>/dev/null | head -1)
+      if [[ -n "$LATEST_RUN" ]]; then
+        SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/runs/${LATEST_RUN}/inventory.ndjson"
+      fi
+    fi
     DEST_INVENTORY="${INVENTORIES_DIR}/${SRV_NAME}.ndjson"
     if [[ -f "$SRC_INVENTORY" ]]; then
       cp "$SRC_INVENTORY" "$DEST_INVENTORY"
       info "Copied inventory → ${DEST_INVENTORY}"
       (( SUCCESS_COUNT++ )) || true
     else
-      warn "audit-remote succeeded but inventory not found at: ${SRC_INVENTORY}"
+      warn "audit-remote succeeded but inventory not found for: ${SRV_HOST}"
       printf "  %s — inventory file missing after audit\n" "$SRV_NAME" >> "$FAILED_SERVERS_TXT"
       (( FAIL_COUNT++ )) || true
     fi
@@ -875,6 +894,11 @@ with open(summary_out, 'w', encoding='utf-8') as fh:
 
 print(f"  -> wrote {len(lines)} lines to manager summary")
 PYMANAGER
+
+# ── update _fleet/latest symlink ─────────────────────────────────────────────
+FLEET_LATEST_LINK="${HOME}/filecap-audits/_fleet/latest"
+ln -sfn "${FLEET_TS}" "${FLEET_LATEST_LINK}.tmp" && mv -f "${FLEET_LATEST_LINK}.tmp" "${FLEET_LATEST_LINK}"
+info "Updated '_fleet/latest' symlink → ${FLEET_TS}"
 
 # ── final output ──────────────────────────────────────────────────────────────
 printf "\n${G}Fleet audit complete${N}\n\n"

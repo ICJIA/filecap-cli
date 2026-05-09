@@ -39,14 +39,24 @@
 #
 #  WHERE OUTPUT GOES
 #    ~/filecap-audits/<server-ip>/
-#      ├── SOURCE_INFO.txt         (provenance: who, what, when)
-#      ├── inventory.ndjson        (raw scan output)
-#      └── report/
-#          ├── audit-file-list.csv  (vendor work-order)
-#          ├── audit-file-list.html (only if --html or "yes" answered at the prompt)
-#          ├── audit-summary.txt    (counts by category, manager-friendly)
-#          ├── README.txt           (explains all artifacts)
-#          └── ...
+#      ├── mirror/                           shared local rsync copy (incremental)
+#      ├── runs/
+#      │   ├── 20260509-143000Z/             each run gets its own timestamped dir (UTC)
+#      │   │   ├── SOURCE_INFO.txt           provenance: who, what, when
+#      │   │   ├── inventory.ndjson          raw scan output
+#      │   │   └── report/
+#      │   │       ├── audit-file-list.csv   vendor work-order
+#      │   │       ├── audit-file-list.html  (only if --html or "yes" answered)
+#      │   │       ├── audit-summary.txt     counts by category, manager-friendly
+#      │   │       ├── README.txt            explains all artifacts
+#      │   │       └── ...
+#      │   ├── 20260516-093000Z/
+#      │   └── 20260523-100000Z/
+#      └── latest -> runs/20260523-100000Z   symlink, updated after each run
+#
+#    Re-running the script against the same server preserves history — each
+#    run lands in its own timestamped subdirectory. The 'latest' symlink always
+#    points to the most recent successful run for convenient access.
 #
 #  USAGE
 #    ./audit-remote.sh                                         # interactive
@@ -274,17 +284,22 @@ fi
 # ── work directory ────────────────────────────────────────────────────────────
 WORK_DIR="${HOME}/filecap-audits/${HOST}"
 MIRROR_DIR="${WORK_DIR}/mirror"
-REPORT_DIR="${WORK_DIR}/report"
+
+RUN_TS=$(date -u +"%Y%m%d-%H%M%SZ")
+THIS_RUN_DIR="${WORK_DIR}/runs/${RUN_TS}"
+LATEST_LINK="${WORK_DIR}/latest"
+REPORT_DIR="${THIS_RUN_DIR}/report"
 
 step "Setting up work directory: ${WORK_DIR}"
-mkdir -p "${MIRROR_DIR}" "${REPORT_DIR}"
+mkdir -p "${MIRROR_DIR}" "${THIS_RUN_DIR}/report"
 
 # ── write SOURCE_INFO.txt ─────────────────────────────────────────────────────
 AUDIT_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat > "${WORK_DIR}/SOURCE_INFO.txt" <<SOURCE_INFO
+cat > "${THIS_RUN_DIR}/SOURCE_INFO.txt" <<SOURCE_INFO
 filecap audit — source server info
 ===================================
 
+Audit run timestamp: ${RUN_TS}
 Server name  : ${SERVER_NAME}
 Server IP    : ${HOST}
 SSH user     : ${SSH_USER}
@@ -295,7 +310,7 @@ To locate a file on the remote:
   ssh ${SSH_USER}@${HOST}
   cd ${REMOTE_PATH}
 SOURCE_INFO
-info "Wrote ${WORK_DIR}/SOURCE_INFO.txt"
+info "Wrote ${THIS_RUN_DIR}/SOURCE_INFO.txt"
 
 # ── SSH sanity check ──────────────────────────────────────────────────────────
 step "Verifying SSH connectivity to ${SSH_USER}@${HOST} ..."
@@ -345,7 +360,7 @@ REMOTE_NODE_MAJOR=$(echo "${REMOTE_NODE}" | sed 's/[^0-9]/ /g' | awk '{print $1+
 info "Remote Node: ${REMOTE_NODE} (major=${REMOTE_NODE_MAJOR})"
 
 # ── scan ──────────────────────────────────────────────────────────────────────
-INVENTORY="${WORK_DIR}/inventory.ndjson"
+INVENTORY="${THIS_RUN_DIR}/inventory.ndjson"
 
 if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
   # ─ native mode: filecap runs on the remote, NDJSON streams back ─────────────
@@ -442,6 +457,14 @@ if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" ${
   die "filecap report generation failed."
 fi
 
+# ── update 'latest' symlink ───────────────────────────────────────────────────
+# Atomic symlink update: create temp -> rename into place.
+# ln -sfn: -s symbolic, -f force (remove existing), -n treat existing symlink
+# target as the link itself (not a dir to descend into). Supported on both
+# macOS ln and GNU ln.
+ln -sfn "runs/${RUN_TS}" "${LATEST_LINK}.tmp" && mv -f "${LATEST_LINK}.tmp" "${LATEST_LINK}"
+info "Updated 'latest' symlink → runs/${RUN_TS}"
+
 # ── summary ───────────────────────────────────────────────────────────────────
 printf "\n${G}Audit complete${N} — ${SERVER_NAME} (${HOST})\n\n"
 
@@ -450,7 +473,7 @@ if [[ -f "${REPORT_DIR}/audit-summary.txt" ]]; then
 fi
 
 printf "\n${G}Files generated:${N}\n"
-printf "  Source info : %s\n" "${WORK_DIR}/SOURCE_INFO.txt"
+printf "  Source info : %s\n" "${THIS_RUN_DIR}/SOURCE_INFO.txt"
 printf "  Inventory   : %s\n" "${INVENTORY}"
 printf "  CSV report  : %s\n" "${REPORT_DIR}/audit-file-list.csv"
 if [[ -n "$HTML_FLAG" ]]; then
@@ -459,10 +482,14 @@ fi
 printf "  Full report : %s\n" "${REPORT_DIR}/"
 
 printf "\n${Y}Hint:${N} open the CSV report at:\n"
-printf "  %s\n" "${REPORT_DIR}/audit-file-list.csv"
+printf "  %s\n" "${WORK_DIR}/latest/report/audit-file-list.csv"
 xopen "${REPORT_DIR}/audit-file-list.csv"
 if [[ -n "$HTML_FLAG" ]]; then
   printf "\n${Y}Hint:${N} open the HTML report at:\n"
-  printf "  %s\n" "${REPORT_DIR}/audit-file-list.html"
+  printf "  %s\n" "${WORK_DIR}/latest/report/audit-file-list.html"
   xopen "${REPORT_DIR}/audit-file-list.html"
 fi
+
+echo
+info "Past runs for this server:"
+ls -1t "${WORK_DIR}/runs" 2>/dev/null | head -5 | sed 's/^/  /'
