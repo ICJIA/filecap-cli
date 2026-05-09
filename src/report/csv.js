@@ -168,7 +168,14 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.remediable,
     entry.sizeBytes,
     entry.modifiedAt,
-    entry.sha256 ?? "",
+    (() => {
+      const hash = entry.sha256 ?? "";
+      if (!hash) return "";
+      // Wrap in Excel text-formula syntax so Excel does NOT auto-convert to scientific notation.
+      // The cell renders as the literal hash string in Excel, Numbers, Google Sheets, and any
+      // tool that follows CSV escaping rules.
+      return `="${hash}"`;
+    })(),
     duplicateOf,
     (entry.flags ?? []).join("|"),
     // PDF

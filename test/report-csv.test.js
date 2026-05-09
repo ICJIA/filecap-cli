@@ -302,6 +302,37 @@ describe("writeCsv (consolidated input)", () => {
   });
 });
 
+describe("writeCsv SHA-256 Excel text-formula wrapping", () => {
+  it("wraps SHA-256 hash in Excel text-formula syntax to prevent scientific-notation auto-conversion", () => {
+    const fullHash = "a".repeat(64);
+    const entry = { ...baseEntry, sha256: fullHash };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    // csvCell() wraps the ="<hash>" value in outer quotes and doubles inner quotes per RFC 4180.
+    // Raw CSV cell form is: "=""<hash>"""
+    // Excel parses "=""<hash>""" back to the formula ="<hash>" and evaluates it as the string.
+    expect(csv).toContain(`"=""${fullHash}"""`);
+  });
+
+  it("returns empty string for missing SHA-256 hash", () => {
+    const entry = { ...baseEntry, sha256: undefined };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("sha256")]).toBe("");
+  });
+
+  it("does not wrap other columns in Excel text-formula syntax", () => {
+    const entry = { ...baseEntry, sha256: "deadbeef" };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    // filename column should not be wrapped
+    expect(cells[colIndex("filename")]).toBe("case.pdf");
+    // extension column should not be wrapped
+    expect(cells[colIndex("extension")]).toBe("pdf");
+  });
+});
+
 describe("writeCsv auditLink column", () => {
   it("emits an empty Audit Link when no auditLinkPattern is set", () => {
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
