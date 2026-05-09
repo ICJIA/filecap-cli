@@ -53,6 +53,23 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[1].label).toBe("Website");
   });
 
+  it("third column is serverIp with label Server IP", () => {
+    expect(CSV_COLUMNS[2].name).toBe("serverIp");
+    expect(CSV_COLUMNS[2].label).toBe("Server IP");
+  });
+
+  it("fourth column is modifiedAt with label Date published", () => {
+    expect(CSV_COLUMNS[3].name).toBe("modifiedAt");
+    expect(CSV_COLUMNS[3].label).toBe("Date published");
+  });
+
+  it("modifiedAt column label is 'Date published' not 'Last modified'", () => {
+    const col = CSV_COLUMNS.find((c) => c.name === "modifiedAt");
+    expect(col).toBeDefined();
+    expect(col.label).toBe("Date published");
+    expect(col.label).not.toBe("Last modified");
+  });
+
   it("includes new metadata columns for PDF, DOCX, XLSX", () => {
     const names = CSV_COLUMNS.map((c) => c.name);
     expect(names).toContain("pdfTitle");

@@ -4,6 +4,7 @@ export const CSV_COLUMNS = [
   { name: "serverName",            label: "Server" },
   { name: "siteName",              label: "Website" },
   { name: "serverIp",              label: "Server IP" },
+  { name: "modifiedAt",            label: "Date published" },
   { name: "scannedPath",           label: "Source folder on server" },
   { name: "path",                  label: "File location (relative to source folder)" },
   { name: "absolutePath",          label: "Full file path on server" },
@@ -13,7 +14,6 @@ export const CSV_COLUMNS = [
   { name: "category",              label: "File type" },
   { name: "remediable",            label: "Needs remediation" },
   { name: "sizeBytes",             label: "Size (bytes)" },
-  { name: "modifiedAt",            label: "Last modified" },
   { name: "sha256",                label: "Content hash (SHA-256)" },
   { name: "duplicateOf",           label: "Duplicate of" },
   { name: "flags",                 label: "File-name flags" },
@@ -158,6 +158,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     serverName,
     siteName,
     serverIp,
+    entry.modifiedAt,
     scannedPath,
     entry.path,
     entry.absolutePath,
@@ -167,7 +168,6 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.category,
     entry.remediable,
     entry.sizeBytes,
-    entry.modifiedAt,
     (() => {
       const hash = entry.sha256 ?? "";
       if (!hash) return "";

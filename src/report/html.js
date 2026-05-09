@@ -140,6 +140,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     serverName,
     siteName,
     serverIp,
+    entry.modifiedAt,
     scannedPath,
     entry.path,
     entry.absolutePath,
@@ -149,7 +150,6 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.category,
     entry.remediable,
     entry.sizeBytes,
-    entry.modifiedAt,
     entry.sha256 ?? "",
     duplicateOf,
     (entry.flags ?? []).join("|"),
@@ -695,6 +695,22 @@ ${rowsHtml}
       pairs.forEach(function (p) { tbody.appendChild(p.row); });
     });
   });
+
+  // ── default sort: by Date published, descending (most recent first) ──────────
+  const dateColIdx = headers.findIndex(function (th) { return th.dataset.col === "modifiedAt"; });
+  if (dateColIdx >= 0) {
+    // Trigger the sort logic for this column, descending
+    sortColIdx = dateColIdx;
+    sortAsc = false;
+    headers[dateColIdx].classList.add("sort-desc");
+    const pairs = allRows.map(function (row, i) { return { row: row, vals: data[i] || [] }; });
+    pairs.sort(function (a, b) {
+      const av = a.vals[dateColIdx] ?? "";
+      const bv = b.vals[dateColIdx] ?? "";
+      return String(bv).localeCompare(String(av));  // desc: bv vs av
+    });
+    pairs.forEach(function (p) { tbody.appendChild(p.row); });
+  }
 })();
 </script>
 

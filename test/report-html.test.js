@@ -321,4 +321,21 @@ describe("writeHtml", () => {
     expect(html).toMatch(/document\.getElementById\("filecap-data"\)\.textContent/);
     expect(html).not.toMatch(/JSON\.parse\('[^]*?-08'00'/);
   });
+
+  it("includes the default-sort code path for modifiedAt column in the IIFE", async () => {
+    const out = path.join(tmpDir, "default-sort.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    // The IIFE must contain the default-sort block keyed by the modifiedAt data-col attribute
+    expect(html).toContain('th.dataset.col === "modifiedAt"');
+    expect(html).toContain("dateColIdx");
+  });
+
+  it("renders <th data-col='modifiedAt'> with label 'Date published'", async () => {
+    const out = path.join(tmpDir, "date-published-header.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
+    expect(html).not.toContain("Last modified");
+  });
 });
