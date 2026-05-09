@@ -436,11 +436,30 @@ If the tools are registered correctly, the agent will call them directly rather 
 
 ## For auditors: self-contained audit scripts
 
-Two bash scripts ship with the repo at `examples/` that automate the full audit workflow for accessibility remediation vendors and managers. Auditors can `curl` them directly without cloning the repo or installing filecap globally — `npx` handles filecap auto-fetch.
+### What this is
 
-### Single-server audit: `audit-remote.sh`
+`filecap` is a tool for taking a complete inventory of the document files stored on a remote web server — typically the `/uploads` folder of a Strapi-powered website — so that a remediation vendor can see exactly what work is needed and produce a defensible, fixed-price quote. It works by connecting to the server over SSH, walking the entire file tree, and recording structured metadata about each file: PDF page counts, whether a PDF is image-only (scanned), DOCX heading structure, alt-text coverage, and more. The result is a spreadsheet (CSV) the vendor can open in Excel, plus an optional interactive web page (HTML) you can open in any browser for review meetings. No files on the server are modified — this is a read-only audit.
 
-Walks the auditor through a single remote server, produces `~/filecap-audits/<server-ip>/report/files.csv` (a 32-column vendor work-order with one row per file, plus introspection-derived columns like page count, has-text-layer, alt-text presence, image-only flag). Optionally also writes `files.html` — a self-contained HTML report with the same 32 columns, built-in sort/filter/search, and clean print styles.
+### What you'll need
+
+Check this list before running anything. All five items are required.
+
+1. **A computer running macOS, Linux, or Windows with WSL2.** Standard Mac and Linux terminals work out of the box. Windows users need one extra setup step — see [Windows: the situation](#windows-the-situation) below for a plain-language explanation of why, and how to fix it in about 5 minutes.
+
+2. **SSH access to the remote server.** This means you (or your IT team) already have a username and an SSH key configured for the target machine. The default username for ICJIA Strapi servers is `forge`. If you can already run `ssh forge@<server-ip>` and get a prompt, you're ready. If not, you'll need your server administrator to set this up before running the audit.
+
+3. **Node.js 18 or newer installed on your local machine.** Node is the JavaScript runtime the tool uses; it's free and widely used. Check whether it's already installed by opening a terminal and typing `node --version`. If you see `v18.x.x` or higher, you're done. If not:
+   - macOS: `brew install node` (if you have Homebrew) or download the installer from https://nodejs.org
+   - Ubuntu/Linux: `sudo apt install -y nodejs` or download from https://nodejs.org
+   - Windows (WSL2/Ubuntu): see the [Windows](#windows-the-situation) section
+
+4. **`npx` available in your terminal.** `npx` comes bundled with Node.js 18+ — if you have Node, you have `npx`. It's the tool that downloads and runs `filecap` automatically; you don't have to install `filecap` separately.
+
+5. **`bash`, `ssh`, `rsync`, and `python3` available.** These are pre-installed on every Mac (macOS 12+), every modern Ubuntu/Debian Linux, and every WSL2/Ubuntu environment. You don't need to do anything. The scripts check for these at startup and tell you if something is missing.
+
+### How to use it (single server)
+
+Three commands. The first downloads the script, the second makes it executable, the third runs it:
 
 ```bash
 curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
@@ -448,22 +467,168 @@ chmod +x audit-remote.sh
 ./audit-remote.sh
 ```
 
-Or non-interactive:
+The script walks you through the rest interactively. It asks a few questions (see below), connects to the server, collects the inventory, and writes the output to `~/filecap-audits/<server-ip>/report/`. When it's done, it prints the path to the results.
+
+If you already know all the details and want to skip the prompts, you can pass them directly:
 
 ```bash
-./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-strapi-prod
+./audit-remote.sh forge 192.241.146.85 ~/dvfr.icjia-api.cloud/strapi_v4/public/uploads dvfr-strapi-prod
 ```
 
-The script auto-detects Node version on the remote: if Node ≥20, it scans natively over SSH (CPU work happens on the remote). If Node <20 (common on older Ubuntu Strapi servers), it falls back to rsync-down-and-scan-locally — the resulting CSV still carries the *remote* server's IP and path so vendors can ssh in and locate any flagged file.
+### What you'll be asked
 
-**Inputs the script asks for** (interactive mode):
-- SSH username on the target server — defaults to `forge`; override with the `FILECAP_DEFAULT_SSH_USER` environment variable or by typing a different name at the prompt
-- Server IP or hostname
-- Full path to the uploads directory on the remote
-- Friendly server name (used in report headers; defaults to `strapi-<IP>` if blank)
-- Whether to also generate a self-contained HTML report (optional; defaults to no) — answer `y` to produce `audit-file-list.html` alongside the CSV
+In interactive mode, the script asks five questions. Here's what each one means and what a sensible answer looks like:
 
-**Output structure:**
+- **SSH username** — The login name on the remote server. Defaults to `forge` (the ICJIA Strapi convention). Press Enter to accept the default, or type a different name if your server uses one.
+- **Server IP or hostname** — The address of the server you're auditing. Examples: `192.241.146.85` or `strapi-prod-01.example.com`. This is required — there's no default.
+- **Full path to the uploads folder on the remote** — Where the files live on the server. Example: `~/dvfr.icjia-api.cloud/strapi_v4/public/uploads`. Your server administrator can confirm this path. Required.
+- **Friendly server name** — A human-readable label used in report headings. Defaults to `strapi-<IP-with-dashes>` (e.g., `strapi-192-241-146-85`). Optional — press Enter to accept the default, or type something like `dvfr-strapi-prod`.
+- **Generate HTML report? [y/N]** — Defaults to no (just press Enter). If you answer `y`, the script also produces `audit-file-list.html` — a self-contained web page with the same data, interactive column sorting, full-text search, and visual highlights for image-only PDFs. Useful to have open during a vendor review meeting.
+
+### What you get
+
+After the script finishes, navigate to `~/filecap-audits/<server-ip>/report/`. You'll find:
+
+- **`audit-file-list.csv`** — The main deliverable. One row per file, 32 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
+- **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
+- **`audit-file-list.html`** — (Only present if you answered `y` to the HTML prompt.) A self-contained web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, and print-to-PDF.
+- **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.
+- **`largest_files.txt`** — The top 50 files by size. Helpful for scheduling the most time-consuming remediation work first.
+- **`flagged_filenames.txt`** — Files whose names suggest they're scanned documents or unprocessed camera photos (`Scan_001.pdf`, `IMG_4567.pdf`, etc.) — typically the highest-cost items to remediate.
+- **`duplicate_hashes.txt`** — Files that are byte-for-byte identical to another file on the server. Useful for identifying redundant copies before remediation.
+- **`pdf_image_only.txt`** — PDFs that contain no text layer — they're essentially photos of pages. These require OCR before any accessibility remediation can begin, and they're usually the cost driver in a vendor quote.
+
+The output directory also contains `inventory.ndjson` (the raw scan data used to generate the report) and `SOURCE_INFO.txt` (a provenance record: which server was scanned, when, and how to SSH in and locate a specific file).
+
+### How to use it (multiple servers / fleet mode)
+
+If you're responsible for more than one server, the fleet script runs the single-server audit on each one and then produces a combined report across all of them.
+
+```bash
+curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
+curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+chmod +x audit-fleet.sh audit-remote.sh
+./audit-fleet.sh
+```
+
+Or, if you have a list of servers ready, pass it as a CSV file:
+
+```bash
+./audit-fleet.sh servers.csv
+```
+
+The servers.csv format (no header row; `#` lines are comments):
+
+```
+server_name,user,host,remote_path
+dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads
+another-server,deploy,10.0.0.5,/var/strapi/uploads
+```
+
+Output lands in `~/filecap-audits/_fleet/<timestamp>/` and includes a per-server breakdown (`MANAGER_SUMMARY.txt`), a combined CSV (`audit-file-list.csv`) with one row per file across all servers, and a `duplicate_hashes.txt` that catches files that appear on multiple servers.
+
+---
+
+### Windows: the situation
+
+If you're on a Windows machine and wondering why you can't just double-click the script or run it in PowerShell, here's the full explanation — and a straightforward fix.
+
+#### Why this script doesn't run natively on Windows
+
+The audit scripts depend on four tools that come from the Unix world. Here's what each one does and why there's no drop-in Windows replacement:
+
+1. **The script is written in `bash`, the standard Unix shell.** Bash has been the native command line on Mac and Linux since 1989. Windows has two different command languages — PowerShell (the modern one) and cmd.exe (the older one) — and they use an entirely different vocabulary. A bash script is not something either of them can read directly, any more than a Spanish speaker can read Japanese without translation.
+
+2. **The script depends on `rsync`, a Unix file-transfer tool with no Windows equivalent.** `rsync` does three things simultaneously: it copies files, transfers them over SSH, and only re-transfers what has changed since the last run. Windows has separate tools for each of those pieces (`robocopy` for local copying, `scp` for SSH transfer) but nothing that combines all three. We use `rsync` because it makes re-running an audit fast and reliable — subsequent runs on the same server take a fraction of the time.
+
+3. **The script uses `python3` for some glue logic.** Python itself runs fine on Windows, but the way Unix scripts invoke it (via a "shebang line" — the `#!/usr/bin/env python3` at the top of a file) is a Unix convention that Windows ignores. So even if Python is installed, Windows doesn't know to use it when our script calls for it.
+
+4. **Unix and Windows use different file path conventions.** A file in your home folder is `~/filecap-audits` on Mac/Linux but `C:\Users\YourName\filecap-audits` on Windows — different separators, different home-directory conventions. A script written for one won't translate to the other without rewriting all the path-handling code.
+
+5. **More broadly: Unix shell scripting is a 50-year-old tradition.** What takes one line in bash often takes 5–10 lines in PowerShell because the two ecosystems developed separately. A clean Windows port isn't a translation pass — it's a full rewrite, with its own test coverage and long-term maintenance. (See [Native PowerShell support — on the roadmap](#native-powershell-support--on-the-roadmap) below for our current thinking on this.)
+
+#### What Microsoft recommends: WSL2
+
+WSL2 — Windows Subsystem for Linux, version 2 — is **Microsoft's official answer** to exactly this problem. They built it because Windows developer customers were missing out on the rich ecosystem of Unix tools, and they needed a first-class solution. It's not a workaround; it's a supported Microsoft product.
+
+**What WSL2 actually is:**
+
+- A real Linux operating system running inside Windows. Specifically, you install Ubuntu Linux (recommended) alongside your normal Windows installation.
+- It runs in a lightweight virtual machine that starts in under a second and uses negligible memory when you're not actively using it.
+- It's not a separate computer or a separate login. WSL2's filesystem can see your Windows files (your `C:` drive shows up inside Linux at `/mnt/c/`), and Windows Explorer can browse your WSL2 files (under `\\wsl.localhost\Ubuntu\`). The two sides coexist cleanly.
+- It's built into Windows 10 and 11. No separate purchase, no third-party software.
+
+**Why Ubuntu specifically:**
+
+- Ubuntu is the most widely used Linux distribution in the world, and most cross-platform Unix tools are tested on it first.
+- Ubuntu publishes Long-Term Support (LTS) releases — currently 22.04 and 24.04 — that receive security updates for at least five years.
+- The audit scripts have been tested on macOS and Ubuntu. Other Linux distributions (Debian, Fedora, Arch) almost certainly work, but aren't formally tested.
+
+#### How to install WSL2 with Ubuntu
+
+This is a one-time setup. Subsequent audit runs need no admin rights and no extra steps.
+
+```powershell
+# Open PowerShell as Administrator.
+# (Right-click the Start button, choose "Windows PowerShell (Admin)" or "Terminal (Admin)".)
+# Then run this single command:
+wsl --install
+```
+
+That one command installs both WSL2 and Ubuntu. When it finishes, reboot your computer when prompted.
+
+After the reboot, find "Ubuntu" in your Start menu and open it. The first time you launch it, Ubuntu asks you to choose a username and password for the Linux side — these are independent of your Windows login and can be anything you like.
+
+Then, inside the Ubuntu terminal, install Node.js and run the audit:
+
+```bash
+# Install Node.js 20 (the audit scripts require Node 18 or newer):
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Confirm it worked:
+node --version    # should print v20.x.x
+
+# Now run the audit exactly as you would on a Mac or Linux machine:
+curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+chmod +x audit-remote.sh
+./audit-remote.sh
+```
+
+#### Common questions from Windows users
+
+**Will WSL2 slow down my computer?**
+No. The Linux environment uses essentially no resources when you're not actively running something in it. It's not running in the background.
+
+**Will WSL2 see my Windows files?**
+Yes. Your `C:` drive appears inside Linux at `/mnt/c/`. If you've downloaded files in Windows, you can access them from inside Ubuntu at `/mnt/c/Users/<YourWindowsName>/Downloads/`.
+
+**Will Windows see my WSL2 files?**
+Yes. From Windows Explorer, navigate to `\\wsl.localhost\Ubuntu\home\<your-linux-username>\` to browse WSL2 files. Audit CSVs generated inside WSL2 can be opened directly in Excel or any Windows browser without copying them anywhere.
+
+**Can I delete WSL2 later if I don't want it?**
+Yes, completely. Run `wsl --unregister Ubuntu` in PowerShell and the Linux environment is gone with no leftovers. WSL2 itself can also be uninstalled through Windows Settings → Apps.
+
+**Do I need administrator rights?**
+Yes, for the initial WSL2 install. After that, day-to-day use (opening Ubuntu, running audit scripts) does not require admin rights.
+
+**Will my company's antivirus or IT department block this?**
+Usually no — Microsoft officially endorses WSL2, and most enterprise antivirus products treat it as a known-good Microsoft component. However, some tightly locked-down corporate machines do disable it via Group Policy. If `wsl --install` fails with a permissions error, contact your IT department and ask them to enable WSL2 (specifically: enable the "Windows Subsystem for Linux" optional feature and the "Virtual Machine Platform" optional feature). This is a routine request.
+
+**What if my company really won't allow WSL2?**
+You have a couple of options. First, another team member on a Mac or Linux machine can run the audit and email you the resulting CSV and HTML files — the audit itself doesn't need to run on your machine. Second, native PowerShell support is on our roadmap (see below). If your organization genuinely cannot use WSL2, please open an issue so we can gauge demand.
+
+#### Native PowerShell support — on the roadmap
+
+A native Windows/PowerShell version of the audit scripts is possible, but it's a meaningful engineering project rather than a quick port. The work involved: approximately 1,500 lines of net-new PowerShell, a replacement for `rsync` over SSH (likely `robocopy` + `scp` with resumption logic), replacements for the inline Python helpers, full path-translation between Windows and Unix conventions, and a separate test matrix across PowerShell 5.1 and 7 on both Windows 10 and Windows 11. Estimated effort: 2–3 focused days of development plus ongoing maintenance as Windows tooling evolves.
+
+We'll prioritize this if there's clear demand from organizations that genuinely cannot use WSL2. If that's your team, please open an issue at https://github.com/ICJIA/filecap-cli/issues with a brief description of why WSL2 isn't viable — that information directly informs our roadmap.
+
+---
+
+### Output structure reference
+
+For completeness, the full directory layout written by `audit-remote.sh`:
 
 ```
 ~/filecap-audits/<server-ip>/
@@ -481,36 +646,7 @@ The script auto-detects Node version on the remote: if Node ≥20, it scans nati
     └── pdf_image_only.txt      PDFs with no text layer (require OCR before remediation)
 ```
 
-The optional `files.html` is a fully self-contained single file — no external stylesheets, fonts, or scripts. It opens in any browser, includes the same 32 columns as the CSV, supports client-side column sort (click any header) and full-text search/filter across all fields, visually highlights image-only PDFs and flagged filenames, and renders cleanly when printed.
-
-### Fleet audit: `audit-fleet.sh`
-
-For managers who need a cross-server consolidated report. Runs `audit-remote.sh` against every server in a fleet, then produces:
-- A consolidated CSV with one row per file across all servers (cross-server duplicates linked via the `duplicateOf` column)
-- A `MANAGER_SUMMARY.txt` with per-server breakdowns and fleet-wide totals — designed to hand to remediation auditors
-
-```bash
-curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
-curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
-chmod +x audit-fleet.sh audit-remote.sh
-./audit-fleet.sh
-```
-
-Or batch mode with a CSV of servers:
-
-```bash
-./audit-fleet.sh servers.csv
-```
-
-The servers.csv format (no header row, `#` comments allowed):
-
-```
-server_name,user,host,remote_path
-dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads
-another-server,deploy,10.0.0.5,/var/strapi/uploads
-```
-
-Output goes to `~/filecap-audits/_fleet/<timestamp>/`:
+And for `audit-fleet.sh`:
 
 ```
 ~/filecap-audits/_fleet/20260509-134500/
@@ -530,26 +666,10 @@ Output goes to `~/filecap-audits/_fleet/<timestamp>/`:
     └── pdf_image_only.txt
 ```
 
-### Windows users: use WSL2
+### Technical requirements
 
-The audit scripts require bash, ssh, rsync, and python3 — all native on macOS and Linux but not on Windows. The path of least resistance for Windows-based auditors is the Windows Subsystem for Linux:
-
-```bash
-# In an admin PowerShell prompt:
-wsl --install
-
-# After reboot, in the new Ubuntu terminal:
-curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
-chmod +x audit-remote.sh
-./audit-remote.sh
-```
-
-This is a one-time WSL2 setup (5 minutes; no admin needed for subsequent runs). Native PowerShell support is on the roadmap for organizations that cannot deploy WSL2.
-
-### Requirements
-
-- bash 3.2+ (default on macOS; default on Linux)
-- python3 (default on macOS 12+; default on most Linux distros)
+- bash 3.2+ (default on macOS; default on Linux and WSL2/Ubuntu)
+- python3 (default on macOS 12+; default on most Linux distros and WSL2/Ubuntu)
 - ssh (with keys configured for the target server[s])
 - rsync
 - npx (comes with Node.js 18+; install Node from https://nodejs.org)
@@ -559,7 +679,7 @@ The scripts run a tool-presence and Node-version preflight at startup and abort 
 
 ### Why local-mode scanning matters
 
-Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The audit-remote.sh script sidesteps this by detecting Node 16 and pulling the files down via rsync, then running filecap on the auditor's mac/laptop. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
+Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The `audit-remote.sh` script sidesteps this by detecting Node 16 and pulling the files down via rsync, then running filecap on the auditor's local machine. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
 
 ## What filecap does not do
 
