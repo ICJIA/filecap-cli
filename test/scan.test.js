@@ -534,3 +534,32 @@ describe("filecap CLI end-to-end", () => {
     expect(ok.flags).toEqual([]);
   });
 });
+
+describe("runScan auditLinkPattern", () => {
+  it("includes auditLinkPattern in header metadata when provided", async () => {
+    const outPath = path.join(outDir, "auditlink.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      auditLinkPattern: "https://example.com/?u={publicUrl}",
+    });
+    const lines = await readNdjson(outPath);
+    expect(lines[0].metadata.auditLinkPattern).toBe("https://example.com/?u={publicUrl}");
+  });
+
+  it("omits auditLinkPattern from header when not provided", async () => {
+    const outPath = path.join(outDir, "no-auditlink.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+    });
+    const lines = await readNdjson(outPath);
+    expect(Object.prototype.hasOwnProperty.call(lines[0].metadata, "auditLinkPattern")).toBe(false);
+  });
+});

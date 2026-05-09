@@ -266,6 +266,28 @@ describe("writeHtml", () => {
     expect(html).toMatch(/All \(5\)/);
   });
 
+  it("renders audit-link column as clickable link when auditLinkPattern is set", async () => {
+    const headerWithPattern = {
+      ...sampleHeader,
+      metadata: {
+        ...sampleHeader.metadata,
+        auditLinkPattern: "https://audit.example.com/?hash={sha256}",
+      },
+    };
+    const out = path.join(tmpDir, "auditlink.html");
+    await writeHtml({ sourceHeader: headerWithPattern, entries: sampleEntries, sources: [headerWithPattern], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/class="audit-link"/);
+    expect(html).toMatch(/View audit/);
+  });
+
+  it("omits audit-link anchor when auditLinkPattern is absent", async () => {
+    const out = path.join(tmpDir, "no-auditlink.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).not.toMatch(/class="audit-link"/);
+  });
+
   it("counts each category correctly in chip labels", async () => {
     const out = path.join(tmpDir, "chip-counts.html");
     const threeAndTwo = [

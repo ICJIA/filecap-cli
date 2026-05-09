@@ -26,6 +26,34 @@ function formatCategory(cat) {
   return CATEGORY_LABELS[cat] ?? cat;
 }
 
+function expandAuditLinkTemplate(pattern, entry, sourceHeader, sourceMap, isConsolidated) {
+  let publicUrl = "";
+  let urlBase, siteName, serverIp;
+  if (isConsolidated) {
+    const src = sourceMap.get(entry.serverName);
+    urlBase = src?.publicUrlBase;
+    siteName = src?.siteName;
+    serverIp = src?.serverIp;
+  } else {
+    urlBase = sourceHeader.metadata?.publicUrlBase;
+    siteName = sourceHeader.metadata?.siteName;
+    serverIp = sourceHeader.metadata?.serverIp;
+  }
+  if (urlBase) {
+    const cleanBase = urlBase.replace(/\/+$/, "");
+    const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
+    publicUrl = `${cleanBase}/${cleanPath}`;
+  }
+
+  return pattern
+    .replace(/\{publicUrl\}/g, encodeURIComponent(publicUrl))
+    .replace(/\{sha256\}/g, encodeURIComponent(entry.sha256 ?? ""))
+    .replace(/\{filename\}/g, encodeURIComponent(entry.filename ?? ""))
+    .replace(/\{path\}/g, encodeURIComponent(entry.path ?? ""))
+    .replace(/\{serverIp\}/g, encodeURIComponent(serverIp ?? ""))
+    .replace(/\{siteName\}/g, encodeURIComponent(siteName ?? ""));
+}
+
 /**
  * Escape a value for safe insertion into HTML.
  * @param {*} s
@@ -82,6 +110,21 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
   }
 
   const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
+
+  // Resolve audit link
+  let auditLink = "";
+  {
+    let pattern;
+    if (isConsolidated) {
+      const src = sourceMap.get(entry.serverName);
+      pattern = src?.auditLinkPattern ?? "";
+    } else {
+      pattern = sourceHeader.metadata?.auditLinkPattern ?? "";
+    }
+    if (pattern) {
+      auditLink = expandAuditLinkTemplate(pattern, entry, sourceHeader, sourceMap, isConsolidated);
+    }
+  }
 
   const intro = entry.introspection ?? null;
   const isPdf = intro?.kind === "pdf";
@@ -159,6 +202,8 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     isXlsx ? (intro.totalCells ?? "") : "",
     // Legacy
     isLegacy ? intro.format : "",
+    // Audit link
+    auditLink,
   ];
 
   return raw.map(formatCellValue);
@@ -222,6 +267,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
 
   // ── build table rows ─────────────────────────────────────────────────────────
   const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
+  const auditLinkColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditLink");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -239,6 +285,9 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
       if (i === publicUrlColIdx && v !== "" && v !== null && v !== undefined) {
         const escaped = htmlEscape(v);
         return `<td><a href="${escaped}" target="_blank" rel="noopener noreferrer">${escaped}</a></td>`;
+      }
+      if (i === auditLinkColIdx && v !== "" && v !== null && v !== undefined) {
+        return `<td><a href="${htmlEscape(v)}" target="_blank" rel="noopener noreferrer" class="audit-link">View audit &#x2192;</a></td>`;
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -466,6 +515,14 @@ tr.flagged td { /* let row bg show through; border is the indicator */ }
   margin-left: 0.25em;
 }
 .badge-warn { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+
+/* ── audit link ────────────────────────────────────────────── */
+.audit-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+}
+.audit-link:hover { text-decoration: underline; }
 
 /* ── footer ────────────────────────────────────────────────── */
 footer {

@@ -62,6 +62,7 @@ export const CSV_COLUMNS = [
   { name: "xlsxAuthor",            label: "XLSX: author" },
   { name: "xlsxTotalCells",        label: "XLSX: total cells" },
   { name: "officeLegacyFormat",    label: "Legacy Office format" },
+  { name: "auditLink",             label: "Audit Link" },
 ];
 
 /**
@@ -127,6 +128,21 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
   }
 
   const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
+
+  // Resolve audit link pattern
+  let auditLink = "";
+  {
+    let pattern;
+    if (isConsolidated) {
+      const src = sourceMap.get(entry.serverName);
+      pattern = src?.auditLinkPattern ?? "";
+    } else {
+      pattern = sourceHeader.metadata?.auditLinkPattern ?? "";
+    }
+    if (pattern) {
+      auditLink = expandAuditLinkTemplate(pattern, entry, sourceHeader, sourceMap);
+    }
+  }
 
   const intro = entry.introspection ?? null;
   const isPdf = intro?.kind === "pdf";
@@ -204,7 +220,38 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     isXlsx ? (intro.totalCells ?? "") : "",
     // Legacy
     isLegacy ? intro.format : "",
+    // Audit link
+    auditLink,
   ];
+}
+
+function expandAuditLinkTemplate(pattern, entry, header, sourceMap) {
+  let publicUrl = "";
+  let urlBase, siteName, serverIp;
+  const isConsolidated = header.kind === "filecap-consolidated-header";
+  if (isConsolidated) {
+    const src = sourceMap.get(entry.serverName);
+    urlBase = src?.publicUrlBase;
+    siteName = src?.siteName;
+    serverIp = src?.serverIp;
+  } else {
+    urlBase = header.metadata?.publicUrlBase;
+    siteName = header.metadata?.siteName;
+    serverIp = header.metadata?.serverIp;
+  }
+  if (urlBase) {
+    const cleanBase = urlBase.replace(/\/+$/, "");
+    const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
+    publicUrl = `${cleanBase}/${cleanPath}`;
+  }
+
+  return pattern
+    .replace(/\{publicUrl\}/g, encodeURIComponent(publicUrl))
+    .replace(/\{sha256\}/g, encodeURIComponent(entry.sha256 ?? ""))
+    .replace(/\{filename\}/g, encodeURIComponent(entry.filename ?? ""))
+    .replace(/\{path\}/g, encodeURIComponent(entry.path ?? ""))
+    .replace(/\{serverIp\}/g, encodeURIComponent(serverIp ?? ""))
+    .replace(/\{siteName\}/g, encodeURIComponent(siteName ?? ""));
 }
 
 // Re-export for consumers that previously used the boolean helper

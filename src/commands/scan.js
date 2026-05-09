@@ -23,6 +23,7 @@ export async function runScan({
   serverIp,
   siteName,
   publicUrlBase,
+  auditLinkPattern,
   includeExt,
   excludeExt,
   introspect: introspectEnabled = false,
@@ -78,6 +79,9 @@ export async function runScan({
     }
     if (publicUrlBase && publicUrlBase !== "") {
       headerMetadata.publicUrlBase = publicUrlBase;
+    }
+    if (auditLinkPattern && auditLinkPattern !== "") {
+      headerMetadata.auditLinkPattern = auditLinkPattern;
     }
     const header = {
       schemaVersion: SCHEMA_VERSION,

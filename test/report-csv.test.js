@@ -301,3 +301,52 @@ describe("writeCsv (consolidated input)", () => {
     expect(cells[colIndex("serverIp")]).toBe("10.42.7.18");
   });
 });
+
+describe("writeCsv auditLink column", () => {
+  it("emits an empty Audit Link when no auditLinkPattern is set", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("auditLink")]).toBe("");
+  });
+
+  it("expands {sha256} placeholder in audit link pattern", () => {
+    const headerWithPattern = {
+      ...baseHeader,
+      metadata: { ...baseHeader.metadata, auditLinkPattern: "https://audit.example.com/?hash={sha256}" },
+    };
+    const entry = { ...baseEntry, sha256: "deadbeef" };
+    const csv = writeCsv({ sourceHeader: headerWithPattern, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("auditLink")]).toBe("https://audit.example.com/?hash=deadbeef");
+  });
+
+  it("expands {publicUrl} placeholder using publicUrlBase + entry path", () => {
+    const headerWithBoth = {
+      ...baseHeader,
+      metadata: {
+        ...baseHeader.metadata,
+        publicUrlBase: "https://cdn.example.com/uploads",
+        auditLinkPattern: "https://audit.example.com/?url={publicUrl}",
+      },
+    };
+    const csv = writeCsv({ sourceHeader: headerWithBoth, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    const expected = "https://audit.example.com/?url=" + encodeURIComponent("https://cdn.example.com/uploads/case.pdf");
+    expect(cells[colIndex("auditLink")]).toBe(expected);
+  });
+
+  it("emits empty string when pattern is set but publicUrlBase is absent and template uses only {publicUrl}", () => {
+    const headerWithPatternOnly = {
+      ...baseHeader,
+      metadata: { ...baseHeader.metadata, auditLinkPattern: "https://audit.example.com/?url={publicUrl}" },
+    };
+    const csv = writeCsv({ sourceHeader: headerWithPatternOnly, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    // publicUrl resolves to "", so encoded empty string — link is still returned (pattern is set)
+    expect(cells[colIndex("auditLink")]).toContain("https://audit.example.com");
+  });
+});

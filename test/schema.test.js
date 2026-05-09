@@ -526,6 +526,46 @@ describe("publicUrlBase in headerSchema", () => {
   });
 });
 
+describe("auditLinkPattern in headerSchema", () => {
+  it("validates a header without auditLinkPattern (optional field absent)", () => {
+    const header = {
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        serverName: "s1",
+        hostname: "s1.local",
+        serverIp: "10.0.0.1",
+        scannedPath: "/uploads",
+        scannedAt: "2026-05-09T00:00:00.000Z",
+        filecapVersion: "1.0.5",
+        nodeVersion: "v20.11.1",
+        options: { introspect: false, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    };
+    expect(() => headerSchema.parse(header)).not.toThrow();
+  });
+
+  it("validates a header with auditLinkPattern set", () => {
+    const header = {
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        serverName: "s1",
+        hostname: "s1.local",
+        serverIp: "10.0.0.1",
+        scannedPath: "/uploads",
+        scannedAt: "2026-05-09T00:00:00.000Z",
+        filecapVersion: "1.0.5",
+        nodeVersion: "v20.11.1",
+        auditLinkPattern: "https://audit.example.com/?hash={sha256}",
+        options: { introspect: false, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    };
+    expect(() => headerSchema.parse(header)).not.toThrow();
+    expect(headerSchema.parse(header).metadata.auditLinkPattern).toBe("https://audit.example.com/?hash={sha256}");
+  });
+});
+
 describe("isCompleteInventory", () => {
   it("returns true for a complete inventory (header + entries + footer)", () => {
     const text = [

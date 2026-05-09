@@ -17,6 +17,7 @@ export const headerSchema = z.object({
   metadata: z.object({
     siteName: z.string().optional(),
     publicUrlBase: z.string().optional(),
+    auditLinkPattern: z.string().optional(),
     serverName: z.string(),
     hostname: z.string(),
     serverIp: z.string(),
@@ -31,6 +32,7 @@ export const headerSchema = z.object({
 const sourceBlockSchema = z.object({
   siteName: z.string().optional(),
   publicUrlBase: z.string().optional(),
+  auditLinkPattern: z.string().optional(),
   serverName: z.string(),
   hostname: z.string(),
   serverIp: z.string(),
