@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] — 2026-05-09
+
+### Changed
+
+- **Documentation: the two audit columns now BOTH work end-to-end.** When `--audit-link-pattern` was added in 1.0.5, the "Audit Link" column rendered clickable URLs that opened audit.icjia.app's homepage with a `?prefill=URL` query param the web app ignored. As of audit.icjia.app's PR #12 (merged + deployed today), `?prefill=URL` now triggers an on-demand audit via the new `POST /api/analyze-url` endpoint. The README's audit section was rewritten to explain when to use each column: "View audit →" for ad-hoc spot checks (no precomputation), "View report →" for pre-saved bulk results (after audit-enrich). No code changes — purely a documentation update reflecting the now-working behavior.
+
+[1.0.9]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.9
+
 ## [1.0.8] — 2026-05-09
 
 ### Added

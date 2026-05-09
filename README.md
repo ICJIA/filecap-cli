@@ -720,6 +720,24 @@ export FILECAP_AUDIT_TOKEN="fap_yourtokenhere"
 
 Best practice: store in macOS Keychain or a `~/.filecap/credentials` file with mode 600. **Never commit the token to git or paste it in chat/email.** filecap reads it only via env var.
 
+### The two audit columns explained
+
+The CSV and HTML reports have two columns that look similar but mean different things. Both link to audit.icjia.app; the difference is when the score is computed:
+
+| Column header in CSV | HTML link text | When to use |
+|---|---|---|
+| **Audit Link** | "View audit →" | On-demand. Click and audit.icjia.app fetches the file server-side and runs the analysis right then. No prior `audit-enrich` step required. Always available when `--audit-link-pattern` is set. |
+| **Audit Report** | "View report →" | Pre-saved. Populated only after running `filecap audit-enrich`, which calls `/api/bulk-from-inventory` and persists each result with a sharable report ID. Click and you see the saved report at `https://audit.icjia.app/report/<id>` instantly. |
+
+In practice, the workflow is:
+
+- **For a quick spot check** during a working session, click "View audit →" on any row. audit.icjia.app fetches the file via its public URL (no upload needed) and shows the score within ~30 seconds.
+- **For a finalized vendor handoff**, run `audit-enrich` once after the scan. Every PDF gets pre-computed scores stored persistently. The "View report →" links open instantly (no waiting), and the report URL is shareable — auditors can email a "View report →" link to a remediator for that specific file.
+
+Both columns can be present at the same time. If you set both `--audit-link-pattern` and run `audit-enrich`, every row has both clickable options.
+
+The on-demand path uses the new `POST /api/analyze-url` endpoint (added to audit.icjia.app in May 2026). The bulk path uses `POST /api/bulk-from-inventory` (also May 2026). Both require an audit.icjia.app personal access token; see [Authentication](#authentication) above.
+
 ## For auditors: self-contained audit scripts
 
 ### What this is
