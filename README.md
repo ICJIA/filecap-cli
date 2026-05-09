@@ -6,7 +6,7 @@
 
 ## Status
 
-**Phase 5 shipped (v0.5.0).** Multi-server rollup is functional: `filecap rollup *.ndjson -o consolidated.ndjson` merges per-server inventories into one consolidated file with content-duplicate detection (entries sharing a SHA-256 get a `duplicateOf` link to the canonical entry — oldest `modifiedAt`, alphabetical tiebreaker on `serverName`). Phase 4's filename flagging, Phase 3's Office introspection, and Phase 2's PDF introspection all continue unchanged.
+**Phase 6 shipped (v0.6.0).** Report command is functional: `filecap report consolidated.ndjson -o ./report/` produces the vendor handoff package — `files.csv` (32-column work-order), `SUMMARY.txt` with file-count breakdowns, plus four flagged-list `.txt` files (largest, flagged-names, duplicate-hashes, image-only PDFs). The full inventory pipeline `scan → rollup → report` is now end-to-end functional. Phases 5, 4, 3, and 2 all continue unchanged.
 
 The full design specification lives at [`docs/filecap-design.md`](docs/filecap-design.md).
 
@@ -16,8 +16,8 @@ The full design specification lives at [`docs/filecap-design.md`](docs/filecap-d
 | 2 | v0.2.0 | shipped | PDF introspection (image-only, tags, producer, signatures, language) |
 | 3 | v0.3.0 | shipped | Office introspection (DOCX, XLSX, legacy flag) |
 | 4 | v0.4.0 | shipped | Filename flagging |
-| 5 | v0.5.0 | **shipped** | Multi-server rollup |
-| 6 | v0.6.0 | planned | CSV reporter and summary artifacts |
+| 5 | v0.5.0 | shipped | Multi-server rollup |
+| 6 | v0.6.0 | **shipped** | CSV reporter and summary artifacts |
 | 7 | v1.0.0 | planned | MCP server entry point |
 | 8 | vNext | deferred | Strapi-aware mode (separate package) |
 
@@ -267,6 +267,35 @@ The consolidated NDJSON has the same line-delimited structure as a single-instan
   "duplicateOf": { "serverName": "strapi-prod-01", "path": "2024/case-001.pdf" }
 }
 ```
+
+## Report workflow (Phase 6)
+
+Generate the vendor handoff package from an inventory NDJSON (single-instance or consolidated):
+
+```bash
+filecap report consolidated.ndjson -o ./report-2026-Q2/
+```
+
+Output directory contents:
+
+| File | Purpose |
+|---|---|
+| `files.csv` | One row per file, 32 columns (the work-order vendors actually consume). Filterable in Excel, Smartsheet, etc. |
+| `SUMMARY.txt` | Top-level numbers: file counts by category, total bytes, image-only PDF count, remediable count, sources |
+| `largest_files.txt` | Top 50 files by size (helps schedule the biggest remediation work) |
+| `flagged_filenames.txt` | Files whose `flags[]` includes scanned-original or filename anti-patterns |
+| `duplicate_hashes.txt` | Content-duplicate groups (entries sharing a SHA-256) — useful for de-dup analysis |
+| `pdf_image_only.txt` | PDFs with `isImageOnly: true` — the headline cost driver in PDF remediation |
+
+The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `filecap diff` command to detect changes. This division-of-labor decision is documented in the design doc and locks vendor workflow out of the inventory tool itself.
+
+**CSV column order** (32 columns, stable):
+
+`serverName, serverIp, hostname, scannedPath, relativePath, absolutePath, filename, extension, category, remediable, sizeBytes, sizeHuman, modifiedAt, sha256, documentLanguage, pdfPageCount, pdfHasTextLayer, pdfIsImageOnly, pdfHasTags, pdfHasFormFields, pdfHasSignatures, pdfEncrypted, pdfProducer, pdfCreator, pdfCreationDate, docxHasHeadings, docxAltTextCoverage, docxTableCount, docxImageCount, xlsxSheetCount, xlsxHasMergedCells, flags`
+
+`flags` is pipe-separated (e.g., `scanned-name-pattern|filename-has-spaces`). Empty cells indicate the field doesn't apply to this file's type.
+
+**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). For consolidated inputs, the per-entry `serverName` is used and `serverIp`/`hostname` are looked up from the header's `metadata.sources[]` array. Both input shapes produce the same 32-column CSV — the consumer doesn't need to know which scanner/rollup pipeline produced the data.
 
 ## What filecap does not do
 
