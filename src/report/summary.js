@@ -1,6 +1,77 @@
 import { humanizeBytes } from "./format.js";
 import { FILECAP_VERSION } from "../version.js";
 
+// ── Category classification ────────────────────────────────────────────────────
+// REMEDIABLE: the file itself can be fixed for accessibility
+// NON-REMEDIABLE: alt text lives in the CMS schema, not in the file
+const REMEDIABLE_CATEGORIES = new Set(["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"]);
+
+function isRemediableCategory(cat) {
+  return REMEDIABLE_CATEGORIES.has(cat);
+}
+
+/**
+ * Build the "AUDIT SCOPE / OTHER FILES" block that opens the summary.
+ * Exported separately so tests can exercise it in isolation.
+ *
+ * @param {Array} entries
+ * @returns {string} multi-line text (no trailing newline)
+ */
+export function buildAuditScopeBlock(entries) {
+  const lines = [];
+
+  // Gather counts
+  const pdfCount    = entries.filter((e) => e.category === "pdf").length;
+  const officeCount = entries.filter((e) => e.category === "office-document").length;
+  const spreadsheetCount = entries.filter((e) => e.category === "spreadsheet").length;
+  const presentationCount = entries.filter((e) => e.category === "presentation").length;
+  const legacyCount = entries.filter((e) => e.category === "legacy-office").length;
+  const remediableCount = pdfCount + officeCount + spreadsheetCount + presentationCount + legacyCount;
+
+  const imageCount = entries.filter((e) => e.category === "image").length;
+  const textCount  = entries.filter((e) => e.category === "text" || e.category === "web").length;
+  const otherCount = entries.filter((e) => !isRemediableCategory(e.category) && e.category !== "image" && e.category !== "text" && e.category !== "web").length;
+  const nonRemediableCount = entries.length - remediableCount;
+
+  const W = 66; // total width of box lines
+  const DLINE = "═".repeat(W);
+  const SLINE = "─".repeat(W);
+  const DCOUNT_LABEL = "  AUDIT SCOPE — files needing accessibility remediation:";
+  const OCOUNT_LABEL = "  OTHER FILES (no direct remediation in the file itself):";
+
+  // AUDIT SCOPE box
+  lines.push(DLINE);
+  lines.push(`${DCOUNT_LABEL.padEnd(W - String(remediableCount).length - 1)}${remediableCount}`);
+  lines.push(DLINE);
+  lines.push("");
+  lines.push(`  ${"PDFs".padEnd(32)}${padL(pdfCount, 5)}    (need structural tagging,`);
+  lines.push(`  ${"".padEnd(37)}alt text on images, heading`);
+  lines.push(`  ${"".padEnd(37)}structure, etc.)`);
+  lines.push(`  ${"Word documents (.docx)".padEnd(32)}${padL(officeCount, 5)}    (need heading styles, table`);
+  lines.push(`  ${"".padEnd(37)}header rows, alt text, etc.)`);
+  lines.push(`  ${"Excel files (.xlsx)".padEnd(32)}${padL(spreadsheetCount, 5)}`);
+  lines.push(`  ${"PowerPoint (.pptx)".padEnd(32)}${padL(presentationCount, 5)}`);
+  lines.push(`  ${"Legacy Office (.doc/.xls)".padEnd(32)}${padL(legacyCount, 5)}    (need conversion + remediation)`);
+  lines.push(`  ${"".padEnd(32)}${"────"}`);
+  lines.push(`  ${"Total needing work:".padEnd(32)}${padL(remediableCount, 5)}    ← THIS IS THE AUDIT WORKLOAD`);
+  lines.push("");
+
+  // OTHER FILES divider
+  lines.push(SLINE);
+  lines.push(`${OCOUNT_LABEL.padEnd(W - String(nonRemediableCount).length - 1)}${nonRemediableCount}`);
+  lines.push(SLINE);
+  lines.push("");
+  lines.push(`  ${"Images (.jpg, .png, .gif,".padEnd(32)}${padL(imageCount, 5)}    (alt text lives in the CMS`);
+  lines.push(`  ${"         .webp, .svg)".padEnd(37)}schema, not in the image file)`);
+  lines.push(`  ${"Text files (.txt, .md)".padEnd(32)}${padL(textCount, 5)}`);
+  lines.push(`  ${"Other / placeholders".padEnd(32)}${padL(otherCount, 5)}    (e.g., .gitkeep — empty Git`);
+  lines.push(`  ${"".padEnd(37)}placeholder, can be ignored)`);
+  lines.push(`  ${"".padEnd(32)}${"────"}`);
+  lines.push(`  ${"Total non-remediation:".padEnd(32)}${padL(nonRemediableCount, 5)}`);
+
+  return lines.join("\n");
+}
+
 /**
  * Right-pad or left-pad a string to fixed width.
  */
@@ -96,16 +167,26 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
     lines.push(`Source location:  ${scannedPath}`);
     lines.push(`Audit date:       ${auditDate}`);
   }
+  lines.push("");
+
+  // ── AUDIT SCOPE / OTHER FILES block ──────────────────────────────────────────
+  lines.push(buildAuditScopeBlock(entries));
+  lines.push("");
+
+  // ── Totals footer for the scope block ────────────────────────────────────────
+  const totalFiles = entries.length;
+  const totalBytes = entries.reduce((s, e) => s + (e.sizeBytes ?? 0), 0);
+  const remediableCount = entries.filter((e) => isRemediableCategory(e.category ?? "other")).length;
+  const nonRemediableCount = totalFiles - remediableCount;
+  lines.push(`  Total files inventoried:   ${totalFiles}    (${remediableCount} + ${nonRemediableCount})`);
+  lines.push(`  Total bytes:                ${humanizeBytes(totalBytes)}`);
   if (durationMs !== null && Number.isFinite(durationMs)) {
     const secs = (durationMs / 1000).toFixed(1);
-    lines.push(`Audit duration:   ${secs}s`);
+    lines.push(`  Audit duration:             ${secs}s`);
   }
   lines.push("");
 
   // ── The numbers ─────────────────────────────────────────────────────────────
-  const totalFiles = entries.length;
-  const totalBytes = entries.reduce((s, e) => s + (e.sizeBytes ?? 0), 0);
-  const remediableCount = entries.filter((e) => e.remediable).length;
   const notRemediable = totalFiles - remediableCount;
 
   // Duplicate analysis

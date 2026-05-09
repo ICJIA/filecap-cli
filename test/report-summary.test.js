@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { writeSummary } from "../src/report/summary.js";
+import { writeSummary, buildAuditScopeBlock } from "../src/report/summary.js";
 
 const singleHeader = {
   schemaVersion: 1,
@@ -221,5 +221,74 @@ describe("writeSummary — fleet consolidated", () => {
     const text = writeSummary({ entries, sources: consolidatedHeader.metadata.sources, header: consolidatedHeader });
     expect(text).toContain("Site");
     expect(text).toContain("DVFR");
+  });
+});
+
+// ── buildAuditScopeBlock ─────────────────────────────────────────────────────
+
+// 5 remediable (3 pdf + 2 office-doc), 3 non-remediable (2 image + 1 other)
+// Intentionally no spreadsheet, presentation, or legacy-office entries
+// so those rows must still appear with count 0 (zero-row suppression check)
+const scopeEntries = [
+  // remediable
+  { category: "pdf", remediable: true, sizeBytes: 100 },
+  { category: "pdf", remediable: true, sizeBytes: 200 },
+  { category: "pdf", remediable: true, sizeBytes: 300 },
+  { category: "office-document", remediable: true, sizeBytes: 150 },
+  { category: "office-document", remediable: true, sizeBytes: 250 },
+  // non-remediable
+  { category: "image", remediable: false, sizeBytes: 80 },
+  { category: "image", remediable: false, sizeBytes: 90 },
+  { category: "other", remediable: false, sizeBytes: 10 },
+];
+
+describe("buildAuditScopeBlock", () => {
+  it("shows the correct remediable count in AUDIT SCOPE heading", () => {
+    const text = buildAuditScopeBlock(scopeEntries);
+    // 3 pdf + 2 office-doc = 5
+    expect(text).toMatch(/AUDIT SCOPE.*5/);
+  });
+
+  it("shows the correct non-remediable count in OTHER FILES heading", () => {
+    const text = buildAuditScopeBlock(scopeEntries);
+    // 2 image + 1 other = 3
+    expect(text).toMatch(/OTHER FILES.*3/);
+  });
+
+  it("remediable + non-remediable equals total entries", () => {
+    const text = buildAuditScopeBlock(scopeEntries);
+    // Extract count from "Total needing work:" line
+    const needingMatch = text.match(/Total needing work:\s+(\d+)/);
+    const nonRemMatch  = text.match(/Total non-remediation:\s+(\d+)/);
+    expect(needingMatch).not.toBeNull();
+    expect(nonRemMatch).not.toBeNull();
+    const needing = parseInt(needingMatch[1], 10);
+    const nonRem  = parseInt(nonRemMatch[1], 10);
+    expect(needing + nonRem).toBe(scopeEntries.length);
+  });
+
+  it("contains the THIS IS THE AUDIT WORKLOAD annotation", () => {
+    const text = buildAuditScopeBlock(scopeEntries);
+    expect(text).toContain("← THIS IS THE AUDIT WORKLOAD");
+  });
+
+  it("shows zero counts for categories with no entries (zero rows are never omitted)", () => {
+    const text = buildAuditScopeBlock(scopeEntries);
+    // No presentations or legacy-office in scopeEntries — rows must still appear with 0
+    expect(text).toMatch(/PowerPoint.*0/);
+    expect(text).toMatch(/Legacy Office.*0/);
+    expect(text).toMatch(/Excel files.*0/);
+    // Text files also absent — still shown
+    expect(text).toMatch(/Text files.*0/);
+  });
+
+  it("writeSummary includes AUDIT SCOPE block before the per-server breakdown", () => {
+    const text = writeSummary({ entries: scopeEntries, sources: null, header: singleHeader });
+    expect(text).toContain("AUDIT SCOPE");
+    expect(text).toContain("OTHER FILES");
+    expect(text).toContain("← THIS IS THE AUDIT WORKLOAD");
+    const scopeIdx = text.indexOf("AUDIT SCOPE");
+    const numbersIdx = text.indexOf("The numbers");
+    expect(scopeIdx).toBeLessThan(numbersIdx);
   });
 });
