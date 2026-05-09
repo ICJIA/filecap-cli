@@ -39,6 +39,7 @@ The output is line-delimited JSON: one header line, one line per file, one foote
 | `-o, --output <path>` | `filecap-<hostname>.ndjson` | Output path (use `-` for stdout) |
 | `-s, --server-name <name>` | `os.hostname()` | Override server identifier in metadata |
 | `--server-ip <ip>` | auto-detected | Override server IP (defaults to first non-loopback IPv4) |
+| `--site-name <name>` | (none) | Optional website nickname (e.g., DVFR). Used as a human-friendly identifier alongside `--server-name`. |
 | `--no-hash` | (off) | Skip SHA-256 hashing (much faster, but no dedup) |
 | `--no-introspect` | (off) | Skip PDF/Office introspection (filesystem stats only) |
 | `--max-introspect-mb <n>` | `200` | Skip introspection for files larger than this |
@@ -77,14 +78,17 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
   "schemaVersion": 1,
   "kind": "filecap-inventory-header",
   "metadata": {
-    "serverName": "strapi-prod-01",
+    "siteName": "DVFR",
+    "serverName": "dvfr-strapi-prod",
     "scannedPath": "/var/strapi/uploads",
     "scannedAt": "2026-05-08T14:23:11.000Z",
-    "filecapVersion": "0.3.0",
+    "filecapVersion": "1.0.3",
     "options": { "introspect": true, "hash": true, "maxIntrospectMb": 200, "concurrency": 4 }
   }
 }
 ```
+
+`siteName` is optional. Omitting it is valid. Old inventories without it continue to validate.
 
 **Example file entry (DOCX):**
 
@@ -477,12 +481,13 @@ If you already know all the details and want to skip the prompts, you can pass t
 
 ### What you'll be asked
 
-In interactive mode, the script asks five questions. Here's what each one means and what a sensible answer looks like:
+In interactive mode, the script asks six questions. Here's what each one means and what a sensible answer looks like:
 
 - **SSH username** — The login name on the remote server. Defaults to `forge` (the ICJIA Strapi convention). Press Enter to accept the default, or type a different name if your server uses one.
 - **Server IP or hostname** — The address of the server you're auditing. Examples: `192.241.146.85` or `strapi-prod-01.example.com`. This is required — there's no default.
 - **Full path to the uploads folder on the remote** — Where the files live on the server. Example: `~/dvfr.icjia-api.cloud/strapi_v4/public/uploads`. Your server administrator can confirm this path. Required.
-- **Friendly server name** — A human-readable label used in report headings. Defaults to `strapi-<IP-with-dashes>` (e.g., `strapi-192-241-146-85`). Optional — press Enter to accept the default, or type something like `dvfr-strapi-prod`.
+- **Friendly server name** — A human-readable label (the technical identifier) used in report headings. Defaults to `strapi-<IP-with-dashes>` (e.g., `strapi-192-241-146-85`). Optional — press Enter to accept the default, or type something like `dvfr-strapi-prod`.
+- **Website nickname** — An optional short name managers and vendors use to identify the site (e.g., `DVFR`, `i2i`, `vpp`). Different from the server name — this is the business-facing identity. Press Enter to skip if you don't have one.
 - **Generate HTML report? [y/N]** — Defaults to no (just press Enter). If you answer `y`, the script also produces `audit-file-list.html` — a self-contained web page with the same data, interactive column sorting, full-text search, and visual highlights for image-only PDFs. Useful to have open during a vendor review meeting.
 
 ### What you get
@@ -517,12 +522,14 @@ Or, if you have a list of servers ready, pass it as a CSV file:
 ./audit-fleet.sh servers.csv
 ```
 
-The servers.csv format (no header row; `#` lines are comments):
+The servers.csv format (no header row; `#` lines are comments). An optional 5th column adds the website nickname:
 
 ```
-server_name,user,host,remote_path
-dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads
-another-server,deploy,10.0.0.5,/var/strapi/uploads
+# server_name,user,host,remote_path[,site_name]
+dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR
+i2i-strapi-prod,forge,10.0.0.5,/var/strapi/uploads,i2i
+vpp-strapi-prod,forge,10.0.0.6,/var/strapi/uploads
+# (the third row has no site_name — that's allowed; old 4-column CSVs still work)
 ```
 
 Output lands in `~/filecap-audits/_fleet/<timestamp>/` and includes a per-server breakdown (`MANAGER_SUMMARY.txt`), a combined CSV (`audit-file-list.csv`) with one row per file across all servers, and a `duplicate_hashes.txt` that catches files that appear on multiple servers.
