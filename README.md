@@ -461,23 +461,24 @@ The script auto-detects Node version on the remote: if Node ≥20, it scans nati
 - Server IP or hostname
 - Full path to the uploads directory on the remote
 - Friendly server name (used in report headers; defaults to `strapi-<IP>` if blank)
-- Whether to also generate a self-contained HTML report (optional; defaults to no)
+- Whether to also generate a self-contained HTML report (optional; defaults to no) — answer `y` to produce `audit-file-list.html` alongside the CSV
 
 **Output structure:**
 
 ```
 ~/filecap-audits/<server-ip>/
-├── SOURCE_INFO.txt        Provenance — server, path, audit timestamp, find-a-file recipe
-├── inventory.ndjson       Raw scan output (one entry per file)
-├── mirror/                Local rsync mirror (only created in local-scan mode)
+├── SOURCE_INFO.txt             Provenance — server, path, audit timestamp, find-a-file recipe
+├── inventory.ndjson            Raw scan output (one entry per file)
+├── mirror/                     Local rsync mirror (only created in local-scan mode)
 └── report/
-    ├── files.csv          The vendor work-order, 32 columns × N rows
-    ├── files.html         (only if --html or "yes" answered at the prompt)
-    ├── SUMMARY.txt        Counts by category (PDFs, images, Office docs)
-    ├── largest_files.txt  Top files by size
-    ├── flagged_filenames.txt  Files with name patterns suggesting scanned/IMG-prefixed origin
-    ├── duplicate_hashes.txt   Content-identical files (by SHA-256)
-    └── pdf_image_only.txt     PDFs with no text layer (require OCR before remediation)
+    ├── README.txt              Explains all artifacts (start here)
+    ├── audit-file-list.csv     The vendor work-order, one row per file
+    ├── audit-file-list.html    (only if --html or "yes" answered at the prompt)
+    ├── audit-summary.txt       Manager-friendly counts by category and PDF/DOCX/XLSX detail
+    ├── largest_files.txt       Top files by size
+    ├── flagged_filenames.txt   Files with name patterns suggesting scanned/IMG-prefixed origin
+    ├── duplicate_hashes.txt    Content-identical files (by SHA-256)
+    └── pdf_image_only.txt      PDFs with no text layer (require OCR before remediation)
 ```
 
 The optional `files.html` is a fully self-contained single file — no external stylesheets, fonts, or scripts. It opens in any browser, includes the same 32 columns as the CSV, supports client-side column sort (click any header) and full-text search/filter across all fields, visually highlights image-only PDFs and flagged filenames, and renders cleanly when printed.
@@ -513,14 +514,37 @@ Output goes to `~/filecap-audits/_fleet/<timestamp>/`:
 
 ```
 ~/filecap-audits/_fleet/20260509-134500/
-├── servers.txt              List of servers audited
-├── failed_servers.txt       (only if any audits failed)
-├── inventories/             Per-server NDJSON inventories
-├── consolidated.ndjson      Cross-server consolidated NDJSON
-├── consolidated-report/     Full report directory
-│   └── files.csv            One row per file across the entire fleet
-└── MANAGER_SUMMARY.txt      Top-level summary for handoff
+├── servers.txt                   List of servers audited
+├── failed_servers.txt            (only if any audits failed)
+├── MANAGER_SUMMARY.txt           Full audit numbers + per-server breakdown
+├── inventories/                  Per-server NDJSON inventories
+├── consolidated.ndjson           Cross-server consolidated NDJSON
+└── consolidated-report/
+    ├── README.txt                Explains all artifacts (start here)
+    ├── audit-file-list.csv       One row per file across the entire fleet
+    ├── audit-file-list.html      (only if HTML was requested)
+    ├── audit-summary.txt         Fleet-wide summary with per-server breakdown
+    ├── largest_files.txt
+    ├── flagged_filenames.txt
+    ├── duplicate_hashes.txt
+    └── pdf_image_only.txt
 ```
+
+### Windows users: use WSL2
+
+The audit scripts require bash, ssh, rsync, and python3 — all native on macOS and Linux but not on Windows. The path of least resistance for Windows-based auditors is the Windows Subsystem for Linux:
+
+```bash
+# In an admin PowerShell prompt:
+wsl --install
+
+# After reboot, in the new Ubuntu terminal:
+curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+chmod +x audit-remote.sh
+./audit-remote.sh
+```
+
+This is a one-time WSL2 setup (5 minutes; no admin needed for subsequent runs). Native PowerShell support is on the roadmap for organizations that cannot deploy WSL2.
 
 ### Requirements
 
@@ -529,8 +553,9 @@ Output goes to `~/filecap-audits/_fleet/<timestamp>/`:
 - ssh (with keys configured for the target server[s])
 - rsync
 - npx (comes with Node.js 18+; install Node from https://nodejs.org)
+- Node.js 18+ locally (the scripts verify this at startup and abort with guidance if the version is too old)
 
-The scripts run a tool-presence preflight at startup and abort with clear remediation messages if anything is missing.
+The scripts run a tool-presence and Node-version preflight at startup and abort with clear remediation messages if anything is missing.
 
 ### Why local-mode scanning matters
 
