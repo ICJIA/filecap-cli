@@ -5,6 +5,7 @@ export const CSV_COLUMNS = [
   { name: "siteName",              label: "Website" },
   { name: "serverIp",              label: "Server IP" },
   { name: "modifiedAt",            label: "Date published" },
+  { name: "remediable",            label: "Remediation needed?" },
   { name: "scannedPath",           label: "Source folder on server" },
   { name: "path",                  label: "File location (relative to source folder)" },
   { name: "absolutePath",          label: "Full file path on server" },
@@ -12,7 +13,6 @@ export const CSV_COLUMNS = [
   { name: "filename",              label: "File name" },
   { name: "extension",             label: "File extension" },
   { name: "category",              label: "File type" },
-  { name: "remediable",            label: "Needs remediation" },
   { name: "sizeBytes",             label: "Size (bytes)" },
   { name: "sha256",                label: "Content hash (SHA-256)" },
   { name: "duplicateOf",           label: "Duplicate of" },
@@ -100,6 +100,12 @@ function formatValue(v) {
   return v;
 }
 
+function formatRemediable(remediable) {
+  if (remediable === true) return "Yes — needs accessibility work";
+  if (remediable === false) return "No — reference file (image, placeholder, etc.)";
+  return "";
+}
+
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   let base;
   if (isConsolidated) {
@@ -162,6 +168,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     siteName,
     serverIp,
     entry.modifiedAt,
+    formatRemediable(entry.remediable),
     scannedPath,
     entry.path,
     entry.absolutePath,
@@ -169,7 +176,6 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.filename,
     entry.extension,
     entry.category,
-    entry.remediable,
     entry.sizeBytes,
     (() => {
       const hash = entry.sha256 ?? "";

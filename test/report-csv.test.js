@@ -63,6 +63,11 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[3].label).toBe("Date published");
   });
 
+  it("fifth column (index 4) is remediable with label 'Remediation needed?'", () => {
+    expect(CSV_COLUMNS[4].name).toBe("remediable");
+    expect(CSV_COLUMNS[4].label).toBe("Remediation needed?");
+  });
+
   it("modifiedAt column label is 'Date published' not 'Last modified'", () => {
     const col = CSV_COLUMNS.find((c) => c.name === "modifiedAt");
     expect(col).toBeDefined();
@@ -90,7 +95,7 @@ describe("writeCsv header row uses human-readable labels", () => {
     const headerRow = csv.trim().split("\n")[0];
     expect(headerRow).toContain("Server");
     expect(headerRow).toContain("File name");
-    expect(headerRow).toContain("Needs remediation");
+    expect(headerRow).toContain("Remediation needed?");
     expect(headerRow).toContain("PDF: page count");
     expect(headerRow).not.toBe(CSV_COLUMNS.map((c) => c.name).join(","));
   });
@@ -116,9 +121,27 @@ describe("writeCsv boolean rendering", () => {
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
 
-    expect(cells[colIndex("remediable")]).toBe("Yes");
+    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility work");
     expect(cells[colIndex("hasTextLayer")]).toBe("Yes");
     expect(cells[colIndex("isImageOnly")]).toBe("No");
+  });
+
+  it("remediable true cell value is 'Yes — needs accessibility work'", () => {
+    const entry = { ...baseEntry, remediable: true };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility work");
+  });
+
+  it("remediable false cell value is 'No — reference file (image, placeholder, etc.)'", () => {
+    const entry = { ...baseEntry, remediable: false };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    // The value contains a comma, so it will be quoted in CSV — split differently
+    const fullLine = csv.trim().split("\n")[1];
+    expect(fullLine).toContain("No — reference file (image, placeholder, etc.)");
   });
 
   it("renders empty string for missing introspection fields", () => {

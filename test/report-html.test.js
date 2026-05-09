@@ -116,7 +116,7 @@ describe("writeHtml", () => {
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
     expect(html).toContain("File name");
-    expect(html).toContain("Needs remediation");
+    expect(html).toContain("Remediation needed?");
     expect(html).toContain("PDF: page count");
     expect(html).not.toContain("<th data-col=\"filename\">filename</th>");
   });
