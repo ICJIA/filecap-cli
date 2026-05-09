@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] — 2026-05-09
+
+### Added
+
+- **Saved-sites manager.** `audit-remote.sh` now stores per-site configs in `~/.filecap/sites.json` and offers a menu on startup: select a saved site (skipping all per-field prompts), add a new one, edit, delete, or preflight all of them. Each site stores SSH user, host, remote path, friendly name, website nickname, public URL prefix, and audit link template — but never the audit token (that stays in env). File is created with mode 600 inside `~/.filecap/` (mode 700). Override location with `FILECAP_SITES_FILE` env var.
+- **Preflight-all-sites.** New `p` option in the saved-sites menu runs a quick health check on every saved site (SSH connectivity, remote path existence and readability, file count) and prints a status table. Read-only — no rsync, no scan. Catches SSH key drift, moved paths, and unexpectedly empty directories before running a full audit.
+
+### Changed
+
+- **HTML report is now always generated alongside the CSV.** No more "Also generate HTML report? [y/N]" prompt. Set `AUDIT_HTML=0` in the environment to opt out (rare). The CSV and HTML are the same data; the HTML is the manager-facing version with sortable filterable interactive controls.
+- **Config review now allows per-field correction.** When the auditor sees the configuration summary before the audit runs, they can type a number 1-9 to fix any single field, then the table re-renders. Loop continues until they press Enter to proceed.
+
+### Fixed
+
+- **Required-input validation on Server IP and remote path.** Empty values are no longer silently accepted; the script re-prompts with "(required — please type a value)". Previously, pressing Enter at the IP prompt led to silent failure later (`forge@` with no host).
+
+[1.0.8]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.8
+
 ## [1.0.7] — 2026-05-09
 
 ### Added

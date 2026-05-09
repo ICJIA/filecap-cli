@@ -188,6 +188,7 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 ### `filecap scan <directory>`
 
 | Flag | Default | Description |
+
 |---|---|---|
 | `-o, --output <path>` | `filecap-<hostname>.ndjson` | Output path (use `-` for stdout) |
 | `-s, --server-name <name>` | `os.hostname()` | Override server identifier in metadata |
@@ -762,14 +763,14 @@ If you already know all the details and want to skip the prompts, you can pass t
 
 ### What you'll be asked
 
-In interactive mode, the script asks six questions. Here's what each one means and what a sensible answer looks like:
+In interactive mode, the script asks a few questions. Here's what each one means and what a sensible answer looks like:
 
+- **(If saved sites exist, you'll see a menu first — pick a number to skip the per-field prompts.)**
 - **SSH username** — The login name on the remote server. Defaults to `forge` (the ICJIA Strapi convention). Press Enter to accept the default, or type a different name if your server uses one.
-- **Server IP or hostname** — The address of the server you're auditing. Examples: `192.241.146.85` or `strapi-prod-01.example.com`. This is required — there's no default.
-- **Full path to the uploads folder on the remote** — Where the files live on the server. Example: `~/dvfr.icjia-api.cloud/strapi_v4/public/uploads`. Your server administrator can confirm this path. Required.
+- **Server IP or hostname** — The address of the server you're auditing. Examples: `192.241.146.85` or `strapi-prod-01.example.com`. Required — empty values are not accepted.
+- **Full path to the uploads folder on the remote** — Where the files live on the server. Example: `~/dvfr.icjia-api.cloud/strapi_v4/public/uploads`. Your server administrator can confirm this path. Required — empty values are not accepted.
 - **Friendly server name** — A human-readable label (the technical identifier) used in report headings. Defaults to `strapi-<IP-with-dashes>` (e.g., `strapi-192-241-146-85`). Optional — press Enter to accept the default, or type something like `dvfr-strapi-prod`.
 - **Website nickname** — An optional short name managers and vendors use to identify the site (e.g., `DVFR`, `i2i`, `vpp`, `infonet`). Different from the server name — this is the business-facing identity. Press Enter to skip if you don't have one.
-- **Generate HTML report? [y/N]** — Defaults to no (just press Enter). If you answer `y`, the script also produces `audit-file-list.html` — a self-contained web page with the same data, interactive column sorting, full-text search, and visual highlights for image-only PDFs. Useful to have open during a vendor review meeting.
 
 ### What you get
 
@@ -777,7 +778,7 @@ After the script finishes, navigate to `~/filecap-audits/<server-ip>/latest/repo
 
 - **`audit-file-list.csv`** — The main deliverable. One row per file, 58 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
-- **`audit-file-list.html`** — (Only present if you answered `y` to the HTML prompt.) A self-contained web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, and print-to-PDF.
+- **`audit-file-list.html`** — A self-contained web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, and print-to-PDF. (Set `AUDIT_HTML=0` in the environment to suppress this file on rare occasions when you don't want it.)
 - **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.
 - **`largest_files.txt`** — The top 50 files by size. Helpful for scheduling the most time-consuming remediation work first.
 - **`flagged_filenames.txt`** — Files whose names suggest they're scanned documents or unprocessed camera photos (`Scan_001.pdf`, `IMG_4567.pdf`, etc.) — typically the highest-cost items to remediate.
@@ -794,6 +795,58 @@ The deliverable shows **two** numbers, deliberately:
 - **Reference files** (e.g., 33) — files that are inventoried but don't need direct work: images (their alt text lives in your CMS schema, not in the JPEG), text files (`.txt`, `.md`), `.gitkeep` placeholders, etc. They're listed for completeness so the inventory is comprehensive, but no remediator will touch them.
 
 The HTML report opens filtered to "Remediable only" by default. Click the "All" chip to see everything; click a category chip to drill into a specific type.
+
+### Saved sites — type each site's config once
+
+If you audit the same fleet repeatedly, the script remembers each site's config in `~/.filecap/sites.json` so you don't re-type the SSH user, IP, remote path, etc. every run.
+
+On startup, the script offers a menu:
+
+```
+Saved sites:
+  1. DVFR (dvfr-strapi-prod) — forge@192.241.146.85
+  2. i2i (i2i-strapi-prod) — forge@10.0.0.5
+
+  Type a number 1-2 to select a saved site
+    a  →  add a new site
+    e  →  edit a saved site
+    d  →  delete a saved site
+    p  →  preflight all saved sites (verify SSH + path + file count)
+    s  →  skip (one-off prompts, don't save)
+    q  →  quit
+```
+
+Picking a number loads the site's full config and jumps straight to the **config review screen** (where you can override any field for this run by typing its number, e.g., `9` to toggle audit-enrich off temporarily).
+
+Picking `a` walks you through the prompts for a new site. At the end, the script asks "Save these settings as a named site for next time? [y/N]". Answer yes and the site is selectable from the menu thereafter.
+
+**The audit token is never stored in `sites.json`.** It stays in your `FILECAP_AUDIT_TOKEN` environment variable (or your system keychain). Lose your laptop and somebody finds the file? They get site IPs and paths but no credential to scan with.
+
+The file is created with mode `600` (user-only readable) inside `~/.filecap/` (mode `700`). Override the location with `FILECAP_SITES_FILE=/some/path` if you want to keep multiple sets of saved sites.
+
+### Preflight all saved sites
+
+The `p` option in the saved-sites menu runs a quick health check across every saved site. For each: SSH connectivity, remote path existence + readability, file count via `find`. Prints a status table:
+
+```
+  Nickname           Server name            Host               SSH      Path     Files    Notes
+  ------------------ ---------------------- ------------------ -------- -------- -------- ----------------
+  DVFR               dvfr-strapi-prod       192.241.146.85     OK       OK       102
+  i2i                i2i-strapi-prod        10.0.0.5           FAIL     -        -        SSH connect failed
+  VPP                vpp-strapi-prod        10.0.0.6           OK       OK       0        directory is empty
+```
+
+Useful for catching SSH key drift, moved-or-renamed remote paths, and unexpectedly empty directories before running a full audit. ~5 seconds per site (sequential SSH probes).
+
+The preflight is read-only — no rsync, no scan, no audit. It returns to the menu when complete so you can still pick a site to audit (or fix issues first).
+
+### Required-input validation and always-HTML
+
+A few smaller UX improvements:
+
+- **Server IP and remote path are required** — empty values re-prompt with "(required — please type a value)". No more silent acceptance leading to confusing later failures.
+- **HTML report is always produced alongside the CSV** — no more "generate HTML?" prompt. Set `AUDIT_HTML=0` in the environment to opt out (rare).
+- **Config review with per-field correction** — review screen lets you fix any field by typing its number (1-9). The screen re-renders so you can keep adjusting until everything's right, then press Enter to proceed.
 
 ### How to use it (multiple servers / fleet mode)
 
