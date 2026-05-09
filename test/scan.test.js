@@ -262,6 +262,47 @@ describe("runScan", () => {
     expect(cleanEntry.flags).toEqual([]);
   });
 
+  it("includes siteName in header metadata when provided", async () => {
+    const outPath = path.join(outDir, "sitename.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      siteName: "DVFR",
+    });
+    const lines = await readNdjson(outPath);
+    expect(lines[0].metadata.siteName).toBe("DVFR");
+  });
+
+  it("omits siteName from header when undefined", async () => {
+    const outPath = path.join(outDir, "no-sitename.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+    });
+    const lines = await readNdjson(outPath);
+    expect(Object.prototype.hasOwnProperty.call(lines[0].metadata, "siteName")).toBe(false);
+  });
+
+  it("omits siteName from header when empty string", async () => {
+    const outPath = path.join(outDir, "empty-sitename.ndjson");
+    await runScan({
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      concurrency: 4,
+      progress: false,
+      siteName: "",
+    });
+    const lines = await readNdjson(outPath);
+    expect(Object.prototype.hasOwnProperty.call(lines[0].metadata, "siteName")).toBe(false);
+  });
+
   it("populates multiple flags for problematic filenames", async () => {
     const problematic = "Scan 001 résumé.pdf";
     await fs.writeFile(path.join(tmpRoot, problematic), "x");

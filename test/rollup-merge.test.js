@@ -19,20 +19,24 @@ afterEach(async () => {
   await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 
-function inventoryHeader(serverName, scannedAt = "2024-01-01T00:00:00.000Z") {
+function inventoryHeader(serverName, scannedAt = "2024-01-01T00:00:00.000Z", siteName) {
+  const metadata = {
+    serverName,
+    hostname: `${serverName}.local`,
+    serverIp: "10.0.0.1",
+    scannedPath: "/uploads",
+    scannedAt,
+    filecapVersion: "0.4.0",
+    nodeVersion: "v20.11.1",
+    options: { introspect: false, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+  };
+  if (siteName !== undefined) {
+    metadata.siteName = siteName;
+  }
   return JSON.stringify({
     schemaVersion: 1,
     kind: "filecap-inventory-header",
-    metadata: {
-      serverName,
-      hostname: `${serverName}.local`,
-      serverIp: "10.0.0.1",
-      scannedPath: "/uploads",
-      scannedAt,
-      filecapVersion: "0.4.0",
-      nodeVersion: "v20.11.1",
-      options: { introspect: false, hash: true, maxIntrospectMb: 200, concurrency: 4 },
-    },
+    metadata,
   });
 }
 
@@ -182,6 +186,49 @@ describe("rollupInventories", () => {
     const lines = await readNdjson(out);
     const entries = lines.slice(1, -1);
     expect(entries.some((e) => e.serverName === "server-b")).toBe(true);
+  });
+
+  it("preserves siteName in consolidated header sources when present", async () => {
+    const inA = path.join(tmpRoot, "a.ndjson");
+    const inB = path.join(tmpRoot, "b.ndjson");
+    const out = path.join(tmpRoot, "consolidated-site.ndjson");
+    await writeNdjson(inA, [
+      inventoryHeader("server-a", "2024-01-01T00:00:00.000Z", "DVFR"),
+      inventoryEntry("file1.pdf", "hash-1"),
+      inventoryFooter(1, 1024),
+    ]);
+    await writeNdjson(inB, [
+      inventoryHeader("server-b", "2024-01-01T00:00:00.000Z", "i2i"),
+      inventoryEntry("file2.pdf", "hash-2"),
+      inventoryFooter(1, 1024),
+    ]);
+
+    const result = await rollupInventories([inA, inB], out, { strict: false });
+    expect(result.exitCode).toBe(0);
+
+    const lines = await readNdjson(out);
+    const sources = lines[0].metadata.sources;
+    const srcA = sources.find((s) => s.serverName === "server-a");
+    const srcB = sources.find((s) => s.serverName === "server-b");
+    expect(srcA.siteName).toBe("DVFR");
+    expect(srcB.siteName).toBe("i2i");
+  });
+
+  it("omits siteName from consolidated sources when source has none", async () => {
+    const inA = path.join(tmpRoot, "a-nosite.ndjson");
+    const out = path.join(tmpRoot, "consolidated-nosite.ndjson");
+    await writeNdjson(inA, [
+      inventoryHeader("server-a"),
+      inventoryEntry("file1.pdf", "hash-1"),
+      inventoryFooter(1, 1024),
+    ]);
+
+    const result = await rollupInventories([inA], out, { strict: false });
+    expect(result.exitCode).toBe(0);
+
+    const lines = await readNdjson(out);
+    const sources = lines[0].metadata.sources;
+    expect(Object.prototype.hasOwnProperty.call(sources[0], "siteName")).toBe(false);
   });
 
   it("rejects an inventory missing its footer when --strict is on", async () => {

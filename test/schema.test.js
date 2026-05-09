@@ -418,6 +418,74 @@ describe("inventory schemas", () => {
   });
 });
 
+describe("siteName in headerSchema", () => {
+  it("validates a header without siteName (optional field absent)", () => {
+    const header = {
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        serverName: "strapi-prod-01",
+        hostname: "strapi-prod-01.icjia.local",
+        serverIp: "10.42.7.18",
+        scannedPath: "/var/strapi/uploads",
+        scannedAt: "2026-05-08T14:23:11.000Z",
+        filecapVersion: "0.1.0",
+        nodeVersion: "v20.11.1",
+        options: { introspect: false, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    };
+    expect(() => headerSchema.parse(header)).not.toThrow();
+  });
+
+  it("validates a header with siteName: 'DVFR'", () => {
+    const header = {
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        siteName: "DVFR",
+        serverName: "dvfr-strapi-prod",
+        hostname: "dvfr-strapi-prod.local",
+        serverIp: "192.241.146.85",
+        scannedPath: "/var/strapi/uploads",
+        scannedAt: "2026-05-08T14:23:11.000Z",
+        filecapVersion: "1.0.3",
+        nodeVersion: "v20.11.1",
+        options: { introspect: true, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    };
+    expect(() => headerSchema.parse(header)).not.toThrow();
+    expect(headerSchema.parse(header).metadata.siteName).toBe("DVFR");
+  });
+
+  it("validates a consolidated header whose source has siteName", () => {
+    const header = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: {
+        consolidatedAt: "2026-05-08T15:00:00.000Z",
+        filecapVersion: "1.0.3",
+        nodeVersion: "v20.11.1",
+        sources: [
+          {
+            siteName: "DVFR",
+            serverName: "dvfr-strapi-prod",
+            hostname: "dvfr-strapi-prod.local",
+            serverIp: "192.241.146.85",
+            scannedPath: "/var/strapi/uploads",
+            scannedAt: "2026-05-08T14:23:11.000Z",
+            filecapVersion: "1.0.3",
+            nodeVersion: "v20.11.1",
+            options: { introspect: true, hash: true, maxIntrospectMb: 200, concurrency: 4 },
+            stats: { fileCount: 10, totalBytes: 1024000, scanDurationMs: 100, introspectionFailures: 0, permissionDenials: 0 },
+          },
+        ],
+      },
+    };
+    expect(() => consolidatedHeaderSchema.parse(header)).not.toThrow();
+    expect(consolidatedHeaderSchema.parse(header).metadata.sources[0].siteName).toBe("DVFR");
+  });
+});
+
 describe("isCompleteInventory", () => {
   it("returns true for a complete inventory (header + entries + footer)", () => {
     const text = [

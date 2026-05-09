@@ -21,6 +21,7 @@ export async function runScan({
   progress,
   serverName,
   serverIp,
+  siteName,
   includeExt,
   excludeExt,
   introspect: introspectEnabled = false,
@@ -56,24 +57,28 @@ export async function runScan({
       });
     }
 
+    const headerMetadata = {
+      serverName: serverName || getHostname(),
+      hostname: getHostname(),
+      serverIp: serverIp || getFirstIPv4(),
+      scannedPath: absoluteRoot,
+      scannedAt: new Date().toISOString(),
+      filecapVersion: FILECAP_VERSION,
+      nodeVersion: process.version,
+      options: {
+        introspect: introspectEnabled,
+        hash,
+        maxIntrospectMb,
+        concurrency,
+      },
+    };
+    if (siteName && siteName !== "") {
+      headerMetadata.siteName = siteName;
+    }
     const header = {
       schemaVersion: SCHEMA_VERSION,
       kind: "filecap-inventory-header",
-      metadata: {
-        serverName: serverName || getHostname(),
-        hostname: getHostname(),
-        serverIp: serverIp || getFirstIPv4(),
-        scannedPath: absoluteRoot,
-        scannedAt: new Date().toISOString(),
-        filecapVersion: FILECAP_VERSION,
-        nodeVersion: process.version,
-        options: {
-          introspect: introspectEnabled,
-          hash,
-          maxIntrospectMb,
-          concurrency,
-        },
-      },
+      metadata: headerMetadata,
     };
     headerSchema.parse(header);
     await writeLine(header);

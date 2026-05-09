@@ -15,6 +15,7 @@ export const headerSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   kind: z.literal("filecap-inventory-header"),
   metadata: z.object({
+    siteName: z.string().optional(),
     serverName: z.string(),
     hostname: z.string(),
     serverIp: z.string(),
@@ -27,6 +28,7 @@ export const headerSchema = z.object({
 });
 
 const sourceBlockSchema = z.object({
+  siteName: z.string().optional(),
   serverName: z.string(),
   hostname: z.string(),
   serverIp: z.string(),
