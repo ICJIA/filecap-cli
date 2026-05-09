@@ -137,9 +137,7 @@ describe("writeCsv boolean rendering", () => {
   it("remediable false cell value is 'No — reference file (image, placeholder, etc.)'", () => {
     const entry = { ...baseEntry, remediable: false };
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    // The value contains a comma, so it will be quoted in CSV — split differently
+    // The value contains a comma so it is quoted in CSV — check the full line
     const fullLine = csv.trim().split("\n")[1];
     expect(fullLine).toContain("No — reference file (image, placeholder, etc.)");
   });

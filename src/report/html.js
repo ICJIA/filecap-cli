@@ -256,10 +256,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
   const totalFiles = entries.length;
 
   // ── remediable vs reference breakdown ────────────────────────────────────────
-  const REMEDIABLE_CATEGORIES = ["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"];
-  function entryIsRemediable(category) {
-    return REMEDIABLE_CATEGORIES.includes(category);
-  }
   const pdfCount = categoryCounts["pdf"] ?? 0;
   const officeCount = categoryCounts["office-document"] ?? 0;
   const spreadsheetCount = categoryCounts["spreadsheet"] ?? 0;
