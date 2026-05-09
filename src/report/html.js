@@ -3,6 +3,12 @@ import { CSV_COLUMNS } from "./csv.js";
 import { humanizeBytes } from "./format.js";
 import { FILECAP_VERSION } from "../version.js";
 
+function formatCellValue(v) {
+  if (v === true) return "Yes";
+  if (v === false) return "No";
+  return v;
+}
+
 /**
  * Escape a value for safe insertion into HTML.
  * @param {*} s
@@ -19,27 +25,26 @@ function htmlEscape(s) {
 }
 
 /**
- * Build a raw (un-escaped) row value array for one entry, mirroring csv.js buildRow logic.
+ * Build a display-ready row value array for one entry, parallel to CSV_COLUMNS.
+ * Booleans are converted to "Yes"/"No" for human readability.
  *
  * @param {object} entry
  * @param {object} sourceHeader
  * @param {Map} sourceMap - serverName → source metadata (consolidated only)
  * @param {boolean} isConsolidated
- * @returns {Array<string|number|boolean>}
+ * @returns {Array<string|number>}
  */
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
-  let serverName, serverIp, hostname, scannedPath;
+  let serverName, serverIp, scannedPath;
   if (isConsolidated) {
     serverName = entry.serverName;
     const src = sourceMap.get(entry.serverName);
     serverIp = src?.serverIp ?? "";
-    hostname = src?.hostname ?? "";
     scannedPath = src?.scannedPath ?? "";
   } else {
     const m = sourceHeader.metadata;
     serverName = m.serverName;
     serverIp = m.serverIp;
-    hostname = m.hostname;
     scannedPath = m.scannedPath;
   }
 
@@ -47,11 +52,15 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
   const isPdf = intro?.kind === "pdf";
   const isDocx = intro?.kind === "docx";
   const isXlsx = intro?.kind === "xlsx";
+  const isLegacy = intro?.kind === "office-legacy";
 
-  return [
+  const duplicateOf = entry.duplicateOf
+    ? `${entry.duplicateOf.serverName}:${entry.duplicateOf.path}`
+    : "";
+
+  const raw = [
     serverName,
     serverIp,
-    hostname,
     scannedPath,
     entry.path,
     entry.absolutePath,
@@ -60,32 +69,62 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.category,
     entry.remediable,
     entry.sizeBytes,
-    humanizeBytes(entry.sizeBytes),
     entry.modifiedAt,
     entry.sha256 ?? "",
-    intro?.documentLanguage ?? "",
+    duplicateOf,
+    (entry.flags ?? []).join("|"),
     // PDF
     isPdf ? intro.pageCount : "",
     isPdf ? intro.hasTextLayer : "",
+    isPdf ? (intro.textLayerCoverage ?? "") : "",
     isPdf ? intro.isImageOnly : "",
     isPdf ? intro.hasTags : "",
+    isPdf ? (intro.hasOutline ?? "") : "",
     isPdf ? intro.hasFormFields : "",
     isPdf ? intro.hasSignatures : "",
     isPdf ? intro.encrypted : "",
+    isPdf ? (intro.isLinearized ?? "") : "",
+    isPdf ? (intro.pdfVersion ?? "") : "",
+    intro?.documentLanguage ?? "",
     isPdf ? (intro.producer ?? "") : "",
     isPdf ? (intro.creator ?? "") : "",
     isPdf ? (intro.creationDate ?? "") : "",
+    isPdf ? (intro.title ?? "") : "",
+    isPdf ? (intro.author ?? "") : "",
+    isPdf ? (intro.subject ?? "") : "",
+    isPdf ? (intro.keywords ?? "") : "",
+    isPdf ? (intro.modificationDate ?? "") : "",
+    isPdf ? (intro.approxWordCount ?? "") : "",
     // DOCX
     isDocx ? intro.hasHeadings : "",
+    isDocx ? intro.imageCount : "",
     isDocx ? (intro.altTextCoverage ?? "") : "",
     isDocx ? intro.tableCount : "",
-    isDocx ? intro.imageCount : "",
+    isDocx ? (intro.tablesHaveHeaders ?? "") : "",
+    isDocx ? intro.hyperlinkCount : "",
+    isDocx ? intro.vagueLinkCount : "",
+    isDocx ? (intro.title ?? "") : "",
+    isDocx ? (intro.author ?? "") : "",
+    isDocx ? (intro.lastModifiedBy ?? "") : "",
+    isDocx ? (intro.wordCount ?? "") : "",
+    isDocx ? (intro.paragraphCount ?? "") : "",
+    isDocx ? (intro.headingLevelsUsed ?? []).join("|") : "",
     // XLSX
     isXlsx ? intro.sheetCount : "",
-    isXlsx ? (intro.mergedCellCount > 0) : "",
-    // Flags
-    (entry.flags ?? []).join("|"),
+    isXlsx ? intro.sheetNames.join("|") : "",
+    isXlsx ? intro.defaultSheetNameCount : "",
+    isXlsx ? intro.hasHeaderRows : "",
+    isXlsx ? intro.mergedCellCount : "",
+    isXlsx ? intro.hasCharts : "",
+    isXlsx ? intro.hasImages : "",
+    isXlsx ? (intro.title ?? "") : "",
+    isXlsx ? (intro.author ?? "") : "",
+    isXlsx ? (intro.totalCells ?? "") : "",
+    // Legacy
+    isLegacy ? intro.format : "",
   ];
+
+  return raw.map(formatCellValue);
 }
 
 /**
@@ -153,7 +192,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
     .join("\n");
 
   // ── header columns ───────────────────────────────────────────────────────────
-  const headerCells = CSV_COLUMNS.map((col) => `<th data-col="${htmlEscape(col)}">${htmlEscape(col)}</th>`).join("");
+  const headerCells = CSV_COLUMNS.map((col) => `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}</th>`).join("");
 
   // ── server/scan metadata display ─────────────────────────────────────────────
   const serverName = meta?.serverName ?? "";

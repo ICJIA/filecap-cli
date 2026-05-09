@@ -29,11 +29,82 @@ const baseEntry = {
   flags: [],
 };
 
+function colIndex(name) {
+  return CSV_COLUMNS.findIndex((c) => c.name === name);
+}
+
 describe("CSV_COLUMNS", () => {
-  it("declares 32 columns in stable order", () => {
-    expect(CSV_COLUMNS.length).toBe(32);
-    expect(CSV_COLUMNS[0]).toBe("serverName");
-    expect(CSV_COLUMNS[CSV_COLUMNS.length - 1]).toBe("flags");
+  it("declares columns as objects with name and label fields", () => {
+    expect(CSV_COLUMNS.length).toBeGreaterThan(0);
+    for (const col of CSV_COLUMNS) {
+      expect(typeof col.name).toBe("string");
+      expect(typeof col.label).toBe("string");
+      expect(col.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("first column is serverName with label Server", () => {
+    expect(CSV_COLUMNS[0].name).toBe("serverName");
+    expect(CSV_COLUMNS[0].label).toBe("Server");
+  });
+
+  it("includes new metadata columns for PDF, DOCX, XLSX", () => {
+    const names = CSV_COLUMNS.map((c) => c.name);
+    expect(names).toContain("pdfTitle");
+    expect(names).toContain("pdfAuthor");
+    expect(names).toContain("pdfApproxWordCount");
+    expect(names).toContain("docxTitle");
+    expect(names).toContain("docxAuthor");
+    expect(names).toContain("docxHeadingLevelsUsed");
+    expect(names).toContain("xlsxTitle");
+    expect(names).toContain("xlsxAuthor");
+    expect(names).toContain("xlsxTotalCells");
+  });
+});
+
+describe("writeCsv header row uses human-readable labels", () => {
+  it("first row contains labels, not raw column names", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
+    const headerRow = csv.trim().split("\n")[0];
+    expect(headerRow).toContain("Server");
+    expect(headerRow).toContain("File name");
+    expect(headerRow).toContain("Needs remediation");
+    expect(headerRow).toContain("PDF: page count");
+    expect(headerRow).not.toBe(CSV_COLUMNS.map((c) => c.name).join(","));
+  });
+});
+
+describe("writeCsv boolean rendering", () => {
+  it("renders boolean true as Yes and false as No", () => {
+    const entry = {
+      ...baseEntry,
+      remediable: true,
+      introspection: {
+        kind: "pdf",
+        pageCount: 5,
+        hasTextLayer: true,
+        isImageOnly: false,
+        hasTags: false,
+        hasFormFields: false,
+        hasSignatures: false,
+        encrypted: false,
+      },
+    };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+
+    expect(cells[colIndex("remediable")]).toBe("Yes");
+    expect(cells[colIndex("hasTextLayer")]).toBe("Yes");
+    expect(cells[colIndex("isImageOnly")]).toBe("No");
+  });
+
+  it("renders empty string for missing introspection fields", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("pageCount")]).toBe("");
+    expect(cells[colIndex("hasTextLayer")]).toBe("");
   });
 });
 
@@ -46,7 +117,6 @@ describe("writeCsv (single-instance input)", () => {
     });
     const lines = csv.trim().split("\n");
     expect(lines.length).toBe(2);
-    expect(lines[0]).toBe(CSV_COLUMNS.join(","));
   });
 
   it("populates introspection-derived columns from PDF entries", () => {
@@ -64,24 +134,18 @@ describe("writeCsv (single-instance input)", () => {
         producer: "Microsoft Word",
         creator: "Word",
         creationDate: "2024-01-01T00:00:00.000Z",
-        documentLanguage: "en-US",
+        title: "Policy Doc",
+        author: "Jane Smith",
+        approxWordCount: 1500,
       },
     };
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
-    expect(cells[CSV_COLUMNS.indexOf("pdfPageCount")]).toBe("47");
-    expect(cells[CSV_COLUMNS.indexOf("pdfHasTextLayer")]).toBe("true");
-    expect(cells[CSV_COLUMNS.indexOf("documentLanguage")]).toBe("en-US");
-    expect(cells[CSV_COLUMNS.indexOf("pdfProducer")]).toBe("Microsoft Word");
-  });
-
-  it("emits empty cells for missing introspection fields", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[CSV_COLUMNS.indexOf("pdfPageCount")]).toBe("");
-    expect(cells[CSV_COLUMNS.indexOf("pdfHasTextLayer")]).toBe("");
+    expect(cells[colIndex("pageCount")]).toBe("47");
+    expect(cells[colIndex("pdfTitle")]).toBe("Policy Doc");
+    expect(cells[colIndex("pdfAuthor")]).toBe("Jane Smith");
+    expect(cells[colIndex("pdfApproxWordCount")]).toBe("1500");
   });
 
   it("joins flags with pipe", () => {
@@ -89,19 +153,12 @@ describe("writeCsv (single-instance input)", () => {
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
-    expect(cells[CSV_COLUMNS.indexOf("flags")]).toBe("scanned-name-pattern|filename-has-spaces");
-  });
-
-  it("emits sizeHuman for human-readable sizes", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[CSV_COLUMNS.indexOf("sizeHuman")]).toBe("4.6 MB");
+    expect(cells[colIndex("flags")]).toBe("scanned-name-pattern|filename-has-spaces");
   });
 });
 
 describe("writeCsv (consolidated input)", () => {
-  it("uses per-entry serverName and looks up serverIp/hostname from sources", () => {
+  it("uses per-entry serverName and looks up serverIp from sources", () => {
     const consolidatedHeader = {
       schemaVersion: 1,
       kind: "filecap-consolidated-header",
@@ -125,8 +182,7 @@ describe("writeCsv (consolidated input)", () => {
     });
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
-    expect(cells[CSV_COLUMNS.indexOf("serverName")]).toBe("strapi-prod-01");
-    expect(cells[CSV_COLUMNS.indexOf("serverIp")]).toBe("10.42.7.18");
-    expect(cells[CSV_COLUMNS.indexOf("hostname")]).toBe("strapi-prod-01.icjia.local");
+    expect(cells[colIndex("serverName")]).toBe("strapi-prod-01");
+    expect(cells[colIndex("serverIp")]).toBe("10.42.7.18");
   });
 });

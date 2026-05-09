@@ -108,8 +108,32 @@ describe("writeHtml", () => {
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
     expect(html).toContain("Total files");
-    // Either "2" appears prominently in a count, or "pdf" with a count of 2
     expect(html).toMatch(/2/);
+  });
+
+  it("uses human-readable column headers in <th> elements", async () => {
+    const out = path.join(tmpDir, "labels.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("File name");
+    expect(html).toContain("Needs remediation");
+    expect(html).toContain("PDF: page count");
+    expect(html).not.toContain("<th data-col=\"filename\">filename</th>");
+  });
+
+  it("renders boolean true as Yes and false as No in table cells", async () => {
+    const out = path.join(tmpDir, "booleans.html");
+    const entries = [{
+      ...sampleEntries[0],
+      remediable: true,
+      introspection: { kind: "pdf", pageCount: 3, hasTextLayer: true, isImageOnly: false, hasTags: false, hasFormFields: false, hasSignatures: false, encrypted: false },
+    }];
+    await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("<td>Yes</td>");
+    expect(html).toContain("<td>No</td>");
+    expect(html).not.toMatch(/<td>true<\/td>/);
+    expect(html).not.toMatch(/<td>false<\/td>/);
   });
 
   it("flags image-only PDFs visually (e.g. row class or badge)", async () => {

@@ -20,3 +20,9 @@ export function csvCell(v) {
   }
   return s;
 }
+
+export function boolToYesNo(v) {
+  if (v === true) return "Yes";
+  if (v === false) return "No";
+  return v;
+}

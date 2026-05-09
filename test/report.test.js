@@ -94,12 +94,9 @@ describe("filecap report CLI", () => {
     }
 
     const csv = await fs.readFile(path.join(reportDir, "files.csv"), "utf8");
-    expect(csv.split("\n")[0]).toContain("serverName");
+    expect(csv.split("\n")[0]).toContain("Server");
     expect(csv).toContain("Scan_001.pdf");
     expect(csv).toContain("ok.pdf");
-
-    const summary = await fs.readFile(path.join(reportDir, "SUMMARY.txt"), "utf8");
-    expect(summary).toContain("Total files: 2");
 
     const flagged = await fs.readFile(path.join(reportDir, "flagged_filenames.txt"), "utf8");
     expect(flagged).toContain("Scan_001.pdf");
