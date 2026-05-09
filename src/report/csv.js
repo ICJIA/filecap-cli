@@ -83,7 +83,7 @@ export function writeCsv({ sourceHeader, entries, sources }) {
     }
   }
 
-  const lines = [CSV_COLUMNS.map((c) => c.label).join(",")];
+  const lines = [CSV_COLUMNS.map((c) => csvCell(c.label)).join(",")];
   for (const entry of entries) {
     const row = buildRow({ entry, sourceHeader, sourceMap, isConsolidated });
     lines.push(row.map((v) => csvCell(formatValue(v))).join(","));

@@ -302,6 +302,25 @@ describe("writeCsv (consolidated input)", () => {
   });
 });
 
+describe("writeCsv header row escaping", () => {
+  it("escapes header labels containing commas or quotes", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
+    const firstLine = csv.split("\n")[0];
+    // DOCX: vague hyperlinks ("click here") — has quotes, needs escaping
+    expect(firstLine).toContain('"DOCX: vague hyperlinks (""click here"")"');
+    // XLSX: default sheet names (Sheet1, Sheet2, …) — has comma, needs quoting
+    expect(firstLine).toContain('"XLSX: default sheet names (Sheet1, Sheet2, …)"');
+  });
+
+  it("leaves simple labels unquoted in the header", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
+    const firstLine = csv.split("\n")[0];
+    // Simple labels without commas/quotes/newlines stay unquoted
+    expect(firstLine).toMatch(/(^|,)Server(,|$)/);
+    expect(firstLine).toMatch(/(^|,)Website(,|$)/);
+  });
+});
+
 describe("writeCsv SHA-256 Excel text-formula wrapping", () => {
   it("wraps SHA-256 hash in Excel text-formula syntax to prevent scientific-notation auto-conversion", () => {
     const fullHash = "a".repeat(64);
