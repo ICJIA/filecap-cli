@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] — 2026-05-09
+
+### Fixed
+
+- **`audit-summary.txt` had blank Server / Source location fields and missing Website line.** `runReport` was not passing the inventory header to `writeSummary`. The header data was correctly captured in `inventory.ndjson` but never reached the summary text. Fixed by passing `header` through.
+- **Tilde (`~`) paths failed the remote path check in `audit-remote.sh` and `audit-fleet.sh`.** Inner single quotes around the path in the SSH `test -d '${path}'` call prevented the remote shell from expanding `~`. Removed the inner quotes so tilde paths now work correctly. Note: paths containing spaces or shell metacharacters should still be passed as absolute paths.
+
+### Added
+
+- **Public URL column.** New `--public-url-base <url>` flag for `filecap scan` records the URL prefix where files are publicly served (e.g., `https://example.com/uploads`). The CSV and HTML reports gain a "Public URL" column with one full URL per file. In the HTML report, the URL is rendered as a clickable link that opens the file in a new tab. The audit scripts prompt for it interactively (press Enter to skip), accept it via positional arg or env var, and the fleet script CSV format gains an optional 6th column.
+- **Scrollable HTML table with sticky first column.** The 58-column HTML report is now wrapped in a horizontally-scrolling container so the rightmost columns are reachable on any screen. The first column ("Server") stays pinned in place while you scroll, so you don't lose context.
+
+[1.0.4]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.4
+
 ## [1.0.3] — 2026-05-09
 
 ### Added
