@@ -1,6 +1,7 @@
 import { runScan } from "../commands/scan.js";
 import { runRollup } from "../commands/rollup.js";
 import { runReport } from "../commands/report.js";
+import { runAuditEnrich } from "../commands/audit-enrich.js";
 import { queryInventory } from "./query.js";
 
 export const TOOL_DEFINITIONS = [
@@ -49,6 +50,21 @@ export const TOOL_DEFINITIONS = [
         html: { type: "boolean", description: "Also write a self-contained HTML report (default false)" },
       },
       required: ["input", "outputDir"],
+    },
+  },
+  {
+    name: "filecap_audit_enrich",
+    description:
+      "Enrich an inventory NDJSON with audit.icjia.app accessibility scores. Each PDF entry whose publicUrl is reachable gets augmented with score (0-100), grade (A-F), reportId, and reportUrl. The audit-enrich step is intermediate — feed the enriched NDJSON to filecap_report to render the score columns.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        input: { type: "string", description: "Path to inventory NDJSON" },
+        output: { type: "string", description: "Output path (default: rewrite input)" },
+        apiBase: { type: "string", description: "Audit service base URL (default: https://audit.icjia.app)" },
+        authToken: { type: "string", description: "Bearer token (omit to use FILECAP_AUDIT_TOKEN env)" },
+      },
+      required: ["input"],
     },
   },
   {
@@ -114,6 +130,17 @@ export async function dispatchTool(name, args) {
         input: args.input,
         outputDir: args.outputDir,
         html: args.html ?? false,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+    if (name === "filecap_audit_enrich") {
+      const authToken = args.authToken ?? process.env.FILECAP_AUDIT_TOKEN ?? "";
+      const result = await runAuditEnrich({
+        input: args.input,
+        output: args.output ?? args.input,
+        apiBase: args.apiBase ?? "https://audit.icjia.app",
+        authToken,
+        verbose: false,
       });
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }

@@ -4,6 +4,7 @@ import { runScan } from "../src/commands/scan.js";
 import { runRollup } from "../src/commands/rollup.js";
 import { runReport } from "../src/commands/report.js";
 import { runMcp } from "../src/commands/mcp.js";
+import { runAuditEnrich } from "../src/commands/audit-enrich.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
 
@@ -118,6 +119,30 @@ program
       process.stderr.write(`filecap: ${err.message}\n`);
       process.exit(1);
     }
+  });
+
+program
+  .command("audit-enrich <inventory>")
+  .description("Enrich an inventory NDJSON with audit.icjia.app scores via the bulk-from-inventory endpoint")
+  .option("-o, --output <path>", "Write enriched NDJSON here (default: rewrite input in place)")
+  .option("--api-base <url>", "Audit service base URL", "https://audit.icjia.app")
+  .option("--auth-token <token>", "Bearer token (default: $FILECAP_AUDIT_TOKEN)")
+  .option("--verbose", "Print per-file progress to stderr")
+  .action(async (inventory, opts) => {
+    const authToken = opts.authToken ?? process.env.FILECAP_AUDIT_TOKEN ?? "";
+    const result = await runAuditEnrich({
+      input: inventory,
+      output: opts.output ?? inventory,
+      apiBase: opts.apiBase,
+      authToken,
+      verbose: opts.verbose ?? false,
+    });
+    if (result.exitCode !== 0) {
+      process.stderr.write(`audit-enrich error: ${result.error}\n`);
+      process.exit(result.exitCode);
+    }
+    const s = result.summary;
+    process.stderr.write(`Enriched ${s.enrichedEntries} of ${s.manifestResults} results (${s.analyzed} analyzed, ${s.failed} failed of ${s.total} submitted)\n`);
   });
 
 program
