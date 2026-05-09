@@ -4,9 +4,138 @@
 
 `filecap` walks a directory tree, introspects each file (PDFs, DOCX, XLSX), and produces a structured NDJSON inventory suitable for accessibility remediation scoping. The primary use case is generating per-server inventories of file stores (Strapi `/uploads` directories, general file servers) to hand to remediation vendors so they can produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
 
+## Are you a...
+
+- **Manager** running an organization that has to comply with accessibility law? → [Manager TL;DR](#tldr-for-managers)
+- **Developer** evaluating this for technical fit? → [Developer TL;DR](#tldr-for-developers)
+- **Accessibility vendor or auditor** receiving an inventory? → [Vendor / auditor TL;DR](#tldr-for-vendors-and-auditors)
+- **Just curious** about what problem this solves? → [Curious-onlooker TL;DR](#tldr-for-the-curious)
+
+---
+
+## TL;DR for managers
+
+You run a website. Like most websites, it hosts hundreds or thousands of uploaded documents — PDFs of meeting minutes, Word documents of policies, image attachments, spreadsheets. Federal accessibility law (ADA Title II / WCAG 2.1 AA) requires those files to be accessible to people with disabilities.
+
+To budget the remediation work, you need to know what's actually there: file counts by type, which PDFs are scanned images (need OCR — often substantially more expensive than tagging born-digital PDFs), which Word docs lack heading structure, which tables are missing header rows, and so on.
+
+`filecap` produces this inventory automatically. It walks your website's `/uploads` folder, parses every file, and writes a spreadsheet (CSV) plus an interactive HTML report with one row per file and detailed accessibility-relevant metadata. You hand the spreadsheet to a remediation vendor; they give you a fixed-price quote with confidence.
+
+The included `audit-remote.sh` script automates the entire workflow against any server you have SSH access to. Auditors run one command, answer a few prompts, and get a vendor-ready deliverable. Works on macOS, Linux, and Windows (via WSL2). Free; open source.
+
+**Three things you, as a manager, get out of this:**
+1. A precise count of files needing remediation, with composition (not just `wc -l`).
+2. A spreadsheet you can email to bid-out vendors without explanation.
+3. Repeatability — re-run quarterly, see what changed.
+
+→ Skip to [Quick start for managers](#quick-start-for-managers) for handoff instructions.
+
+---
+
+## TL;DR for developers
+
+Node.js CLI written in ESM, distributed via npm as `@icjia/filecap`. Walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX). 58-column CSV writer + self-contained HTML report with sortable/filterable client-side JS. Cross-server rollup with content-duplicate detection via SHA-256.
+
+Includes an MCP server (`filecap mcp`) exposing `filecap_scan`, `filecap_rollup`, `filecap_report`, and `filecap_query_inventory` as tools for AI agents (Claude Desktop, Claude Code, Cursor, Windsurf, Continue).
+
+Two distribution shapes: `filecap` CLI invoked directly via npx, plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where filecap actually ran.
+
+ESM-only. Node 20+ required. ~25 test files; 200+ tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
+
+→ Skip to [Quick start](#quick-start) for installation and basic usage.
+
+---
+
+## TL;DR for vendors and auditors
+
+You receive an `audit-file-list.csv` (58 columns, one row per file) with everything needed to scope and quote a remediation engagement:
+
+- **Identification**: server name, website nickname, server IP, source folder on server, full file path on server, filename, extension.
+- **Filesystem metadata**: size in bytes, last-modified timestamp, SHA-256 content hash (for cross-server dedup detection).
+- **Filename heuristics**: flags for scanned-document patterns, non-ASCII chars, very long names, etc.
+- **PDF introspection**: page count, has-text-layer (Yes/No), text coverage fraction, image-only flag (signals OCR needed), tag presence, outline/bookmarks, form fields, signatures, encryption, linearized, PDF version, document language, producer/creator, creation date, title, author, subject, keywords, PDF modification date, approximate word count.
+- **DOCX introspection**: has-headings, image count, alt-text coverage, table count, tables-have-headers, hyperlink count, vague-link count ("click here", "read more"), title, author, last-modified-by, word count, paragraph count, heading levels actually used (gap detection, e.g., `H1|H2|H4` flags a missing H3).
+- **XLSX introspection**: sheet count, sheet names, default-sheet-name count (Sheet1/Sheet2/etc.), has-header-rows, merged cell count, has-charts, has-images, title, author, total cells.
+
+The "Server IP" and "Full file path on server" columns identify exactly where each file lives — you ssh into the server and download the file directly. Optionally accompanied by an `audit-file-list.html` rendering of the same data with sortable/searchable browser-based interface.
+
+Zero account creation; the inventory is a vendor-neutral structured file you can ingest into your own tooling.
+
+→ Skip to [Report workflow](#report-workflow-phase-6) for the full output spec.
+
+---
+
+## TL;DR for the curious
+
+filecap was originally built at ICJIA (the [Illinois Criminal Justice Information Authority](https://icjia.illinois.gov)) to inventory the document files on our agency's public-facing websites — PDFs of meeting agendas, annual reports, statutes, etc. Federal accessibility law requires those files to be reachable for screen-readers, keyboard navigation, and assistive technology, but figuring out exactly *which* files need *which* kind of work, across multiple servers, was a manual job that took weeks.
+
+The tool is general-purpose. Any organization that hosts public-facing document repositories — government agencies, schools, libraries, nonprofits, businesses — can use it to scope their accessibility work. The output is a spreadsheet a remediation vendor can quote against, line by line.
+
+The complexity in filecap exists because "is this PDF accessible?" is a much harder question than "does this file exist?" Answering it requires actually opening every file and inspecting its internal structure — see the [next section](#just-count-the-files-all-right--why-filecap-is-more-than-wc--l) for why this matters.
+
+→ See the project page on GitHub: https://github.com/ICJIA/filecap-cli
+
+---
+
+## "Just count the files, all right?" — why filecap is more than `wc -l`
+
+Imagine asking a remediation vendor for a quote. They say "I need to see the files first." You forward them a list of filenames and sizes. They reply: "Great — but how many are scanned PDFs vs born-digital? How many Word docs lack heading structure? How many tables are missing header rows? Without that detail, my quote will be the worst-case price for every single file."
+
+That's why filecap exists. A simple `find . -type f` gives you filenames and sizes — but a vendor can't price accurately against that. They'll either give you a worst-case quote (you overpay), or insist on inspecting every file themselves (the audit takes weeks instead of hours).
+
+filecap is built around one question: **what does a remediation vendor need to know, per file, to give a defensible fixed-price quote?** Every "complexity" in this tool answers a specific vendor question:
+
+| Vendor question | What filecap captures |
+|---|---|
+| Is this PDF a scan (needs OCR — often substantially more expensive)? | `isImageOnly`, `hasTextLayer`, `textLayerCoverage` |
+| Is this PDF already partly accessible? | `hasTags`, `hasOutline`, `documentLanguage` |
+| Does this PDF need special handling? | `encrypted`, `hasFormFields`, `hasSignatures` |
+| Is this Word doc structured for screen readers? | `hasHeadings`, `headingLevelsUsed` (gap detection) |
+| Are tables marked up for accessibility? | `tableCount`, `tablesHaveHeaders` |
+| Do images have alt text? | `imageCount`, `altTextCoverage` |
+| Are hyperlinks descriptive? | `vagueLinkCount` (counts "click here", "read more", etc.) |
+| Are spreadsheets navigable for screen readers? | `mergedCellCount`, `defaultSheetNameCount`, `hasHeaderRows` |
+| Do the same files appear on multiple servers? | `sha256` content hash + `duplicateOf` cross-server linking |
+| Are filenames human-readable? | filename heuristic flags |
+
+**The cost of NOT having this information is often substantially greater than the cost of running filecap.** Scanned PDFs typically cost vendors substantially more to remediate than born-digital ones, because OCR + tagging is an order of magnitude more work than tagging alone. If your inventory has 100 PDFs and 30 of them are scanned, knowing that distinction affects the vendor quote materially.
+
+filecap takes a few seconds per file to extract this metadata — and produces a spreadsheet a vendor can price line by line. That's the whole game.
+
+So: yes, "just count the files" is a one-liner. But the count alone won't help you budget for compliance. The detail is the point.
+
+---
+
+## Table of contents
+
+- [Are you a...](#are-you-a)
+  - [TL;DR for managers](#tldr-for-managers)
+  - [TL;DR for developers](#tldr-for-developers)
+  - [TL;DR for vendors and auditors](#tldr-for-vendors-and-auditors)
+  - [TL;DR for the curious](#tldr-for-the-curious)
+- ["Just count the files, all right?"](#just-count-the-files-all-right--why-filecap-is-more-than-wc--l)
+- [Status](#status)
+- [Quick start](#quick-start)
+- [Quick start for managers](#quick-start-for-managers)
+- [CLI reference](#cli-reference)
+- [Multi-server workflow](#multi-server-workflow)
+- [NDJSON output format](#ndjson-output-format)
+- [What gets introspected](#what-gets-introspected)
+- [Filename flags](#filename-flags-phase-4)
+- [Rollup workflow](#rollup-workflow-phase-5)
+- [Report workflow](#report-workflow-phase-6)
+- [MCP server](#mcp-server-phase-7)
+- [For auditors: self-contained audit scripts](#for-auditors-self-contained-audit-scripts)
+- [What filecap does not do](#what-filecap-does-not-do)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Related tools](#related-icjia-tools)
+
+---
+
 ## Status
 
-**Phase 7 shipped (v1.0.0) — v1.0 milestone reached.** MCP server entry point is live: `filecap mcp` starts an stdio MCP server exposing `filecap_scan`, `filecap_rollup`, `filecap_report`, and `filecap_query_inventory` as tools callable by AI agents (Claude Desktop, Claude Code, etc.). The full inventory pipeline `scan → rollup → report` remains end-to-end functional. All prior phases continue unchanged.
+**v1.0.3 shipped.** MCP server, full vendor handoff pipeline, self-contained audit scripts, and comprehensive per-file introspection are all live. The full inventory pipeline `scan → rollup → report` is end-to-end functional. Timestamped audit history, optional website nicknames, and self-version-checking audit scripts landed in 1.0.2–1.0.3.
 
 The full design specification lives at [`docs/filecap-design.md`](docs/filecap-design.md).
 
@@ -17,9 +146,12 @@ The full design specification lives at [`docs/filecap-design.md`](docs/filecap-d
 | 3 | v0.3.0 | shipped | Office introspection (DOCX, XLSX, legacy flag) |
 | 4 | v0.4.0 | shipped | Filename flagging |
 | 5 | v0.5.0 | shipped | Multi-server rollup |
-| 6 | v0.6.0 | **shipped** | CSV reporter and summary artifacts |
-| 7 | v1.0.0 | **shipped** | MCP server entry point |
-| 8 | vNext | deferred | Strapi-aware mode (separate package) |
+| 6 | v0.6.0 | shipped | CSV reporter and summary artifacts |
+| 7 | v1.0.0 | shipped | MCP server entry point |
+| 8 | v1.0.1 | shipped | MCP client docs (Claude Desktop, Claude Code, Cursor, Windsurf, Continue) |
+| 9 | v1.0.2 | shipped | Audit automation scripts, HTML report, enhanced metadata, auditor-readable output |
+| 10 | v1.0.3 | shipped | Self-version-check, timestamped runs, `--site-name` flag, README overhaul |
+| — | vNext | deferred | Strapi-aware mode (separate package) |
 
 ## Quick start
 
@@ -30,6 +162,27 @@ npx --yes @icjia/filecap scan /var/strapi/uploads
 
 The output is line-delimited JSON: one header line, one line per file, one footer line.
 
+## Quick start for managers
+
+If you're handing this off to an auditor or accessibility coordinator, copy the block below verbatim. They have everything they need.
+
+> **For the auditor:**
+>
+> 1. Make sure you have macOS, Linux, or Windows-with-WSL2 installed (see [Windows: the situation](#windows-the-situation) below if you're on Windows).
+> 2. Make sure you have Node.js 20+ installed (https://nodejs.org).
+> 3. Make sure you have SSH access to the target server.
+> 4. Run these three commands:
+>
+>    ```bash
+>    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+>    chmod +x audit-remote.sh
+>    ./audit-remote.sh
+>    ```
+>
+> 5. Answer the prompts (SSH user, server IP, path to uploads, optional website nickname).
+> 6. The deliverable is at `~/filecap-audits/<server-ip>/latest/report/`. Open `audit-file-list.csv` (Excel/Numbers/Sheets) or `audit-file-list.html` (any browser).
+> 7. Email the entire `report/` folder to your remediation vendor.
+
 ## CLI reference
 
 ### `filecap scan <directory>`
@@ -39,7 +192,7 @@ The output is line-delimited JSON: one header line, one line per file, one foote
 | `-o, --output <path>` | `filecap-<hostname>.ndjson` | Output path (use `-` for stdout) |
 | `-s, --server-name <name>` | `os.hostname()` | Override server identifier in metadata |
 | `--server-ip <ip>` | auto-detected | Override server IP (defaults to first non-loopback IPv4) |
-| `--site-name <name>` | (none) | Optional website nickname (e.g., DVFR). Used as a human-friendly identifier alongside `--server-name`. |
+| `--site-name <name>` | (none) | Optional website nickname (e.g., DVFR or any short site nickname). Used as a human-friendly identifier alongside `--server-name`. |
 | `--no-hash` | (off) | Skip SHA-256 hashing (much faster, but no dedup) |
 | `--no-introspect` | (off) | Skip PDF/Office introspection (filesystem stats only) |
 | `--max-introspect-mb <n>` | `200` | Skip introspection for files larger than this |
@@ -47,12 +200,31 @@ The output is line-delimited JSON: one header line, one line per file, one foote
 | `--exclude-ext <list>` | (none) | Comma-separated extensions to exclude |
 | `--concurrency <n>` | `4` | Parallel introspection/hashing workers |
 | `--progress` | (off) | Emit progress to stderr |
+| `--quiet` | (off) | Suppress non-error output |
 
 **Exit codes.** `0` success, `1` argument or runtime error, `2` directory not readable, `3` partial completion.
 
-### `filecap rollup` and `filecap report`
+### `filecap rollup <files...>`
 
-Stubs printing "not implemented in v0.3.0". Phase 5 and Phase 6 respectively.
+Merge multiple per-server NDJSONs into a consolidated inventory.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-o, --output <path>` | `consolidated.ndjson` | Output path |
+| `--strict` | (off) | Fail on schema mismatch or missing footer in any input (default: warn and skip) |
+
+### `filecap report <inventory>`
+
+Generate vendor handoff package (CSV + summary + flagged lists) from an inventory NDJSON (single-instance or consolidated).
+
+| Flag | Default | Description |
+|---|---|---|
+| `-o, --output <dir>` | `./filecap-report-<ts>/` | Output directory |
+| `--html` | (off) | Also write a self-contained sortable HTML report (`audit-file-list.html`) |
+
+### `filecap mcp`
+
+Starts an stdio MCP server for use with AI agent clients (Claude Desktop, Claude Code, Cursor, etc.). No flags — configuration is handled by the client.
 
 ## Multi-server workflow
 
@@ -80,9 +252,12 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
   "metadata": {
     "siteName": "DVFR",
     "serverName": "dvfr-strapi-prod",
+    "hostname": "dvfr-strapi-prod",
+    "serverIp": "192.241.146.85",
     "scannedPath": "/var/strapi/uploads",
-    "scannedAt": "2026-05-08T14:23:11.000Z",
+    "scannedAt": "2026-05-09T14:23:11.000Z",
     "filecapVersion": "1.0.3",
+    "nodeVersion": "20.19.0",
     "options": { "introspect": true, "hash": true, "maxIntrospectMb": 200, "concurrency": 4 }
   }
 }
@@ -90,16 +265,59 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
 
 `siteName` is optional. Omitting it is valid. Old inventories without it continue to validate.
 
+**Example file entry (PDF):**
+
+```json
+{
+  "path": "2024/reports/annual-report.pdf",
+  "absolutePath": "/var/strapi/uploads/2024/reports/annual-report.pdf",
+  "filename": "annual-report.pdf",
+  "extension": "pdf",
+  "category": "pdf",
+  "remediable": true,
+  "sizeBytes": 4827193,
+  "modifiedAt": "2024-03-12T09:14:22.000Z",
+  "sha256": "e3b0c44...",
+  "flags": [],
+  "introspection": {
+    "kind": "pdf",
+    "pageCount": 48,
+    "hasTextLayer": true,
+    "textLayerCoverage": 1.0,
+    "isImageOnly": false,
+    "hasTags": false,
+    "hasOutline": true,
+    "hasFormFields": false,
+    "hasSignatures": false,
+    "encrypted": false,
+    "documentLanguage": "en-US",
+    "producer": "Adobe PDF Library 15.0",
+    "creator": "Adobe InDesign CC 2019",
+    "creationDate": "2024-03-10T08:00:00.000Z",
+    "title": "DVFR Annual Report 2024",
+    "author": "Illinois Criminal Justice Information Authority",
+    "subject": "Annual Report",
+    "keywords": null,
+    "modificationDate": null,
+    "approxWordCount": 14230
+  }
+}
+```
+
 **Example file entry (DOCX):**
 
 ```json
 {
   "path": "2024/policies/handbook.docx",
+  "absolutePath": "/var/strapi/uploads/2024/policies/handbook.docx",
   "filename": "handbook.docx",
   "extension": "docx",
   "category": "office-document",
   "remediable": true,
   "sizeBytes": 152340,
+  "modifiedAt": "2024-06-15T13:00:00.000Z",
+  "sha256": "a1b2c3d4...",
+  "flags": [],
   "introspection": {
     "kind": "docx",
     "hasHeadings": true,
@@ -109,21 +327,33 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
     "tablesHaveHeaders": true,
     "hyperlinkCount": 12,
     "vagueLinkCount": 2,
-    "documentLanguage": "en-US"
+    "documentLanguage": "en-US",
+    "title": "Staff Handbook",
+    "author": "HR Department",
+    "lastModifiedBy": "Jane Smith",
+    "wordCount": 8450,
+    "paragraphCount": 342,
+    "headingLevelsUsed": ["H1", "H2", "H4"]
   }
 }
 ```
+
+Note: `headingLevelsUsed: ["H1", "H2", "H4"]` signals a missing H3 — a heading gap that can confuse screen reader navigation.
 
 **Example file entry (XLSX):**
 
 ```json
 {
   "path": "2024/data/budget.xlsx",
+  "absolutePath": "/var/strapi/uploads/2024/data/budget.xlsx",
   "filename": "budget.xlsx",
   "extension": "xlsx",
   "category": "spreadsheet",
   "remediable": true,
   "sizeBytes": 48720,
+  "modifiedAt": "2024-04-01T09:00:00.000Z",
+  "sha256": "f9e8d7c6...",
+  "flags": [],
   "introspection": {
     "kind": "xlsx",
     "sheetCount": 4,
@@ -132,7 +362,10 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
     "hasHeaderRows": true,
     "mergedCellCount": 3,
     "hasCharts": true,
-    "hasImages": false
+    "hasImages": false,
+    "title": "FY2024 Budget",
+    "author": "Finance",
+    "totalCells": 14400
   }
 }
 ```
@@ -155,9 +388,9 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
 
 The presence of `kind: "office-legacy"` is itself the signal: this file needs manual review with Office or an upgrade to a modern format before remediation.
 
-## What gets introspected (Phase 3)
+## What gets introspected
 
-### PDF (Phase 2)
+### PDF
 
 | Field | What it tells you |
 |---|---|
@@ -167,8 +400,11 @@ The presence of `kind: "office-legacy"` is itself the signal: this file needs ma
 | `producer`, `creator` | Strong triage signal (born-digital vs. OCR'd from paper) |
 | `documentLanguage`, `creationDate`, `pdfVersion` | Document metadata |
 | `encrypted`, `isLinearized`, `hasOutline` | Structural state |
+| `title`, `author`, `subject`, `keywords` | Embedded PDF metadata (often the actual document name, vs. a hashed filename) |
+| `modificationDate` | PDF-internal modification timestamp (separate from filesystem mtime) |
+| `approxWordCount` | Sum of word counts across all pages (signals document complexity) |
 
-### DOCX (new in Phase 3)
+### DOCX
 
 | Field | What it tells you |
 |---|---|
@@ -177,8 +413,12 @@ The presence of `kind: "office-legacy"` is itself the signal: this file needs ma
 | `tableCount`, `tablesHaveHeaders` | Table count and whether any table has marked header rows |
 | `hyperlinkCount`, `vagueLinkCount` | Total links and how many use ambiguous text ("click here", "read more") |
 | `documentLanguage` | Declared language (WCAG 3.1.1) |
+| `title`, `author`, `lastModifiedBy` | From `docProps/core.xml` — useful for document identification |
+| `wordCount` | From `docProps/app.xml` — signals document complexity |
+| `paragraphCount` | Count of paragraph elements |
+| `headingLevelsUsed` | Sorted unique array of heading levels actually used (e.g., `["H1", "H2", "H4"]` flags an H3 gap) |
 
-### XLSX (new in Phase 3)
+### XLSX
 
 | Field | What it tells you |
 |---|---|
@@ -187,6 +427,8 @@ The presence of `kind: "office-legacy"` is itself the signal: this file needs ma
 | `hasHeaderRows` | At least one sheet has a styled (bold) first row |
 | `mergedCellCount` | Total merged cell ranges across all sheets (accessibility anti-pattern) |
 | `hasCharts`, `hasImages` | Embedded objects |
+| `title`, `author` | From `core.xml` — document identification metadata |
+| `totalCells` | Sum of cell counts across all sheets (signals spreadsheet complexity) |
 
 ### Legacy `.doc/.ppt/.xls`
 
@@ -207,7 +449,7 @@ Every entry's `flags[]` array is populated with applicable filename-heuristic fl
 | `filename-non-ascii` | Basename contains characters outside the printable ASCII range (e.g., `résumé.pdf`, `文件.docx`). Web-server URL handling and some legacy systems still mishandle these. |
 | `filename-long` | Basename exceeds 200 characters. Long names cause filesystem truncation and URL length issues. |
 
-Flags are emitted as a sorted array; the CSV reporter (Phase 6) will join them with `|` for spreadsheet consumption.
+Flags are emitted as a sorted array; the CSV reporter joins them with `|` for spreadsheet consumption.
 
 A file with no triggered flags has `flags: []` (empty array).
 
@@ -225,14 +467,7 @@ The consolidated NDJSON has the same line-delimited structure as a single-instan
 2. **Entries.** Each entry gains `serverName: string` (which source it came from) and `duplicateOf: {serverName, path} | null`. Content-duplicates (identical SHA-256 across servers) get `duplicateOf` set to the canonical copy. The canonical entry has `duplicateOf: null`.
 3. **Footer.** `kind: "filecap-consolidated-footer"` with cross-instance stats: `totalUniqueHashes`, `totalDuplicateGroups`, `bytesSavedIfDeduped` (bytes that could be reclaimed by deleting non-canonical duplicates).
 
-**Flags:**
-
-| Flag | Default | Description |
-|---|---|---|
-| `-o, --output <path>` | `consolidated.ndjson` | Output path |
-| `--strict` | (off) | Fail on schema mismatch or missing footer in any input (default: warn and skip) |
-
-**Why one row per physical copy?** Each duplicate entry in the consolidated CSV (Phase 6) represents real disk space someone has to decide to keep or delete. The `duplicateOf` link tells the consumer "this is the same content as `<serverName>:<path>`" so a vendor can group by hash for de-dup analysis OR filter to canonicals only for remediation work. Both views are one query away.
+**Why one row per physical copy?** Each duplicate entry in the consolidated CSV represents real disk space someone has to decide to keep or delete. The `duplicateOf` link tells the consumer "this is the same content as `<serverName>:<path>`" so a vendor can group by hash for de-dup analysis OR filter to canonicals only for remediation work. Both views are one query away.
 
 **Canonical-pick rule.** When two or more entries share a SHA-256, the canonical is the one with the oldest `modifiedAt`. Ties are broken alphabetically by `serverName`. The canonical entry has `duplicateOf: null`; all others have `duplicateOf: {serverName, path}` pointing at it.
 
@@ -278,15 +513,17 @@ Generate the vendor handoff package from an inventory NDJSON (single-instance or
 
 ```bash
 filecap report consolidated.ndjson -o ./report-2026-Q2/
-filecap report consolidated.ndjson -o ./report-2026-Q2/ --html   # also writes files.html
+filecap report consolidated.ndjson -o ./report-2026-Q2/ --html   # also writes audit-file-list.html
 ```
 
 Output directory contents:
 
 | File | Purpose |
 |---|---|
-| `files.csv` | One row per file, 32 columns (the work-order vendors actually consume). Filterable in Excel, Smartsheet, etc. |
-| `SUMMARY.txt` | Top-level numbers: file counts by category, total bytes, image-only PDF count, remediable count, sources |
+| `audit-file-list.csv` | One row per file, 58 columns (the work-order vendors actually consume). Human-readable column headers. Booleans render as Yes/No. Filterable in Excel, Smartsheet, etc. |
+| `audit-file-list.html` | (Only when `--html` is passed.) Self-contained interactive page — same data, sortable columns, full-text search, no external dependencies. Image-only PDFs highlighted. |
+| `audit-summary.txt` | Manager-friendly top-line numbers: file counts by category, total bytes, image-only PDF count, remediable count, heading coverage, alt-text coverage, and "What this means" observation bullets. |
+| `README.txt` | Plain-text guide to all files in this folder. Start here if you're not sure which file to open. |
 | `largest_files.txt` | Top 50 files by size (helps schedule the biggest remediation work) |
 | `flagged_filenames.txt` | Files whose `flags[]` includes scanned-original or filename anti-patterns |
 | `duplicate_hashes.txt` | Content-duplicate groups (entries sharing a SHA-256) — useful for de-dup analysis |
@@ -294,13 +531,13 @@ Output directory contents:
 
 The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `filecap diff` command to detect changes. This division-of-labor decision is documented in the design doc and locks vendor workflow out of the inventory tool itself.
 
-**CSV column order** (32 columns, stable):
+**CSV column order** (58 columns, stable):
 
-`serverName, serverIp, hostname, scannedPath, relativePath, absolutePath, filename, extension, category, remediable, sizeBytes, sizeHuman, modifiedAt, sha256, documentLanguage, pdfPageCount, pdfHasTextLayer, pdfIsImageOnly, pdfHasTags, pdfHasFormFields, pdfHasSignatures, pdfEncrypted, pdfProducer, pdfCreator, pdfCreationDate, docxHasHeadings, docxAltTextCoverage, docxTableCount, docxImageCount, xlsxSheetCount, xlsxHasMergedCells, flags`
+`Server, Website, Server IP, Source folder on server, File location (relative to source folder), Full file path on server, File name, File extension, File type, Needs remediation, Size (bytes), Last modified, Content hash (SHA-256), Duplicate of, File-name flags, PDF: page count, PDF: has searchable text, PDF: text coverage (fraction), PDF: image-only (needs OCR), PDF: structurally tagged, PDF: has bookmarks/outline, PDF: has form fields, PDF: digitally signed, PDF: encrypted, PDF: web-optimized (linearized), PDF version, Document language, PDF producer, PDF creator, Created, PDF: title, PDF: author, PDF: subject, PDF: keywords, PDF: modified date, PDF: approximate word count, DOCX: has headings, DOCX: image count, DOCX: alt-text coverage (fraction), DOCX: table count, DOCX: tables have header rows, DOCX: hyperlink count, DOCX: vague hyperlinks ("click here"), DOCX: title, DOCX: author, DOCX: last modified by, DOCX: word count, DOCX: paragraph count, DOCX: heading levels used, XLSX: sheet count, XLSX: sheet names, XLSX: default sheet names (Sheet1, Sheet2, …), XLSX: has header rows, XLSX: merged cell count, XLSX: has charts, XLSX: has embedded images, XLSX: title, XLSX: author, XLSX: total cells, Legacy Office format`
 
-`flags` is pipe-separated (e.g., `scanned-name-pattern|filename-has-spaces`). Empty cells indicate the field doesn't apply to this file's type.
+Column headers are human-facing labels (not raw field names). The `flags` / `DOCX: heading levels used` / `XLSX: sheet names` cells are pipe-separated (e.g., `scanned-name-pattern|filename-has-spaces`). Empty cells indicate the field doesn't apply to this file's type.
 
-**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). For consolidated inputs, the per-entry `serverName` is used and `serverIp`/`hostname` are looked up from the header's `metadata.sources[]` array. Both input shapes produce the same 32-column CSV — the consumer doesn't need to know which scanner/rollup pipeline produced the data.
+**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). For consolidated inputs, the per-entry `serverName` is used and `serverIp` / `hostname` are looked up from the header's `metadata.sources[]` array. Both input shapes produce the same 58-column CSV — the consumer doesn't need to know which scanner/rollup pipeline produced the data.
 
 ## MCP server (Phase 7)
 
@@ -452,12 +689,12 @@ Check this list before running anything. All five items are required.
 
 2. **SSH access to the remote server.** This means you (or your IT team) already have a username and an SSH key configured for the target machine. The default username for ICJIA Strapi servers is `forge`. If you can already run `ssh forge@<server-ip>` and get a prompt, you're ready. If not, you'll need your server administrator to set this up before running the audit.
 
-3. **Node.js 18 or newer installed on your local machine.** Node is the JavaScript runtime the tool uses; it's free and widely used. Check whether it's already installed by opening a terminal and typing `node --version`. If you see `v18.x.x` or higher, you're done. If not:
+3. **Node.js 20 or newer installed on your local machine.** Node is the JavaScript runtime the tool uses; it's free and widely used. Check whether it's already installed by opening a terminal and typing `node --version`. If you see `v20.x.x` or higher, you're done. If not:
    - macOS: `brew install node` (if you have Homebrew) or download the installer from https://nodejs.org
    - Ubuntu/Linux: `sudo apt install -y nodejs` or download from https://nodejs.org
    - Windows (WSL2/Ubuntu): see the [Windows](#windows-the-situation) section
 
-4. **`npx` available in your terminal.** `npx` comes bundled with Node.js 18+ — if you have Node, you have `npx`. It's the tool that downloads and runs `filecap` automatically; you don't have to install `filecap` separately.
+4. **`npx` available in your terminal.** `npx` comes bundled with Node.js 20+ — if you have Node, you have `npx`. It's the tool that downloads and runs `filecap` automatically; you don't have to install `filecap` separately.
 
 5. **`bash`, `ssh`, `rsync`, and `python3` available.** These are pre-installed on every Mac (macOS 12+), every modern Ubuntu/Debian Linux, and every WSL2/Ubuntu environment. You don't need to do anything. The scripts check for these at startup and tell you if something is missing.
 
@@ -471,7 +708,7 @@ chmod +x audit-remote.sh
 ./audit-remote.sh
 ```
 
-The script walks you through the rest interactively. It asks a few questions (see below), connects to the server, collects the inventory, and writes the output to `~/filecap-audits/<server-ip>/report/`. When it's done, it prints the path to the results.
+The script walks you through the rest interactively. It asks a few questions (see below), connects to the server, collects the inventory, and writes the output to `~/filecap-audits/<server-ip>/latest/report/`. When it's done, it prints the path to the results.
 
 If you already know all the details and want to skip the prompts, you can pass them directly:
 
@@ -487,14 +724,14 @@ In interactive mode, the script asks six questions. Here's what each one means a
 - **Server IP or hostname** — The address of the server you're auditing. Examples: `192.241.146.85` or `strapi-prod-01.example.com`. This is required — there's no default.
 - **Full path to the uploads folder on the remote** — Where the files live on the server. Example: `~/dvfr.icjia-api.cloud/strapi_v4/public/uploads`. Your server administrator can confirm this path. Required.
 - **Friendly server name** — A human-readable label (the technical identifier) used in report headings. Defaults to `strapi-<IP-with-dashes>` (e.g., `strapi-192-241-146-85`). Optional — press Enter to accept the default, or type something like `dvfr-strapi-prod`.
-- **Website nickname** — An optional short name managers and vendors use to identify the site (e.g., `DVFR`, `i2i`, `vpp`). Different from the server name — this is the business-facing identity. Press Enter to skip if you don't have one.
+- **Website nickname** — An optional short name managers and vendors use to identify the site (e.g., `DVFR`, `i2i`, `vpp`, `infonet`). Different from the server name — this is the business-facing identity. Press Enter to skip if you don't have one.
 - **Generate HTML report? [y/N]** — Defaults to no (just press Enter). If you answer `y`, the script also produces `audit-file-list.html` — a self-contained web page with the same data, interactive column sorting, full-text search, and visual highlights for image-only PDFs. Useful to have open during a vendor review meeting.
 
 ### What you get
 
 After the script finishes, navigate to `~/filecap-audits/<server-ip>/latest/report/`. You'll find:
 
-- **`audit-file-list.csv`** — The main deliverable. One row per file, 32 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
+- **`audit-file-list.csv`** — The main deliverable. One row per file, 58 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
 - **`audit-file-list.html`** — (Only present if you answered `y` to the HTML prompt.) A self-contained web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, and print-to-PDF.
 - **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.
@@ -631,7 +868,7 @@ After the reboot, find "Ubuntu" in your Start menu and open it. The first time y
 Then, inside the Ubuntu terminal, install Node.js and run the audit:
 
 ```bash
-# Install Node.js 20 (the audit scripts require Node 18 or newer):
+# Install Node.js 20 (the audit scripts require Node 20 or newer):
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
@@ -728,22 +965,22 @@ And for `audit-fleet.sh`:
 - python3 (default on macOS 12+; default on most Linux distros and WSL2/Ubuntu)
 - ssh (with keys configured for the target server[s])
 - rsync
-- npx (comes with Node.js 18+; install Node from https://nodejs.org)
-- Node.js 18+ locally (the scripts verify this at startup and abort with guidance if the version is too old)
+- npx (comes with Node.js 20+; install Node from https://nodejs.org)
+- Node.js 20+ locally (the scripts verify this at startup and abort with guidance if the version is too old)
 
 The scripts run a tool-presence and Node-version preflight at startup and abort with clear remediation messages if anything is missing.
 
 ### Why local-mode scanning matters
 
-Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The `audit-remote.sh` script sidesteps this by detecting Node 16 and pulling the files down via rsync, then running filecap on the auditor's local machine. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
+Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The `audit-remote.sh` script sidesteps this by detecting Node 16 (or any Node < 20) on the remote and pulling the files down via rsync, then running filecap on the auditor's local machine. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
 
 ## What filecap does not do
 
 - Perform full WCAG conformance auditing (that's [audit.icjia.app](https://audit.icjia.app)'s job, per-file)
 - Remediate, fix, or modify any files
 - Track vendor remediation status (out of scope — NDJSON inventories are themselves the time-series record)
-- Integrate with the Strapi API (deferred to Phase 8)
-- Introspect PPTX (deferred to a future phase; Phase 3 only covers DOCX, XLSX, and legacy stubs)
+- Integrate with the Strapi API (deferred to a future release; the core inventory pipeline is format-agnostic)
+- Introspect PPTX (deferred to a future phase; current introspection covers DOCX, XLSX, and legacy stubs)
 
 ## Troubleshooting
 
@@ -752,6 +989,12 @@ Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 1
 **`introspection` field missing from a PDF / DOCX / XLSX entry.** filecap couldn't parse this file. Likely causes: malformed file, encrypted, exotic variant. The file still appears in the inventory; vendor's deeper tooling (Acrobat Pro, Office, qpdf) will surface the actual issue.
 
 **Scans are slow on large directories.** Hashing dominates wall time. For triage scans, pass `--no-hash`. For Office-heavy stores, increase `--concurrency`. Skip introspection with `--no-introspect` for filesystem-only inventories.
+
+**pdfjs-dist warning chatter on stderr.** pdfjs-dist emits informational warnings for non-fatal conditions (e.g., "TT: undefined function", unsupported PDF features). These are cosmetic noise — the scan continues and the introspection result is valid. Pipe stderr to `/dev/null` or use `--quiet` if you want a clean terminal.
+
+**EOL Ubuntu / Node 16 / glibc-2.27 on the remote server.** The audit scripts handle this automatically: if the remote server has Node < 20 (or no Node at all), the script falls back to rsync-and-scan-locally. No manual intervention needed. If you're running filecap directly on such a server (not via the audit scripts), you'll need to install a compatible Node version — see [Why local-mode scanning matters](#why-local-mode-scanning-matters).
+
+**rsync `--info=progress2` not supported on macOS.** The audit scripts use a macOS-compatible rsync progress flag. If you're running rsync manually and see this error, use `--progress` instead of `--info=progress2`.
 
 ## License
 
