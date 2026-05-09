@@ -136,6 +136,16 @@ export const legacyOfficeIntrospectionSchema = z.object({
   format: z.enum(["doc", "ppt", "xls"]),
 });
 
+const auditBlockSchema = z
+  .object({
+    score: z.number().int().min(0).max(100),
+    grade: z.string().regex(/^[A-F][+-]?$/),
+    reportId: z.string().regex(/^[a-f0-9]{32}$/),
+    reportUrl: z.string().url(),
+    enrichedAt: z.string().datetime(),
+  })
+  .optional();
+
 export const entrySchema = z.object({
   path: z.string(),
   absolutePath: z.string(),
@@ -155,6 +165,7 @@ export const entrySchema = z.object({
       legacyOfficeIntrospectionSchema,
     ])
     .optional(),
+  audit: auditBlockSchema,
 });
 
 export const consolidatedEntrySchema = entrySchema.extend({
@@ -165,6 +176,7 @@ export const consolidatedEntrySchema = entrySchema.extend({
       path: z.string(),
     })
     .nullable(),
+  audit: auditBlockSchema,
 });
 
 export const footerSchema = z.object({
