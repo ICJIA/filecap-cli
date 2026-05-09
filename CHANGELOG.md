@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`filecap_audit_enrich` MCP tool.** Same enrichment workflow available to AI agent clients: accepts `input` (required), `output` (optional, defaults to `input`), `apiBase` (optional, defaults to `https://audit.icjia.app`), and `authToken` (optional, falls back to `FILECAP_AUDIT_TOKEN` env var).
 - **Optional audit-enrich step in `audit-remote.sh` and `audit-fleet.sh`.** After generating the initial report, both scripts now prompt "Enrich inventory with audit.icjia.app scores? [y/N]". If yes, they call `filecap audit-enrich`, then regenerate the report so the CSV/HTML include the audit columns. The prompt can be suppressed by setting `RUN_AUDIT_ENRICH=y` (or `=n`) before running. `audit-fleet.sh` also enriches the consolidated inventory after the per-server audits complete.
 
+### Manager clarity (1.0.7)
+
+- **Summary, CSV, and HTML now lead with the audit-relevant count, not the total file count.** Managers reading "Total files: 102" were assuming that was the audit workload — but only 69 of those 102 are remediable (PDFs + Office docs); the other 33 are images / placeholders / text files where alt text lives in the CMS schema, not in the file itself.
+- `audit-summary.txt` and the HTML report both now open with an "AUDIT SCOPE" block (remediable count) and a parallel "OTHER FILES" block (reference count).
+- HTML report has a two-stat box at the top — `Audit work: 69 files need remediation` vs `Reference files: 33 files no direct work needed` — and the chip filter defaults to "Remediable only" on page load.
+- CSV's "Needs remediation" column was renamed to "Remediation needed?" and moved to column 5 (was column 12). Cell values now read "Yes — needs accessibility work" / "No — reference file (image, placeholder, etc.)" so a non-technical reader sees the meaning, not jargon.
+- `MANAGER_SUMMARY.txt` (fleet runs) follows the same AUDIT SCOPE / OTHER FILES structure.
+
 [1.0.7]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.7
 
 ## [1.0.6] — 2026-05-09

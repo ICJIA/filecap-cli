@@ -786,6 +786,15 @@ After the script finishes, navigate to `~/filecap-audits/<server-ip>/latest/repo
 
 The run directory also contains `inventory.ndjson` (the raw scan data used to generate the report) and `SOURCE_INFO.txt` (a provenance record: which server was scanned, when, and how to SSH in and locate a specific file).
 
+### Why two file counts?
+
+The deliverable shows **two** numbers, deliberately:
+
+- **Audit work** (e.g., 69) — files that need actual accessibility remediation: PDFs, Word docs, Excel sheets, PowerPoint, legacy Office files. These are what your remediation vendor will quote against.
+- **Reference files** (e.g., 33) — files that are inventoried but don't need direct work: images (their alt text lives in your CMS schema, not in the JPEG), text files (`.txt`, `.md`), `.gitkeep` placeholders, etc. They're listed for completeness so the inventory is comprehensive, but no remediator will touch them.
+
+The HTML report opens filtered to "Remediable only" by default. Click the "All" chip to see everything; click a category chip to drill into a specific type.
+
 ### How to use it (multiple servers / fleet mode)
 
 If you're responsible for more than one server, the fleet script runs the single-server audit on each one and then produces a combined report across all of them.
