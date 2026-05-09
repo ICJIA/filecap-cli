@@ -692,6 +692,19 @@ for e in entries:
     cat_counts[cat] = cat_counts.get(cat, 0) + 1
     cat_bytes[cat]  = cat_bytes.get(cat, 0) + e.get('sizeBytes', 0)
 
+# ── AUDIT SCOPE breakdown ─────────────────────────────────────────────────────
+REMEDIABLE_CATS = {'pdf', 'office-document', 'spreadsheet', 'presentation', 'legacy-office'}
+scope_pdf          = cat_counts.get('pdf', 0)
+scope_office       = cat_counts.get('office-document', 0)
+scope_spreadsheet  = cat_counts.get('spreadsheet', 0)
+scope_presentation = cat_counts.get('presentation', 0)
+scope_legacy       = cat_counts.get('legacy-office', 0)
+scope_remediable   = scope_pdf + scope_office + scope_spreadsheet + scope_presentation + scope_legacy
+scope_image        = cat_counts.get('image', 0)
+scope_text         = cat_counts.get('text', 0) + cat_counts.get('web', 0)
+scope_non_rem      = total_files - scope_remediable
+scope_other        = scope_non_rem - scope_image - scope_text
+
 # ── per-server counts ─────────────────────────────────────────────────────────
 srv_counts = {}
 for s in sources_list:
@@ -786,6 +799,44 @@ lines.append("")
 audit_run = header.get('metadata', {}).get('consolidatedAt', fleet_ts + 'Z')
 lines.append(f"Audit date:       {audit_run[:10]}")
 lines.append(f"Servers audited:  {success_count} of {total_count}")
+lines.append("")
+
+# ── AUDIT SCOPE / OTHER FILES block (mirrors audit-summary.txt) ───────────────
+W = 66
+DLINE = "═" * W
+SLINE = "─" * W
+DCOUNT_LABEL = "  AUDIT SCOPE — files needing accessibility remediation:"
+OCOUNT_LABEL = "  OTHER FILES (no direct remediation in the file itself):"
+
+lines.append(DLINE)
+lines.append(DCOUNT_LABEL.ljust(W - len(str(scope_remediable)) - 1) + str(scope_remediable))
+lines.append(DLINE)
+lines.append("")
+lines.append(f"  {'PDFs':<32}{str(scope_pdf).rjust(5)}    (need structural tagging,")
+lines.append(f"  {''.ljust(37)}alt text on images, heading")
+lines.append(f"  {''.ljust(37)}structure, etc.)")
+lines.append(f"  {'Word documents (.docx)':<32}{str(scope_office).rjust(5)}    (need heading styles, table")
+lines.append(f"  {''.ljust(37)}header rows, alt text, etc.)")
+lines.append(f"  {'Excel files (.xlsx)':<32}{str(scope_spreadsheet).rjust(5)}")
+lines.append(f"  {'PowerPoint (.pptx)':<32}{str(scope_presentation).rjust(5)}")
+lines.append(f"  {'Legacy Office (.doc/.xls)':<32}{str(scope_legacy).rjust(5)}    (need conversion + remediation)")
+lines.append(f"  {''.ljust(32)}{'────'}")
+lines.append(f"  {'Total needing work:':<32}{str(scope_remediable).rjust(5)}    ← THIS IS THE AUDIT WORKLOAD")
+lines.append("")
+lines.append(SLINE)
+lines.append(OCOUNT_LABEL.ljust(W - len(str(scope_non_rem)) - 1) + str(scope_non_rem))
+lines.append(SLINE)
+lines.append("")
+lines.append(f"  {'Images (.jpg, .png, .gif,':<32}{str(scope_image).rjust(5)}    (alt text lives in the CMS")
+lines.append(f"  {'         .webp, .svg)':<37}schema, not in the image file)")
+lines.append(f"  {'Text files (.txt, .md)':<32}{str(scope_text).rjust(5)}")
+lines.append(f"  {'Other / placeholders':<32}{str(scope_other).rjust(5)}    (e.g., .gitkeep — empty Git")
+lines.append(f"  {''.ljust(37)}placeholder, can be ignored)")
+lines.append(f"  {''.ljust(32)}{'────'}")
+lines.append(f"  {'Total non-remediation:':<32}{str(scope_non_rem).rjust(5)}")
+lines.append("")
+lines.append(f"  Total files inventoried:   {total_files}    ({scope_remediable} + {scope_non_rem})")
+lines.append(f"  Total bytes:                {humanize_bytes(total_bytes)}")
 lines.append("")
 
 # The numbers
