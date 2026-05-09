@@ -456,7 +456,7 @@ Or non-interactive:
 The script auto-detects Node version on the remote: if Node ≥20, it scans natively over SSH (CPU work happens on the remote). If Node <20 (common on older Ubuntu Strapi servers), it falls back to rsync-down-and-scan-locally — the resulting CSV still carries the *remote* server's IP and path so vendors can ssh in and locate any flagged file.
 
 **Inputs the script asks for** (interactive mode):
-- SSH username on the target server (e.g., `forge`, `deploy`, `ubuntu`)
+- SSH username on the target server — defaults to `forge`; override with the `FILECAP_DEFAULT_SSH_USER` environment variable or by typing a different name at the prompt
 - Server IP or hostname
 - Full path to the uploads directory on the remote
 - Friendly server name (used in report headers; defaults to `strapi-<IP>` if blank)
