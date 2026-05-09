@@ -302,4 +302,23 @@ describe("writeHtml", () => {
     expect(html).toMatch(/PDF[^(]*\(3\)/i);
     expect(html).toMatch(/Image[^(]*\(2\)/i);
   });
+
+  it("embeds entry data via <script type=application/json> so values containing single quotes do not break the IIFE", async () => {
+    const out = path.join(tmpDir, "files.html");
+    const trickyEntries = [
+      {
+        ...sampleEntries[0],
+        introspection: {
+          ...sampleEntries[0].introspection,
+          modificationDate: "D:20250207081607-08'00'",
+          producer: "Adobe Acrobat 'Pro' 21.0",
+        },
+      },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries: trickyEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/<script[^>]*type="application\/json"[^>]*id="filecap-data"/i);
+    expect(html).toMatch(/document\.getElementById\("filecap-data"\)\.textContent/);
+    expect(html).not.toMatch(/JSON\.parse\('[^]*?-08'00'/);
+  });
 });

@@ -313,7 +313,10 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
   const titleSuffix = siteName !== "" ? siteName : serverName;
 
   // ── embed data as JSON for client-side search/sort ────────────────────────────
-  // Safe JSON embedding: prevent </script> from ending the script block early
+  // The JSON sits in a separate <script type="application/json"> block, so we
+  // never need to worry about JS string-literal escaping (single quotes from PDF
+  // date metadata like 'D:20250207-08'00'' previously broke the IIFE silently).
+  // We still escape </script> sequences to prevent premature script-tag termination.
   const jsonData = JSON.stringify(
     entries.map((entry) => buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }))
   ).replace(/<\/script/gi, "<\\/script");
@@ -604,12 +607,13 @@ ${rowsHtml}
   &mdash; <a href="https://github.com/ICJIA/filecap-cli" target="_blank" rel="noopener noreferrer">filecap on GitHub</a>
 </footer>
 
+<script type="application/json" id="filecap-data">${jsonData}</script>
 <script>
 (function () {
   "use strict";
 
   // ── embedded data (column-parallel to CSV_COLUMNS) ─────────────────────────
-  const data = JSON.parse('${jsonData}');
+  const data = JSON.parse(document.getElementById("filecap-data").textContent);
 
   const tbody = document.getElementById("inventory-body");
   const searchInput = document.getElementById("search");
