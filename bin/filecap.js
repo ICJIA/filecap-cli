@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { runScan } from "../src/commands/scan.js";
 import { runRollup } from "../src/commands/rollup.js";
 import { runReport } from "../src/commands/report.js";
+import { runMcp } from "../src/commands/mcp.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
 
@@ -108,6 +109,18 @@ program
       process.exit(result.exitCode);
     } catch (err) {
       process.stderr.write(`filecap: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("mcp")
+  .description("Run filecap as an stdio MCP server (for use with Claude Desktop, Claude Code, etc.)")
+  .action(async () => {
+    try {
+      await runMcp();
+    } catch (err) {
+      process.stderr.write(`filecap mcp error: ${err.message}\n`);
       process.exit(1);
     }
   });
