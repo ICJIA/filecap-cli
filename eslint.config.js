@@ -12,6 +12,8 @@ export default [
         setImmediate: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
+        fetch: "readonly",
+        globalThis: "readonly",
       },
     },
     rules: {
