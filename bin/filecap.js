@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { runScan } from "../src/commands/scan.js";
 import { runRollup } from "../src/commands/rollup.js";
+import { runReport } from "../src/commands/report.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
 
@@ -97,11 +98,18 @@ program
   });
 
 program
-  .command("report")
-  .description("(Phase 6 — not yet implemented in v0.1.0)")
-  .action(() => {
-    process.stderr.write("filecap report is not implemented in v0.1.0 (Phase 6).\n");
-    process.exit(1);
+  .command("report <inventory>")
+  .description("Generate vendor handoff package (CSV + summary + flagged lists) from an inventory NDJSON")
+  .option("-o, --output <dir>", "output directory", `./filecap-report-${Date.now()}/`)
+  .action(async (inventory, opts) => {
+    try {
+      const result = await runReport({ input: inventory, outputDir: opts.output });
+      if (result.error) process.stderr.write(`${result.error}\n`);
+      process.exit(result.exitCode);
+    } catch (err) {
+      process.stderr.write(`filecap: ${err.message}\n`);
+      process.exit(1);
+    }
   });
 
 program.parseAsync(process.argv).catch((err) => {
