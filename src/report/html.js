@@ -318,6 +318,29 @@ p { margin: 0 0 0.5rem; }
   border: 1px solid #dee2e6;
   border-radius: 4px;
   max-height: 70vh;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── scrollable container (alias for table-wrap) ───────────── */
+.table-scroll {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── sticky first column ───────────────────────────────────── */
+.table-wrap th:first-child,
+.table-wrap td:first-child {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 1;
+  border-right: 1px solid #dee2e6;
+}
+
+.table-wrap thead th:first-child {
+  background: #f8f9fa;
+  z-index: 2;
 }
 
 /* ── data table ────────────────────────────────────────────── */
@@ -437,7 +460,7 @@ ${categoryRows}
   <span id="row-count"></span>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap table-scroll">
   <table id="inventory-table" aria-label="File inventory">
     <thead><tr>${headerCells}</tr></thead>
     <tbody id="inventory-body">

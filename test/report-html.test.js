@@ -205,6 +205,14 @@ describe("writeHtml", () => {
     expect(html).not.toMatch(/href="https:\/\/cdn\.example\.com/);
   });
 
+  it("wraps the table in a scrollable container with overflow-x: auto", async () => {
+    const out = path.join(tmpDir, "scroll.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/<div[^>]*class=["'][^"']*table-scroll[^"']*["']/i);
+    expect(html).toMatch(/overflow-x:\s*auto/);
+  });
+
   it("shows Website in the summary meta-grid when siteName is set", async () => {
     const headerWithSite = {
       ...sampleHeader,
