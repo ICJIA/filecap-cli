@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] — 2026-05-09
+
+### Added
+
+- **Domain preflight verification for `--public-url-base`.** The audit scripts now HEAD-check the public URL prefix before running the scan. If unreachable (typo, network restrictions, or site down), a yellow warning prompts the auditor to confirm whether to proceed. Same check applied per-server in `audit-fleet.sh`'s pre-validation pass.
+- **Category filter chips in HTML report.** New chip row at the top of the report (`[All]`, `[PDFs]`, `[Office docs]`, `[Images]`, etc.) with counts. Clicking a chip filters the table to that category. Combines with the existing search input. Print stylesheet hides the chips on paper output.
+- **Optional `--audit-link-pattern` flag.** Accepts a URL template with placeholders (`{publicUrl}`, `{sha256}`, `{filename}`, `{path}`, `{serverIp}`, `{siteName}`) — rendered as a clickable "View audit →" column in the HTML report. Lets auditors jump from a row in the filecap inventory to the corresponding page on an external audit service (audit.icjia.app or otherwise). The audit scripts prompt for it interactively, accept it as a 7th positional arg, and `audit-fleet.sh` CSV format gains an optional 7th column. See [filecap issue #100](https://github.com/ICJIA/filecap-cli/issues) and the related issue at https://github.com/ICJIA/file-accessibility-audit/issues/9 for the broader integration plan.
+
+[1.0.5]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.5
+
 ## [1.0.4] — 2026-05-09
 
 ### Fixed
