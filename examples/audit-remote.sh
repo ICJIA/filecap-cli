@@ -1,19 +1,63 @@
 #!/usr/bin/env bash
-# audit-remote.sh — audit a single remote Strapi server.
+# ============================================================================
+#  filecap audit — single-server accessibility-inventory script
+# ============================================================================
 #
-# Auto-detects the remote Node version and chooses the right strategy:
-#   - Node >= 20 on remote: run filecap natively over SSH (CPU on remote)
-#   - Node < 20 or missing: rsync uploads down, scan locally on the Mac
+#  WHAT THIS DOES
+#    Inventories the document files on a remote server relevant to an
+#    accessibility audit: PDFs, Word/Excel/PowerPoint, images, and more.
+#    Produces a vendor-ready CSV with one row per file plus per-file metadata
+#    (page counts, has-text-layer, alt-text presence, etc.) so remediation
+#    vendors know exactly what they are working with.
 #
-# Paths in the output NDJSON / CSV are always rewritten to the source server's
-# paths so the auditor-facing artefacts don't leak local Mac paths.
+#  HOW TO GET THIS SCRIPT
+#    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+#    chmod +x audit-remote.sh
+#    ./audit-remote.sh
 #
-# Usage:
-#   ./audit-remote.sh                                         # interactive
-#   ./audit-remote.sh USER HOST REMOTE_PATH [SERVER_NAME]
-#   ./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-prod
+#    (For fleet audits across multiple servers, use audit-fleet.sh instead.)
+#
+#  REQUIREMENTS
+#    - bash 3.2+  (ships with macOS; standard on Linux)
+#    - python3    (ships with macOS 12+; install via package manager on Linux)
+#    - ssh        (with keys configured for the target server)
+#    - rsync      (ships with macOS; install via package manager on Linux)
+#    - npx        (comes with Node.js 18+; install Node from https://nodejs.org)
+#
+#  WHAT YOU WILL BE ASKED
+#    - SSH username on the target server (e.g. forge, deploy, ubuntu)
+#    - Server IP or hostname
+#    - Full path to the uploads directory on the remote
+#    - A friendly name for the server (used in the report header)
+#
+#  WHERE OUTPUT GOES
+#    ~/filecap-audits/<server-ip>/
+#      ├── SOURCE_INFO.txt    (provenance: who, what, when)
+#      ├── inventory.ndjson   (raw scan output)
+#      └── report/
+#          ├── files.csv      (32-column vendor work-order)
+#          ├── SUMMARY.txt    (counts by category)
+#          └── ...
+#
+#  USAGE
+#    ./audit-remote.sh                                         # interactive
+#    ./audit-remote.sh USER HOST REMOTE_PATH [SERVER_NAME]
+#    ./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-prod
+#
+# ============================================================================
 
 set -euo pipefail
+
+# ── portable open helper ──────────────────────────────────────────────────────
+xopen() {
+  if command -v open >/dev/null 2>&1; then
+    open "$1"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$1"
+  else
+    echo "  (your OS does not have 'open' or 'xdg-open'; navigate manually to the file above)"
+  fi
+}
 
 # ── colour codes ──────────────────────────────────────────────────────────────
 G='\033[0;32m'   # green
@@ -28,16 +72,35 @@ step() { printf "${G}==>${N} %s\n" "$*"; }
 info() { printf "${B}  ->${N} %s\n" "$*"; }
 warn() { printf "${Y}WARN:${N} %s\n" "$*" >&2; }
 
-# ── preflight: local tooling ──────────────────────────────────────────────────
-if ! command -v npx &>/dev/null; then
-  die "npx is not in PATH. Install Node.js 20+ on this Mac (https://nodejs.org/) and re-run."
-fi
-if ! command -v python3 &>/dev/null; then
-  die "python3 is not in PATH — it is required for JSON path rewriting."
-fi
-if ! command -v rsync &>/dev/null; then
-  die "rsync is not in PATH."
-fi
+# ── preflight: verify all required tools are present ─────────────────────────
+check_required_tools() {
+  local missing=()
+  for tool in bash python3 ssh rsync npx; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      missing+=("$tool")
+    fi
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo
+    echo "ERROR: missing required tools: ${missing[*]}" >&2
+    echo
+    echo "Install instructions:" >&2
+    for tool in "${missing[@]}"; do
+      case "$tool" in
+        bash|python3|ssh|rsync)
+          echo "  - $tool: install via your OS package manager (apt, brew, dnf, etc.)" >&2
+          ;;
+        npx)
+          echo "  - npx: install Node.js 18+ from https://nodejs.org (npx ships with Node)" >&2
+          ;;
+      esac
+    done
+    echo
+    exit 1
+  fi
+}
+
+check_required_tools
 
 # ── parse / prompt for arguments ─────────────────────────────────────────────
 USER_ARG="${1:-}"
@@ -46,18 +109,18 @@ REMOTE_PATH_ARG="${3:-}"
 SERVER_NAME_ARG="${4:-}"
 
 if [[ -z "$USER_ARG" ]]; then
-  read -r -p "SSH user (e.g. forge): " USER_ARG
+  read -r -p "SSH username on the target server (e.g. forge, deploy, ubuntu): " USER_ARG
 fi
 if [[ -z "$HOST_ARG" ]]; then
-  read -r -p "Remote host / IP (e.g. 192.241.146.85): " HOST_ARG
+  read -r -p "Server IP or hostname (e.g. 192.241.146.85): " HOST_ARG
 fi
 if [[ -z "$REMOTE_PATH_ARG" ]]; then
-  read -r -p "Remote uploads path (e.g. ~/uploads or /var/strapi/uploads): " REMOTE_PATH_ARG
+  read -r -p "Full path to uploads directory on the remote (e.g. ~/uploads): " REMOTE_PATH_ARG
 fi
 if [[ -z "$SERVER_NAME_ARG" ]]; then
   # Default: strapi-<ip-with-dashes>
   DEFAULT_NAME="strapi-${HOST_ARG//./-}"
-  read -r -p "Server name [${DEFAULT_NAME}]: " SERVER_NAME_ARG
+  read -r -p "Friendly server name [${DEFAULT_NAME}]: " SERVER_NAME_ARG
   SERVER_NAME_ARG="${SERVER_NAME_ARG:-$DEFAULT_NAME}"
 fi
 
@@ -140,7 +203,7 @@ if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
   fi
 
 else
-  # ─ local mode: rsync mirror, then scan on the Mac ───────────────────────────
+  # ─ local mode: rsync mirror, then scan locally ───────────────────────────────
   step "Mode: LOCAL (remote Node ${REMOTE_NODE} < 20 or absent — will rsync and scan locally)"
   info "This is expected for Ubuntu 18.04 / Node 16 servers."
   info "Step 1/2: rsyncing ${SSH_USER}@${HOST}:${REMOTE_PATH}/ → ${MIRROR_DIR}/"
@@ -163,8 +226,8 @@ fi
 
 # ── path rewrite (CRITICAL) ───────────────────────────────────────────────────
 # Rewrite scannedPath / hostname in the header and absolutePath in entries so
-# that the output always reflects the *source server's* paths, not the local
-# Mac mirror paths.
+# that the output always reflects the *source server's* paths, not any local
+# mirror paths.
 step "Rewriting inventory paths to remote source paths ..."
 
 python3 - "${INVENTORY}" "${REMOTE_PATH}" "${HOST}" <<'PYREWRITE'
@@ -221,7 +284,7 @@ if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" \
 fi
 
 # ── summary ───────────────────────────────────────────────────────────────────
-printf "\n${G}✓ Audit complete${N} — ${SERVER_NAME} (${HOST})\n\n"
+printf "\n${G}Audit complete${N} — ${SERVER_NAME} (${HOST})\n\n"
 
 if [[ -f "${REPORT_DIR}/SUMMARY.txt" ]]; then
   cat "${REPORT_DIR}/SUMMARY.txt"
@@ -233,4 +296,6 @@ printf "  Inventory   : %s\n" "${INVENTORY}"
 printf "  CSV report  : %s\n" "${REPORT_DIR}/files.csv"
 printf "  Full report : %s\n" "${REPORT_DIR}/"
 
-printf "\n${Y}Hint:${N} open '%s'\n" "${REPORT_DIR}/files.csv"
+printf "\n${Y}Hint:${N} open the CSV report at:\n"
+printf "  %s\n" "${REPORT_DIR}/files.csv"
+xopen "${REPORT_DIR}/files.csv"

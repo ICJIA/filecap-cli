@@ -1,17 +1,68 @@
 #!/usr/bin/env bash
-# audit-fleet.sh — run audit-remote.sh across a fleet of Strapi servers and
-# produce a consolidated report + manager-friendly summary.
+# ============================================================================
+#  filecap audit — fleet accessibility-inventory script
+# ============================================================================
 #
-# Usage:
-#   ./audit-fleet.sh                  # interactive: prompts for each server
-#   ./audit-fleet.sh servers.csv      # batch mode from CSV file
+#  WHAT THIS DOES
+#    Runs audit-remote.sh across a fleet of servers and then consolidates
+#    all per-server inventories into a single vendor-ready CSV plus a
+#    manager-friendly MANAGER_SUMMARY.txt that rolls up counts by server
+#    and by file category. Useful when your organization hosts content on
+#    multiple servers and you need one combined work-order for remediation.
 #
-# CSV format (no header row; lines starting with # are comments):
-#   server_name,user,host,remote_path
-#   dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads
-#   another-server,deploy,10.0.0.5,/var/strapi/uploads
+#  HOW TO GET BOTH SCRIPTS
+#    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
+#    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+#    chmod +x audit-fleet.sh audit-remote.sh
+#    ./audit-fleet.sh                  # interactive
+#    ./audit-fleet.sh servers.csv      # batch mode from CSV file
+#
+#  REQUIREMENTS
+#    - bash 3.2+  (ships with macOS; standard on Linux)
+#    - python3    (ships with macOS 12+; install via package manager on Linux)
+#    - ssh        (with keys configured for each target server)
+#    - rsync      (ships with macOS; install via package manager on Linux)
+#    - npx        (comes with Node.js 18+; install Node from https://nodejs.org)
+#    - audit-remote.sh must be in the same directory as this script
+#
+#  WHAT YOU WILL BE ASKED (interactive mode)
+#    - How many servers to audit
+#    - For each server: friendly name, SSH user, host/IP, remote uploads path
+#
+#  CSV INPUT FORMAT (batch mode)
+#    No header row; lines starting with # are comments:
+#      server_name,user,host,remote_path
+#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads
+#      another-server,deploy,10.0.0.5,/var/strapi/uploads
+#
+#  WHERE OUTPUT GOES
+#    ~/filecap-audits/_fleet/<timestamp>/
+#      ├── servers.txt              (manifest of servers audited)
+#      ├── MANAGER_SUMMARY.txt      (rollup counts by server and category)
+#      ├── consolidated.ndjson      (merged raw scan output)
+#      ├── consolidated-report/
+#      │   ├── files.csv            (32-column vendor work-order, all servers)
+#      │   └── SUMMARY.txt
+#      └── inventories/
+#          └── <server-name>.ndjson (per-server scan output)
+#
+#    Per-server reports also remain at:
+#      ~/filecap-audits/<server-ip>/report/
+#
+# ============================================================================
 
 set -euo pipefail
+
+# ── portable open helper ──────────────────────────────────────────────────────
+xopen() {
+  if command -v open >/dev/null 2>&1; then
+    open "$1"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$1"
+  else
+    echo "  (your OS does not have 'open' or 'xdg-open'; navigate manually to the file above)"
+  fi
+}
 
 # ── colour codes ──────────────────────────────────────────────────────────────
 G='\033[0;32m'
@@ -26,20 +77,45 @@ step() { printf "${G}==>${N} %s\n" "$*"; }
 info() { printf "${B}  ->${N} %s\n" "$*"; }
 warn() { printf "${Y}WARN:${N} %s\n" "$*" >&2; }
 
+# ── preflight: verify all required tools are present ─────────────────────────
+check_required_tools() {
+  local missing=()
+  for tool in bash python3 ssh rsync npx; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      missing+=("$tool")
+    fi
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo
+    echo "ERROR: missing required tools: ${missing[*]}" >&2
+    echo
+    echo "Install instructions:" >&2
+    for tool in "${missing[@]}"; do
+      case "$tool" in
+        bash|python3|ssh|rsync)
+          echo "  - $tool: install via your OS package manager (apt, brew, dnf, etc.)" >&2
+          ;;
+        npx)
+          echo "  - npx: install Node.js 18+ from https://nodejs.org (npx ships with Node)" >&2
+          ;;
+      esac
+    done
+    echo
+    exit 1
+  fi
+}
+
+check_required_tools
+
 # ── locate sibling audit-remote.sh ───────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUDIT_REMOTE="${SCRIPT_DIR}/audit-remote.sh"
 
 if [[ ! -x "$AUDIT_REMOTE" ]]; then
-  die "audit-remote.sh not found or not executable at: ${AUDIT_REMOTE}"
-fi
-
-# ── preflight ─────────────────────────────────────────────────────────────────
-if ! command -v npx &>/dev/null; then
-  die "npx is not in PATH. Install Node.js 20+ on this Mac (https://nodejs.org/) and re-run."
-fi
-if ! command -v python3 &>/dev/null; then
-  die "python3 is not in PATH — it is required for MANAGER_SUMMARY.txt generation."
+  die "audit-remote.sh not found or not executable at: ${AUDIT_REMOTE}
+  Download it alongside this script:
+    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+    chmod +x audit-remote.sh"
 fi
 
 # ── fleet / timestamp setup ───────────────────────────────────────────────────
@@ -76,7 +152,7 @@ if [[ -n "$CSV_FILE" ]]; then
     _name="${_name// /}"
     _user="${_user// /}"
     _host="${_host// /}"
-    # path may contain spaces but typically doesn't; trim leading/trailing only
+    # path may contain spaces but typically does not; trim leading/trailing only
     _path="$(echo "${_path}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$_name" || -z "$_user" || -z "$_host" || -z "$_path" ]]; then
@@ -106,9 +182,9 @@ else
   for (( i=1; i<=NUM_SERVERS; i++ )); do
     printf "\n${B}Server %d of %d:${N}\n" "$i" "$NUM_SERVERS"
     read -r -p "  Server name (e.g. dvfr-prod): " _name
-    read -r -p "  SSH user   (e.g. forge):      " _user
-    read -r -p "  Host / IP  (e.g. 192.168.1.1):  " _host
-    read -r -p "  Remote path (e.g. ~/uploads):  " _path
+    read -r -p "  SSH username on the target server (e.g. forge, deploy, ubuntu): " _user
+    read -r -p "  Server IP or hostname (e.g. 192.168.1.1): " _host
+    read -r -p "  Full path to uploads directory on the remote (e.g. ~/uploads): " _path
 
     SRV_NAMES+=("$_name")
     SRV_USERS+=("$_user")
@@ -400,7 +476,7 @@ print(f"  -> wrote {len(lines)} lines to manager summary")
 PYMANAGER
 
 # ── final output ──────────────────────────────────────────────────────────────
-printf "\n${G}✓ Fleet audit complete${N}\n\n"
+printf "\n${G}Fleet audit complete${N}\n\n"
 printf "${G}Files generated:${N}\n"
 printf "  Server manifest  : %s\n" "${SERVERS_TXT}"
 printf "  Fleet inventories: %s\n" "${INVENTORIES_DIR}/"
@@ -412,4 +488,6 @@ if [[ -f "${FAILED_SERVERS_TXT}" ]]; then
   printf "  Failed servers   : %s\n" "${FAILED_SERVERS_TXT}"
 fi
 
-printf "\n${Y}Hint:${N} open '%s'\n" "${MANAGER_SUMMARY}"
+printf "\n${Y}Hint:${N} open the manager summary at:\n"
+printf "  %s\n" "${MANAGER_SUMMARY}"
+xopen "${MANAGER_SUMMARY}"
