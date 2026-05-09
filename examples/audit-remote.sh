@@ -38,12 +38,13 @@
 #
 #  WHERE OUTPUT GOES
 #    ~/filecap-audits/<server-ip>/
-#      ├── SOURCE_INFO.txt    (provenance: who, what, when)
-#      ├── inventory.ndjson   (raw scan output)
+#      ├── SOURCE_INFO.txt         (provenance: who, what, when)
+#      ├── inventory.ndjson        (raw scan output)
 #      └── report/
-#          ├── files.csv      (32-column vendor work-order)
-#          ├── files.html     (only if --html or "yes" answered at the prompt)
-#          ├── SUMMARY.txt    (counts by category)
+#          ├── audit-file-list.csv  (vendor work-order)
+#          ├── audit-file-list.html (only if --html or "yes" answered at the prompt)
+#          ├── audit-summary.txt    (counts by category, manager-friendly)
+#          ├── README.txt           (explains all artifacts)
 #          └── ...
 #
 #  USAGE
@@ -79,6 +80,20 @@ step() { printf "${G}==>${N} %s\n" "$*"; }
 info() { printf "${B}  ->${N} %s\n" "$*"; }
 warn() { printf "${Y}WARN:${N} %s\n" "$*" >&2; }
 
+# ── size_to_bytes: convert du -sh output (e.g., "39M", "2.1G") to bytes ──────
+size_to_bytes() {
+  local s="$1"
+  local num="${s%[KMGT]}"
+  local unit="${s#$num}"
+  case "$unit" in
+    K) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024 }' ;;
+    M) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024*1024 }' ;;
+    G) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024*1024*1024 }' ;;
+    T) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024*1024*1024*1024 }' ;;
+    *) awk -v n="$num" 'BEGIN { printf "%.0f", n }' ;;
+  esac
+}
+
 # ── preflight: verify all required tools are present ─────────────────────────
 check_required_tools() {
   local missing=()
@@ -104,6 +119,21 @@ check_required_tools() {
     done
     echo
     exit 1
+  fi
+
+  NODE_VER_RAW=$(node --version 2>/dev/null | sed 's/^v//')
+  NODE_MAJOR=$(echo "$NODE_VER_RAW" | cut -d. -f1)
+  if [[ -z "$NODE_MAJOR" ]] || ! [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: cannot determine Node version. Install Node 18+ from https://nodejs.org" >&2
+    exit 1
+  fi
+  if [[ "$NODE_MAJOR" -lt 18 ]]; then
+    echo "ERROR: Node $NODE_VER_RAW detected; this script requires Node 18+." >&2
+    echo "       Install a current LTS from https://nodejs.org or via nvm." >&2
+    exit 1
+  fi
+  if [[ "$NODE_MAJOR" -lt 20 ]]; then
+    warn "Node $NODE_VER_RAW detected. Filecap works best on Node 20+; consider upgrading."
   fi
 }
 
@@ -189,7 +219,10 @@ step "Verifying remote path exists: ${REMOTE_PATH}"
 if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -d '${REMOTE_PATH}'" 2>/dev/null; then
   die "Remote path '${REMOTE_PATH}' does not exist or is not a directory on ${HOST}."
 fi
-info "Remote path confirmed"
+if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -r '${REMOTE_PATH}'" 2>/dev/null; then
+  die "Remote path '${REMOTE_PATH}' exists but is not readable by user '${SSH_USER}'."
+fi
+info "Remote path confirmed and readable"
 
 # ── remote size / file count ──────────────────────────────────────────────────
 step "Checking remote upload size ..."
@@ -198,6 +231,20 @@ REMOTE_SIZE=$(ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" \
 REMOTE_COUNT=$(ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" \
   "LC_ALL=C find '${REMOTE_PATH}' -type f 2>/dev/null | wc -l | tr -d ' \t'" 2>/dev/null || echo "?")
 info "Remote: ${REMOTE_COUNT} files, ${REMOTE_SIZE} total on disk"
+
+# ── local disk-space check ────────────────────────────────────────────────────
+if [[ "$REMOTE_SIZE" != "unknown" ]]; then
+  REMOTE_BYTES=$(size_to_bytes "$REMOTE_SIZE")
+  FREE_BYTES=$(df -Pk "${HOME}" | awk 'NR==2 { print $4 * 1024 }')
+  if [[ "$REMOTE_BYTES" -gt "$FREE_BYTES" ]]; then
+    die "Remote source size ($REMOTE_SIZE) exceeds local free disk. Aborting."
+  fi
+  if [[ "$REMOTE_BYTES" -gt $((FREE_BYTES * 9 / 10)) ]]; then
+    warn "Remote source size ($REMOTE_SIZE) is more than 90% of local free disk."
+    read -r -p "Proceed anyway? [y/N]: " ans
+    [[ "$ans" =~ ^[Yy]$ ]] || die "Aborted by user."
+  fi
+fi
 
 # ── detect remote Node version ────────────────────────────────────────────────
 step "Detecting Node.js version on remote ..."
@@ -308,24 +355,24 @@ fi
 # ── summary ───────────────────────────────────────────────────────────────────
 printf "\n${G}Audit complete${N} — ${SERVER_NAME} (${HOST})\n\n"
 
-if [[ -f "${REPORT_DIR}/SUMMARY.txt" ]]; then
-  cat "${REPORT_DIR}/SUMMARY.txt"
+if [[ -f "${REPORT_DIR}/audit-summary.txt" ]]; then
+  cat "${REPORT_DIR}/audit-summary.txt"
 fi
 
 printf "\n${G}Files generated:${N}\n"
 printf "  Source info : %s\n" "${WORK_DIR}/SOURCE_INFO.txt"
 printf "  Inventory   : %s\n" "${INVENTORY}"
-printf "  CSV report  : %s\n" "${REPORT_DIR}/files.csv"
+printf "  CSV report  : %s\n" "${REPORT_DIR}/audit-file-list.csv"
 if [[ -n "$HTML_FLAG" ]]; then
-  printf "  HTML report : %s\n" "${REPORT_DIR}/files.html"
+  printf "  HTML report : %s\n" "${REPORT_DIR}/audit-file-list.html"
 fi
 printf "  Full report : %s\n" "${REPORT_DIR}/"
 
 printf "\n${Y}Hint:${N} open the CSV report at:\n"
-printf "  %s\n" "${REPORT_DIR}/files.csv"
-xopen "${REPORT_DIR}/files.csv"
+printf "  %s\n" "${REPORT_DIR}/audit-file-list.csv"
+xopen "${REPORT_DIR}/audit-file-list.csv"
 if [[ -n "$HTML_FLAG" ]]; then
   printf "\n${Y}Hint:${N} open the HTML report at:\n"
-  printf "  %s\n" "${REPORT_DIR}/files.html"
-  xopen "${REPORT_DIR}/files.html"
+  printf "  %s\n" "${REPORT_DIR}/audit-file-list.html"
+  xopen "${REPORT_DIR}/audit-file-list.html"
 fi

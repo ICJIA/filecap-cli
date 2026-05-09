@@ -80,6 +80,20 @@ step() { printf "${G}==>${N} %s\n" "$*"; }
 info() { printf "${B}  ->${N} %s\n" "$*"; }
 warn() { printf "${Y}WARN:${N} %s\n" "$*" >&2; }
 
+# ── size_to_bytes: convert du -sh output (e.g., "39M", "2.1G") to bytes ──────
+size_to_bytes() {
+  local s="$1"
+  local num="${s%[KMGT]}"
+  local unit="${s#$num}"
+  case "$unit" in
+    K) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024 }' ;;
+    M) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024*1024 }' ;;
+    G) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024*1024*1024 }' ;;
+    T) awk -v n="$num" 'BEGIN { printf "%.0f", n*1024*1024*1024*1024 }' ;;
+    *) awk -v n="$num" 'BEGIN { printf "%.0f", n }' ;;
+  esac
+}
+
 # ── preflight: verify all required tools are present ─────────────────────────
 check_required_tools() {
   local missing=()
@@ -105,6 +119,21 @@ check_required_tools() {
     done
     echo
     exit 1
+  fi
+
+  NODE_VER_RAW=$(node --version 2>/dev/null | sed 's/^v//')
+  NODE_MAJOR=$(echo "$NODE_VER_RAW" | cut -d. -f1)
+  if [[ -z "$NODE_MAJOR" ]] || ! [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: cannot determine Node version. Install Node 18+ from https://nodejs.org" >&2
+    exit 1
+  fi
+  if [[ "$NODE_MAJOR" -lt 18 ]]; then
+    echo "ERROR: Node $NODE_VER_RAW detected; this script requires Node 18+." >&2
+    echo "       Install a current LTS from https://nodejs.org or via nvm." >&2
+    exit 1
+  fi
+  if [[ "$NODE_MAJOR" -lt 20 ]]; then
+    warn "Node $NODE_VER_RAW detected. Filecap works best on Node 20+; consider upgrading."
   fi
 }
 
@@ -226,12 +255,81 @@ else
   HTML_FLAG=""
 fi
 
+# ── fleet pre-validation ──────────────────────────────────────────────────────
+step "Pre-validating ${#SRV_NAMES[@]} server(s) before starting audit work ..."
+
+declare -a VALID_INDEXES=()
+declare -a SKIPPED_REASONS=()
+TOTAL_REMOTE_BYTES=0
+
+printf "\n  %-22s %-18s %-12s %-10s %-22s\n" "Name" "IP" "Status" "Node" "Source"
+printf "  %-22s %-18s %-12s %-10s %-22s\n" "----" "--" "------" "----" "------"
+
+for i in "${!SRV_NAMES[@]}"; do
+  name="${SRV_NAMES[$i]}"
+  user="${SRV_USERS[$i]}"
+  host="${SRV_HOSTS[$i]}"
+  path_="${SRV_PATHS[$i]}"
+
+  if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "${user}@${host}" true 2>/dev/null; then
+    printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s\n" "$name" "$host" "UNREACHABLE" "-" "-"
+    SKIPPED_REASONS+=("$name: SSH failed")
+    continue
+  fi
+
+  if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d '${path_}' && test -r '${path_}'" 2>/dev/null; then
+    printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s\n" "$name" "$host" "PATH ERROR" "-" "$path_"
+    SKIPPED_REASONS+=("$name: path missing or unreadable")
+    continue
+  fi
+
+  node_ver=$(ssh -o ConnectTimeout=10 "${user}@${host}" 'node --version 2>/dev/null || echo none' 2>/dev/null | tr -d '[:space:]')
+  if [[ -z "$node_ver" || "$node_ver" == "none" ]]; then
+    node_label="none"
+  else
+    node_label="$node_ver"
+  fi
+
+  remote_size=$(ssh -o ConnectTimeout=10 "${user}@${host}" "du -sh '${path_}' 2>/dev/null | cut -f1" 2>/dev/null || echo "?")
+  if [[ "$remote_size" != "?" ]]; then
+    remote_bytes=$(size_to_bytes "$remote_size")
+    TOTAL_REMOTE_BYTES=$((TOTAL_REMOTE_BYTES + remote_bytes))
+  fi
+
+  printf "  %-22s %-18s ${G}%-12s${N} %-10s %-22s\n" "$name" "$host" "OK" "$node_label" "$remote_size"
+  VALID_INDEXES+=("$i")
+done
+
+echo
+
+N_VALID=${#VALID_INDEXES[@]}
+N_TOTAL=${#SRV_NAMES[@]}
+if [[ "$N_VALID" -eq 0 ]]; then
+  die "0 of $N_TOTAL servers are reachable. Cannot continue."
+fi
+
+FREE_BYTES=$(df -Pk "${HOME}" | awk 'NR==2 { print $4 * 1024 }')
+if [[ "$TOTAL_REMOTE_BYTES" -gt "$FREE_BYTES" ]]; then
+  die "Total remote bytes ($(awk -v b="$TOTAL_REMOTE_BYTES" 'BEGIN { printf "%.1f GB", b/1024/1024/1024 }')) exceeds local free disk."
+fi
+
+echo
+if [[ "$N_VALID" -lt "$N_TOTAL" ]]; then
+  warn "$N_VALID of $N_TOTAL servers reachable. Skipping:"
+  for r in "${SKIPPED_REASONS[@]}"; do
+    echo "  - $r" >&2
+  done
+fi
+echo
+read -r -p "Proceed with audit of $N_VALID server(s)? [y/N]: " ans
+[[ "$ans" =~ ^[Yy]$ ]] || die "Aborted by user."
+
 # ── per-server audits ─────────────────────────────────────────────────────────
 FAILED_SERVERS_TXT="${FLEET_DIR}/failed_servers.txt"
 SUCCESS_COUNT=0
 FAIL_COUNT=0
 
-for (( i=0; i<${#SRV_NAMES[@]}; i++ )); do
+for i in "${VALID_INDEXES[@]}"; do
   SRV_NAME="${SRV_NAMES[$i]}"
   SRV_USER="${SRV_USERS[$i]}"
   SRV_HOST="${SRV_HOSTS[$i]}"
