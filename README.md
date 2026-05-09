@@ -840,6 +840,26 @@ Useful for catching SSH key drift, moved-or-renamed remote paths, and unexpected
 
 The preflight is read-only — no rsync, no scan, no audit. It returns to the menu when complete so you can still pick a site to audit (or fix issues first).
 
+### Sharing saved sites — auditor onboarding
+
+When external auditors join a project, you typically want them up and running fast. Two new menu options make this trivial:
+
+- **`x → export all sites to a JSON file`** — writes the current saved sites to a path you choose (default `~/Desktop/icjia-sites.json`). The file contains hostnames, paths, nicknames, public URLs, and audit link templates — but **never the audit token**.
+- **`i → import sites from a JSON file`** — reads a sites JSON file, previews what would be imported, and asks: merge (add new sites by name, skip names that already exist) / replace (wipe current sites + use only the imported ones) / cancel.
+
+The intended workflow:
+
+1. **Admin** configures every site once on their machine (or imports an existing list).
+2. **Admin** picks `x → export`, enters a path, hands the resulting JSON file to each visiting auditor (email, secure file share, USB stick).
+3. **Each auditor** receives the file plus their own SSH access (configured separately by the admin).
+4. **Auditor** runs `./audit-remote.sh` for the first time on their machine. The menu shows just `a / i / s / q` (no saved sites yet).
+5. **Auditor** picks `i → import`, pastes the path to the JSON file. Picks `m` for merge.
+6. Menu now shows the full fleet. Auditor picks a site number and runs an audit. Total onboarding time after SSH setup: ~30 seconds.
+
+The import option is shown in the menu **even when there are no saved sites yet**, so first-time auditors with a fresh machine see it immediately.
+
+If you want to keep multiple unrelated sets of sites (different clients, different fleets), set `FILECAP_SITES_FILE=/path/to/other-sites.json` in your shell to point at a different file. Each `FILECAP_SITES_FILE` value is its own independent saved-sites bundle.
+
 ### Required-input validation and always-HTML
 
 A few smaller UX improvements:

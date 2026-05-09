@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Saved-sites manager.** `audit-remote.sh` now stores per-site configs in `~/.filecap/sites.json` and offers a menu on startup: select a saved site (skipping all per-field prompts), add a new one, edit, delete, or preflight all of them. Each site stores SSH user, host, remote path, friendly name, website nickname, public URL prefix, and audit link template — but never the audit token (that stays in env). File is created with mode 600 inside `~/.filecap/` (mode 700). Override location with `FILECAP_SITES_FILE` env var.
 - **Preflight-all-sites.** New `p` option in the saved-sites menu runs a quick health check on every saved site (SSH connectivity, remote path existence and readability, file count) and prints a status table. Read-only — no rsync, no scan. Catches SSH key drift, moved paths, and unexpectedly empty directories before running a full audit.
+- **Import / export sites as JSON.** Two new menu options: `x` exports the current saved sites to a JSON file (no credentials — just hostnames, paths, nicknames), and `i` imports sites from a JSON file in either merge mode (add new sites by name, skip existing) or replace mode (wipe + use only imported). Designed for the auditor-onboarding workflow: an admin configures all sites once on their machine, exports the JSON, hands it to each visiting auditor; auditors import it on their machines (with their own SSH access already configured) and pick a site from the menu in seconds.
 
 ### Changed
 

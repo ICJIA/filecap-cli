@@ -373,6 +373,112 @@ print(f"Removed site: {nick}")
 PYDEL
 }
 
+# Export saved sites to an external JSON file (no credentials are stored).
+# Useful for handing a pre-configured fleet to other auditors who already have
+# their own SSH access.
+export_sites_to_file() {
+  local out_path="$1"
+  ensure_sites_file
+  python3 - <<'PYEXPORT' "$SITES_FILE" "$out_path"
+import json, sys, os
+src, dst = sys.argv[1], sys.argv[2]
+with open(src) as f:
+    data = json.load(f)
+sites = data.get("sites", [])
+# Strip empty optional fields and any unexpected fields (e.g., never a token)
+allowed = {"name", "siteName", "user", "host", "remotePath", "publicUrlBase", "auditLinkPattern"}
+clean = []
+for s in sites:
+    c = {k: v for k, v in s.items() if k in allowed and v}
+    if c.get("name"):
+        clean.append(c)
+out = {"version": 1, "sites": clean}
+dst = os.path.expanduser(dst)
+with open(dst, "w") as f:
+    json.dump(out, f, indent=2)
+print(f"Wrote {len(clean)} site(s) to {dst}")
+PYEXPORT
+}
+
+# Import sites from an external JSON file. Caller chooses merge or replace.
+# mode = "merge"    → add new sites by name, skip names that already exist
+# mode = "replace"  → wipe current sites and use only the imported ones
+import_sites_from_file() {
+  local in_path="$1"
+  local mode="$2"
+  ensure_sites_file
+  python3 - <<'PYIMPORT' "$SITES_FILE" "$in_path" "$mode"
+import json, sys, os
+dst, src, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+src = os.path.expanduser(src)
+if not os.path.isfile(src):
+    print(f"ERROR: file not found: {src}", file=sys.stderr); sys.exit(1)
+try:
+    with open(src) as f:
+        incoming = json.load(f)
+except json.JSONDecodeError as e:
+    print(f"ERROR: not a valid JSON file: {e}", file=sys.stderr); sys.exit(2)
+if not isinstance(incoming, dict) or "sites" not in incoming:
+    print("ERROR: file does not look like a sites.json (no 'sites' key)", file=sys.stderr); sys.exit(2)
+new_sites = incoming.get("sites", [])
+if not isinstance(new_sites, list):
+    print("ERROR: 'sites' is not a list", file=sys.stderr); sys.exit(2)
+allowed = {"name", "siteName", "user", "host", "remotePath", "publicUrlBase", "auditLinkPattern"}
+cleaned = []
+for s in new_sites:
+    if not isinstance(s, dict): continue
+    c = {k: v for k, v in s.items() if k in allowed and v}
+    if c.get("name"):
+        cleaned.append(c)
+with open(dst) as f:
+    current = json.load(f)
+existing = current.get("sites", [])
+if mode == "replace":
+    final = cleaned
+    added = len(cleaned)
+    skipped = 0
+else:
+    existing_names = {s.get("name") for s in existing}
+    added_list = [s for s in cleaned if s.get("name") not in existing_names]
+    skipped = len(cleaned) - len(added_list)
+    final = existing + added_list
+    added = len(added_list)
+current["sites"] = final
+current["version"] = 1
+with open(dst, "w") as f:
+    json.dump(current, f, indent=2)
+print(f"Imported {added} site(s) ({skipped} skipped because the name already existed) into {dst}")
+PYIMPORT
+}
+
+# Preview an import file without modifying anything. Prints the sites that
+# would be imported so the auditor can confirm before committing.
+preview_import_file() {
+  local in_path="$1"
+  python3 - <<'PYPREVIEW' "$in_path"
+import json, sys, os
+src = os.path.expanduser(sys.argv[1])
+if not os.path.isfile(src):
+    print(f"ERROR: file not found: {src}", file=sys.stderr); sys.exit(1)
+try:
+    with open(src) as f:
+        data = json.load(f)
+except json.JSONDecodeError as e:
+    print(f"ERROR: not a valid JSON file: {e}", file=sys.stderr); sys.exit(2)
+sites = data.get("sites") if isinstance(data, dict) else None
+if not isinstance(sites, list):
+    print("ERROR: file does not contain a 'sites' array", file=sys.stderr); sys.exit(2)
+print(f"Found {len(sites)} site(s) in {src}:")
+for i, s in enumerate(sites, 1):
+    if not isinstance(s, dict): continue
+    nick = s.get("siteName") or "(no nickname)"
+    name = s.get("name") or "(unnamed)"
+    user = s.get("user") or "?"
+    host = s.get("host") or "?"
+    print(f"  {i}. {nick} ({name}) — {user}@{host}")
+PYPREVIEW
+}
+
 # Preflight every saved site. Verifies SSH connectivity, remote path existence
 # and readability, and counts files. Prints a status table; does not modify
 # any state. Useful for catching issues before running a full audit.
@@ -518,7 +624,9 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
       echo "    e  →  edit a saved site"
       echo "    d  →  delete a saved site"
       echo "    p  →  preflight all saved sites (verify SSH + path + file count)"
+      echo "    x  →  export all sites to a JSON file (no credentials)"
     fi
+    echo "    i  →  import sites from a JSON file"
     echo "    s  →  skip (one-off prompts, don't save)"
     echo "    q  →  quit"
     read -r -p "  Select: " menu_choice
@@ -581,6 +689,50 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
           continue
         fi
         preflight_all_sites
+        ;;
+      x|X)
+        if [[ "$saved_count" -eq 0 ]]; then
+          warn "No saved sites to export."
+          continue
+        fi
+        read -r -p "  Export to file path [~/Desktop/icjia-sites.json]: " export_path
+        export_path="${export_path:-${HOME}/Desktop/icjia-sites.json}"
+        if export_sites_to_file "$export_path"; then
+          info "Hand this file to other auditors. It contains hostnames and paths but NO audit token."
+        fi
+        ;;
+      i|I)
+        read -r -p "  Import from file path: " import_path
+        if [[ -z "$import_path" ]]; then
+          warn "No path given."
+          continue
+        fi
+        if ! preview_import_file "$import_path"; then
+          continue
+        fi
+        echo
+        echo "  How to import?"
+        echo "    m  →  merge (add new sites by name; skip names that already exist)"
+        echo "    r  →  replace (wipe current saved sites; use only the imported ones)"
+        echo "    c  →  cancel"
+        read -r -p "  Choice [m]: " import_mode
+        import_mode="${import_mode:-m}"
+        case "$import_mode" in
+          m|M|merge)
+            import_sites_from_file "$import_path" "merge"
+            ;;
+          r|R|replace)
+            read -r -p "  Wipe current sites and replace with imported? [y/N]: " confirm_replace
+            if [[ "$confirm_replace" =~ ^[Yy]$ ]]; then
+              import_sites_from_file "$import_path" "replace"
+            else
+              info "Cancelled."
+            fi
+            ;;
+          c|C|cancel|*)
+            info "Cancelled."
+            ;;
+        esac
         ;;
       s|S)
         info "Skipping saved-sites menu — running with one-off prompts."
