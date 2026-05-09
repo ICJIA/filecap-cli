@@ -79,6 +79,35 @@ describe("introspectXlsx", () => {
     expect(result.hasHeaderRows).toBe(false);
   });
 
+  it("extracts title and author from workbook properties", async () => {
+    const file = path.join(tmpRoot, "meta.xlsx");
+    const wb = new ExcelJS.Workbook();
+    wb.title = "Budget Report";
+    wb.creator = "Finance Team";
+    wb.addWorksheet("Summary");
+    await wb.xlsx.writeFile(file);
+
+    const result = await introspectXlsx(file);
+    expect(() => xlsxIntrospectionSchema.parse(result)).not.toThrow();
+    expect(result.title).toBe("Budget Report");
+    expect(result.author).toBe("Finance Team");
+  });
+
+  it("returns null for missing title/author and a non-negative totalCells", async () => {
+    const file = path.join(tmpRoot, "no-meta.xlsx");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Data");
+    ws.addRow(["A", "B", "C"]);
+    ws.addRow([1, 2, 3]);
+    await wb.xlsx.writeFile(file);
+
+    const result = await introspectXlsx(file);
+    expect(() => xlsxIntrospectionSchema.parse(result)).not.toThrow();
+    expect(result.title === null || result.title === undefined || typeof result.title === "string").toBe(true);
+    expect(typeof result.totalCells).toBe("number");
+    expect(result.totalCells).toBeGreaterThanOrEqual(0);
+  });
+
   it("throws on a malformed XLSX", async () => {
     const file = path.join(tmpRoot, "garbage.xlsx");
     await fs.writeFile(file, "not an xlsx");

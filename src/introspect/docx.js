@@ -1,5 +1,13 @@
 import fs from "node:fs/promises";
 
+function sanitizeDocxString(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v)
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .trim();
+  return s.length > 0 ? s : null;
+}
+
 const VAGUE_LINK_PATTERNS = [
   /^click here$/i,
   /^click$/i,
@@ -157,6 +165,57 @@ export async function introspectDocx(filePath) {
     }
   }
 
+  // Core properties (docProps/core.xml): title, author, lastModifiedBy
+  let title = null;
+  let author = null;
+  let lastModifiedBy = null;
+  try {
+    const coreXml = zip.file("docProps/core.xml");
+    if (coreXml) {
+      const coreText = await coreXml.async("string");
+      const coreTree = parser.parse(coreText);
+      const titleVal = collectByTag(coreTree, "dc:title")[0];
+      const authorVal = collectByTag(coreTree, "dc:creator")[0];
+      const lmbVal = collectByTag(coreTree, "cp:lastModifiedBy")[0];
+      title = sanitizeDocxString(titleVal);
+      author = sanitizeDocxString(authorVal);
+      lastModifiedBy = sanitizeDocxString(lmbVal);
+    }
+  } catch {
+    // core.xml missing or malformed — leave null.
+  }
+
+  // App properties (docProps/app.xml): word count
+  let wordCount = null;
+  try {
+    const appXml = zip.file("docProps/app.xml");
+    if (appXml) {
+      const appText = await appXml.async("string");
+      const appTree = parser.parse(appText);
+      const wordsVal = collectByTag(appTree, "Words")[0];
+      if (wordsVal !== undefined && wordsVal !== null) {
+        const n = parseInt(String(wordsVal), 10);
+        if (!isNaN(n) && n >= 0) wordCount = n;
+      }
+    }
+  } catch {
+    // app.xml missing or malformed — leave null.
+  }
+
+  // Paragraph count: count w:p elements in document.xml
+  const paragraphCount = paragraphs.length;
+
+  // Heading levels used: collect distinct heading numbers from pStyle vals
+  const headingLevelSet = new Set();
+  for (const p of paragraphs) {
+    const ppr = p?.["w:pPr"];
+    const pStyle = ppr?.["w:pStyle"];
+    const styleVal = pStyle?.["@_w:val"] || "";
+    const m = styleVal.match(/^Heading(\d)$/i);
+    if (m) headingLevelSet.add(`H${m[1]}`);
+  }
+  const headingLevelsUsed = [...headingLevelSet].sort();
+
   const result = {
     kind: "docx",
     hasHeadings,
@@ -164,6 +223,12 @@ export async function introspectDocx(filePath) {
     tableCount,
     hyperlinkCount,
     vagueLinkCount,
+    title,
+    author,
+    lastModifiedBy,
+    wordCount,
+    paragraphCount,
+    headingLevelsUsed,
   };
   if (altTextCoverage !== undefined) result.altTextCoverage = altTextCoverage;
   if (tablesHaveHeaders !== undefined) result.tablesHaveHeaders = tablesHaveHeaders;

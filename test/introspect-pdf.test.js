@@ -89,6 +89,44 @@ describe("introspectPdf", () => {
     expect(result.hasFormFields).toBe(true);
   });
 
+  it("extracts title, author, subject, keywords from PDF metadata", async () => {
+    const file = path.join(tmpRoot, "metadata.pdf");
+    await writePdf(file, async (doc) => {
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const page = doc.addPage([600, 400]);
+      page.drawText("Document text.", { x: 50, y: 350, size: 14, font, color: rgb(0, 0, 0) });
+      doc.setTitle("Audit Report 2024");
+      doc.setAuthor("Jane Smith");
+      doc.setSubject("Accessibility Review");
+      doc.setKeywords(["accessibility", "WCAG"]);
+    });
+
+    const result = await introspectPdf(file);
+    expect(() => pdfIntrospectionSchema.parse(result)).not.toThrow();
+    expect(result.title).toBe("Audit Report 2024");
+    expect(result.author).toBe("Jane Smith");
+    expect(result.subject).toBe("Accessibility Review");
+    expect(result.keywords).toMatch(/accessibility/);
+  });
+
+  it("returns null for missing title/author and a non-negative approxWordCount", async () => {
+    const file = path.join(tmpRoot, "no-meta.pdf");
+    await writePdf(file, async (doc) => {
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const page = doc.addPage([600, 400]);
+      page.drawText("Hello world this is a test sentence.", { x: 50, y: 350, size: 14, font, color: rgb(0, 0, 0) });
+    });
+
+    const result = await introspectPdf(file);
+    expect(() => pdfIntrospectionSchema.parse(result)).not.toThrow();
+    expect(result.title).toBeNull();
+    expect(result.author).toBeNull();
+    expect(result.subject).toBeNull();
+    expect(result.keywords).toBeNull();
+    expect(typeof result.approxWordCount).toBe("number");
+    expect(result.approxWordCount).toBeGreaterThanOrEqual(0);
+  });
+
   it("throws on a malformed PDF", async () => {
     const file = path.join(tmpRoot, "garbage.pdf");
     await fs.writeFile(file, "not a pdf at all, just bytes");

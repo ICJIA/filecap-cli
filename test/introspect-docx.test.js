@@ -174,6 +174,70 @@ describe("introspectDocx", () => {
     expect(result.vagueLinkCount).toBe(2); // "click here" + "Read more"
   });
 
+  it("extracts title and author from core.xml properties", async () => {
+    const file = path.join(tmpRoot, "core-props.docx");
+    const doc = new Document({
+      creator: "Jane Doe",
+      title: "My Policy Document",
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: "Body text.", heading: HeadingLevel.HEADING_1 }),
+          ],
+        },
+      ],
+    });
+    await writeDocx(file, doc);
+
+    const result = await introspectDocx(file);
+    expect(() => docxIntrospectionSchema.parse(result)).not.toThrow();
+    expect(result.title).toBe("My Policy Document");
+    expect(result.author).toBe("Jane Doe");
+  });
+
+  it("returns paragraphCount and headingLevelsUsed", async () => {
+    const file = path.join(tmpRoot, "heading-levels.docx");
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: "H1 title", heading: HeadingLevel.HEADING_1 }),
+            new Paragraph({ text: "Body text." }),
+            new Paragraph({ text: "H3 section", heading: HeadingLevel.HEADING_3 }),
+            new Paragraph({ text: "More body." }),
+          ],
+        },
+      ],
+    });
+    await writeDocx(file, doc);
+
+    const result = await introspectDocx(file);
+    expect(() => docxIntrospectionSchema.parse(result)).not.toThrow();
+    expect(result.paragraphCount).toBeGreaterThanOrEqual(4);
+    expect(result.headingLevelsUsed).toContain("H1");
+    expect(result.headingLevelsUsed).toContain("H3");
+    expect(result.headingLevelsUsed).not.toContain("H2");
+  });
+
+  it("returns null title/author and empty headingLevelsUsed for plain document", async () => {
+    const file = path.join(tmpRoot, "plain.docx");
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: "Just a plain paragraph." }),
+          ],
+        },
+      ],
+    });
+    await writeDocx(file, doc);
+
+    const result = await introspectDocx(file);
+    expect(result.title).toBeNull();
+    expect(result.headingLevelsUsed).toEqual([]);
+    expect(result.paragraphCount).toBeGreaterThanOrEqual(1);
+  });
+
   it("throws on a malformed DOCX", async () => {
     const file = path.join(tmpRoot, "garbage.docx");
     await fs.writeFile(file, "this is not a real docx file");

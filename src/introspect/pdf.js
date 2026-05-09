@@ -31,11 +31,19 @@ export async function introspectPdf(filePath) {
     const pageCount = doc.numPages;
 
     let pagesWithText = 0;
+    let approxWordCount = 0;
     for (let i = 1; i <= pageCount; i++) {
-      const page = await doc.getPage(i);
-      const textContent = await page.getTextContent();
-      if (textContent.items.length > 0) pagesWithText++;
-      page.cleanup();
+      try {
+        const page = await doc.getPage(i);
+        const textContent = await page.getTextContent();
+        if (textContent.items.length > 0) pagesWithText++;
+        const pageText = textContent.items.map((item) => item.str ?? "").join(" ");
+        const words = pageText.trim().split(/\s+/).filter((w) => w.length > 0);
+        approxWordCount += words.length;
+        page.cleanup();
+      } catch {
+        // Count 0 for this page on failure; don't throw.
+      }
     }
     const hasTextLayer = pagesWithText > 0;
     const textLayerCoverage = pageCount > 0 ? pagesWithText / pageCount : 0;
@@ -84,6 +92,11 @@ export async function introspectPdf(filePath) {
     let creationDateRaw;
     let pdfVersion;
     let documentLanguage;
+    let title;
+    let author;
+    let subject;
+    let keywords;
+    let modificationDateRaw;
     try {
       const metadata = await doc.getMetadata();
       const info = metadata.info ?? {};
@@ -98,6 +111,11 @@ export async function introspectPdf(filePath) {
       creationDateRaw = info.CreationDate || undefined;
       pdfVersion = info.PDFFormatVersion || undefined;
       documentLanguage = info.Language || undefined;
+      title = sanitizePdfString(info.Title);
+      author = sanitizePdfString(info.Author);
+      subject = sanitizePdfString(info.Subject);
+      keywords = sanitizePdfString(info.Keywords);
+      modificationDateRaw = info.ModDate || undefined;
     } catch {
       // Metadata read failed — leave the optional fields undefined.
     }
@@ -123,11 +141,35 @@ export async function introspectPdf(filePath) {
       const parsed = parsePdfDate(creationDateRaw);
       if (parsed) result.creationDate = parsed;
     }
+    result.title = title ?? null;
+    result.author = author ?? null;
+    result.subject = subject ?? null;
+    result.keywords = keywords ?? null;
+    if (modificationDateRaw) {
+      result.modificationDate = modificationDateRaw.startsWith("D:")
+        ? modificationDateRaw.slice(2)
+        : modificationDateRaw;
+    } else {
+      result.modificationDate = null;
+    }
+    result.approxWordCount = approxWordCount;
 
     return result;
   } finally {
     await doc.destroy();
   }
+}
+
+/**
+ * Trim a PDF info string and return null for empty/missing values.
+ * Strips ASCII control characters that would corrupt CSV/HTML output.
+ */
+function sanitizePdfString(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v)
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .trim();
+  return s.length > 0 ? s : null;
 }
 
 /**

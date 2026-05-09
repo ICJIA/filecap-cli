@@ -85,6 +85,12 @@ export const pdfIntrospectionSchema = z.object({
   producer: z.string().optional(),
   creator: z.string().optional(),
   creationDate: isoDate.optional(),
+  title: z.string().nullable().optional(),
+  author: z.string().nullable().optional(),
+  subject: z.string().nullable().optional(),
+  keywords: z.string().nullable().optional(),
+  modificationDate: z.string().nullable().optional(),
+  approxWordCount: z.number().int().nonnegative().optional(),
 });
 
 export const docxIntrospectionSchema = z.object({
@@ -97,6 +103,12 @@ export const docxIntrospectionSchema = z.object({
   hyperlinkCount: z.number().int().nonnegative(),
   vagueLinkCount: z.number().int().nonnegative(),
   documentLanguage: z.string().optional(),
+  title: z.string().nullable().optional(),
+  author: z.string().nullable().optional(),
+  lastModifiedBy: z.string().nullable().optional(),
+  wordCount: z.number().int().nonnegative().nullable().optional(),
+  paragraphCount: z.number().int().nonnegative().nullable().optional(),
+  headingLevelsUsed: z.array(z.string()).optional(),
 });
 
 export const xlsxIntrospectionSchema = z.object({
@@ -108,6 +120,9 @@ export const xlsxIntrospectionSchema = z.object({
   mergedCellCount: z.number().int().nonnegative(),
   hasCharts: z.boolean(),
   hasImages: z.boolean(),
+  title: z.string().nullable().optional(),
+  author: z.string().nullable().optional(),
+  totalCells: z.number().int().nonnegative().optional(),
 });
 
 export const legacyOfficeIntrospectionSchema = z.object({

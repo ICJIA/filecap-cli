@@ -63,6 +63,16 @@ export async function introspectXlsx(filePath) {
     }
   }
 
+  const title = wb.title ? String(wb.title).trim() || null : null;
+  const author = wb.creator ? String(wb.creator).trim() || null : null;
+
+  let totalCells = 0;
+  for (const ws of wb.worksheets) {
+    const rows = ws.actualRowCount ?? ws.rowCount ?? 0;
+    const cols = ws.actualColumnCount ?? ws.columnCount ?? 0;
+    totalCells += rows * cols;
+  }
+
   return {
     kind: "xlsx",
     sheetCount,
@@ -72,5 +82,8 @@ export async function introspectXlsx(filePath) {
     mergedCellCount,
     hasCharts,
     hasImages,
+    title,
+    author,
+    totalCells,
   };
 }
