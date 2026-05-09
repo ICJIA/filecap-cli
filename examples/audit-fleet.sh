@@ -333,11 +333,20 @@ else
   DEFAULT_SSH_USER="${FILECAP_DEFAULT_SSH_USER:-forge}"
   for (( i=1; i<=NUM_SERVERS; i++ )); do
     printf "\n${B}Server %d of %d:${N}\n" "$i" "$NUM_SERVERS"
-    read -r -p "  Server name (e.g. dvfr-prod): " _name
+    while [[ -z "${_name:-}" ]]; do
+      read -r -p "  Server name (e.g. dvfr-prod): " _name
+      [[ -z "$_name" ]] && echo "  (required — please type a value)" >&2
+    done
     read -r -p "  SSH username [${DEFAULT_SSH_USER}]: " _user
     _user="${_user:-$DEFAULT_SSH_USER}"
-    read -r -p "  Server IP or hostname (e.g. 192.168.1.1): " _host
-    read -r -p "  Full path to uploads directory on the remote (e.g. ~/uploads): " _path
+    while [[ -z "${_host:-}" ]]; do
+      read -r -p "  Server IP or hostname (e.g. 192.168.1.1): " _host
+      [[ -z "$_host" ]] && echo "  (required — please type a value)" >&2
+    done
+    while [[ -z "${_path:-}" ]]; do
+      read -r -p "  Full path to uploads directory on the remote (e.g. ~/uploads): " _path
+      [[ -z "$_path" ]] && echo "  (required — please type a value)" >&2
+    done
     read -r -p "  Website nickname (e.g. DVFR, i2i, vpp; press Enter to skip): " _site
     read -r -p "  Public URL prefix (e.g. https://dvfr.icjia-api.cloud/uploads; press Enter to skip): " _urlbase
     read -r -p "  Audit link template (e.g. https://audit.icjia.app/?prefill={publicUrl}; press Enter to skip): " _auditlinkpattern
@@ -368,16 +377,14 @@ SERVERS_TXT="${FLEET_DIR}/servers.txt"
 info "Wrote ${SERVERS_TXT}"
 
 # ── HTML report flag ──────────────────────────────────────────────────────────
-# When set, audit-remote.sh will also generate files.html for each server,
-# and the final consolidated report will include files.html as well.
-# audit-remote.sh reads AUDIT_HTML=1 so we don't need to pass --html on its CLI.
-read -r -p "Also generate self-contained HTML reports? [y/N]: " HTML_ANS
-if [[ "${HTML_ANS}" == "y" || "${HTML_ANS}" == "Y" ]]; then
-  export AUDIT_HTML=1
-  HTML_FLAG="--html"
-else
+# Always generate the HTML report alongside the CSV — no prompt. Set AUDIT_HTML=0
+# in the environment to opt out (rare).
+if [[ "${AUDIT_HTML:-1}" == "0" ]]; then
   export AUDIT_HTML=0
   HTML_FLAG=""
+else
+  export AUDIT_HTML=1
+  HTML_FLAG="--html"
 fi
 
 # ── optional: enrich with audit.icjia.app scores ─────────────────────────────

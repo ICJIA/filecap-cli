@@ -260,12 +260,18 @@ if [[ -z "$USER_ARG" ]]; then
   read -r -p "SSH username on the target server [${DEFAULT_SSH_USER}]: " USER_ARG
   USER_ARG="${USER_ARG:-$DEFAULT_SSH_USER}"
 fi
-if [[ -z "$HOST_ARG" ]]; then
+while [[ -z "$HOST_ARG" ]]; do
   read -r -p "Server IP or hostname (e.g. 192.241.146.85): " HOST_ARG
-fi
-if [[ -z "$REMOTE_PATH_ARG" ]]; then
+  if [[ -z "$HOST_ARG" ]]; then
+    echo "  (required — please type a value)" >&2
+  fi
+done
+while [[ -z "$REMOTE_PATH_ARG" ]]; do
   read -r -p "Full path to uploads directory on the remote (e.g. ~/uploads): " REMOTE_PATH_ARG
-fi
+  if [[ -z "$REMOTE_PATH_ARG" ]]; then
+    echo "  (required — please type a value)" >&2
+  fi
+done
 if [[ -z "$SERVER_NAME_ARG" ]]; then
   # Default: strapi-<ip-with-dashes>
   DEFAULT_NAME="strapi-${HOST_ARG//./-}"
@@ -304,16 +310,13 @@ REMOTE_PATH="$REMOTE_PATH_ARG"
 SERVER_NAME="$SERVER_NAME_ARG"
 
 # ── HTML report flag ──────────────────────────────────────────────────────────
-# The env var AUDIT_HTML=1 lets audit-fleet.sh propagate the choice without
-# re-prompting. When running standalone, ask interactively.
-HTML_FLAG=""
-if [[ "${AUDIT_HTML:-0}" == "1" ]]; then
-  HTML_FLAG="--html"
+# Always generate the HTML report — no prompt. The CSV is always produced;
+# the HTML is the manager-facing version of the same data. Set AUDIT_HTML=0
+# explicitly to opt out (rare).
+if [[ "${AUDIT_HTML:-1}" == "0" ]]; then
+  HTML_FLAG=""
 else
-  read -r -p "Also generate self-contained HTML report? [y/N]: " HTML_ANS
-  if [[ "${HTML_ANS}" == "y" || "${HTML_ANS}" == "Y" ]]; then
-    HTML_FLAG="--html"
-  fi
+  HTML_FLAG="--html"
 fi
 
 # ── work directory ────────────────────────────────────────────────────────────
