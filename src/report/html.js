@@ -98,7 +98,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     siteName,
     serverIp,
     entry.modifiedAt,
-    entry.remediable === true ? "Yes — needs accessibility work" : entry.remediable === false ? "No — reference file (image, placeholder, etc.)" : "",
+    entry.remediable === true ? "Yes — needs accessibility audit" : entry.remediable === false ? "No — reference file (image, placeholder, etc.)" : "",
     scannedPath,
     entry.path,
     entry.absolutePath,
@@ -241,13 +241,46 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
   const headerCells = CSV_COLUMNS.map((col) => `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}</th>`).join("");
 
   // ── server/scan metadata display ─────────────────────────────────────────────
+  // Per-site reports pull from top-level metadata fields. Consolidated fleet
+  // reports have a different shape — metadata.sources[] holds per-server info
+  // and the top-level fields are absent. Branch the meta-grid render on that.
   const serverName = meta?.serverName ?? "";
   const siteName = meta?.siteName ?? "";
   const serverIp = meta?.serverIp ?? "";
   const hostname = meta?.hostname ?? "";
   const scannedPath = meta?.scannedPath ?? "";
   const scannedAt = meta?.scannedAt ?? "";
-  const titleSuffix = siteName !== "" ? siteName : serverName;
+
+  let metaGridHtml;
+  let titleSuffix;
+  if (isConsolidated) {
+    const consolidatedSources = meta?.sources ?? [];
+    const consolidatedAt = meta?.consolidatedAt ?? "";
+    const serverNames = consolidatedSources.map((s) => s.serverName).filter(Boolean);
+    const siteNamesList = consolidatedSources.map((s) => s.siteName).filter(Boolean);
+    const scanTimes = consolidatedSources.map((s) => s.scannedAt).filter(Boolean).slice().sort();
+    const earliest = scanTimes[0] ?? "";
+    const latest = scanTimes[scanTimes.length - 1] ?? "";
+    const scanWindow = earliest && latest && earliest !== latest
+      ? `${earliest} — ${latest}`
+      : earliest || latest || "";
+    titleSuffix = "Fleet";
+    metaGridHtml = `
+  <span class="meta-label">Audit type:</span>      <span>Multi-server fleet</span>
+  <span class="meta-label">Servers:</span>         <span>${htmlEscape(String(consolidatedSources.length))}${serverNames.length ? ` (${htmlEscape(serverNames.join(", "))})` : ""}</span>
+  ${siteNamesList.length ? `<span class="meta-label">Websites:</span>        <span>${htmlEscape(siteNamesList.join(", "))}</span>` : ""}
+  ${scanWindow ? `<span class="meta-label">Scan window:</span>     <span>${htmlEscape(scanWindow)}</span>` : ""}
+  ${consolidatedAt ? `<span class="meta-label">Consolidated at:</span> <span>${htmlEscape(consolidatedAt)}</span>` : ""}`;
+  } else {
+    titleSuffix = siteName !== "" ? siteName : serverName;
+    metaGridHtml = `
+  ${siteName !== "" ? `<span class="meta-label">Website:</span>      <span>${htmlEscape(siteName)}</span>` : ""}
+  <span class="meta-label">Server:</span>      <span>${htmlEscape(serverName)}</span>
+  <span class="meta-label">IP:</span>           <span>${htmlEscape(serverIp)}</span>
+  <span class="meta-label">Hostname:</span>     <span>${htmlEscape(hostname)}</span>
+  <span class="meta-label">Scanned path:</span> <span>${htmlEscape(scannedPath)}</span>
+  <span class="meta-label">Scanned at:</span>   <span>${htmlEscape(scannedAt)}</span>`;
+  }
 
   // ── embed data as JSON for client-side search/sort ────────────────────────────
   // The JSON sits in a separate <script type="application/json"> block, so we
@@ -535,13 +568,7 @@ footer {
 
 <h1>filecap inventory report</h1>
 
-<div class="meta-grid">
-  ${siteName !== "" ? `<span class="meta-label">Website:</span>      <span>${htmlEscape(siteName)}</span>` : ""}
-  <span class="meta-label">Server:</span>      <span>${htmlEscape(serverName)}</span>
-  <span class="meta-label">IP:</span>           <span>${htmlEscape(serverIp)}</span>
-  <span class="meta-label">Hostname:</span>     <span>${htmlEscape(hostname)}</span>
-  <span class="meta-label">Scanned path:</span> <span>${htmlEscape(scannedPath)}</span>
-  <span class="meta-label">Scanned at:</span>   <span>${htmlEscape(scannedAt)}</span>
+<div class="meta-grid">${metaGridHtml}
 </div>
 
 <section class="audit-stats">

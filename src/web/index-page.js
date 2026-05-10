@@ -117,7 +117,7 @@ function renderCard(sr) {
     <span class="label">total files inventoried</span>
   </div>
   <div class="remediation-summary">
-    <p class="remediable-count">${he(remediable.toLocaleString())} need accessibility work</p>
+    <p class="remediable-count">${he(remediable.toLocaleString())} need accessibility audit</p>
     ${breakdownHtml}
     <p class="reference-count muted">${he(nonRemediable.toLocaleString())} other (mostly images)</p>
   </div>
@@ -613,7 +613,7 @@ main {
       <p class="hero-stat-row">
         <span class="stat-block remediable">
           <span class="stat-num">${he(fleetRemediable.toLocaleString())}</span>
-          <span class="stat-label">need accessibility work</span>
+          <span class="stat-label">need accessibility audit</span>
         </span>
         <span class="stat-block reference">
           <span class="stat-num">${he(fleetNonRemediable.toLocaleString())}</span>
@@ -628,12 +628,12 @@ main {
 
     <p>
       Good question — the number of files we found and the number that
-      need accessibility work are different on purpose. Here&#39;s the gist:
+      need accessibility audit are different on purpose. Here&#39;s the gist:
     </p>
 
     <div class="explanation-grid">
       <div class="explanation-card">
-        <h3>Files that need accessibility work</h3>
+        <h3>Files that need accessibility audit</h3>
         <p>
           These are documents people read directly — <strong>PDFs</strong>
           (like meeting agendas, annual reports, statutes),
@@ -652,7 +652,7 @@ main {
       </div>
 
       <div class="explanation-card">
-        <h3>Files that <em>don&#39;t</em> need accessibility work</h3>
+        <h3>Files that <em>don&#39;t</em> need accessibility audit</h3>
         <p>
           Most of these are <strong>images</strong> uploaded alongside blog
           posts, news announcements, and page content. Images don&#39;t get

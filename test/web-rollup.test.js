@@ -487,7 +487,7 @@ describe("runWebRollup", () => {
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
     expect(html).toContain("We scanned");
     expect(html).toContain("files in total");
-    expect(html).toContain("need accessibility work");
+    expect(html).toContain("need accessibility audit");
   });
 
   // ── Security: FC-2026-006 sitesFile path validation ─────────────────────────

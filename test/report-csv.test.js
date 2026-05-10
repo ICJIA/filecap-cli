@@ -140,17 +140,17 @@ describe("writeCsv boolean rendering", () => {
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
 
-    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility work");
+    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility audit");
     expect(cells[colIndex("hasTextLayer")]).toBe("Yes");
     expect(cells[colIndex("isImageOnly")]).toBe("No");
   });
 
-  it("remediable true cell value is 'Yes — needs accessibility work'", () => {
+  it("remediable true cell value is 'Yes — needs accessibility audit'", () => {
     const entry = { ...baseEntry, remediable: true };
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
-    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility work");
+    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility audit");
   });
 
   it("remediable false cell value is 'No — reference file (image, placeholder, etc.)'", () => {

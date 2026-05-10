@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] — 2026-05-10
+
+### Fixed
+
+- **Consolidated fleet HTML report header was rendering blank fields.** When `filecap report` runs against a consolidated NDJSON (output of `filecap rollup`), the metadata structure is `{ consolidatedAt, sources: [...] }` rather than the per-server `{ serverName, serverIp, hostname, scannedPath, scannedAt }` shape. The HTML header template assumed the per-server shape and rendered five empty `<span>`s. Now branches on `kind === "filecap-consolidated-header"` and shows fleet-appropriate fields: Audit type, Servers (count + names), Websites, Scan window (earliest → latest), Consolidated at. Per-site reports are unchanged.
+
+### Changed
+
+- **Wording softened from "needs accessibility work" to "needs accessibility audit"** across the index page, per-site HTML report cells, CSV cells, and the report-command preamble. The earlier wording read as definitive ("this file definitely needs fixes"); the new wording is appropriate for an inventory-scoping deliverable ("this file should be reviewed by the auditor"). Tests updated to match.
+
+[1.3.4]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.3.4
+
 ## [1.3.3] — 2026-05-10
 
 ### Added

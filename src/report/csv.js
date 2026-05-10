@@ -66,7 +66,7 @@ function formatValue(v) {
 }
 
 function formatRemediable(remediable) {
-  if (remediable === true) return "Yes — needs accessibility work";
+  if (remediable === true) return "Yes — needs accessibility audit";
   if (remediable === false) return "No — reference file (image, placeholder, etc.)";
   return "";
 }
