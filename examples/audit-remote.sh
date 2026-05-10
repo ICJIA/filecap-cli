@@ -568,7 +568,9 @@ PYTSV
     fi
 
     # Remote path existence + readability
-    if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d ${rpath} && test -r ${rpath}" 2>/dev/null; then
+    local qrpath
+    qrpath=$(printf '%q' "${rpath}")
+    if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d ${qrpath} && test -r ${qrpath}" 2>/dev/null; then
       printf "  %-18s %-22s %-18s ${G}%-8s${N} ${R}%-8s${N} %-8s %s\n" \
         "$nick" "$name" "$host" "OK" "FAIL" "-" "path missing or unreadable"
       fail_count=$((fail_count + 1))
@@ -577,7 +579,7 @@ PYTSV
 
     # File count (find -type f)
     local file_count
-    file_count=$(ssh -o ConnectTimeout=10 "${user}@${host}" "find ${rpath} -type f 2>/dev/null | wc -l" 2>/dev/null | tr -d '[:space:]')
+    file_count=$(ssh -o ConnectTimeout=10 "${user}@${host}" "find ${qrpath} -type f 2>/dev/null | wc -l" 2>/dev/null | tr -d '[:space:]')
     if [[ -z "$file_count" || ! "$file_count" =~ ^[0-9]+$ ]]; then
       printf "  %-18s %-22s %-18s ${G}%-8s${N} ${G}%-8s${N} ${Y}%-8s${N} %s\n" \
         "$nick" "$name" "$host" "OK" "OK" "?" "couldn't count files"
@@ -1000,6 +1002,7 @@ REPORT_DIR="${THIS_RUN_DIR}/report"
 
 step "Setting up work directory: ${WORK_DIR}"
 mkdir -p "${MIRROR_DIR}" "${THIS_RUN_DIR}/report"
+chmod 700 "${WORK_DIR}" 2>/dev/null || true
 
 # ── write SOURCE_INFO.txt ─────────────────────────────────────────────────────
 AUDIT_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -1054,10 +1057,11 @@ info "SSH OK"
 # shell can expand tilde paths (e.g. ~/uploads). Paths with spaces should be
 # given as absolute paths instead.
 step "Verifying remote path exists: ${REMOTE_PATH}"
-if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -d ${REMOTE_PATH}" 2>/dev/null; then
+QPATH=$(printf '%q' "${REMOTE_PATH}")
+if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -d ${QPATH}" 2>/dev/null; then
   die "Remote path '${REMOTE_PATH}' does not exist or is not a directory on ${HOST}."
 fi
-if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -r ${REMOTE_PATH}" 2>/dev/null; then
+if ! ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" "test -r ${QPATH}" 2>/dev/null; then
   die "Remote path '${REMOTE_PATH}' exists but is not readable by user '${SSH_USER}'."
 fi
 info "Remote path confirmed and readable"
@@ -1078,9 +1082,9 @@ fi
 # ── remote size / file count ──────────────────────────────────────────────────
 step "Checking remote upload size ..."
 REMOTE_SIZE=$(ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" \
-  "LC_ALL=C du -sh ${REMOTE_PATH} 2>/dev/null | tr -s ' \t' ' ' | cut -d' ' -f1" 2>/dev/null || echo "unknown")
+  "LC_ALL=C du -sh ${QPATH} 2>/dev/null | tr -s ' \t' ' ' | cut -d' ' -f1" 2>/dev/null || echo "unknown")
 REMOTE_COUNT=$(ssh -o ConnectTimeout=10 "${SSH_USER}@${HOST}" \
-  "LC_ALL=C find ${REMOTE_PATH} -type f 2>/dev/null | wc -l | tr -d ' \t'" 2>/dev/null || echo "?")
+  "LC_ALL=C find ${QPATH} -type f 2>/dev/null | wc -l | tr -d ' \t'" 2>/dev/null || echo "?")
 info "Remote: ${REMOTE_COUNT} files, ${REMOTE_SIZE} total on disk"
 
 # ── local disk-space check ────────────────────────────────────────────────────
@@ -1120,16 +1124,17 @@ if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
   step "Mode: NATIVE (remote Node ${REMOTE_NODE} >= 20 — scan runs on the server)"
   info "Running: ssh ${SSH_USER}@${HOST} npx @icjia/filecap@latest scan '${REMOTE_PATH}' ..."
 
+  QNAME=$(printf '%q' "${SERVER_NAME}")
+  QHOST=$(printf '%q' "${HOST}")
   NATIVE_SITE_ARGS=""
-  [[ -n "$SITE_NAME" ]] && NATIVE_SITE_ARGS="--site-name '${SITE_NAME}'"
+  [[ -n "$SITE_NAME" ]] && NATIVE_SITE_ARGS="--site-name $(printf '%q' "${SITE_NAME}")"
   NATIVE_PUBURL_ARGS=""
-  [[ -n "$PUBLIC_URL_BASE" ]] && NATIVE_PUBURL_ARGS="--public-url-base '${PUBLIC_URL_BASE}'"
+  [[ -n "$PUBLIC_URL_BASE" ]] && NATIVE_PUBURL_ARGS="--public-url-base $(printf '%q' "${PUBLIC_URL_BASE}")"
 
-  # shellcheck disable=SC2029
   if ! ssh -o ConnectTimeout=30 "${SSH_USER}@${HOST}" \
-      "npx --yes @icjia/filecap@latest scan '${REMOTE_PATH}' \
-        --server-name '${SERVER_NAME}' \
-        --server-ip '${HOST}' \
+      "npx --yes @icjia/filecap@latest scan ${QPATH} \
+        --server-name ${QNAME} \
+        --server-ip ${QHOST} \
         ${NATIVE_SITE_ARGS} \
         ${NATIVE_PUBURL_ARGS} \
         -o -" \
@@ -1145,7 +1150,7 @@ else
 
   RSYNC_PHASE_START=$(date +%s)
   RSYNC_TMPOUT=$(mktemp)
-  if ! rsync -av --delete --stats \
+  if ! rsync -av --delete --stats --no-links \
       "${SSH_USER}@${HOST}:${REMOTE_PATH}/" \
       "${MIRROR_DIR}/" 2>&1 | tee "${RSYNC_TMPOUT}"; then
     rm -f "${RSYNC_TMPOUT}"

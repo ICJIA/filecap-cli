@@ -1,5 +1,60 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { TOOL_DEFINITIONS, dispatchTool } from "../src/mcp/tools.js";
+
+describe("dispatchTool — filecap_scan path allowlist", () => {
+  const savedEnvHolder = {};
+
+  afterEach(() => {
+    if (savedEnvHolder.val !== undefined) {
+      process.env.FILECAP_MCP_ALLOWED_PATHS = savedEnvHolder.val;
+    } else {
+      delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+    }
+    savedEnvHolder.val = undefined;
+  });
+
+  it("allows scan when FILECAP_MCP_ALLOWED_PATHS is not set", async () => {
+    savedEnvHolder.val = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+    const fs = await import("node:fs/promises");
+    const nodePath = await import("node:path");
+    const os = await import("node:os");
+    const tmpRoot = await fs.mkdtemp(nodePath.join(os.tmpdir(), "fc-allow-"));
+    const outPath = nodePath.join(tmpRoot, "scan.ndjson");
+    const result = await dispatchTool("filecap_scan", { directory: tmpRoot, output: outPath });
+    expect(result.isError).toBeFalsy();
+    await fs.rm(tmpRoot, { recursive: true, force: true });
+  });
+
+  it("rejects scan outside allowed paths when FILECAP_MCP_ALLOWED_PATHS is set", async () => {
+    savedEnvHolder.val = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    const nodePath = await import("node:path");
+    const os = await import("node:os");
+    const allowed = nodePath.join(os.tmpdir(), "fc-allowed-dir");
+    process.env.FILECAP_MCP_ALLOWED_PATHS = allowed;
+    const result = await dispatchTool("filecap_scan", {
+      directory: os.homedir(),
+      output: "/tmp/should-not-exist.ndjson",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
+  });
+
+  it("allows scan inside an allowed path (subdirectory)", async () => {
+    savedEnvHolder.val = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    const fs = await import("node:fs/promises");
+    const nodePath = await import("node:path");
+    const os = await import("node:os");
+    const allowedRoot = await fs.mkdtemp(nodePath.join(os.tmpdir(), "fc-allowed-root-"));
+    const subDir = nodePath.join(allowedRoot, "sub");
+    await fs.mkdir(subDir);
+    const outPath = nodePath.join(allowedRoot, "scan.ndjson");
+    process.env.FILECAP_MCP_ALLOWED_PATHS = allowedRoot;
+    const result = await dispatchTool("filecap_scan", { directory: subDir, output: outPath });
+    expect(result.isError).toBeFalsy();
+    await fs.rm(allowedRoot, { recursive: true, force: true });
+  });
+});
 
 describe("TOOL_DEFINITIONS", () => {
   it("exports five tools with names and JSON schemas", () => {

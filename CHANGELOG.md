@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-05-10
+
+### Security
+
+- **Comprehensive red/blue audit completed.** Full findings in `docs/security/audit-2026-05-10.md`. 17 findings: 2 Critical, 6 Moderate, 7 Low, 2 Notes. All Critical and Moderate findings are fixed in 1.3.0; remaining Low items are either fixed or documented in the README's "residual risk" section.
+  - **FC-2026-001 / FC-2026-002 (Critical):** Shell injection via SSH command interpolation. All variables are now passed through `printf '%q'` before embedding in SSH/rsync commands in `audit-remote.sh` and `audit-fleet.sh`.
+  - **FC-2026-003 (Moderate):** rsync now uses `--no-links` to prevent symlink escapes from a compromised remote server.
+  - **FC-2026-004 (Moderate):** MCP server gains `FILECAP_MCP_ALLOWED_PATHS` env var (colon-separated absolute paths) to restrict the `filecap_scan` tool's reachable directories. Unset = no restriction (backward-compatible).
+  - **FC-2026-005 (Moderate):** README and `password-gate.js` CAVEAT now explicitly document that the client-side password gate uses an unsalted SHA-256 that can be cracked offline in seconds; Netlify Site Password is recommended for any non-public content.
+  - **FC-2026-006 (Moderate):** `--sites-file` argument validation added: rejects non-`.json` paths; error messages no longer include `err.message` (which could leak file content fragments).
+  - **FC-2026-007 (Moderate):** `sites.json` validated against a Zod schema on load; entries with unexpected fields or wrong types are rejected with a clear error.
+  - **FC-2026-008 (Moderate):** XSS regression test suite added covering server name, site name, hostname, entry filename, and path injection vectors; confirms `htmlEscape()` covers all HTML table-cell output paths.
+  - **FC-2026-011 (Low):** Audit work directory `~/filecap-audits/<server-name>/` now created with mode 700.
+  - **FC-2026-013 (Low):** Added code comments to `src/introspect/docx.js` and `src/introspect/xlsx.js` documenting the intentional in-memory-only zip/XLSX parsing (prevents zip-slip).
+- **Bumped `vitest` from `^1.6.0` to `^4.1.5`** to clear 4 moderate dev-dep CVEs (esbuild → vite → vite-node → vitest chain, GHSA-67mh-4wv8-2f99). All 304 tests pass on v4. Production dependencies remain zero-vulnerability per `npm audit --omit=dev`.
+
+[1.3.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.3.0
+
 ## [1.2.3] — 2026-05-10
 
 ### Security

@@ -113,6 +113,73 @@ So: yes, "just count the files" is a one-liner. But the count alone won't help y
 
 ---
 
+## Security audit
+
+filecap is open source and tries to be transparent about its security posture.
+The full audit findings and mitigations are in `docs/security/audit-2026-05-10.md`.
+The summary below is for managers and auditors.
+
+### What we protect
+
+- **Auditor credentials.** SSH keys and any `FILECAP_AUDIT_TOKEN` env var never appear in any output, log, or transcript.
+- **Shell injection.** Every variable interpolated into SSH remote-command strings is quoted via `printf '%q'` to prevent command injection from malicious site configs.
+- **rsync symlink escape.** The `--no-links` flag prevents a compromised remote server from using symlinks to copy files outside the intended uploads directory.
+- **The audit script** verifies its own SHA-256 against the GitHub `main` branch on every run (`--no-version-check` to skip).
+- **The published npm package** uses `npm pack` + explicit-tarball publish with 2FA-required publishes.
+- **Network transit** is HTTPS for the audit-remote.sh download (raw.githubusercontent.com), npm package install, and Netlify deployment.
+- **Bundle privacy** uses Netlify's server-side Site Password (paid plan) — recommended for any non-public content.
+- **Output directory** `~/filecap-audits/<server-name>/` is created with mode 700 (user-only readable).
+- **MCP scan path restriction.** Set `FILECAP_MCP_ALLOWED_PATHS` (colon-separated absolute paths) to restrict which directories an AI agent can scan.
+
+### What we don't protect (residual risk)
+
+- **The optional client-side password gate** (`--password` flag) is for "ward off the curious" only. The SHA-256 hash is unsalted and can be cracked offline with no rate limiting. Anyone with view-source can read all content. Do not use this gate for content you would not share publicly if the password were guessed. Use Netlify Site Password for actual enforcement.
+- **A compromised remote server** could serve malicious PDFs that exploit pdfjs-dist parsing bugs (we depend on the upstream parser being patched). More rigorous isolation (sandbox/container) is future work.
+- **Stolen `~/.filecap/sites.json`** reveals server hostnames and remote paths but no credentials (SSH keys are never stored here). File mode is 600.
+- **The Netlify bundle URL** is not secret. `robots.txt` blocks search-engine indexing, but the URL could leak via browser history or link sharing. Netlify Site Password provides the recommended protection.
+- **Initial `curl audit-remote.sh` download.** The self-version-check detects post-download tampering, but not initial-fetch tampering. For maximum verifiability, download from a specific commit SHA URL rather than `main`.
+
+### Audit findings summary (1.3.0)
+
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| FC-2026-001 | Critical | Shell injection via REMOTE_PATH in SSH scan commands | Fixed in 1.3.0 |
+| FC-2026-002 | Critical | Shell injection via path in SSH test/find/du commands | Fixed in 1.3.0 |
+| FC-2026-003 | Moderate | rsync follows remote symlinks (symlink escape) | Fixed in 1.3.0 |
+| FC-2026-004 | Moderate | MCP server has no scan-path allowlist | Fixed in 1.3.0 |
+| FC-2026-005 | Moderate | Unsalted SHA-256 password gate (cracking risk underdocumented) | Fixed in 1.3.0 (docs) |
+| FC-2026-006 | Moderate | sitesFile path not validated (info leakage via error messages) | Fixed in 1.3.0 |
+| FC-2026-007 | Moderate | sites.json not schema-validated on load | Fixed in 1.3.0 |
+| FC-2026-008 | Moderate | HTML XSS coverage verification and regression tests | Fixed in 1.3.0 |
+| FC-2026-009 | Low | Initial curl download not verifiable at fetch time | Documented |
+| FC-2026-010 | Low | npx --yes accepts any latest version (supply-chain) | Documented |
+| FC-2026-011 | Low | Audit output directory permissions not enforced | Fixed in 1.3.0 |
+| FC-2026-012 | Low | pdfjs-dist parsing-attack surface | Accepted (mitigated by isEvalSupported:false) |
+| FC-2026-013 | Low | jszip/exceljs zip-slip surface | Verified safe (in-memory only); documented |
+| FC-2026-014 | Low | Netlify bundle URL publicly guessable | Documented |
+| FC-2026-015 | Low | CSP header missing from netlify.toml | Deferred (inline scripts require unsafe-inline) |
+| FC-2026-016 | Note | Client-side gate is not real security (by design) | Documented |
+| FC-2026-017 | Note | Inventory NDJSON contains server metadata | Accepted (required for vendor work-order) |
+
+### How to report a security issue
+
+Email the audit administrator or open a **private** GitHub Security Advisory at
+`https://github.com/ICJIA/filecap-cli/security/advisories/new`.
+**Do not open a public GitHub issue for security bugs.**
+Acknowledged within 5 business days.
+
+### How to verify the audit yourself
+
+```bash
+cat docs/security/audit-2026-05-10.md
+npm audit
+npx vitest run test/report-html.test.js
+npx vitest run test/mcp-tools.test.js
+npx vitest run test/web-rollup.test.js
+```
+
+---
+
 ## Table of contents
 
 - [Are you a...](#are-you-a)

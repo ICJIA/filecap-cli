@@ -4,12 +4,30 @@ import path from "node:path";
 import readline from "node:readline";
 import os from "node:os";
 import { spawn } from "node:child_process";
+import { z } from "zod";
 import { runReport } from "./report.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
 import { generateNetlifyToml } from "../web/netlify-config.js";
 import { darkModeCss } from "../web/styles.js";
+
+// FC-2026-007: Zod schema for sites.json validation
+const siteEntrySchema = z
+  .object({
+    name: z.string().min(1),
+    siteName: z.string().optional(),
+    user: z.string().optional(),
+    host: z.string().optional(),
+    remotePath: z.string().optional(),
+    publicUrlBase: z.string().optional(),
+  })
+  .strict();
+
+const sitesFileSchema = z.object({
+  version: z.number().optional(),
+  sites: z.array(siteEntrySchema),
+});
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -157,12 +175,30 @@ export async function runWebRollup({
     ?? process.env.FILECAP_SITES_FILE
     ?? path.join(os.homedir(), ".filecap", "sites.json");
 
+  // FC-2026-006: validate sitesFile is a .json path to prevent information
+  // leakage via error messages when unexpected file types are passed.
+  if (sitesFile !== null && sitesFile !== undefined) {
+    if (!sitesPath.endsWith(".json")) {
+      return { exitCode: 2, error: `sites file must be a .json file: ${sitesPath}` };
+    }
+  }
+
   let sitesData;
   try {
     const raw = await fs.readFile(sitesPath, "utf8");
     sitesData = JSON.parse(raw);
-  } catch (err) {
-    return { exitCode: 2, error: `cannot read sites file ${sitesPath}: ${err.message}` };
+  } catch {
+    // Do not include err.message here — it may contain file content fragments.
+    return { exitCode: 2, error: `cannot read sites file ${sitesPath}` };
+  }
+
+  // FC-2026-007: validate sites.json schema
+  const validation = sitesFileSchema.safeParse(sitesData);
+  if (!validation.success) {
+    const issues = validation.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
+    return { exitCode: 2, error: `sites file ${sitesPath} failed schema validation: ${issues}` };
   }
 
   const allSites = sitesData?.sites ?? [];

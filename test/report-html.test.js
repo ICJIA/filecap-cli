@@ -382,4 +382,71 @@ describe("writeHtml", () => {
     const html = await fs.readFile(out, "utf8");
     expect(html).toMatch(/2 PDFs/);
   });
+
+  // ── XSS regression suite (FC-2026-008) ──────────────────────────────────────
+
+  it("escapes XSS payload in serverName metadata (FC-2026-008)", async () => {
+    const xssPayload = "<script>alert(1)</script>";
+    const headerWithXss = {
+      ...sampleHeader,
+      metadata: { ...sampleHeader.metadata, serverName: xssPayload },
+    };
+    const out = path.join(tmpDir, "xss-servername.html");
+    await writeHtml({ sourceHeader: headerWithXss, entries: [], sources: [headerWithXss], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).not.toMatch(/<script>alert\(1\)<\/script>/);
+    expect(html).toMatch(/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  });
+
+  it("escapes XSS payload in siteName metadata (FC-2026-008)", async () => {
+    const xssPayload = "<script>alert(1)</script>";
+    const headerWithXss = {
+      ...sampleHeader,
+      metadata: { ...sampleHeader.metadata, siteName: xssPayload },
+    };
+    const out = path.join(tmpDir, "xss-sitename.html");
+    await writeHtml({ sourceHeader: headerWithXss, entries: [], sources: [headerWithXss], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).not.toMatch(/<script>alert\(1\)<\/script>/);
+    expect(html).toMatch(/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  });
+
+  it("escapes XSS payload in hostname metadata (FC-2026-008)", async () => {
+    const xssPayload = "<img src=x onerror=alert(1)>";
+    const headerWithXss = {
+      ...sampleHeader,
+      metadata: { ...sampleHeader.metadata, hostname: xssPayload },
+    };
+    const out = path.join(tmpDir, "xss-hostname.html");
+    await writeHtml({ sourceHeader: headerWithXss, entries: [], sources: [headerWithXss], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    // The angle brackets must be escaped so <img> tag cannot execute
+    expect(html).not.toContain("<img src=x onerror=alert(1)>");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+
+  it("escapes XSS payload in entry filename and path in HTML table cells (FC-2026-008)", async () => {
+    // The payload starts with "> which closes any enclosing attribute/tag context.
+    // htmlEscape() must prevent this from breaking out of the <td> context.
+    const xssFilename = '"><img src=x onerror=alert(1)>.pdf';
+    const xssEntry = {
+      ...sampleEntries[0],
+      path: xssFilename,
+      absolutePath: "/uploads/" + xssFilename,
+      filename: xssFilename,
+    };
+    const out = path.join(tmpDir, "xss-filename.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: [xssEntry], sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    // In the HTML table cells, angle brackets and quotes must be escaped.
+    // The escaped form of the payload with both " and < escaped:
+    expect(html).toContain("&quot;&gt;&lt;img src=x onerror=alert(1)&gt;.pdf");
+    // The raw payload must not appear outside of JSON data blocks.
+    // Strip the JSON data block to check only the HTML markup context.
+    const htmlWithoutJsonBlock = html.replace(
+      /<script[^>]*type="application\/json"[^>]*>[\s\S]*?<\/script>/gi,
+      ""
+    );
+    expect(htmlWithoutJsonBlock).not.toContain('"><img src=x onerror=alert(1)>');
+  });
 });

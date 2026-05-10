@@ -489,4 +489,65 @@ describe("runWebRollup", () => {
     expect(html).toContain("files in total");
     expect(html).toContain("need accessibility work");
   });
+
+  // ── Security: FC-2026-006 sitesFile path validation ─────────────────────────
+
+  it("rejects sitesFile that does not have a .json extension (FC-2026-006)", async () => {
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "fc-rollup-test"),
+      sitesFile: "/etc/hosts",
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.error).toMatch(/sites file/i);
+    // Error must NOT include file content snippets
+    expect(result.error).not.toMatch(/127\.0\.0\.1/);
+    expect(result.error).not.toMatch(/localhost/);
+  });
+
+  it("does not leak file content in error message when sites file is missing (FC-2026-006)", async () => {
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "fc-rollup-test2"),
+      sitesFile: path.join(tmpDir, "nonexistent-file.json"),
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.error).toMatch(/cannot read sites file/i);
+    // Error must reference the path but not file content
+    expect(result.error).toContain("nonexistent-file.json");
+  });
+
+  // ── Security: FC-2026-007 sites.json schema validation ──────────────────────
+
+  it("rejects sites.json with unrecognized extra fields in a site entry (FC-2026-007)", async () => {
+    const sitesFile = path.join(tmpDir, "bad-schema.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [{ name: "dvfr", injectedField: "malicious; rm -rf" }],
+      }),
+    );
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-bad"),
+      sitesFile,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.error).toMatch(/schema validation/i);
+  });
+
+  it("rejects sites.json where name is not a string (FC-2026-007)", async () => {
+    const sitesFile = path.join(tmpDir, "bad-name.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [{ name: 42, host: "1.2.3.4" }],
+      }),
+    );
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-bad-name"),
+      sitesFile,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.error).toMatch(/schema validation/i);
+  });
 });

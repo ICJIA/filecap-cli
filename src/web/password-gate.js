@@ -18,10 +18,15 @@ export function computeHash(plain) {
  * re-prompt. The password is never stored in cleartext — only the SHA-256 hex
  * is embedded in the HTML.
  *
- * CAVEAT: This is "ward off the curious" security only. Anyone with DevTools or
- * view-source can read the embedded hash. CSVs served at direct URLs are NOT
- * covered by this gate. For real protection use Netlify Visitor Access or
- * HTTP Basic Auth.
+ * CAVEAT: This is "ward off the curious" security only. The SHA-256 hash is
+ * UNSALTED and can be cracked offline with no rate limiting using hashcat or
+ * online rainbow tables (seconds for any password under 12 characters).
+ * Anyone with view-source can extract the hash and crack it with zero effort.
+ * CSVs served at direct URLs are NOT covered by this gate at all.
+ *
+ * Do not use this gate for any content you would not share publicly if the
+ * password were leaked. For real enforcement, use Netlify Site Password
+ * (server-side, paid plan) or HTTP Basic Auth.
  *
  * @param {string} html   - full HTML document string
  * @param {string} hexHash - SHA-256 hex of the password

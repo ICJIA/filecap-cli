@@ -2,6 +2,11 @@ import ExcelJS from "exceljs";
 
 const DEFAULT_SHEET_NAME_RE = /^Sheet\d+$/i;
 
+// Security note (FC-2026-013): exceljs reads the XLSX file directly without
+// extracting zip entries to disk, preventing zip-slip path traversal attacks
+// from maliciously crafted XLSX files. Keep using wb.xlsx.readFile() (in-memory
+// parse) rather than any extract-to-disk API.
+
 /**
  * Introspect an XLSX file via exceljs.
  *

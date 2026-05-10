@@ -1,8 +1,32 @@
+import path from "node:path";
 import { runScan } from "../commands/scan.js";
 import { runRollup } from "../commands/rollup.js";
 import { runReport } from "../commands/report.js";
 import { runWebRollup } from "../commands/web-rollup.js";
 import { queryInventory } from "./query.js";
+
+/**
+ * Check whether `dir` is within one of the colon-separated paths in
+ * FILECAP_MCP_ALLOWED_PATHS. Returns null if the env var is not set
+ * (no restriction) or an error message string if the path is blocked.
+ *
+ * @param {string} dir - resolved absolute path to check
+ * @returns {string|null}
+ */
+function checkAllowedPath(dir) {
+  const allowedRaw = process.env.FILECAP_MCP_ALLOWED_PATHS;
+  if (!allowedRaw) return null; // no restriction
+  const allowed = allowedRaw
+    .split(":")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (allowed.length === 0) return null;
+  for (const root of allowed) {
+    const norm = root.endsWith("/") ? root : root + "/";
+    if (dir === root || dir.startsWith(norm)) return null;
+  }
+  return `directory "${dir}" is not in allowed paths (FILECAP_MCP_ALLOWED_PATHS=${allowedRaw})`;
+}
 
 export const TOOL_DEFINITIONS = [
   {
@@ -106,6 +130,11 @@ export const TOOL_DEFINITIONS = [
 export async function dispatchTool(name, args) {
   try {
     if (name === "filecap_scan") {
+      const resolvedDir = path.resolve(args.directory ?? "");
+      const blocked = checkAllowedPath(resolvedDir);
+      if (blocked) {
+        return { isError: true, content: [{ type: "text", text: `error: ${blocked}` }] };
+      }
       const result = await runScan({
         directory: args.directory,
         output: args.output,

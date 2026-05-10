@@ -439,9 +439,8 @@ for i in "${!SRV_NAMES[@]}"; do
     continue
   fi
 
-  # Note: inner single-quotes omitted so remote shell can expand tilde paths.
-  # Paths with spaces should use absolute paths instead.
-  if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d ${path_} && test -r ${path_}" 2>/dev/null; then
+  QPATH_=$(printf '%q' "${path_}")
+  if ! ssh -o ConnectTimeout=10 "${user}@${host}" "test -d ${QPATH_} && test -r ${QPATH_}" 2>/dev/null; then
     printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s %-8s\n" "$name" "$host" "PATH ERROR" "-" "$path_" "-"
     SKIPPED_REASONS+=("$name: path missing or unreadable")
     continue
@@ -454,7 +453,7 @@ for i in "${!SRV_NAMES[@]}"; do
     node_label="$node_ver"
   fi
 
-  remote_size=$(ssh -o ConnectTimeout=10 "${user}@${host}" "du -sh ${path_} 2>/dev/null | cut -f1" 2>/dev/null || echo "?")
+  remote_size=$(ssh -o ConnectTimeout=10 "${user}@${host}" "du -sh ${QPATH_} 2>/dev/null | cut -f1" 2>/dev/null || echo "?")
   if [[ "$remote_size" != "?" ]]; then
     remote_bytes=$(size_to_bytes "$remote_size")
     TOTAL_REMOTE_BYTES=$((TOTAL_REMOTE_BYTES + remote_bytes))

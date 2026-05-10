@@ -19,6 +19,11 @@ const VAGUE_LINK_PATTERNS = [
   /^link$/i,
 ];
 
+// Security note (FC-2026-013): all zip extraction is done in-memory via
+// JSZip.loadAsync(). No zip entries are ever written to disk, which prevents
+// zip-slip (path traversal via malicious zip entry names). Do not change this
+// to use JSZip's extraction-to-disk API.
+
 /**
  * Introspect a DOCX file. DOCX is a zip of XML; we read word/document.xml,
  * word/styles.xml, and the relationships file directly.
