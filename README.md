@@ -241,11 +241,11 @@ The output is line-delimited JSON: one header line, one line per file, one foote
 
 If you're handing this off to an auditor or accessibility coordinator, copy the block below verbatim. They have everything they need.
 
-> **For the auditor:**
+> **For the auditor (single server):**
 >
-> 1. Make sure you have macOS, Linux, or Windows-with-WSL2 installed (see [Windows: the situation](#windows-the-situation) below if you're on Windows).
-> 2. Make sure you have Node.js 20+ installed (https://nodejs.org).
-> 3. Make sure you have SSH access to the target server.
+> 1. Use macOS, Linux, or Windows with WSL2/Ubuntu (see [Windows: the situation](#windows-the-situation) below). On Windows, run everything inside WSL2 — never PowerShell, Command Prompt, Git Bash, or PuTTY.
+> 2. Install Node.js 20+ (https://nodejs.org).
+> 3. Generate an OpenSSH key with `ssh-keygen -t ed25519` (skip if you already have one) and have your server admin authorize it on the target server. See [Setting up SSH access](#setting-up-ssh-access-one-time-before-your-first-run) for the full flow.
 > 4. Run these three commands:
 >
 >    ```bash
@@ -257,6 +257,29 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 > 5. Answer the prompts (SSH user, server IP, path to uploads, optional website nickname).
 > 6. The deliverable is at `~/filecap-audits/<server-name>/latest/report/`. Open `audit-file-list.csv` (Excel/Numbers/Sheets) or `audit-file-list.html` (any browser).
 > 7. Email the entire `report/` folder to your remediation vendor.
+
+> **For the auditor (multiple servers / fleet, with a sites.json bundle):**
+>
+> If you've been handed a `sites.json` file along with these instructions, it lists every site in the audit — you don't have to type any server details.
+>
+> 1. Same prerequisites as above (macOS/Linux/WSL2-Ubuntu, Node 20+, OpenSSH key authorized on every target server).
+> 2. Drop the `sites.json` you received into `~/.filecap/`:
+>
+>    ```bash
+>    mkdir -p ~/.filecap
+>    mv /path/to/sites.json ~/.filecap/
+>    ```
+>
+> 3. Download both scripts and run:
+>
+>    ```bash
+>    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
+>    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+>    chmod +x audit-fleet.sh audit-remote.sh
+>    ./audit-fleet.sh
+>    ```
+>
+> 4. The fleet deliverable is at `~/filecap-audits/_fleet/latest/`. Email the whole folder (or the `consolidated-report/` subfolder) to your remediation vendor.
 
 ## CLI reference
 
@@ -759,13 +782,17 @@ If you're an auditor or manager who will run the script, do this once per machin
 
 #### 1. Generate an SSH key (if you don't already have one)
 
-On macOS or Linux:
+> **Use OpenSSH only.** The audit scripts shell out to `ssh` and `rsync`, which expect standard OpenSSH key files at `~/.ssh/id_ed25519` (or `id_rsa`). Generate the key with `ssh-keygen` from the **OpenSSH** suite that ships with macOS, every modern Linux distribution, and Windows WSL2 (Ubuntu preferred). PuTTY's `.ppk` format and other vendor key formats are **not** compatible — converting them to OpenSSH format is more friction than just generating a fresh OpenSSH key. If you're on Windows, do this inside a WSL2/Ubuntu terminal — **not** PowerShell, Command Prompt, Git Bash, Cygwin, or PuTTY. WSL2/Ubuntu ships OpenSSH out of the box, and the audit scripts run inside the same WSL2 environment.
+
+On macOS, Linux, or Windows-WSL2 (Ubuntu):
 
 ```
 ssh-keygen -t ed25519 -C "your-email@example.com"
 ```
 
 Press Enter to accept the default location (`~/.ssh/id_ed25519`). You can set a passphrase for extra protection or leave it empty for hands-off use.
+
+If you're on Windows and haven't installed WSL2 yet, jump to [Windows: the situation](#windows-the-situation) for the one-command install (it takes about 5 minutes including the reboot).
 
 #### 2. Copy your public key
 
@@ -943,27 +970,54 @@ A few smaller UX improvements:
 
 If you're responsible for more than one server, the fleet script runs the single-server audit on each one and then produces a combined report across all of them.
 
+#### Bundle workflow (recommended — for handing the audit off to a remediator)
+
+The cleanest workflow when an audit lead wants to hand the audit off to a remediator, manager, or vendor: bundle a `sites.json` file (the saved-sites list from `audit-remote.sh`) plus the two `.sh` scripts. The receiver drops the file into `~/.filecap/`, runs `./audit-fleet.sh`, and gets the full deliverable — no per-site typing, no CSV editing.
+
+The audit lead exports the bundle once, using the `x` option in the saved-sites menu (see [Sharing saved sites — auditor onboarding](#sharing-saved-sites--auditor-onboarding) above). The export writes `~/Desktop/icjia-sites.json` by default. Send that file to the remediator. The bundle contains hostnames, paths, nicknames, and public URLs only — no credentials.
+
+The receiver runs:
+
 ```bash
+# Drop the sites.json bundle you were handed into ~/.filecap/
+mkdir -p ~/.filecap
+mv /path/to/sites.json ~/.filecap/
+
+# Download both scripts
 curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
 curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
 chmod +x audit-fleet.sh audit-remote.sh
+
+# Run the fleet audit — sites.json is auto-detected
 ./audit-fleet.sh
 ```
 
-Or, if you have a list of servers ready, pass it as a CSV file:
+You can also pass a `.json` path explicitly: `./audit-fleet.sh /path/to/sites.json`.
+
+**SSH access is configured separately.** The bundle does not contain SSH keys. The receiver still needs their own OpenSSH key authorized on each target server (see [Setting up SSH access](#setting-up-ssh-access-one-time-before-your-first-run) above). On Windows, run everything inside WSL2/Ubuntu — never PowerShell, never Git Bash, never PuTTY.
+
+#### Alternative: ad-hoc CSV (no bundle)
+
+If you don't have a sites.json bundle and prefer to provide the server list inline, pass any non-`.json` file as a CSV (no header row; `#` lines are comments; trailing columns are optional):
 
 ```bash
 ./audit-fleet.sh servers.csv
 ```
 
-The servers.csv format (no header row; `#` lines are comments). An optional 5th column adds the website nickname:
-
 ```
-# server_name,user,host,remote_path[,site_name]
-dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR
+# server_name,user,host,remote_path[,site_name[,public_url_base]]
+dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads
 i2i-strapi-prod,forge,10.0.0.5,/var/strapi/uploads,i2i
 vpp-strapi-prod,forge,10.0.0.6,/var/strapi/uploads
-# (the third row has no site_name — that's allowed; old 4-column CSVs still work)
+# (4-, 5-, and 6-column rows all work — trailing columns are optional)
+```
+
+#### Fully interactive (no args, no bundle, no CSV)
+
+If neither `~/.filecap/sites.json` nor a positional CSV is provided, the script falls back to prompting interactively for each server:
+
+```bash
+./audit-fleet.sh
 ```
 
 Output lands in `~/filecap-audits/_fleet/<timestamp>/` and includes a per-server breakdown (`MANAGER_SUMMARY.txt`), a combined CSV (`audit-file-list.csv`) with one row per file across all servers, and a `duplicate_hashes.txt` that catches files that appear on multiple servers.
