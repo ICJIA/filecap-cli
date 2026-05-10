@@ -74,6 +74,38 @@
 
 set -euo pipefail
 
+FLEET_START_EPOCH=$(date +%s)
+
+# Format seconds as a human-readable duration: "1s", "45s", "2m 34s", "1h 15m"
+fmt_duration() {
+  local secs=$1
+  if [[ "$secs" -lt 1 ]]; then
+    echo "<1s"
+  elif [[ "$secs" -lt 60 ]]; then
+    echo "${secs}s"
+  elif [[ "$secs" -lt 3600 ]]; then
+    local m=$((secs / 60))
+    local s=$((secs % 60))
+    echo "${m}m ${s}s"
+  else
+    local h=$((secs / 3600))
+    local m=$(((secs % 3600) / 60))
+    echo "${h}h ${m}m"
+  fi
+}
+
+# Convert raw bytes to human-readable string (no external tools required)
+human_bytes() {
+  local b=$1
+  if [[ -z "$b" || "$b" == "?" ]]; then echo "?"; return; fi
+  awk -v b="$b" 'BEGIN {
+    if (b < 1024) printf "%d B", b
+    else if (b < 1024*1024) printf "%.1f KB", b/1024
+    else if (b < 1024*1024*1024) printf "%.1f MB", b/1024/1024
+    else printf "%.2f GB", b/1024/1024/1024
+  }'
+}
+
 # ── portable open helper ──────────────────────────────────────────────────────
 xopen() {
   if command -v open >/dev/null 2>&1; then
@@ -468,6 +500,10 @@ if [[ "${#URL_WARNINGS[@]}" -gt 0 ]]; then
   done
   warn "This may be a typo, network restriction, or the site being temporarily down."
 fi
+# If any servers failed SSH pre-validation, remind about SSH setup docs
+if [[ "$N_VALID" -lt "$N_TOTAL" ]]; then
+  echo "  -> For SSH failures, see the README's 'Setting up SSH access' section." >&2
+fi
 echo
 read -r -p "Proceed with audit of $N_VALID server(s)? [y/N]: " ans
 [[ "$ans" =~ ^[Yy]$ ]] || die "Aborted by user."
@@ -476,6 +512,11 @@ read -r -p "Proceed with audit of $N_VALID server(s)? [y/N]: " ans
 FAILED_SERVERS_TXT="${FLEET_DIR}/failed_servers.txt"
 SUCCESS_COUNT=0
 FAIL_COUNT=0
+
+# Per-server timing and stats arrays (parallel to VALID_INDEXES)
+declare -a SRV_DURATIONS=()
+declare -a SRV_FILE_COUNTS=()
+declare -a SRV_BYTE_COUNTS=()
 
 for i in "${VALID_INDEXES[@]}"; do
   SRV_NAME="${SRV_NAMES[$i]}"
@@ -487,7 +528,9 @@ for i in "${VALID_INDEXES[@]}"; do
 
   printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
 
+  SRV_PHASE_START=$(date +%s)
   if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+    SRV_DURATIONS+=("$(( $(date +%s) - SRV_PHASE_START ))")
     # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
     # Fall back to scanning runs/ directly in case the symlink is missing.
     SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/latest/inventory.ndjson"
@@ -502,16 +545,26 @@ for i in "${VALID_INDEXES[@]}"; do
       cp "$SRC_INVENTORY" "$DEST_INVENTORY"
       info "Copied inventory → ${DEST_INVENTORY}"
       (( SUCCESS_COUNT++ )) || true
+      # Read per-server stats from inventory footer
+      _srv_files=$(tail -1 "$SRC_INVENTORY" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('stats',{}).get('fileCount',0))" 2>/dev/null || echo "0")
+      _srv_bytes=$(tail -1 "$SRC_INVENTORY" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('stats',{}).get('totalBytes',0))" 2>/dev/null || echo "0")
+      SRV_FILE_COUNTS+=("${_srv_files:-0}")
+      SRV_BYTE_COUNTS+=("${_srv_bytes:-0}")
     else
       warn "audit-remote succeeded but inventory not found for: ${SRV_HOST}"
       printf "  %s — inventory file missing after audit\n" "$SRV_NAME" >> "$FAILED_SERVERS_TXT"
       (( FAIL_COUNT++ )) || true
+      SRV_FILE_COUNTS+=("0")
+      SRV_BYTE_COUNTS+=("0")
     fi
   else
+    SRV_DURATIONS+=("$(( $(date +%s) - SRV_PHASE_START ))")
     warn "Audit FAILED for ${SRV_NAME} (${SRV_HOST})"
     printf "  %s (host: %s, user: %s, path: %s) — audit-remote.sh exited non-zero\n" \
       "$SRV_NAME" "$SRV_HOST" "$SRV_USER" "$SRV_PATH" >> "$FAILED_SERVERS_TXT"
     (( FAIL_COUNT++ )) || true
+    SRV_FILE_COUNTS+=("0")
+    SRV_BYTE_COUNTS+=("0")
   fi
 done
 
@@ -1043,3 +1096,32 @@ if [[ -n "$HTML_FLAG" ]]; then
   printf "  %s\n" "${CONSOLIDATED_REPORT_DIR}/audit-file-list.html"
   xopen "${CONSOLIDATED_REPORT_DIR}/audit-file-list.html"
 fi
+
+# ── fleet postflight summary ──────────────────────────────────────────────────
+FLEET_DURATION=$(( $(date +%s) - FLEET_START_EPOCH ))
+
+echo
+echo "══════════════════════════════════════════════════════════════════════════"
+echo "  Fleet run completed in $(fmt_duration "$FLEET_DURATION")"
+echo "══════════════════════════════════════════════════════════════════════════"
+echo
+printf "  %-18s %-10s %s\n" "Site" "Time" "Stats"
+printf "  %-18s %-10s %s\n" "-----------------" "--------" "-----"
+total_files=0
+total_bytes=0
+for _idx in "${!SRV_DURATIONS[@]}"; do
+  _i="${VALID_INDEXES[$_idx]}"
+  _site="${SRV_SITES[$_i]:-${SRV_NAMES[$_i]}}"
+  _fcount="${SRV_FILE_COUNTS[$_idx]:-0}"
+  _bcount="${SRV_BYTE_COUNTS[$_idx]:-0}"
+  printf "  %-18s %-10s %s files · %s\n" \
+    "$_site" \
+    "$(fmt_duration "${SRV_DURATIONS[$_idx]}")" \
+    "$_fcount" \
+    "$(human_bytes "$_bcount")"
+  total_files=$((total_files + _fcount))
+  total_bytes=$((total_bytes + _bcount))
+done
+echo
+printf "  Fleet totals:        %d files · %s\n" "$total_files" "$(human_bytes "$total_bytes")"
+echo

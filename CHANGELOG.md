@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`--deploy` flag.** After building the bundle, run `netlify deploy --prod --dir <output>` automatically. Combines build + push into a single command. Requires `netlify` CLI installed and `netlify login` already done. Prints friendly install instructions if the CLI is missing at runtime.
 - **`--deploy-site <site-id>` flag.** Pass `--site <id>` to `netlify deploy` for non-linked sites.
 - **`audit-remote.sh` `w` menu now offers three password modes** (none / client-side / Netlify Site Password) plus an optional auto-deploy prompt after building.
+- **Postflight run summary.** After every successful `audit-remote.sh` run, a summary block prints showing total elapsed time, per-phase timings (SSH preflight, rsync, scan + introspect, report generation), bytes transferred, files updated, and inventory totals (file count, bytes, remediable count). For `audit-fleet.sh`, a per-server table shows timings, file counts, and byte counts side-by-side with fleet totals at the bottom. Helps auditors see where time is spent and spot anomalies (e.g., a server that suddenly takes 10× longer than usual).
+- **SSH-key setup docs.** New "Setting up SSH access" section in the README explains how to generate an Ed25519 keypair on macOS or Linux, what to email IDS, and how to verify access. The audit scripts' SSH-preflight failure message now points at this section and explicitly mentions contacting IDS.
 
 ### Changed
 

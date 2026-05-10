@@ -682,6 +682,68 @@ Check this list before running anything. All five items are required.
 
 5. **`bash`, `ssh`, `rsync`, and `python3` available.** These are pre-installed on every Mac (macOS 12+), every modern Ubuntu/Debian Linux, and every WSL2/Ubuntu environment. You don't need to do anything. The scripts check for these at startup and tell you if something is missing.
 
+### Setting up SSH access (one-time, before your first run)
+
+The audit scripts need SSH access from your machine into each ICJIA server. **Vendors who only receive the resulting CSV/HTML don't need this** — only people running the script do.
+
+If you're a remediation vendor receiving an audit deliverable, skip ahead to "How to use it" — you don't need SSH access; you just open the CSV/HTML.
+
+If you're an auditor or manager who will run the script, do this once per machine:
+
+#### 1. Generate an SSH key (if you don't already have one)
+
+On macOS or Linux:
+
+```
+ssh-keygen -t ed25519 -C "your-email@example.com"
+```
+
+Press Enter to accept the default location (`~/.ssh/id_ed25519`). You can set a passphrase for extra protection or leave it empty for hands-off use.
+
+#### 2. Copy your public key
+
+On macOS:
+
+```
+cat ~/.ssh/id_ed25519.pub | pbcopy
+```
+
+On Linux:
+
+```
+cat ~/.ssh/id_ed25519.pub
+```
+
+(Then select-and-copy from the terminal.)
+
+The public key is the file ending in `.pub`. The matching private key (without `.pub`) stays on your machine and is never shared.
+
+#### 3. Send the public key to IDS
+
+Email the contents of `id_ed25519.pub` to ICJIA's IDS team and ask them to add it to the `forge` user's `~/.ssh/authorized_keys` on each audit server you need access to. Include in the email:
+
+- Which servers you need (e.g., DVFR, i2i, VPP, intranet)
+- The SSH user (almost always `forge`)
+- Your contact info
+- The public key content (the entire single-line `ssh-ed25519 AAAA... your-email@example.com` blob)
+
+#### 4. Verify access
+
+Once IDS confirms the key is installed, test it:
+
+```
+ssh forge@<server-ip> "echo OK"
+```
+
+If it prints `OK` without prompting for a password, you're set up. If it prompts for a password, the key isn't installed yet — follow up with IDS.
+
+### Common SSH issues
+
+- **"Permission denied (publickey)"** — the public key isn't on the server yet. Re-confirm with IDS that they added the right key to the right user.
+- **"Host key verification failed"** — first-time connection. Type `yes` to accept the host's fingerprint.
+- **"Connection refused"** — the server's SSH daemon isn't responding. Check with IDS that the server is up.
+- **No prompt at all, just hangs** — networking / firewall issue. May need to be on a specific VPN or IP allowlist; check with IDS.
+
 ### How to use it (single server)
 
 Three commands. The first downloads the script, the second makes it executable, the third runs it:

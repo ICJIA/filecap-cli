@@ -84,6 +84,38 @@
 
 set -euo pipefail
 
+RUN_START_EPOCH=$(date +%s)
+
+# Format seconds as a human-readable duration: "1s", "45s", "2m 34s", "1h 15m"
+fmt_duration() {
+  local secs=$1
+  if [[ "$secs" -lt 1 ]]; then
+    echo "<1s"
+  elif [[ "$secs" -lt 60 ]]; then
+    echo "${secs}s"
+  elif [[ "$secs" -lt 3600 ]]; then
+    local m=$((secs / 60))
+    local s=$((secs % 60))
+    echo "${m}m ${s}s"
+  else
+    local h=$((secs / 3600))
+    local m=$(((secs % 3600) / 60))
+    echo "${h}h ${m}m"
+  fi
+}
+
+# Convert raw bytes to human-readable string (no external tools required)
+human_bytes() {
+  local b=$1
+  if [[ -z "$b" || "$b" == "?" ]]; then echo "?"; return; fi
+  awk -v b="$b" 'BEGIN {
+    if (b < 1024) printf "%d B", b
+    else if (b < 1024*1024) printf "%.1f KB", b/1024
+    else if (b < 1024*1024*1024) printf "%.1f MB", b/1024/1024
+    else printf "%.2f GB", b/1024/1024/1024
+  }'
+}
+
 # ── portable open helper ──────────────────────────────────────────────────────
 xopen() {
   if command -v open >/dev/null 2>&1; then
@@ -978,10 +1010,29 @@ AUDIT_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 info "Wrote ${THIS_RUN_DIR}/SOURCE_INFO.txt"
 
 # ── SSH sanity check ──────────────────────────────────────────────────────────
+SSH_PHASE_START=$(date +%s)
 step "Verifying SSH connectivity to ${SSH_USER}@${HOST} ..."
 if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "${SSH_USER}@${HOST}" true 2>/dev/null; then
-  die "Cannot SSH to ${SSH_USER}@${HOST}. Check your SSH config / keys and retry."
+  echo
+  echo -e "${R}ERROR:${N} Cannot SSH to ${SSH_USER}@${HOST}." >&2
+  echo >&2
+  echo "Most likely cause: your SSH public key isn't on the server yet." >&2
+  echo >&2
+  echo "To set up access:" >&2
+  echo "  1. Generate a key (one-time):  ssh-keygen -t ed25519 -C \"you@example.com\"" >&2
+  echo "  2. Copy ~/.ssh/id_ed25519.pub  (the .pub file, not the private key)" >&2
+  echo "  3. Email the public key to ICJIA IDS, asking them to add it to" >&2
+  echo "     forge@${HOST}:~/.ssh/authorized_keys" >&2
+  echo "  4. Re-run this script after IDS confirms" >&2
+  echo >&2
+  echo "If you already have key-based access, check ssh-agent and try:" >&2
+  echo "  ssh ${SSH_USER}@${HOST} \"echo OK\"" >&2
+  echo >&2
+  echo "See the README's 'Setting up SSH access' section for full setup details:" >&2
+  echo "  https://github.com/ICJIA/filecap-cli#setting-up-ssh-access" >&2
+  exit 1
 fi
+SSH_PHASE_DURATION=$(( $(date +%s) - SSH_PHASE_START ))
 info "SSH OK"
 
 # ── verify remote path ────────────────────────────────────────────────────────
@@ -1044,6 +1095,13 @@ info "Remote Node: ${REMOTE_NODE} (major=${REMOTE_NODE_MAJOR})"
 # ── scan ──────────────────────────────────────────────────────────────────────
 INVENTORY="${THIS_RUN_DIR}/inventory.ndjson"
 
+# Phase timing placeholders (rsync only used in local mode)
+RSYNC_PHASE_DURATION=0
+RSYNC_BYTES="?"
+RSYNC_FILES="?"
+
+SCAN_PHASE_START=$(date +%s)
+
 if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
   # ─ native mode: filecap runs on the remote, NDJSON streams back ─────────────
   step "Mode: NATIVE (remote Node ${REMOTE_NODE} >= 20 — scan runs on the server)"
@@ -1072,11 +1130,26 @@ else
   info "This is expected for Ubuntu 18.04 / Node 16 servers."
   info "Step 1/2: rsyncing ${SSH_USER}@${HOST}:${REMOTE_PATH}/ → ${MIRROR_DIR}/"
 
-  if ! rsync -av --delete \
+  RSYNC_PHASE_START=$(date +%s)
+  RSYNC_TMPOUT=$(mktemp)
+  if ! rsync -av --delete --stats \
       "${SSH_USER}@${HOST}:${REMOTE_PATH}/" \
-      "${MIRROR_DIR}/" 2>&1; then
+      "${MIRROR_DIR}/" 2>&1 | tee "${RSYNC_TMPOUT}"; then
+    rm -f "${RSYNC_TMPOUT}"
     die "rsync failed. Check SSH connectivity / permissions and retry."
   fi
+  RSYNC_PHASE_DURATION=$(( $(date +%s) - RSYNC_PHASE_START ))
+  # Parse rsync --stats output for transferred counts
+  RSYNC_FILES=$(grep -i 'Number of regular files transferred:' "${RSYNC_TMPOUT}" 2>/dev/null | awk '{print $NF}' | tr -d ',')
+  RSYNC_BYTES=$(grep -i 'Total transferred file size:' "${RSYNC_TMPOUT}" 2>/dev/null | awk '{print $NF}' | tr -d ',')
+  # macOS rsync may report "Total transferred file size: 1,234 bytes" — strip commas
+  RSYNC_BYTES=$(echo "${RSYNC_BYTES}" | tr -d ',')
+  [[ -z "$RSYNC_FILES" ]] && RSYNC_FILES="?"
+  [[ -z "$RSYNC_BYTES" || ! "$RSYNC_BYTES" =~ ^[0-9]+$ ]] && RSYNC_BYTES="?"
+  rm -f "${RSYNC_TMPOUT}"
+
+  # Reset scan timer — scan phase begins after rsync
+  SCAN_PHASE_START=$(date +%s)
 
   info "Step 2/2: scanning local mirror with filecap ..."
   # Build scan args array; include optional flags only when non-empty
@@ -1089,6 +1162,8 @@ else
     die "Local filecap scan failed. Check stderr above for details."
   fi
 fi
+
+SCAN_PHASE_DURATION=$(( $(date +%s) - SCAN_PHASE_START ))
 
 # ── path rewrite (CRITICAL) ───────────────────────────────────────────────────
 # Rewrite scannedPath / hostname in the header and absolutePath in entries so
@@ -1143,11 +1218,13 @@ except Exception as e:
 PYREWRITE
 
 # ── generate report ───────────────────────────────────────────────────────────
+REPORT_PHASE_START=$(date +%s)
 step "Generating filecap report ..."
 if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" ${HTML_FLAG} \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap report generation failed."
 fi
+REPORT_PHASE_DURATION=$(( $(date +%s) - REPORT_PHASE_START ))
 
 # ── update 'latest' symlink ───────────────────────────────────────────────────
 # Use rm-then-ln inside a subshell to avoid macOS mv-symlink quirks.
@@ -1190,3 +1267,53 @@ fi
 echo
 info "Past runs for this server:"
 ls -1t "${WORK_DIR}/runs" 2>/dev/null | head -5 | sed 's/^/  /'
+
+# ── postflight run summary ────────────────────────────────────────────────────
+TOTAL_DURATION=$(( $(date +%s) - RUN_START_EPOCH ))
+
+INV_FILES=$(tail -1 "${INVENTORY}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('stats', {}).get('fileCount', '?'))" 2>/dev/null || echo '?')
+INV_BYTES=$(tail -1 "${INVENTORY}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('stats', {}).get('totalBytes', '?'))" 2>/dev/null || echo '?')
+INV_FAILURES=$(tail -1 "${INVENTORY}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('stats', {}).get('introspectionFailures', '?'))" 2>/dev/null || echo '?')
+
+INV_HUMAN="?"
+if [[ "$INV_BYTES" =~ ^[0-9]+$ ]]; then
+  INV_HUMAN=$(human_bytes "$INV_BYTES")
+fi
+
+# Compute remediable count from CSV (column 5 'Remediation needed?' starting with 'Yes')
+REM_COUNT=$(awk -F'","' 'NR>1 && $5 ~ /^"?Yes/' "${REPORT_DIR}/audit-file-list.csv" 2>/dev/null | wc -l | tr -d ' ' || echo '?')
+
+CSV_BYTES=$(stat -f%z "${REPORT_DIR}/audit-file-list.csv" 2>/dev/null || stat -c%s "${REPORT_DIR}/audit-file-list.csv" 2>/dev/null || echo '?')
+HTML_BYTES="?"
+if [[ -n "$HTML_FLAG" && -f "${REPORT_DIR}/audit-file-list.html" ]]; then
+  HTML_BYTES=$(stat -f%z "${REPORT_DIR}/audit-file-list.html" 2>/dev/null || stat -c%s "${REPORT_DIR}/audit-file-list.html" 2>/dev/null || echo '?')
+fi
+
+CSV_HUMAN="?"
+[[ "$CSV_BYTES" =~ ^[0-9]+$ ]] && CSV_HUMAN=$(human_bytes "$CSV_BYTES")
+HTML_HUMAN="?"
+[[ "$HTML_BYTES" =~ ^[0-9]+$ ]] && HTML_HUMAN=$(human_bytes "$HTML_BYTES")
+
+RSYNC_BYTES_HUMAN="?"
+[[ "$RSYNC_BYTES" =~ ^[0-9]+$ ]] && RSYNC_BYTES_HUMAN=$(human_bytes "$RSYNC_BYTES")
+
+echo
+echo "══════════════════════════════════════════════════════════════════════════"
+echo "  Run completed in $(fmt_duration "$TOTAL_DURATION")"
+echo "══════════════════════════════════════════════════════════════════════════"
+echo
+printf "  %-22s %-12s %s\n" "Phase" "Duration" "Notes"
+printf "  %-22s %-12s %s\n" "--------------------" "----------" "----------------------------------------"
+printf "  %-22s %-12s ${G}%s${N}\n" "SSH preflight" "$(fmt_duration "$SSH_PHASE_DURATION")" "${SSH_USER}@${HOST} — OK"
+if [[ "$RSYNC_PHASE_DURATION" -gt 0 ]]; then
+  printf "  %-22s %-12s %s\n" "rsync mirror" "$(fmt_duration "$RSYNC_PHASE_DURATION")" "${RSYNC_BYTES_HUMAN} transferred, ${RSYNC_FILES} files updated"
+fi
+printf "  %-22s %-12s %s\n" "Scan + introspect" "$(fmt_duration "$SCAN_PHASE_DURATION")" "${INV_FAILURES} introspection failures"
+if [[ -n "$HTML_FLAG" ]]; then
+  printf "  %-22s %-12s %s\n" "Report generation" "$(fmt_duration "$REPORT_PHASE_DURATION")" "CSV (${CSV_HUMAN}), HTML (${HTML_HUMAN})"
+else
+  printf "  %-22s %-12s %s\n" "Report generation" "$(fmt_duration "$REPORT_PHASE_DURATION")" "CSV (${CSV_HUMAN})"
+fi
+echo
+printf "  Inventory:           %s files · %s · %s need remediation\n" "${INV_FILES}" "${INV_HUMAN}" "${REM_COUNT}"
+echo
