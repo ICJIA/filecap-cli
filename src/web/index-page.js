@@ -212,7 +212,7 @@ body {
   font-size: 15px;
   line-height: 1.6;
   color: #e5e5e5;
-  background: #0a0a0a;
+  background: #0d1117;
   margin: 0;
   padding: 0;
 }
@@ -237,8 +237,8 @@ h2 {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #161616;
-  border-bottom: 1px solid #2a2a2a;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
   padding: 0.75rem 2rem;
   display: flex;
   align-items: center;
@@ -267,8 +267,8 @@ main {
 
 /* ── hero / fleet totals ─────────────────────────────────────── */
 .hero {
-  background: #161616;
-  border: 1px solid #2a2a2a;
+  background: #161b22;
+  border: 1px solid #21262d;
   border-radius: 12px;
   padding: 2rem;
   margin-bottom: 2.5rem;
@@ -326,8 +326,8 @@ main {
 
 /* ── site card ───────────────────────────────────────────────── */
 .site-card {
-  background: #161616;
-  border: 1px solid #2a2a2a;
+  background: #161b22;
+  border: 1px solid #21262d;
   border-radius: 12px;
   padding: 1.5em;
   display: flex;
@@ -336,7 +336,7 @@ main {
   transition: border-color 150ms ease-out, transform 150ms ease-out;
 }
 .site-card:hover {
-  border-color: #404040;
+  border-color: #30363d;
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
@@ -416,17 +416,17 @@ main {
 }
 .btn-primary {
   background: #60a5fa;
-  color: #0a0a0a;
+  color: #0d1117;
 }
 .btn-primary:hover {
   background: #93c5fd;
-  color: #0a0a0a;
+  color: #0d1117;
   text-decoration: none;
 }
 .btn-secondary {
   background: transparent;
   color: #60a5fa;
-  border: 1px solid #404040;
+  border: 1px solid #30363d;
 }
 .btn-secondary:hover {
   border-color: #60a5fa;
@@ -436,7 +436,7 @@ main {
 
 /* ── footer ─────────────────────────────────────────────────── */
 .site-footer {
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid #21262d;
   padding: 1.5rem 2rem;
   max-width: 1200px;
   margin: 0 auto;

@@ -41,7 +41,7 @@ export function injectPasswordGate(html, hexHash) {
   while (true) {
     const pw = prompt("Password:");
     if (pw === null) {
-      document.body.innerHTML = "<p style=\\"font-family:sans-serif;padding:2em;color:#e5e5e5;background:#0a0a0a;min-height:100vh\\">Authentication cancelled.</p>";
+      document.body.innerHTML = "<p style=\\"font-family:sans-serif;padding:2em;color:#e5e5e5;background:#0d1117;min-height:100vh\\">Authentication cancelled.</p>";
       return;
     }
     const h = await sha(pw);

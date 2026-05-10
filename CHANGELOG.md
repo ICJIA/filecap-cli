@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] — 2026-05-10
+
+### Changed
+
+- **Dark-mode palette warmed up to GitHub-Dark / Nuxt-style cool navy** instead of pure gray-black. Background `#0a0a0a` → `#0d1117`; card backgrounds `#161616` → `#161b22`; sunken backgrounds `#050505` → `#010409`; subtle borders `#2a2a2a` → `#21262d`; strong borders `#404040` → `#30363d`. Gives the bundle and per-site reports a slightly polished navy tint without being dramatically blue. Applies to web-rollup index, per-site HTML reports, and any direct `filecap report --html` output.
+
+[1.2.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.2.1
+
 ## [1.2.0] — 2026-05-10
 
 ### Added

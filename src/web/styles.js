@@ -7,11 +7,11 @@
  * search-and-replace across files.
  *
  * Color palette:
- *   Background base:     #0a0a0a
- *   Background elevated: #161616
- *   Background sunken:   #050505
- *   Border subtle:       #2a2a2a
- *   Border strong:       #404040
+ *   Background base:     #0d1117
+ *   Background elevated: #161b22
+ *   Background sunken:   #010409
+ *   Border subtle:       #21262d
+ *   Border strong:       #30363d
  *   Text primary:        #e5e5e5
  *   Text secondary:      #999999
  *   Text muted:          #666666
@@ -24,11 +24,11 @@
  */
 
 export const DESIGN_TOKENS = {
-  bgBase: "#0a0a0a",
-  bgElevated: "#161616",
-  bgSunken: "#050505",
-  borderSubtle: "#2a2a2a",
-  borderStrong: "#404040",
+  bgBase: "#0d1117",
+  bgElevated: "#161b22",
+  bgSunken: "#010409",
+  borderSubtle: "#21262d",
+  borderStrong: "#30363d",
   textPrimary: "#e5e5e5",
   textSecondary: "#999999",
   textMuted: "#666666",
