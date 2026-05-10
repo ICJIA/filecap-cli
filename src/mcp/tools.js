@@ -1,6 +1,7 @@
 import { runScan } from "../commands/scan.js";
 import { runRollup } from "../commands/rollup.js";
 import { runReport } from "../commands/report.js";
+import { runWebRollup } from "../commands/web-rollup.js";
 import { queryInventory } from "./query.js";
 
 export const TOOL_DEFINITIONS = [
@@ -49,6 +50,23 @@ export const TOOL_DEFINITIONS = [
         html: { type: "boolean", description: "Also write a self-contained HTML report (default false)" },
       },
       required: ["input", "outputDir"],
+    },
+  },
+  {
+    name: "filecap_web_rollup",
+    description:
+      "Bundle the most recent scans of every saved site into a static-site directory ready for manual upload to Netlify or any static host. Output: a self-contained directory containing index.html (fleet overview), per-site HTML reports, downloadable CSVs, robots.txt blocking indexing, and an optional client-side password gate.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        output: { type: "string", description: "Output directory" },
+        password: { type: "string", description: "Plaintext password (hashed at build time, never stored)" },
+        title: { type: "string", description: "Title for the index page" },
+        includeSite: { type: "array", items: { type: "string" }, description: "Only bundle these site nicknames" },
+        excludeSite: { type: "array", items: { type: "string" }, description: "Skip these site nicknames" },
+        sitesFile: { type: "string", description: "Override saved-sites JSON path" },
+      },
+      required: ["output"],
     },
   },
   {
@@ -114,6 +132,17 @@ export async function dispatchTool(name, args) {
         input: args.input,
         outputDir: args.outputDir,
         html: args.html ?? false,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+    if (name === "filecap_web_rollup") {
+      const result = await runWebRollup({
+        output: args.output,
+        password: args.password ?? null,
+        title: args.title ?? "filecap audit fleet snapshot",
+        includeSite: args.includeSite ?? [],
+        excludeSite: args.excludeSite ?? [],
+        sitesFile: args.sitesFile ?? null,
       });
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
