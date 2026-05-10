@@ -7,6 +7,7 @@ import { runRollup } from "../src/commands/rollup.js";
 import { runReport } from "../src/commands/report.js";
 import { runMcp } from "../src/commands/mcp.js";
 import { runWebRollup } from "../src/commands/web-rollup.js";
+import { loadConfig } from "../src/config/load.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
 
@@ -148,13 +149,24 @@ program
       process.stderr.write("WARN: --password is ignored when --no-client-gate is set.\n");
     }
 
+    let config;
+    try {
+      config = loadConfig();
+    } catch (err) {
+      process.stderr.write(`filecap web-rollup error: ${err.message}\n`);
+      process.exit(1);
+    }
+    const wrCfg = config.webRollup ?? {};
+    const deploy = opts.deploy ?? wrCfg.autoDeploy ?? false;
+    const deploySite = opts.deploySite ?? wrCfg.deploySite ?? null;
+
     try {
       const result = await runWebRollup({
         output,
         password,
         noClientGate,
-        deploy: opts.deploy ?? false,
-        deploySite: opts.deploySite ?? null,
+        deploy,
+        deploySite,
         title: opts.title,
         includeSite: opts.includeSite ?? [],
         excludeSite: opts.excludeSite ?? [],

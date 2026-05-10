@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] — 2026-05-10
+
+### Added
+
+- **`~/.filecap/config.json` user-config file with `webRollup.autoDeploy`.** When `webRollup.autoDeploy` is `true`, `filecap web-rollup` always runs `netlify deploy --prod` on completion — no `--deploy` flag needed. The CLI flag still wins when present, so the config only fills in defaults. Optional `webRollup.deploySite` (passed to `netlify deploy --site`) covers cases where the working directory isn't already linked. Config is validated against a Zod schema on load; unknown fields, typos, and wrong types fail loudly with a named error rather than being silently ignored. Loader returns `{}` cleanly when the file doesn't exist, so existing users see no behavior change unless they opt in.
+
+[1.3.2]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.3.2
+
 ## [1.3.1] — 2026-05-10
 
 ### Fixed

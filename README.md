@@ -1304,6 +1304,35 @@ filecap web-rollup --output ~/Desktop/icjia-fleet --no-client-gate --deploy
 
 The bundle's `netlify.toml` ensures Netlify sees the correct publish directory + cache headers automatically; you don't have to configure those in the dashboard.
 
+### Auto-deploying every snapshot — `~/.filecap/config.json`
+
+If you always want `filecap web-rollup` to deploy on completion (no `--deploy` flag, every time), drop a `config.json` next to your `sites.json`:
+
+```json
+{
+  "version": 1,
+  "webRollup": {
+    "autoDeploy": true
+  }
+}
+```
+
+With that file in place, plain `filecap web-rollup` builds **and** deploys to Netlify. Pass `--deploy` on the CLI to override (it always wins). Both `--deploy` and `--deploy-site` on the CLI take precedence over the config; the config only fills in defaults when the flag is absent. To temporarily skip auto-deploy, comment out `autoDeploy` in the config or move the file aside.
+
+The config file is validated on load: unknown top-level fields, typos in `webRollup` keys (e.g., `autodeploy` instead of `autoDeploy`), or wrong types (string instead of boolean) cause an immediate, named error rather than silently being ignored.
+
+```json
+{
+  "version": 1,
+  "webRollup": {
+    "autoDeploy": true,
+    "deploySite": "abc123-your-netlify-site-id"
+  }
+}
+```
+
+`deploySite` is optional — only needed if your local working directory isn't already linked to a Netlify site (`netlify link`). For the common case where the dir is linked, leave `deploySite` unset.
+
 ### The netlify.toml that ships with every bundle
 
 The auto-generated `netlify.toml` sets:
