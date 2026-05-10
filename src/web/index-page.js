@@ -115,15 +115,24 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
     const datesText = (newest && oldest && newest !== oldest)
       ? `${he(fmtDate(newest))} <span class="dup-dim">↓</span> ${he(fmtDate(oldest))}`
       : he(newest ? fmtDate(newest) : "—");
+    const sitesText = items.map((i) => i.siteName || i.serverName || "").join(", ");
     return `<tr>
-      <td class="dup-filename">${he(g.normalizedFilename)}</td>
+      <td title="${he(g.normalizedFilename)}">${he(g.normalizedFilename)}</td>
       <td>${matchBadge}</td>
-      <td>${sites}</td>
+      <td title="${he(sitesText)}">${sites}</td>
       <td class="num">${he(String(items.length))}</td>
-      <td class="dup-dates">${datesText}</td>
+      <td title="${he(datesPlain(items))}">${datesText}</td>
       <td class="num">${he(humanBytes(totalBytes))}</td>
     </tr>`;
   });
+
+  // Plain-text dates for the title tooltip (no markup, friendly for SR users).
+  function datesPlain(items) {
+    const dates = items.map((i) => i.modifiedAt).filter(Boolean).sort();
+    if (dates.length === 0) return "—";
+    if (dates.length === 1) return fmtDate(dates[0]);
+    return `Newest ${fmtDate(dates[dates.length - 1])}, oldest ${fmtDate(dates[0])}`;
+  }
 
   const csvDownloadHtml = duplicatesCsv && duplicatesCsv.filename
     ? `<p class="dup-csv-download">
@@ -921,79 +930,73 @@ main {
   user-select: none;
 }
 .dup-pan-wrap.is-panning * { user-select: none !important; }
+/* Mirror the per-site report table styling exactly (src/report/html.js)
+   so every data table in the app looks the same: 12px tabular type, tight
+   padding, alternating dark stripes, brighter hover row, sticky thead +
+   sticky first column. Auto-sized columns — content drives width via
+   width:max-content; no per-column min-widths, so the "Sites" column
+   shrinks to its longest cell instead of leaving blank space. Cells use
+   white-space:nowrap + max-width:320px + ellipsis to clip very long
+   filenames; the full text is in a title= tooltip on the cell. */
 .dup-table {
   border-collapse: collapse;
-  /* width:max-content sizes the table exactly to its content — no trailing
-     padding to the right when the table is narrower than the viewport. The
-     last column meets the wrapper's right edge. */
   width: max-content;
-  font-size: 0.9rem;
+  font-size: 12px;
 }
-.dup-table .dup-col-sites a {
-  color: #58a6ff;
-  text-decoration: none;
+.dup-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #161b22;
 }
-.dup-table .dup-col-sites a:hover { text-decoration: underline; }
-.dup-table .dup-col-sites a:focus-visible {
+.dup-table thead th {
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 2px solid #21262d;
+  color: #e5e5e5;
+  font-weight: 600;
+}
+.dup-table tbody tr:nth-child(even) { background: #0c0c0c; }
+.dup-table tbody tr:nth-child(odd)  { background: #0d1117; }
+.dup-table tbody tr:hover { background: #1a1a1a; }
+.dup-table td {
+  padding: 0.35rem 0.65rem;
+  white-space: nowrap;
+  border-bottom: 1px solid #1a1a1a;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #e5e5e5;
+  vertical-align: top;
+}
+.dup-table td a { color: #60a5fa; text-decoration: none; }
+.dup-table td a:hover { color: #93c5fd; text-decoration: underline; }
+.dup-table td a:focus-visible {
   outline: 2px solid #58a6ff;
   outline-offset: 2px;
   border-radius: 2px;
 }
-.dup-table th, .dup-table td {
-  padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid #21262d;
-  text-align: left;
-  vertical-align: top;
-  white-space: nowrap;
-}
-.dup-table thead th {
-  position: sticky;
-  top: 0;
-  background: #161b22;
-  color: #c9d1d9;
-  z-index: 2;
-  border-bottom: 1px solid #30363d;
-  font-weight: 600;
-}
-.dup-table tbody tr:hover { background: #1c2128; }
-.dup-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
 
-/* Per-column sizing — keeps each column legible without crushing the wide
-   columns (filename, sites, dates) into 1-word strips. The table sets
-   width:max-content so anything over the viewport scrolls horizontally
-   rather than wrapping. */
-.dup-col-filename { min-width: 28ch; }
-.dup-col-match    { min-width: 10ch; }
-.dup-col-sites    { min-width: 18ch; }
-.dup-col-copies   { min-width: 7ch; text-align: right; }
-.dup-col-dates    { min-width: 24ch; }
-.dup-col-size     { min-width: 9ch; text-align: right; }
-
-.dup-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.dup-table td.dup-hash { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #8b949e; }
-.dup-filename {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  color: #c9d1d9;
+/* Sticky first column (filename) — keeps the row's identity visible when
+   the user scrolls right. Background is set explicitly per stripe so the
+   sticky cell doesn't show the row behind it bleeding through. */
+.dup-table th:first-child,
+.dup-table td:first-child {
   position: sticky;
   left: 0;
-  background: #0d1117;
   z-index: 1;
   border-right: 1px solid #21262d;
-  /* Filename can be long — wrap inside the sticky cell rather than blow
-     the column out to 80+ chars. */
-  white-space: normal !important;
-  word-break: break-word;
-  max-width: 42ch;
 }
-.dup-table tbody tr:nth-child(even) .dup-filename { background: #0e141b; }
-.dup-table tbody tr:hover .dup-filename { background: #1c2128; }
-.dup-table thead th.dup-col-filename {
-  position: sticky;
-  left: 0;
-  z-index: 3;
+.dup-table thead th:first-child {
   background: #161b22;
-  border-right: 1px solid #30363d;
+  z-index: 3;
 }
+.dup-table tbody tr:nth-child(even) td:first-child { background: #0c0c0c; }
+.dup-table tbody tr:nth-child(odd)  td:first-child { background: #0d1117; }
+.dup-table tbody tr:hover td:first-child { background: #1a1a1a; }
+
+.dup-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dup-dates { font-size: 0.85rem; color: #c9d1d9; white-space: nowrap; }
 .dup-dim { color: #6e7681; padding: 0 0.2rem; }
 .dup-csv-download {

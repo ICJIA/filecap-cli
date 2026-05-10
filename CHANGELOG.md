@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.6] — 2026-05-10
+
+### Changed
+
+- **Duplicates summary table now uses the same visual styling as the per-site report tables.** 12px tabular type, tight padding (`0.45rem 0.65rem` thead / `0.35rem 0.65rem` td), alternating row stripes (`#0c0c0c` / `#0d1117`), hover row (`#1a1a1a`), sticky thead, sticky first column, link color `#60a5fa`. Every data table in the app now looks the same.
+- **Sites column (and every other column) auto-sizes to its content** — dropped per-column `min-width` rules that were forcing extra width. The "Sites" column was particularly weirdly wide before (~18ch min) because some rows had many comma-separated sites; now it shrinks to whatever the longest cell needs.
+- Cells use `white-space: nowrap` + `max-width: 320px` + `text-overflow: ellipsis` (matching the per-site tables). Full text is in a `title=` tooltip on every clipped cell, so hover reveals the complete filename / site list / date range.
+
+[1.5.6]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.5.6
+
 ## [1.5.5] — 2026-05-10
 
 ### Changed
