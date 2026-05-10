@@ -53,7 +53,7 @@ ESM-only. Node 20+ required. ~27 test files; 288 tests via vitest. Source under 
 
 ## TL;DR for vendors and auditors
 
-You receive an `audit-file-list.csv` (30 columns, one row per file) with everything needed to scope and quote a remediation engagement:
+You receive an `audit-file-list.csv` (14 columns, one row per file) with everything needed to scope and quote a remediation engagement:
 
 - **Identification**: server name, website nickname, server IP, source folder on server, file location, full path, public URL, filename, extension, category.
 - **Filesystem metadata**: size in bytes, last-modified timestamp, SHA-256 content hash (for cross-server dedup detection), duplicate-of reference.
@@ -122,13 +122,15 @@ The summary below is for managers and auditors.
 ### What we protect
 
 - **Auditor credentials.** SSH keys and any `FILECAP_AUDIT_TOKEN` env var never appear in any output, log, or transcript.
+- **Bearer tokens (1.3.3+).** JWT bearer tokens for sites whose public URL requires auth (`intranet` in the ICJIA fleet) live in `~/.filecap/secrets.json` (mode `0600`) or a `FILECAP_BEARER_TOKEN_<SERVER_NAME>` env var. The token is fed to `curl` via stdin (`--header @-`), never argv, so it does not appear in `ps aux`. `secrets.json` is never bundled, never exported via the saved-sites menu, never sent to a remediator.
 - **Shell injection.** Every variable interpolated into SSH remote-command strings is quoted via `printf '%q'` to prevent command injection from malicious site configs.
 - **rsync symlink escape.** The `--no-links` flag prevents a compromised remote server from using symlinks to copy files outside the intended uploads directory.
 - **The audit script** verifies its own SHA-256 against the GitHub `main` branch on every run (`--no-version-check` to skip).
 - **The published npm package** uses `npm pack` + explicit-tarball publish with 2FA-required publishes.
 - **Network transit** is HTTPS for the audit-remote.sh download (raw.githubusercontent.com), npm package install, and Netlify deployment.
-- **Bundle privacy** uses Netlify's server-side Site Password (paid plan) — recommended for any non-public content.
+- **Bundle privacy** uses Netlify's server-side Site Password (Pro plan) — gates **every** file in the bundle including the master CSV (verified HTTP 401 on both the index and `audit-file-list-master.csv` for the production deployment).
 - **Output directory** `~/filecap-audits/<server-name>/` is created with mode 700 (user-only readable).
+- **Configuration files** at `~/.filecap/config.json` (autoDeploy + deploySite) and `~/.filecap/secrets.json` (bearer tokens) — schema-validated on load via Zod (strict mode rejects unknown fields, catches typos). Both files mode-0600.
 - **MCP scan path restriction.** Set `FILECAP_MCP_ALLOWED_PATHS` (colon-separated absolute paths) to restrict which directories an AI agent can scan.
 
 ### What we don't protect (residual risk)
@@ -139,7 +141,28 @@ The summary below is for managers and auditors.
 - **The Netlify bundle URL** is not secret. `robots.txt` blocks search-engine indexing, but the URL could leak via browser history or link sharing. Netlify Site Password provides the recommended protection.
 - **Initial `curl audit-remote.sh` download.** The self-version-check detects post-download tampering, but not initial-fetch tampering. For maximum verifiability, download from a specific commit SHA URL rather than `main`.
 
-### Audit findings summary (1.3.0)
+### Live deployment posture (1.5.6)
+
+The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app was reviewed for deployment-specific risks after the initial deploy:
+
+| Check | Status |
+|---|---|
+| **TLS** | ✓ HTTP/2 over TLS 1.3 (Netlify managed certificate, auto-renewed) |
+| **HSTS** | ✓ `strict-transport-security` set by Netlify edge |
+| **`robots.txt`** | ✓ `User-agent: *` + `Disallow: /` — blocks every path for every compliant crawler |
+| **`X-Robots-Tag`** | ✓ `noindex, nofollow` on all HTML pages |
+| **CSV serving** | ✓ `Content-Disposition: attachment` + `Cache-Control: max-age=3600`; Netlify Site Password gates these too (returns 401 to unauthenticated requests) |
+| **Site Password gate** | ✓ Netlify Pro Site Password set via dashboard — server-side enforcement covers every file (verified HTTP 401 on `/`, `/audit-file-list-master.csv`, and a per-site report) |
+| **Security headers (all paths)** | ✓ `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` |
+| **Deploy previews** | Netlify deploy preview URLs inherit the site password setting by default; no separate exposure |
+| **Search engine indexing** | Belt-and-suspenders: robots.txt blocks crawlers; `X-Robots-Tag` blocks indexing of any page that gets crawled anyway; the URL pattern is non-discoverable (no inbound links from public sites); password gate blocks content delivery regardless |
+| **Bundle URL secrecy** | URL is not secret; could leak via browser history or link sharing. Site Password is the real protection. |
+
+The deployment review did **not** find new findings beyond the 1.3.0 audit's residual-risk list. The Netlify Pro Site Password upgrade (compared to the 1.3.0 client-side gate) closes FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) — both were "documented" findings now mitigated by the server-side gate.
+
+### Audit findings summary (1.3.0 baseline)
+
+Findings below come from the 1.3.0 red/blue team audit. Versions 1.3.1 through 1.5.6 added features (bearer-token storage, master CSV, duplicates section, infographic hero, etc.) but did not change the core security posture of the original components. A full re-audit is not scheduled; see "Changes since 1.3.0" below for what's new and how each was reviewed.
 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
@@ -160,6 +183,18 @@ The summary below is for managers and auditors.
 | FC-2026-015 | Low | CSP header missing from netlify.toml | Deferred (inline scripts require unsafe-inline) |
 | FC-2026-016 | Note | Client-side gate is not real security (by design) | Documented |
 | FC-2026-017 | Note | Inventory NDJSON contains server metadata | Accepted (required for vendor work-order) |
+
+### Changes since 1.3.0 (security-relevant)
+
+| Version | Change | Security implication | Mitigation |
+|---|---|---|---|
+| 1.3.1 | `audit-fleet.sh` auto-reads `~/.filecap/sites.json` | No new surface — same data the saved-sites menu already exposed | sites.json mode-0600, schema-validated; bundle workflow safe for sharing |
+| 1.3.2 | `~/.filecap/config.json` for `webRollup.autoDeploy` | New file at `~/.filecap/` | Schema-validated, mode-0600; contains a Netlify site name (not a secret) |
+| 1.3.3 | Bearer-token support via `~/.filecap/secrets.json` | New credential at rest | Mode-0600, never bundled/exported; env-var override for users who prefer 1Password CLI / direnv; token fed to curl via stdin (`--header @-`), never argv |
+| 1.4.0 / 1.4.1 | Trimmed CSV/HTML to 14 columns; click-and-drag pan JS | No new surface — drag-pan is pointer-events only, no remote requests | XSS test suite (FC-2026-008) regression-covers the new render path |
+| 1.5.0 | Cross-server duplicates section; `audit-file-list-master.csv` in bundle | Adds data-exposure surface (master CSV is a single ~7 MB file with every path on every server) | Mitigated by Netlify Site Password gate at deployment time (verified HTTP 401 on the master CSV) |
+| 1.5.1 | `audit-file-duplicates.csv` (per-occurrence) in bundle | Same data-exposure surface, smaller file | Same mitigation |
+| 1.5.2–1.5.6 | Visual / UX changes (table styling, infographic hero, total in heading) | No new security surface | n/a |
 
 ### How to report a security issue
 
@@ -210,7 +245,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.2.0 shipped.** The web-rollup feature is live: `filecap web-rollup` bundles every site's latest scan into a static-site directory with a `netlify.toml` (cache headers, security headers, publish dir `.`), optional client-side password gate, and a `--deploy` flag that calls the Netlify CLI directly after the build. The full inventory pipeline `scan → rollup → report → web-rollup` is end-to-end functional.
+**v1.5.6 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
 
 | Phase | Version | Status | Deliverable |
 |---|---|---|---|
@@ -224,9 +259,23 @@ npx vitest run test/web-rollup.test.js
 | 8 | v1.0.1 | shipped | MCP client docs (Claude Desktop, Claude Code, Cursor, Windsurf, Continue) |
 | 9 | v1.0.2 | shipped | Audit automation scripts, HTML report, enhanced metadata, auditor-readable output |
 | 10 | v1.0.3 | shipped | Self-version-check, timestamped runs, `--site-name` flag, README overhaul |
-| 11 | v1.1.0 | shipped | Column-set slim to 30 accessibility-critical fields; audit.icjia.app integration removed |
+| 11 | v1.1.0 | shipped | Column-set slim, audit.icjia.app integration removed |
 | 12 | v1.2.0 | shipped | `filecap web-rollup` — static-site bundle with Netlify amenities; `filecap_web_rollup` MCP tool |
-| — | vNext | deferred | Strapi-aware mode (separate package) |
+| 13 | v1.3.0 | shipped | Red/blue team security audit (17 findings, all Critical and Moderate fixed) |
+| 14 | v1.3.x | shipped | Auto-detected `sites.json` for fleet script; opt-in `~/.filecap/config.json` `webRollup.autoDeploy`; bearer-token support (`~/.filecap/secrets.json`) |
+| 15 | v1.4.x | shipped | CSV/HTML deliverable trimmed to 14 columns; click-and-drag horizontal pan on every table |
+| 16 | v1.5.x | shipped | Cross-server duplicates with action explainer; master CSV + duplicates CSV in bundle; infographic hero; table-styling consistency across the app |
+| — | vNext | deferred | Strapi-aware mode (separate package); content-type sanity check on URL preflight |
+
+### Production deployment
+
+The ICJIA fleet snapshot is deployed at:
+
+**https://icjia-fleet-audit.netlify.app**
+
+The site is **password-protected** (Netlify Pro Site Password — server-side enforcement, gates every file including the CSVs). The current password is held by ICJIA's IDS (Innovation and Digital Services) team — request access by emailing IDS at ICJIA. The password is rotated periodically; if a previously-shared password stops working, ask IDS for the current one.
+
+Deploy mechanics: `filecap web-rollup` automatically pushes to this Netlify site whenever `webRollup.autoDeploy: true` is set in `~/.filecap/config.json` (with `deploySite: "icjia-fleet-audit"`). To force a fresh deploy after a new audit, run `./examples/audit-fleet.sh && filecap web-rollup`. No `--deploy` flag needed.
 
 ## Quick start
 
@@ -593,7 +642,7 @@ Output directory contents:
 
 | File | Purpose |
 |---|---|
-| `audit-file-list.csv` | One row per file, 30 columns (the work-order vendors actually consume). Human-readable column headers. Booleans render as Yes/No. Filterable in Excel, Smartsheet, etc. |
+| `audit-file-list.csv` | One row per file, 14 columns (the work-order vendors actually consume). Human-readable column headers. Filterable in Excel, Smartsheet, etc. |
 | `audit-file-list.html` | (Only when `--html` is passed.) Self-contained interactive dark-mode page — same data, sortable columns, full-text search, category filter chips, no external dependencies. `audit-remote.sh` always passes `--html` unless `AUDIT_HTML=0` is set. |
 | `audit-summary.txt` | Manager-friendly top-line numbers: file counts by category, total bytes, image-only PDF count, remediable count, heading coverage, alt-text coverage, and "What this means" observation bullets. |
 | `README.txt` | Plain-text guide to all files in this folder. Start here if you're not sure which file to open. |
@@ -604,9 +653,11 @@ Output directory contents:
 
 The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `filecap diff` command to detect changes.
 
-**CSV column order** (30 columns, stable):
+**CSV column order** (14 columns, stable since 1.4.1):
 
-`Server, Website, Server IP, Date published, Remediation needed?, Source folder on server, File location (relative to source folder), Full file path on server, Public URL, File name, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of, PDF: page count, PDF: has searchable text, PDF: image-only (needs OCR), PDF: structurally tagged, PDF: has form fields, PDF: encrypted, Document language, DOCX: has headings, DOCX: image count, DOCX: alt-text coverage (fraction), DOCX: table count, DOCX: tables have header rows, DOCX: vague hyperlinks ("click here"), XLSX: sheet count, Legacy Office format`
+`Server, Website, Server IP, Date published, Source folder on server, File location (relative to source folder), Full file path on server, Public URL, File name, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of`
+
+The deliverable focuses on the fields a remediator needs to **find** and **price** each file (filename, path, server, type, size, duplicate marker, public URL). Format-specific introspection columns (PDF page count, image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped in 1.4.0 / 1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly from the file. The full introspection remains in the underlying NDJSON inventory for MCP queries and custom reports.
 
 Column headers are human-facing labels (not raw field names). Empty cells indicate the field doesn't apply to this file's type.
 
@@ -844,7 +895,9 @@ Some sites — typically intranet content libraries or staff-only document porta
 
 **Two ways to provide the token, env var wins when both are present:**
 
-> **ICJIA-specific note.** Of the seven public ICJIA Strapi sites, only `intranet` (server-name `intranet-api-prod`) requires a bearer token. Its JWT is **valid for 15 days**, so plan to rotate twice a month. The 1Password CLI workflow below makes that a one-time setup; the secrets-file workflow is one line to edit each rotation.
+> **ICJIA-specific note.** Of the eight ICJIA Strapi sites in production, only `intranet` (server-name `intranet-api-prod`, URL `intranet.icjia.cloud`) requires a bearer token. Its JWT is **valid for 15 days**, so plan to rotate twice a month. The 1Password CLI workflow below makes that a one-time setup; the secrets-file workflow is one line to edit each rotation.
+>
+> **If Intranet audits suddenly stop working:** the most common cause is an expired JWT. Symptom: the preflight URL HEAD probe reports `URL FAILED` for `intranet-api-prod` and prompts `Continue anyway? [y/N]`. The file audit itself still works (SSH+rsync bypasses HTTP), but the public-URL HEAD-check fails. Get a fresh token from your IDS contact and update either `FILECAP_BEARER_TOKEN_INTRANET_API_PROD` (env var) or `~/.filecap/secrets.json` (file path). The other seven sites are not gated by JWT and are unaffected by Intranet's token state.
 
 **Option 1 — env var (recommended for security-conscious / 1Password / direnv users).** Set `FILECAP_BEARER_TOKEN_<SERVER_NAME_UPPER_SNAKE>` in the shell environment before running the script. The token never touches disk:
 
@@ -933,7 +986,7 @@ In interactive mode, the script asks a few questions. Here's what each one means
 
 After the script finishes, navigate to `~/filecap-audits/<server-name>/latest/report/`. You'll find:
 
-- **`audit-file-list.csv`** — The main deliverable. One row per file, 30 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
+- **`audit-file-list.csv`** — The main deliverable. One row per file, 14 columns covering server, website, file location, full path, public URL, filename, type, size, content hash, and duplicate-of marker. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
 - **`audit-file-list.html`** — A self-contained dark-mode web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, category filter chips, and print-to-PDF. (Set `AUDIT_HTML=0` in the environment to suppress this file on rare occasions when you don't want it.)
 - **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.
