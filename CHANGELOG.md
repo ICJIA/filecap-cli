@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] — 2026-05-10
+
+### Changed
+
+- **Duplicates explainer rewritten to cover what to do with each kind.** Two new sub-sections now spell out the action for an audit lead:
+  - **Exact (matching content hash):** fix accessibility once on the canonical copy, then push the corrected file to the other servers' CMSes under the same filename. Don't delete the duplicates — most are referenced by CMS entries on each site, and removing the file would break the page link. Goal: one corrected file appearing in N places.
+  - **Variant (same filename, different content hash):** each variant is its own document and likely needs its own remediation pass. Open them in the per-site links to check whether they're truly distinct or one is canonical.
+- **False-positive caveat added.** The cross-server matcher strips Strapi's 10-character hex suffix before comparing filenames, which can collide for unrelated files that happen to share a base pattern. The caveat explicitly calls out that `exact` matches are the high-confidence signal; `variant` matches are worth investigating but should be opened to confirm.
+
+[1.5.4]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.5.4
+
 ## [1.5.3] — 2026-05-10
 
 ### Added

@@ -147,11 +147,18 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
     ${csvDownloadHtml}
 
     <details class="dup-explainer">
-      <summary>Why does this happen? (and why is a duplicate not an error?)</summary>
-      <p>ICJIA's web presence has evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository where reports, meeting minutes, and reference documents lived. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) developed their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context.</p>
-      <p>Files were sometimes updated on one server (typo fix, new revision, refreshed report) without being updated on the others. That's why a "duplicate" pair may have <strong>different content even though the filename matches</strong> — same file logically, different versions in practice. Those are flagged as <span class="dup-kind dup-variant">variant</span> below; identical-content duplicates are flagged as <span class="dup-kind dup-exact">exact</span>.</p>
-      <p><strong>A duplicate is not an error.</strong> It just means the same filename appears in more than one place. The <em>variant</em> rows are usually more interesting than the <em>exact</em> ones — those are the cases where someone updated the document on one site but not another, and you may want to reconcile them.</p>
-      <p>Use this list as a <strong>cross-check</strong>, not a deletion queue: skim it for surprises, look at timestamp gaps, and coordinate with content owners before removing anything.</p>
+      <summary>Why does this happen? (and what should I do with each kind?)</summary>
+      <p>ICJIA's web presence has evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository where reports, meeting minutes, and reference documents lived. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) developed their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context. Files were sometimes updated on one server without being updated on the others — that's why a "duplicate" pair may have <strong>different content even though the filename matches</strong>.</p>
+
+      <p><strong>A duplicate is not an error.</strong> It just means the same filename appears in more than one place. Use this list as a <strong>cross-check</strong>, not a deletion queue.</p>
+
+      <h3 class="dup-explainer-h3"><span class="dup-kind dup-exact">exact</span> &mdash; same content hash on every server</h3>
+      <p>The byte-for-byte identical file exists in N places. Remediate it <strong>once</strong> on the canonical copy (typically the newest or most-frequently-linked one), then push the corrected file to the other servers' CMSes <em>using the same filename</em>. <strong>Don't delete the duplicates</strong> — most of these files are referenced by CMS entries on each site, and removing the file would break the link on that site's page. The goal is "one corrected file appearing in N places," not "one file existing in one place."</p>
+
+      <h3 class="dup-explainer-h3"><span class="dup-kind dup-variant">variant</span> &mdash; same filename, different content hash</h3>
+      <p>The file was edited on one server and the other servers still hold the older version. <strong>Each variant likely needs its own remediation pass</strong> — the differences between versions might be substantive (corrected data, new section, refreshed cover page) or trivial (single typo fix, re-export from a different tool). Open each variant in the links above to check whether they're truly distinct documents or one is the canonical version the others should be replaced with. Once you decide, either remediate all variants individually, or remediate the canonical one and overwrite the others (treating it like an <em>exact</em> case going forward).</p>
+
+      <p class="dup-caveat"><strong>Heads up on false positives.</strong> Cross-server matching strips Strapi's appended 10-character hex hash before comparing filenames (so <code>report_a1b2c3d4e5.pdf</code> matches <code>report_xxxxxxxxxx.pdf</code>). Two unrelated files that happen to follow the same naming convention before the hash can be flagged as a <em>variant</em> here even though they're logically different documents. The <em>exact</em> match (matching content hash) is the high-confidence signal; <em>variant</em> matches are worth looking at but should be opened to confirm.</p>
     </details>
 
     <details class="dup-table-details" open>
@@ -754,6 +761,20 @@ main {
   border-radius: 2px;
 }
 .duplicates .dup-explainer p { margin: 0.5rem 0; line-height: 1.55; }
+.duplicates .dup-explainer-h3 {
+  margin: 1.2rem 0 0.3rem 0;
+  font-size: 1rem;
+  color: #c9d1d9;
+  font-weight: 600;
+}
+.duplicates .dup-caveat {
+  margin-top: 1.2rem;
+  padding: 0.6rem 0.8rem;
+  background: #0d1117;
+  border-left: 3px solid #d29922;
+  border-radius: 2px;
+  font-size: 0.93rem;
+}
 
 .dup-table-details {
   margin-top: 1rem;
