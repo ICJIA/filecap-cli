@@ -78,13 +78,13 @@ filecap was originally built at ICJIA (the [Illinois Criminal Justice Informatio
 
 The tool is general-purpose. Any organization that hosts public-facing document repositories — government agencies, schools, libraries, nonprofits, businesses — can use it to scope their accessibility work. The output is a spreadsheet a remediation vendor can quote against, line by line.
 
-The complexity in filecap exists because "is this PDF accessible?" is a much harder question than "does this file exist?" Answering it requires actually opening every file and inspecting its internal structure — see the [next section](#just-count-the-files-all-right--why-filecap-is-more-than-wc--l) for why this matters.
+The complexity in filecap exists because "is this PDF accessible?" is a much harder question than "does this file exist?" Answering it requires actually opening every file and inspecting its internal structure — see the [next section](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-filecap-is-more-than-wc--l) for why this matters.
 
 → See the project page on GitHub: https://github.com/ICJIA/filecap-cli
 
 ---
 
-## "Just count the files, all right?" — why filecap is more than `wc -l`
+## "All I want is a file count for the remediators, all right? That's it. Just do it." — why filecap is more than `wc -l`
 
 Imagine asking a remediation vendor for a quote. They say "I need to see the files first." You forward them a list of filenames and sizes. They reply: "Great — but how many are scanned PDFs vs born-digital? How many Word docs lack heading structure? How many tables are missing header rows? Without that detail, my quote will be the worst-case price for every single file."
 
@@ -187,7 +187,7 @@ npx vitest run test/web-rollup.test.js
   - [TL;DR for developers](#tldr-for-developers)
   - [TL;DR for vendors and auditors](#tldr-for-vendors-and-auditors)
   - [TL;DR for the curious](#tldr-for-the-curious)
-- ["Just count the files, all right?"](#just-count-the-files-all-right--why-filecap-is-more-than-wc--l)
+- ["All I want is a file count for the remediators..."](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-filecap-is-more-than-wc--l)
 - [Status](#status)
 - [Quick start](#quick-start)
 - [Quick start for managers](#quick-start-for-managers)
