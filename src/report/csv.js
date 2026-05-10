@@ -23,13 +23,13 @@ export const CSV_COLUMNS = [
   { name: "hasFormFields",            label: "PDF: has form fields" },
   { name: "encrypted",                label: "PDF: encrypted" },
   { name: "documentLanguage",         label: "Document language" },
-  { name: "docxHasHeadings",          label: "DOCX: has headings" },
-  { name: "docxImageCount",           label: "DOCX: image count" },
-  { name: "docxAltTextCoverage",      label: "DOCX: alt-text coverage (fraction)" },
-  { name: "docxTableCount",           label: "DOCX: table count" },
-  { name: "docxTablesHaveHeaders",    label: "DOCX: tables have header rows" },
-  { name: "docxVagueLinkCount",       label: "DOCX: vague hyperlinks (\"click here\")" },
-  { name: "xlsxSheetCount",           label: "XLSX: sheet count" },
+  // DOCX and XLSX-specific introspection columns (heading-style coverage, alt
+  // text, merged cells, etc.) were removed in 1.4.0. Remediators have tools
+  // (Word, Excel, Adobe Acrobat) that surface those properties directly; the
+  // CSV / HTML deliverable focuses on the fields they need to *find* and *price*
+  // each file: filename, path, type, server, size, duplicate marker, public URL.
+  // The underlying NDJSON still carries the full introspection for any future
+  // tooling that needs it (e.g., MCP query_inventory, custom reports).
   { name: "officeLegacyFormat",       label: "Legacy Office format" },
 ];
 

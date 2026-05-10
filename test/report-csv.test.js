@@ -75,16 +75,23 @@ describe("CSV_COLUMNS", () => {
     expect(col.label).not.toBe("Last modified");
   });
 
-  it("includes accessibility-critical columns for PDF, DOCX, XLSX", () => {
+  it("includes accessibility-critical PDF columns", () => {
     const names = CSV_COLUMNS.map((c) => c.name);
     expect(names).toContain("pageCount");
     expect(names).toContain("hasTextLayer");
     expect(names).toContain("isImageOnly");
     expect(names).toContain("hasTags");
-    expect(names).toContain("docxHasHeadings");
-    expect(names).toContain("docxAltTextCoverage");
-    expect(names).toContain("docxVagueLinkCount");
-    expect(names).toContain("xlsxSheetCount");
+  });
+
+  it("does not include DOCX or XLSX introspection columns (dropped in 1.4.0)", () => {
+    const names = CSV_COLUMNS.map((c) => c.name);
+    expect(names).not.toContain("docxHasHeadings");
+    expect(names).not.toContain("docxImageCount");
+    expect(names).not.toContain("docxAltTextCoverage");
+    expect(names).not.toContain("docxTableCount");
+    expect(names).not.toContain("docxTablesHaveHeaders");
+    expect(names).not.toContain("docxVagueLinkCount");
+    expect(names).not.toContain("xlsxSheetCount");
   });
 
   it("does not include dropped metadata columns", () => {
@@ -356,12 +363,11 @@ describe("writeCsv (consolidated input)", () => {
 });
 
 describe("writeCsv header row escaping", () => {
-  it("escapes header labels containing quotes", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
-    const firstLine = csv.split("\n")[0];
-    // DOCX: vague hyperlinks ("click here") — has quotes, needs escaping
-    expect(firstLine).toContain('"DOCX: vague hyperlinks (""click here"")"');
-  });
+  // The DOCX: vague-hyperlinks column (the only remaining label with embedded
+  // quotes) was removed in 1.4.0 along with the rest of the DOCX/XLSX columns.
+  // Header-label escaping is now exercised by quoteCsvField unit tests below
+  // and by data-cell escaping tests above; no remaining column label requires
+  // CSV escaping.
 
   it("leaves simple labels unquoted in the header", () => {
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-05-10
+
+### Removed
+
+- **DOCX and XLSX introspection columns dropped from the CSV / HTML deliverable.** Removed: `docxHasHeadings`, `docxImageCount`, `docxAltTextCoverage`, `docxTableCount`, `docxTablesHaveHeaders`, `docxVagueLinkCount`, `xlsxSheetCount`. Remediators have native tools (Word, Excel) that surface these properties directly, and including them per-row inflated the table from ~30 columns to ~22 without giving anyone the file location, type, or duplicate signal that drives pricing. The deliverable now focuses on what's needed to *find* and *price* each file: filename, path, server, size, type, duplicate marker, public URL, plus PDF-specific cost drivers (page count, image-only/OCR, structurally tagged). The full DOCX/XLSX introspection remains in the underlying NDJSON inventory for any tooling that needs it (MCP `query_inventory`, custom reports). PDF columns are unchanged because image-only-PDF detection is a real cost driver for OCR work.
+
+### Added
+
+- **Click-and-drag horizontal pan on the per-site HTML table.** The cursor turns to the open-hand "grab" affordance over the table; clicking and dragging slides the table horizontally so wide tables don't require fishing for the bottom scrollbar. Implemented via the Pointer Events API with a 5px threshold so single clicks still trigger text selection and link clicks (sort headers, filename links, etc.). Mouse drags use `setPointerCapture` so the drag continues even if the cursor leaves the table. Touch panning was already native via `overflow-x: auto`; that path is unchanged (iOS momentum scroll intact).
+
+[1.4.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.4.0
+
 ## [1.3.4] — 2026-05-10
 
 ### Fixed

@@ -423,6 +423,17 @@ a:hover { color: #93c5fd; text-decoration: underline; }
   border-radius: 4px;
   max-height: 70vh;
   -webkit-overflow-scrolling: touch;
+  /* Drag-to-pan affordance: open hand cursor over the wrapper. JS enables a
+     mouse drag-pan with a 5px threshold so single clicks still select text.
+     Touch panning is native via overflow-x:auto + -webkit-overflow-scrolling. */
+  cursor: grab;
+}
+.table-wrap.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+.table-wrap.is-panning * {
+  user-select: none !important;
 }
 
 /* ── scrollable container (alias for table-wrap) ───────────── */
@@ -777,6 +788,63 @@ ${rowsHtml}
     });
     pairs.forEach(function (p) { tbody.appendChild(p.row); });
   }
+})();
+
+/* ── click-and-drag horizontal pan ──────────────────────────────────────────
+   Mouse: drag-to-pan with a 5px threshold so small clicks still trigger text
+   selection. Once threshold is exceeded, takes pointer capture and pans.
+   Touch: skipped — the browser's native overflow-x:auto handles touch
+   scrolling (with momentum on iOS). */
+(function() {
+  const wrap = document.querySelector(".table-wrap");
+  if (!wrap || typeof wrap.scrollBy !== "function") return;
+
+  const PAN_THRESHOLD = 5;
+  let start = null;
+  let panning = false;
+
+  wrap.addEventListener("pointerdown", function (e) {
+    // Mouse only — touch is native, pen is fine to ignore
+    if (e.pointerType !== "mouse") return;
+    if (e.button !== 0) return;
+    // Don't start drag on interactive children (links, buttons, sort headers, inputs)
+    if (e.target.closest("a, button, input, select, [role='button']")) return;
+    start = {
+      x: e.clientX,
+      scrollLeft: wrap.scrollLeft,
+      pointerId: e.pointerId,
+    };
+  });
+
+  wrap.addEventListener("pointermove", function (e) {
+    if (!start || e.pointerId !== start.pointerId) return;
+    const dx = e.clientX - start.x;
+    if (!panning) {
+      if (Math.abs(dx) < PAN_THRESHOLD) return;
+      panning = true;
+      wrap.classList.add("is-panning");
+      try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+      // Cancel any in-progress text selection caused by the initial click
+      const sel = window.getSelection && window.getSelection();
+      if (sel && sel.removeAllRanges) sel.removeAllRanges();
+    }
+    if (panning) {
+      e.preventDefault();
+      wrap.scrollLeft = start.scrollLeft - dx;
+    }
+  });
+
+  function endPan(e) {
+    if (!start) return;
+    if (e.pointerId !== undefined && e.pointerId !== start.pointerId) return;
+    start = null;
+    panning = false;
+    wrap.classList.remove("is-panning");
+  }
+
+  wrap.addEventListener("pointerup", endPan);
+  wrap.addEventListener("pointercancel", endPan);
+  wrap.addEventListener("pointerleave", endPan);
 })();
 </script>
 
