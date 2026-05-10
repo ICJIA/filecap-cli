@@ -188,7 +188,6 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 ### `filecap scan <directory>`
 
 | Flag | Default | Description |
-
 |---|---|---|
 | `-o, --output <path>` | `filecap-<hostname>.ndjson` | Output path (use `-` for stdout) |
 | `-s, --server-name <name>` | `os.hostname()` | Override server identifier in metadata |
