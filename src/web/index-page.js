@@ -63,7 +63,7 @@ function fmtGeneratedAt(d) {
 }
 
 /**
- * Render a single site card.
+ * Render a single site card for managers.
  *
  * @param {object} sr - siteResult entry
  * @returns {string}
@@ -72,58 +72,59 @@ function renderCard(sr) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const siteName = he(site.siteName ?? site.name ?? "");
   const hostname = he(site.host ?? "");
-  // Try to get the IP from the inventory header metadata; fall back to host
   const ip = he(sr.header?.metadata?.serverIp ?? site.host ?? "");
 
   const totalFiles = summary?.totalFiles ?? 0;
   const remediable = summary?.remediable ?? 0;
+  const nonRemediable = totalFiles - remediable;
   const totalBytes = summary?.totalBytes ?? 0;
   const byCategory = summary?.byCategory ?? {};
 
-  // Build breakdown list items
   const pdfCount = byCategory["pdf"] ?? 0;
-  const officeCount = (byCategory["office-document"] ?? 0) + (byCategory["spreadsheet"] ?? 0) + (byCategory["presentation"] ?? 0) + (byCategory["legacy-office"] ?? 0);
-  const imageCount = byCategory["image"] ?? 0;
-  const otherCount = totalFiles - pdfCount - officeCount - imageCount;
+  const officeCount =
+    (byCategory["office-document"] ?? 0) +
+    (byCategory["spreadsheet"] ?? 0) +
+    (byCategory["presentation"] ?? 0) +
+    (byCategory["office-legacy"] ?? 0) +
+    (byCategory["legacy-office"] ?? 0);
 
   const breakdownItems = [];
-  if (remediable > 0) {
-    breakdownItems.push(`<li class="remediable">&#x25CD; ${he(remediable)} need remediation</li>`);
-  }
-  const detailParts = [];
-  if (pdfCount > 0) detailParts.push(`${pdfCount} PDF${pdfCount !== 1 ? "s" : ""}`);
-  if (officeCount > 0) detailParts.push(`${officeCount} Office`);
-  if (detailParts.length > 0) {
-    breakdownItems.push(`<li class="detail">${he(detailParts.join(" · "))}</li>`);
-  }
-  if (imageCount > 0) {
-    breakdownItems.push(`<li class="detail">${imageCount} image${imageCount !== 1 ? "s" : ""}</li>`);
-  }
-  if (otherCount > 0) {
-    breakdownItems.push(`<li class="detail">${otherCount} other</li>`);
-  }
-
+  if (pdfCount > 0) breakdownItems.push(`<li>${pdfCount.toLocaleString()} PDF${pdfCount !== 1 ? "s" : ""}</li>`);
+  if (officeCount > 0) breakdownItems.push(`<li>${officeCount.toLocaleString()} Office doc${officeCount !== 1 ? "s" : ""}</li>`);
   const breakdownHtml = breakdownItems.length > 0
     ? `<ul class="breakdown">${breakdownItems.join("")}</ul>`
-    : `<ul class="breakdown"><li class="detail">No files found</li></ul>`;
+    : "";
 
   const scanMeta = `Scanned ${he(fmtDate(scannedAt))} &middot; ${he(humanBytes(totalBytes))}`;
+
+  // Only show details element if there's a hostname or IP
+  const hasTechDetails = hostname || (ip && ip !== hostname);
+  const techDetailsHtml = hasTechDetails
+    ? `<details class="tech-details">
+    <summary>Technical details</summary>
+    ${hostname ? `<p class="hostname">${hostname}</p>` : ""}
+    ${ip && ip !== hostname ? `<p class="ip">${ip}</p>` : ""}
+  </details>`
+    : "";
 
   return `<article class="site-card">
   <header>
     <h3>${siteName}</h3>
-    <p class="hostname">${hostname}</p>
-    ${ip && ip !== hostname ? `<p class="ip">${ip}</p>` : ""}
+    <p class="scan-meta">${scanMeta}</p>
   </header>
   <div class="big-stat">
     <span class="number">${he(totalFiles.toLocaleString())}</span>
-    <span class="label">total files</span>
+    <span class="label">total files inventoried</span>
   </div>
-  ${breakdownHtml}
-  <p class="scan-meta">${scanMeta}</p>
+  <div class="remediation-summary">
+    <p class="remediable-count">${he(remediable.toLocaleString())} need accessibility work</p>
+    ${breakdownHtml}
+    <p class="reference-count muted">${he(nonRemediable.toLocaleString())} other (mostly images)</p>
+  </div>
+  ${techDetailsHtml}
   <div class="actions">
-    <a href="${he(htmlFile)}" class="btn btn-primary">View HTML report &rarr;</a>
-    <a href="${he(csvFile)}" class="btn btn-secondary" download>Download CSV</a>
+    <a href="${he(htmlFile)}" class="btn btn-primary">View detailed report &rarr;</a>
+    <a href="${he(csvFile)}" class="btn btn-secondary" download>Download spreadsheet</a>
   </div>
 </article>`;
 }
@@ -141,14 +142,12 @@ export function generateIndexHtml({ siteResults, password = null, title = "filec
   // Fleet totals
   let fleetTotalFiles = 0;
   let fleetRemediable = 0;
-  let fleetTotalBytes = 0;
   const fleetByCategory = {};
 
   for (const sr of siteResults) {
     const s = sr.summary ?? {};
     fleetTotalFiles += s.totalFiles ?? 0;
     fleetRemediable += s.remediable ?? 0;
-    fleetTotalBytes += s.totalBytes ?? 0;
     if (s.byCategory) {
       for (const [cat, n] of Object.entries(s.byCategory)) {
         fleetByCategory[cat] = (fleetByCategory[cat] ?? 0) + n;
@@ -156,42 +155,62 @@ export function generateIndexHtml({ siteResults, password = null, title = "filec
     }
   }
 
-  // By-type section
-  const CAT_LABELS = {
-    "pdf": "PDFs",
-    "office-document": "Word docs",
-    "spreadsheet": "Excel",
-    "presentation": "Presentations",
-    "image": "Images",
-    "archive": "Archives",
-    "text": "Text files",
-    "web": "Web files",
-    "audio-video": "Audio / Video",
-    "other": "Other",
-    "legacy-office": "Legacy Office",
-  };
+  const fleetNonRemediable = fleetTotalFiles - fleetRemediable;
 
-  const byTypeRows = Object.entries(fleetByCategory)
-    .sort((a, b) => b[1] - a[1])
-    .map(([cat, n]) => {
-      const pct = fleetTotalFiles > 0 ? Math.round((n / fleetTotalFiles) * 100) : 0;
-      const label = CAT_LABELS[cat] ?? cat;
-      return `<tr><td class="type-label">${he(label)}</td><td class="type-count">${n.toLocaleString()}</td><td class="type-pct">${pct > 0 ? `(${pct}%)` : ""}</td></tr>`;
-    })
-    .join("");
+  // Manager-friendly categories for the by-type breakdown tables
+  const remediableCategories = [
+    { key: "pdf",             label: "PDFs" },
+    { key: "office-document", label: "Word documents (.docx)" },
+    { key: "spreadsheet",     label: "Excel spreadsheets (.xlsx)" },
+    { key: "presentation",    label: "PowerPoint (.pptx)" },
+    { key: "office-legacy",   label: "Legacy Office (.doc, .xls, .ppt)" },
+    { key: "legacy-office",   label: "Legacy Office (.doc, .xls, .ppt)" },
+  ];
 
-  // Latest scan across all sites
-  const latestScan = siteResults
-    .map((sr) => sr.scannedAt)
-    .filter(Boolean)
-    .sort()
-    .at(-1) ?? null;
+  const referenceCategories = [
+    { key: "image",       label: "Images (.jpg, .png, .gif, .webp, .svg)" },
+    { key: "text",        label: "Text files (.txt, .md)" },
+    { key: "archive",     label: "Archives (.zip, .tar, etc.)" },
+    { key: "audio-video", label: "Audio / video" },
+    { key: "web",         label: "Web pages (.html, .css, .js)" },
+    { key: "other",       label: "Other (placeholders, unrecognized)" },
+  ];
 
-  const latestScanStr = latestScan ? fmtDate(latestScan) : "unknown";
+  // Build by-type table rows — skip zero-count rows
+  // Normalise: sum both "office-legacy" and "legacy-office" into one row
+  const normByCategory = { ...fleetByCategory };
+  if (normByCategory["legacy-office"]) {
+    normByCategory["office-legacy"] = (normByCategory["office-legacy"] ?? 0) + normByCategory["legacy-office"];
+    delete normByCategory["legacy-office"];
+  }
+
+  function buildTypeRows(categories) {
+    const seenLabels = new Set();
+    return categories
+      .filter(({ key, label }) => {
+        if (seenLabels.has(label)) return false;
+        seenLabels.add(label);
+        return (normByCategory[key] ?? 0) > 0;
+      })
+      .map(({ key, label }) => {
+        const n = normByCategory[key] ?? 0;
+        return `<tr><td>${he(label)}</td><td class="num">${he(n.toLocaleString())}</td></tr>`;
+      })
+      .join("");
+  }
+
+  const remediableRowsHtml = buildTypeRows(remediableCategories);
+  const referenceRowsHtml = buildTypeRows(referenceCategories);
+
+  // Totals for tfoot
+  const remediableTotal = remediableCategories
+    .reduce((sum, { key }) => sum + (normByCategory[key] ?? 0), 0);
+  const referenceTotal = referenceCategories
+    .reduce((sum, { key }) => sum + (normByCategory[key] ?? 0), 0);
+
   const generatedAt = fmtGeneratedAt(new Date());
   const siteCount = siteResults.length;
 
-  const h1Text = `Fleet snapshot — ${siteCount} site${siteCount !== 1 ? "s" : ""}`;
   const pageTitle = he(title);
 
   const cardsHtml = siteResults.map(renderCard).join("\n");
@@ -252,11 +271,6 @@ h2 {
   letter-spacing: -0.01em;
 }
 .site-header .brand span { color: #60a5fa; }
-.site-header .gen-ts {
-  font-size: 12px;
-  color: #666666;
-  white-space: nowrap;
-}
 
 /* ── main content ────────────────────────────────────────────── */
 main {
@@ -273,46 +287,137 @@ main {
   padding: 2rem;
   margin-bottom: 2.5rem;
 }
-.hero h1 { margin-bottom: 1.5rem; }
-.hero-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-bottom: 1.5rem;
+.hero h1 { margin-bottom: 0.25rem; }
+.hero .subtitle {
+  font-size: 0.9rem;
+  color: #999999;
+  margin: 0 0 1.5rem;
 }
-.hero-stat .number {
+@media (max-width: 480px) {
+  .hero-summary .stat-block .stat-num { font-size: 2.5em; }
+}
+
+/* ── hero summary (new layout) ───────────────────────────────── */
+.hero-summary p.lead {
+  font-size: 1.25em;
+  line-height: 1.6;
+  color: #e5e5e5;
+  margin: 0 0 1.5em;
+}
+.hero-summary .hero-stat-row {
+  display: flex;
+  gap: 2em;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.hero-summary .stat-block {
+  display: flex;
+  flex-direction: column;
+}
+.hero-summary .stat-block .stat-num {
   font-size: 3.5em;
   font-weight: 700;
   line-height: 1;
-  display: block;
-  color: #e5e5e5;
 }
-.hero-stat.needs-work .number { color: #fbbf24; }
-.hero-stat .label {
-  font-size: 0.9rem;
+.hero-summary .stat-block.remediable .stat-num { color: #fbbf24; }
+.hero-summary .stat-block.reference .stat-num { color: #999999; }
+.hero-summary .stat-block .stat-label {
+  font-size: 1em;
   color: #999999;
-  margin-top: 0.25rem;
-  display: block;
-}
-.hero-meta {
-  font-size: 0.85rem;
-  color: #666666;
-}
-@media (max-width: 480px) {
-  .hero-stats { grid-template-columns: 1fr; gap: 1rem; }
-  .hero-stat .number { font-size: 2.5em; }
+  margin-top: 0.5em;
 }
 
-/* ── by-type section ─────────────────────────────────────────── */
-.section { margin-bottom: 2.5rem; }
-.by-type-table {
-  border-collapse: collapse;
-  font-size: 0.9rem;
+/* ── explanation section ───────────────────────────────────────── */
+.explanation {
+  margin: 3em 0;
 }
-.by-type-table td { padding: 0.3rem 1rem 0.3rem 0; vertical-align: baseline; }
-.by-type-table .type-label { color: #e5e5e5; min-width: 140px; }
-.by-type-table .type-count { font-weight: 600; color: #60a5fa; text-align: right; min-width: 64px; }
-.by-type-table .type-pct { color: #666666; font-size: 0.85rem; }
+.explanation > h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.75rem;
+}
+.explanation > p {
+  font-size: 1.05em;
+  line-height: 1.7;
+  color: #e5e5e5;
+  max-width: 65ch;
+}
+.explanation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 2em;
+  margin-top: 1.5em;
+}
+.explanation-card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 12px;
+  padding: 1.5em;
+}
+.explanation-card h3 {
+  margin-top: 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #e5e5e5;
+}
+.explanation-card p {
+  font-size: 0.95em;
+  line-height: 1.65;
+  color: #c4c4c4;
+  margin: 0.75em 0;
+}
+.explanation-card strong {
+  color: #e5e5e5;
+}
+
+/* ── by-type breakdown ─────────────────────────────────────────── */
+.by-type {
+  margin: 3em 0;
+}
+.by-type > h2 {
+  font-size: 1.15rem;
+  margin-bottom: 1rem;
+}
+.by-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 2em;
+}
+.by-type-column {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 12px;
+  padding: 1.5em;
+}
+.by-type-column.remediable { border-top: 3px solid #fbbf24; }
+.by-type-column.reference  { border-top: 3px solid #71717a; }
+.by-type-column h3 {
+  margin: 0 0 0.25em;
+  font-size: 1.05em;
+  font-weight: 600;
+}
+.by-type-column .caption {
+  margin: 0 0 1em;
+  font-size: 0.9em;
+  color: #999999;
+}
+.by-type-column table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.by-type-column td {
+  padding: 0.5em 0;
+  border-bottom: 1px solid #21262d;
+}
+.by-type-column tfoot td {
+  font-weight: 600;
+  border-bottom: none;
+  border-top: 2px solid #30363d;
+  padding-top: 0.7em;
+}
+.by-type-column td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── site grid ───────────────────────────────────────────────── */
 .site-grid {
@@ -347,18 +452,6 @@ main {
   color: #e5e5e5;
   margin: 0 0 0.25rem;
 }
-.site-card header .hostname {
-  font-size: 0.85rem;
-  color: #999999;
-  margin: 0;
-  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-}
-.site-card header .ip {
-  font-size: 0.8rem;
-  color: #666666;
-  margin: 0;
-  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-}
 .site-card .big-stat {
   display: flex;
   flex-direction: column;
@@ -374,22 +467,6 @@ main {
   color: #999999;
   margin-top: 0.2rem;
 }
-.site-card .breakdown {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 0.9rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-.site-card .breakdown li.remediable {
-  color: #fbbf24;
-  font-weight: 500;
-}
-.site-card .breakdown li.detail {
-  color: #999999;
-}
 .site-card .scan-meta {
   font-size: 0.8rem;
   color: #666666;
@@ -400,6 +477,41 @@ main {
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: auto;
+}
+
+/* ── site card manager refinements ─────────────────────────────── */
+.site-card .remediation-summary {
+  margin: 0;
+}
+.site-card .remediable-count {
+  color: #fbbf24;
+  font-weight: 500;
+  margin: 0;
+}
+.site-card .breakdown {
+  list-style: disc;
+  padding-left: 1.25em;
+  margin: 0.5em 0 0;
+  color: #c4c4c4;
+}
+.site-card .reference-count.muted {
+  color: #999999;
+  font-size: 0.95em;
+  margin: 0.75em 0 0;
+}
+.site-card details.tech-details {
+  margin-top: 0.5em;
+  font-size: 0.85em;
+  color: #999999;
+}
+.site-card details.tech-details summary {
+  cursor: pointer;
+  user-select: none;
+}
+.site-card details.tech-details p {
+  margin: 0.25em 0;
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.85em;
 }
 
 /* ── buttons ─────────────────────────────────────────────────── */
@@ -455,26 +567,29 @@ main {
 @media print {
   body { background: #fff; color: #000; }
   .site-header { position: static; background: #fff; border-bottom: 1px solid #ccc; }
-  .site-header .brand, .site-header .gen-ts { color: #000; }
+  .site-header .brand { color: #000; }
   .site-header .brand span { color: #0066cc; }
-  h1, h2 { color: #000; }
+  h1, h2, h3 { color: #000; }
   .hero { background: #f8f8f8; border-color: #ccc; }
-  .hero-stat .number { color: #000; }
-  .hero-stat.needs-work .number { color: #d97706; }
-  .hero-meta, .hero-stat .label { color: #555; }
+  .hero-summary p.lead { color: #000; }
+  .hero-summary .stat-block.remediable .stat-num { color: #d97706; }
+  .hero-summary .stat-block.reference .stat-num { color: #555; }
+  .explanation { break-inside: avoid; }
+  .explanation-card { background: #f8f8f8; border: 1px solid #ccc; border-left: none; border-radius: 0; }
+  .explanation-card p { color: #000; }
+  .by-type-column { background: #f8f8f8; border: 1px solid #ccc; border-top: none; border-radius: 0; }
+  .by-type-column.remediable, .by-type-column.reference { border-top: 1px solid #ccc; }
   .site-card { background: #f8f8f8; border-color: #ccc; box-shadow: none; transform: none; }
   .site-card header h3 { color: #000; }
-  .site-card header .hostname, .site-card header .ip { color: #555; }
   .site-card .big-stat .number { color: #000; }
   .site-card .big-stat .label, .site-card .scan-meta { color: #555; }
-  .site-card .breakdown li.remediable { color: #d97706; }
-  .site-card .breakdown li.detail { color: #555; }
-  .by-type-table .type-label { color: #000; }
-  .by-type-table .type-count { color: #0066cc; }
-  .by-type-table .type-pct { color: #555; }
+  .site-card .remediable-count { color: #d97706; }
+  .site-card .breakdown { color: #555; }
+  .site-card .reference-count.muted { color: #555; }
   .site-footer { color: #555; border-color: #ccc; }
   .btn { display: none; }
   .site-card { page-break-inside: avoid; }
+  details.tech-details { display: none; }
 }
 </style>
 </head>
@@ -482,35 +597,118 @@ main {
 
 <header class="site-header">
   <span class="brand"><span>filecap</span> audit fleet snapshot</span>
-  <span class="gen-ts">Generated ${he(generatedAt)}</span>
 </header>
 
 <main>
 
   <section class="hero">
-    <h1>${he(h1Text)}</h1>
-    <div class="hero-stats">
-      <div class="hero-stat">
-        <span class="number">${fleetTotalFiles.toLocaleString()}</span>
-        <span class="label">total files</span>
+    <h1>ICJIA accessibility audit fleet</h1>
+    <p class="subtitle">Generated <time>${he(generatedAt)}</time> from ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
+
+    <div class="hero-summary">
+      <p class="lead">
+        We scanned ${he(String(siteCount))} ICJIA website${siteCount !== 1 ? "s" : ""} and found
+        <strong>${he(fleetTotalFiles.toLocaleString())}</strong> files in total.
+      </p>
+      <p class="hero-stat-row">
+        <span class="stat-block remediable">
+          <span class="stat-num">${he(fleetRemediable.toLocaleString())}</span>
+          <span class="stat-label">need accessibility work</span>
+        </span>
+        <span class="stat-block reference">
+          <span class="stat-num">${he(fleetNonRemediable.toLocaleString())}</span>
+          <span class="stat-label">don&#39;t</span>
+        </span>
+      </p>
+    </div>
+  </section>
+
+  <section class="explanation">
+    <h2>Why aren&#39;t all ${he(fleetTotalFiles.toLocaleString())} files counted as needing work?</h2>
+
+    <p>
+      Good question — the number of files we found and the number that
+      need accessibility work are different on purpose. Here&#39;s the gist:
+    </p>
+
+    <div class="explanation-grid">
+      <div class="explanation-card">
+        <h3>Files that need accessibility work</h3>
+        <p>
+          These are documents people read directly — <strong>PDFs</strong>
+          (like meeting agendas, annual reports, statutes),
+          <strong>Word documents</strong> (policies, forms),
+          <strong>Excel spreadsheets</strong>, and
+          <strong>PowerPoint presentations</strong>.
+        </p>
+        <p>
+          Each of these has internal structure that affects whether someone
+          using a screen reader (a tool that reads web pages aloud for
+          people with vision impairments) can navigate and understand it.
+          A remediation vendor adds proper headings, descriptions for
+          embedded images, table header rows, and similar fixes — directly
+          to each document.
+        </p>
       </div>
-      <div class="hero-stat needs-work">
-        <span class="number">${fleetRemediable.toLocaleString()}</span>
-        <span class="label">need remediation</span>
+
+      <div class="explanation-card">
+        <h3>Files that <em>don&#39;t</em> need accessibility work</h3>
+        <p>
+          Most of these are <strong>images</strong> uploaded alongside blog
+          posts, news announcements, and page content. Images don&#39;t get
+          fixed inside the image file itself.
+        </p>
+        <p>
+          Instead, the website&#39;s editing tool (its &#34;content management
+          system&#34;) attaches a separate description to each image —
+          the description that screen readers actually read aloud.
+          That happens when someone uploads the image to the site, not
+          when a vendor processes the file. So those images are listed
+          below for completeness, but no vendor will work on them.
+        </p>
+        <p>
+          A handful of other files — text files, READMEs, empty placeholder
+          files — also don&#39;t need remediation. They&#39;re listed for
+          completeness too.
+        </p>
       </div>
     </div>
-    <p class="hero-meta">Across ${siteCount} server${siteCount !== 1 ? "s" : ""} &middot; ${he(humanBytes(fleetTotalBytes))} &middot; last scan ${he(latestScanStr)}</p>
+  </section>
+
+  <section class="by-type">
+    <h2>By file type</h2>
+
+    <div class="by-type-grid">
+      <div class="by-type-column remediable">
+        <h3>Files needing remediation</h3>
+        <p class="caption">
+          Vendor scope — these documents will be processed file by file.
+        </p>
+        <table>
+          <tbody>${remediableRowsHtml}</tbody>
+          <tfoot>
+            <tr><td>Total</td><td class="num">${he(remediableTotal.toLocaleString())}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="by-type-column reference">
+        <h3>Files NOT requiring remediation</h3>
+        <p class="caption">
+          Handled separately by site editors — or simply don&#39;t apply.
+        </p>
+        <table>
+          <tbody>${referenceRowsHtml}</tbody>
+          <tfoot>
+            <tr><td>Total</td><td class="num">${he(referenceTotal.toLocaleString())}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
   </section>
 
   <section class="section">
-    <h2>By type across the fleet</h2>
-    <table class="by-type-table">
-      <tbody>${byTypeRows}</tbody>
-    </table>
-  </section>
-
-  <section class="section">
-    <h2>Sites</h2>
+    <h2>Websites in this audit</h2>
     <div class="site-grid">
 ${cardsHtml}
     </div>
@@ -519,8 +717,8 @@ ${cardsHtml}
 </main>
 
 <footer class="site-footer">
-  <span>Generated by <a href="https://github.com/ICJIA/filecap-cli" target="_blank" rel="noopener noreferrer">@icjia/filecap</a></span>
-  <span>Manager-facing data only &middot; For internal use</span>
+  <span>Generated by filecap. For questions, contact the audit administrator.</span>
+  <span>Generated ${he(generatedAt)}</span>
 </footer>
 
 </body>

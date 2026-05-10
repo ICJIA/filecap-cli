@@ -437,4 +437,56 @@ describe("runWebRollup", () => {
     expect(result.exitCode).toBe(0);
     expect(result.summary.clientGateEnabled).toBe(false);
   });
+
+  it("index.html contains the manager explainer section", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).toContain("Why aren&#39;t all");
+  });
+
+  it("index.html contains both by-type column headings", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).toContain("Files needing remediation");
+    expect(html).toContain("Files NOT requiring remediation");
+  });
+
+  it("index.html by-type tables skip rows where count is zero", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    // PDF row must be present (count = 1)
+    expect(html).toContain("PDFs");
+    // These categories have count 0 in the fixture — their rows must be absent
+    expect(html).not.toContain("Word documents (.docx)");
+    expect(html).not.toContain("Excel spreadsheets (.xlsx)");
+    expect(html).not.toContain("PowerPoint (.pptx)");
+    expect(html).not.toContain("Images (.jpg");
+    expect(html).not.toContain("Text files (.txt");
+  });
+
+  it("index.html site cards contain Technical details disclosure element", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).toContain("Technical details");
+    expect(html).toContain("<details");
+    expect(html).toContain("<summary>");
+  });
+
+  it("index.html hero section uses plain-English lead paragraph wording", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).toContain("We scanned");
+    expect(html).toContain("files in total");
+    expect(html).toContain("need accessibility work");
+  });
 });

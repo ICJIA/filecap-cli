@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] — 2026-05-10
+
+### Changed
+
+- **Fleet snapshot index page rewritten for non-technical managers.** The page that managers see when handed the URL now leads with plain-English context ("We scanned 7 websites and found 1,247 files in total. 892 need accessibility work; 355 don't.") followed by an explainer section answering the obvious follow-up question ("Why aren't all 1,247 counted?") with side-by-side cards explaining what gets fixed (PDFs, Word docs, Excel, PowerPoint) versus what doesn't (images get descriptions in the CMS; text files, placeholders). The "By file type" breakdown is now a side-by-side table showing remediation-scope vs reference-only counts. Per-site cards drop the hostname and IP from the visible part (folded into a collapsed "Technical details" disclosure) and use friendlier button labels ("View detailed report" / "Download spreadsheet"). Designed for managers who don't know what a11y, alt text, CMS, or remediation mean — every term is defined in plain language at first use.
+
+[1.2.3]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.2.3
+
 ## [1.2.2] — 2026-05-10
 
 ### Fixed
