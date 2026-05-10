@@ -21,6 +21,11 @@ const siteEntrySchema = z
     host: z.string().optional(),
     remotePath: z.string().optional(),
     publicUrlBase: z.string().optional(),
+    // Informational hint — when true, the public URL requires an Authorization
+    // header; the audit script looks for the token in ~/.filecap/secrets.json or
+    // a FILECAP_BEARER_TOKEN_<SERVER_NAME> env var. The token itself never lives
+    // in this file — sites.json is shareable, secrets.json is local-only.
+    requiresBearerToken: z.boolean().optional(),
   })
   .strict();
 

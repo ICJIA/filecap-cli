@@ -1067,13 +1067,55 @@ fi
 info "Remote path confirmed and readable"
 
 # ── preflight: verify public URL is reachable (non-blocking — auditor can override) ──
+# Resolve a bearer token in this priority:
+#   1. BEARER_TOKEN env var (already set by audit-fleet.sh, or by the user
+#      running audit-remote.sh directly with `BEARER_TOKEN=eyJ... ./audit-remote.sh`)
+#   2. FILECAP_BEARER_TOKEN_<SERVER_NAME_UPPER_SNAKE> env var (per-site override)
+#   3. ~/.filecap/secrets.json `tokens.<server-name>` field
+# The token is fed to curl via stdin (--header @-) so it does not appear in
+# argv / `ps aux`.
+if [[ -z "${BEARER_TOKEN:-}" ]]; then
+  _env_var_name="FILECAP_BEARER_TOKEN_$(echo "$SERVER_NAME" | tr '[:lower:]-' '[:upper:]_')"
+  if [[ -n "${!_env_var_name:-}" ]]; then
+    BEARER_TOKEN="${!_env_var_name}"
+  elif [[ -f "${HOME}/.filecap/secrets.json" ]]; then
+    BEARER_TOKEN=$(python3 - "${HOME}/.filecap/secrets.json" "$SERVER_NAME" <<'PYTOK' 2>/dev/null
+import json, sys
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    tok = data.get("tokens", {}).get(sys.argv[2], "")
+    if isinstance(tok, str):
+        sys.stdout.write(tok)
+except Exception:
+    pass
+PYTOK
+)
+  fi
+fi
+
 if [[ -n "$PUBLIC_URL_BASE" ]]; then
   step "Verifying public URL is reachable: ${PUBLIC_URL_BASE}"
-  if curl -fsSL --head --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" >/dev/null 2>&1; then
+  url_ok=1
+  if [[ -n "${BEARER_TOKEN:-}" ]]; then
+    info "Using bearer token for Authorization header (site requires auth)"
+    if printf 'Authorization: Bearer %s\n' "${BEARER_TOKEN}" \
+        | curl -fsSL --head --header @- --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" >/dev/null 2>&1; then
+      url_ok=0
+    fi
+  else
+    if curl -fsSL --head --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" >/dev/null 2>&1; then
+      url_ok=0
+    fi
+  fi
+  if [[ "$url_ok" -eq 0 ]]; then
     info "Public URL responded successfully"
   else
     warn "Public URL did not respond (HEAD ${PUBLIC_URL_BASE})."
     warn "This may be due to a typo, network restrictions, or the site being temporarily down."
+    if [[ -z "${BEARER_TOKEN:-}" ]]; then
+      warn "If the site requires authentication, set FILECAP_BEARER_TOKEN_${SERVER_NAME//-/_} or add an entry to ~/.filecap/secrets.json."
+    fi
     read -r -p "Continue anyway? [y/N]: " ans
     [[ "$ans" =~ ^[Yy]$ ]] || die "Aborted by user."
   fi

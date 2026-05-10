@@ -280,6 +280,38 @@ check_script_version() {
   fi
 }
 
+# ── bearer-token resolution ───────────────────────────────────────────────────
+# Resolves the per-site bearer token from (1) the FILECAP_BEARER_TOKEN_<SERVER_NAME>
+# env var (highest precedence — works with `op run --` / direnv / any secret
+# manager that sets env vars) or (2) ~/.filecap/secrets.json (mode 0600,
+# never bundled, never exported via the saved-sites menu). Tokens are passed
+# to audit-remote.sh via the BEARER_TOKEN env var; from there into curl via
+# `--header @-` (stdin) so the token never appears in argv / `ps aux`.
+SECRETS_FILE="${HOME}/.filecap/secrets.json"
+
+get_bearer_token() {
+  local server_name="$1"
+  local env_var_name
+  env_var_name="FILECAP_BEARER_TOKEN_$(echo "$server_name" | tr '[:lower:]-' '[:upper:]_')"
+  if [[ -n "${!env_var_name:-}" ]]; then
+    printf '%s' "${!env_var_name}"
+    return 0
+  fi
+  if [[ -f "$SECRETS_FILE" ]]; then
+    python3 - "$SECRETS_FILE" "$server_name" <<'PYTOK' 2>/dev/null
+import json, sys
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    tok = data.get("tokens", {}).get(sys.argv[2], "")
+    if isinstance(tok, str):
+        sys.stdout.write(tok)
+except Exception:
+    pass
+PYTOK
+  fi
+}
+
 # ── strip --no-version-check from args before positional parsing ──────────────
 NEW_ARGS=()
 for a in "$@"; do
@@ -528,14 +560,27 @@ for i in "${!SRV_NAMES[@]}"; do
     TOTAL_REMOTE_BYTES=$((TOTAL_REMOTE_BYTES + remote_bytes))
   fi
 
-  # HEAD-check the public URL base if one was given for this server
+  # HEAD-check the public URL base if one was given for this server.
+  # When a bearer token is available (env var or secrets.json), include it via
+  # stdin (--header @-) so it does not appear in `ps aux` argv.
   url_status="-"
   if [[ -n "$urlbase" ]]; then
-    if curl -fsSL --head --connect-timeout 5 --max-time 10 "$urlbase" >/dev/null 2>&1; then
-      url_status="${G}OK${N}"
+    site_token=$(get_bearer_token "$name")
+    if [[ -n "$site_token" ]]; then
+      if printf 'Authorization: Bearer %s\n' "$site_token" \
+          | curl -fsSL --head --header @- --connect-timeout 5 --max-time 10 "$urlbase" >/dev/null 2>&1; then
+        url_status="${G}OK*${N}"
+      else
+        url_status="${R}FAILED${N}"
+        URL_WARNINGS+=("$name: public URL did not respond with bearer auth (HEAD ${urlbase})")
+      fi
     else
-      url_status="${R}FAILED${N}"
-      URL_WARNINGS+=("$name: public URL did not respond (HEAD ${urlbase})")
+      if curl -fsSL --head --connect-timeout 5 --max-time 10 "$urlbase" >/dev/null 2>&1; then
+        url_status="${G}OK${N}"
+      else
+        url_status="${R}FAILED${N}"
+        URL_WARNINGS+=("$name: public URL did not respond (HEAD ${urlbase})")
+      fi
     fi
   fi
 
@@ -599,7 +644,8 @@ for i in "${VALID_INDEXES[@]}"; do
   printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
 
   SRV_PHASE_START=$(date +%s)
-  if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+  SRV_BEARER=$(get_bearer_token "$SRV_NAME")
+  if BEARER_TOKEN="${SRV_BEARER}" SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
     SRV_DURATIONS+=("$(( $(date +%s) - SRV_PHASE_START ))")
     # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
     # Fall back to scanning runs/ directly in case the symlink is missing.

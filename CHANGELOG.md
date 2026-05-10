@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] — 2026-05-10
+
+### Added
+
+- **Bearer-token authentication for the public-URL HEAD-check.** Sites whose public URL is gated behind a JWT/bearer token (intranet portals, staff-only document libraries) can now be audited without the "URL FAILED" preflight warning. Tokens live in a new `~/.filecap/secrets.json` file (mode `0600`, never bundled, never exported via the saved-sites menu) keyed by server-name. An env var `FILECAP_BEARER_TOKEN_<SERVER_NAME_UPPER_SNAKE>` overrides the file when set — works with `op run -- ./audit-fleet.sh` (1Password CLI), `direnv`, or any other secret manager that injects env vars, so the JWT never has to touch disk. The token is fed to `curl` via stdin (`--header @-`) so it never appears in argv / `ps aux`. Resolution order: env var → secrets.json → none. Both `audit-fleet.sh` and `audit-remote.sh` self-resolve the token on each run.
+- **`requiresBearerToken: boolean` field on `sites.json` entries.** Optional, informational — tells a remediator who receives a shared bundle "this site needs a JWT, ask for it separately." The token itself is never in `sites.json`; only this hint flag.
+- **15 new tests** covering the secrets loader (missing-file, valid, invalid-JSON, schema violations, type errors), env-var precedence, server-name → env-var-name normalization, and tolerant fallback when secrets is null/empty. Full suite 327/327 green.
+
+### Changed
+
+- Fleet preflight URL status annotates token-authenticated sites as `OK*` instead of plain `OK`, so you can tell at a glance which sites probed with a bearer token.
+
+[1.3.3]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.3.3
+
 ## [1.3.2] — 2026-05-10
 
 ### Added

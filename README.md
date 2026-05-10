@@ -838,6 +838,61 @@ If it prints `OK` without prompting for a password, you're set up. If it prompts
 - **"Connection refused"** — the server's SSH daemon isn't responding. Check with IDS that the server is up.
 - **No prompt at all, just hangs** — networking / firewall issue. May need to be on a specific VPN or IP allowlist; check with IDS.
 
+### Sites that require a bearer token (intranet, staff-only portals)
+
+Some sites — typically intranet content libraries or staff-only document portals — gate their public file URLs behind a JWT or other bearer token. The audit itself doesn't need the token (SSH+rsync reads files from the filesystem, bypassing HTTP entirely), but the preflight URL HEAD-check would otherwise log a "URL FAILED" warning and force you to confirm `[y/N]` before continuing. Configure the token once and the audit runs cleanly.
+
+**Two ways to provide the token, env var wins when both are present:**
+
+**Option 1 — env var (recommended for security-conscious / 1Password / direnv users).** Set `FILECAP_BEARER_TOKEN_<SERVER_NAME_UPPER_SNAKE>` in the shell environment before running the script. The token never touches disk:
+
+```bash
+# One-off, in the current shell
+export FILECAP_BEARER_TOKEN_INFONET_STRAPI_PROD="eyJhbGciOi..."
+./audit-fleet.sh
+
+# Or via 1Password CLI — pulls fresh from your vault each invocation
+op run --env-file=.env -- ./audit-fleet.sh
+# where .env is:
+# FILECAP_BEARER_TOKEN_INFONET_STRAPI_PROD=op://Private/infonet-jwt/credential
+```
+
+The env-var name is the server-name (the `name` field in `sites.json`) uppercased with hyphens replaced by underscores: `infonet-strapi-prod` → `FILECAP_BEARER_TOKEN_INFONET_STRAPI_PROD`.
+
+**Option 2 — `~/.filecap/secrets.json` file.** Edit once, persists across runs. The file is local-only — never bundled, never exported via the saved-sites menu, never sent to a remediator:
+
+```json
+{
+  "version": 1,
+  "tokens": {
+    "infonet-strapi-prod": "eyJhbGciOi..."
+  }
+}
+```
+
+```bash
+# Set restrictive permissions
+chmod 600 ~/.filecap/secrets.json
+```
+
+When the token rotates (commonly every 30 days for JWT auth), update the one line in `secrets.json` and the next run picks it up. No code change, no re-deploy.
+
+**Optional hint in `sites.json`.** If you maintain `sites.json` for distribution to other auditors, add `"requiresBearerToken": true` to each entry that needs one — it's purely informational, but tells anyone receiving the bundle "you'll need to ask the audit lead for the JWT separately." The token itself never goes in `sites.json`.
+
+```json
+{
+  "name": "infonet-strapi-prod",
+  "siteName": "Infonet",
+  "user": "forge",
+  "host": "192.241.146.85",
+  "remotePath": "/home/forge/infonet.icjia-api.cloud/strapi_v4/public/uploads",
+  "publicUrlBase": "https://infonet.icjia.illinois.gov/uploads",
+  "requiresBearerToken": true
+}
+```
+
+**Security notes.** The token is fed to `curl` via stdin (`--header @-`), not argv, so it never appears in `ps aux`. The `secrets.json` file is read only when needed; nothing writes the token to logs, the report bundle, or any output artifact. Audit work directories never contain the token. If the token leaks, rotate it on the issuing server and update `secrets.json` (or the env var); the leaked one stops working without any change to filecap.
+
 ### How to use it (single server)
 
 Three commands. The first downloads the script, the second makes it executable, the third runs it:
