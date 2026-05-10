@@ -99,7 +99,16 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
     const newest = dates[dates.length - 1] ?? "";
     const oldest = dates[0] ?? "";
     const totalBytes = items.reduce((s, i) => s + (i.sizeBytes ?? 0), 0);
-    const sites = items.map((i) => he(i.siteName || i.serverName || "")).join(", ");
+    // Each site is rendered as a link to its file's public URL (the canonical
+    // way for a manager / remediator to actually go look at the document).
+    // Falls back to plain text when the site has no publicUrlBase configured.
+    const sites = items.map((i) => {
+      const label = he(i.siteName || i.serverName || "");
+      if (i.publicUrl) {
+        return `<a href="${he(i.publicUrl)}" target="_blank" rel="noopener noreferrer" title="${he(i.publicUrl)}">${label}</a>`;
+      }
+      return label;
+    }).join(", ");
     const matchBadge = g.isExactDuplicate
       ? `<span class="dup-kind dup-exact">exact</span>`
       : `<span class="dup-kind dup-variant">variant</span>`;
@@ -426,6 +435,7 @@ main {
   font-weight: 700;
   line-height: 1;
 }
+.hero-summary .stat-block.total .stat-num { color: #58a6ff; }
 .hero-summary .stat-block.remediable .stat-num { color: #fbbf24; }
 .hero-summary .stat-block.reference .stat-num { color: #999999; }
 .hero-summary .stat-block .stat-label {
@@ -768,6 +778,12 @@ main {
    momentum, grab/grabbing cursor for mouse drag-pan, sticky first column +
    sticky header so the filename / column labels stay anchored. */
 .dup-pan-wrap {
+  /* width:fit-content + max-width:100% means the wrapper hugs the table on
+     wide monitors (no blank padding to the right of the last column) but
+     caps at 100% on narrow viewports, where overflow-x kicks in for the
+     horizontal scroll / drag-pan path. */
+  width: fit-content;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: auto;
   max-height: 70vh;
@@ -783,9 +799,21 @@ main {
 .dup-pan-wrap.is-panning * { user-select: none !important; }
 .dup-table {
   border-collapse: collapse;
+  /* width:max-content sizes the table exactly to its content — no trailing
+     padding to the right when the table is narrower than the viewport. The
+     last column meets the wrapper's right edge. */
   width: max-content;
-  min-width: 100%;
   font-size: 0.9rem;
+}
+.dup-table .dup-col-sites a {
+  color: #58a6ff;
+  text-decoration: none;
+}
+.dup-table .dup-col-sites a:hover { text-decoration: underline; }
+.dup-table .dup-col-sites a:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 .dup-table th, .dup-table td {
   padding: 0.55rem 0.85rem;
@@ -924,6 +952,10 @@ main {
         <strong>${he(fleetTotalFiles.toLocaleString())}</strong> files in total.
       </p>
       <p class="hero-stat-row">
+        <span class="stat-block total">
+          <span class="stat-num">${he(fleetTotalFiles.toLocaleString())}</span>
+          <span class="stat-label">total files</span>
+        </span>
         <span class="stat-block remediable">
           <span class="stat-num">${he(fleetRemediable.toLocaleString())}</span>
           <span class="stat-label">need accessibility audit</span>

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] — 2026-05-10
+
+### Added
+
+- **Headline "total files" stat in the hero**, alongside the existing "need accessibility audit" and "don't" blocks. Renders as a three-block row at the top of the index page so a manager can grab the headline number without reading the prose sentence below it. Coloured in the link-blue accent so it visually leads the row.
+- **Clickable per-file site links in the duplicates summary table.** Each site name in the "Sites" column is now a link to that site's public URL for the file (opens in a new tab; the URL is also shown on hover via the `title` attribute). A manager or remediator can scan the table, spot a row that looks worth checking, and click straight through to the document on each server to compare them. Sites without a `publicUrlBase` configured fall back to plain text.
+
+### Fixed
+
+- **Duplicates table no longer pads to fill the wrapper.** Dropped `min-width: 100%` from the table and gave the scroll wrapper `width: fit-content; max-width: 100%`. On wide monitors the wrapper hugs the table (no blank space to the right of the last column); on narrow viewports the wrapper caps at 100% and horizontal scroll / drag-pan kicks in as before.
+
+[1.5.3]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.5.3
+
 ## [1.5.2] — 2026-05-10
 
 ### Changed

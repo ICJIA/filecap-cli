@@ -89,15 +89,21 @@ export function findCrossServerDuplicates(all) {
       return String(mb).localeCompare(String(ma));
     });
 
-    const flatItems = items.map((i) => ({
-      serverName: i.serverName,
-      siteName: i.siteName ?? "",
-      filename: i.entry?.filename ?? "",
-      path: i.entry?.path ?? "",
-      modifiedAt: i.entry?.modifiedAt ?? "",
-      sizeBytes: i.entry?.sizeBytes ?? 0,
-      sha256: i.entry?.sha256 ?? "",
-    }));
+    const flatItems = items.map((i) => {
+      const base = (i.publicUrlBase ?? "").replace(/\/+$/, "");
+      const p = (i.entry?.path ?? "").replace(/^\/+/, "");
+      const publicUrl = base && p ? `${base}/${p}` : "";
+      return {
+        serverName: i.serverName,
+        siteName: i.siteName ?? "",
+        filename: i.entry?.filename ?? "",
+        path: i.entry?.path ?? "",
+        publicUrl,
+        modifiedAt: i.entry?.modifiedAt ?? "",
+        sizeBytes: i.entry?.sizeBytes ?? 0,
+        sha256: i.entry?.sha256 ?? "",
+      };
+    });
 
     const hashSet = new Set(flatItems.map((i) => i.sha256).filter(Boolean));
     const isExactDuplicate = hashSet.size <= 1;
@@ -430,6 +436,7 @@ export async function runWebRollup({
     // `runReport` path is left undisturbed.
     const siteServerName = site.name;
     const siteSiteName = site.siteName ?? site.name ?? "";
+    const sitePublicUrlBase = site.publicUrlBase ?? header.metadata?.publicUrlBase ?? "";
     const stream2 = createReadStream(latestInv, { encoding: "utf8" });
     const rl2 = readline.createInterface({ input: stream2, crlfDelay: Infinity });
     for await (const line of rl2) {
@@ -442,7 +449,12 @@ export async function runWebRollup({
       // Stamp serverName on each entry — the consolidated CSV path in csv.js
       // reads `entry.serverName` to look up the per-site metadata.
       obj.serverName = siteServerName;
-      allEntries.push({ entry: obj, serverName: siteServerName, siteName: siteSiteName });
+      allEntries.push({
+        entry: obj,
+        serverName: siteServerName,
+        siteName: siteSiteName,
+        publicUrlBase: sitePublicUrlBase,
+      });
     }
 
     // Merge sites.json metadata (siteName, host, remotePath, publicUrlBase) on
