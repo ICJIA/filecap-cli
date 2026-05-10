@@ -14,6 +14,10 @@
 #    sortable, filterable, print-friendly version of the same data that opens
 #    in any browser with no external dependencies.
 #
+#    The saved-sites menu now also offers option w → build web rollup, which
+#    bundles the most recent scans of every saved site into a static-site
+#    directory ready to drag-and-drop to Netlify for manager-facing sharing.
+#
 #  HOW TO GET THIS SCRIPT
 #    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
 #    chmod +x audit-remote.sh
@@ -618,6 +622,7 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
       echo "    d  →  delete a saved site"
       echo "    p  →  preflight all saved sites (verify SSH + path + file count)"
       echo "    x  →  export all sites to a JSON file (no credentials)"
+      echo "    w  →  build web rollup from latest scans (publishable static site)"
     fi
     echo "    i  →  import sites from a JSON file"
     echo "    s  →  skip (one-off prompts, don't save)"
@@ -692,6 +697,25 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
         export_path="${export_path:-${HOME}/Desktop/icjia-sites.json}"
         if export_sites_to_file "$export_path"; then
           info "Hand this file to other auditors. It contains hostnames and paths but NO audit token."
+        fi
+        ;;
+      w|W)
+        if [[ "$saved_count" -eq 0 ]]; then
+          warn "No saved sites to bundle."
+          continue
+        fi
+        echo
+        read -r -s -p "  Set a password? (Enter to skip; input hidden): " WEB_PW
+        echo
+        WEB_OUT="${HOME}/filecap-audits/_web-rollup/$(date -u +%Y%m%dT%H%M%SZ)"
+        step "Building web rollup at ${WEB_OUT} ..."
+        ROLLUP_ARGS=( --output "$WEB_OUT" )
+        [[ -n "$WEB_PW" ]] && ROLLUP_ARGS+=( --password "$WEB_PW" )
+        if npx --yes @icjia/filecap@latest web-rollup "${ROLLUP_ARGS[@]}"; then
+          info "Bundle ready. To preview: open ${WEB_OUT}/index.html"
+          info "To deploy: drop the directory at https://app.netlify.com/drop"
+          read -r -p "  Open the index now? [y/N]: " open_now
+          [[ "$open_now" =~ ^[Yy]$ ]] && xopen "${WEB_OUT}/index.html"
         fi
         ;;
       i|I)
