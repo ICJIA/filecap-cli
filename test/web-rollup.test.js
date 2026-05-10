@@ -354,4 +354,84 @@ describe("runWebRollup", () => {
     expect(result.exitCode).toBe(2);
     expect(result.error).toMatch(/no sites had scans/i);
   });
+
+  it("bundle includes netlify.toml with expected build/publish settings", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const files = await fs.readdir(outputDir);
+    expect(files).toContain("netlify.toml");
+
+    const toml = await fs.readFile(path.join(outputDir, "netlify.toml"), "utf8");
+    expect(toml).toContain('publish = "."');
+  });
+
+  it("netlify.toml has CSV cache-control and Content-Disposition rules", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const toml = await fs.readFile(path.join(outputDir, "netlify.toml"), "utf8");
+    expect(toml).toContain('for = "/*.csv"');
+    expect(toml).toContain("max-age=3600");
+    expect(toml).toContain('Content-Disposition = "attachment"');
+  });
+
+  it("--no-client-gate skips password JS injection even when --password is set", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture({
+      siteName: "DVFR",
+      scannedAt: "2026-05-09T16:05:04.000Z",
+    });
+
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = () => true;
+
+    let result;
+    try {
+      result = await runWebRollup({
+        output: outputDir,
+        sitesFile,
+        _auditsBase: auditsBase,
+        password: "secret",
+        noClientGate: true,
+      });
+    } finally {
+      process.stderr.write = origWrite;
+    }
+
+    expect(result.exitCode).toBe(0);
+
+    // Per-site HTML must NOT contain the password gate script
+    const files = await fs.readdir(outputDir);
+    const htmlFile = files.find((f) => f.endsWith(".html") && f !== "index.html");
+    expect(htmlFile).toBeTruthy();
+    const html = await fs.readFile(path.join(outputDir, htmlFile), "utf8");
+    expect(html).not.toContain("sessionStorage.getItem(\"fc-pw\")");
+
+    // index.html must NOT contain the password gate script either
+    const index = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(index).not.toContain("sessionStorage.getItem(\"fc-pw\")");
+
+    // clientGateEnabled should be false in the summary
+    expect(result.summary.clientGateEnabled).toBe(false);
+  });
+
+  it("clientGateEnabled is true when password is set and noClientGate is false", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    const result = await runWebRollup({
+      output: outputDir,
+      sitesFile,
+      _auditsBase: auditsBase,
+      password: "mypassword",
+      noClientGate: false,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.summary.clientGateEnabled).toBe(true);
+  });
+
+  it("clientGateEnabled is false when no password is set", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    expect(result.exitCode).toBe(0);
+    expect(result.summary.clientGateEnabled).toBe(false);
+  });
 });

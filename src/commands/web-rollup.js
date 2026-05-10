@@ -3,10 +3,12 @@ import { createReadStream } from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import os from "node:os";
+import { spawn } from "node:child_process";
 import { runReport } from "./report.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
+import { generateNetlifyToml } from "../web/netlify-config.js";
 import { darkModeCss } from "../web/styles.js";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -128,6 +130,9 @@ async function computeSiteSummary(inventoryPath) {
  * @param {object} args
  * @param {string} args.output             - Output directory
  * @param {string|null} args.password      - Plain password to embed (hashed) for client-side gate
+ * @param {boolean} args.noClientGate      - Skip the client-side password gate JS injection
+ * @param {boolean} args.deploy            - After building, run `netlify deploy --prod`
+ * @param {string|null} args.deploySite    - Pass --site <id> to netlify deploy
  * @param {string} args.title              - Title shown on the index page
  * @param {Array<string>} args.includeSite - Only bundle these nicknames
  * @param {Array<string>} args.excludeSite - Skip these nicknames
@@ -138,6 +143,9 @@ async function computeSiteSummary(inventoryPath) {
 export async function runWebRollup({
   output,
   password = null,
+  noClientGate = false,
+  deploy = false,
+  deploySite = null,
   title = "filecap audit fleet snapshot",
   includeSite = [],
   excludeSite = [],
@@ -226,8 +234,9 @@ export async function runWebRollup({
 
     await fs.copyFile(srcCsv, dstCsv);
 
+    const useClientGate = !noClientGate && password !== null;
     let htmlContent = await fs.readFile(srcHtml, "utf8");
-    if (password) {
+    if (useClientGate) {
       const hexHash = computeHash(password);
       htmlContent = injectPasswordGate(htmlContent, hexHash);
     }
@@ -252,15 +261,24 @@ export async function runWebRollup({
   }
 
   // 6. Generate index.html
-  const passwordHash = password ? computeHash(password) : null;
+  const useClientGateForIndex = !noClientGate && password !== null;
+  const passwordHash = useClientGateForIndex ? computeHash(password) : null;
   const indexHtml = generateIndexHtml({ siteResults, password: passwordHash, title });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 
   // 7. Generate robots.txt
   await fs.writeFile(path.join(output, "robots.txt"), generateRobotsTxt());
 
-  // 8. Generate shared CSS
+  // 8. Generate netlify.toml
+  await fs.writeFile(path.join(output, "netlify.toml"), generateNetlifyToml());
+
+  // 9. Generate shared CSS
   await fs.writeFile(path.join(output, "assets", "style.css"), darkModeCss());
+
+  // 10. Optionally deploy via netlify CLI
+  if (deploy) {
+    await runNetlifyDeploy({ output, deploySite });
+  }
 
   return {
     exitCode: 0,
@@ -269,6 +287,59 @@ export async function runWebRollup({
       sitesSkipped: sites.length - siteResults.length,
       outputDir: output,
       passwordEnabled: !!password,
+      clientGateEnabled: useClientGateForIndex,
     },
   };
+}
+
+// ── netlify deploy helper ──────────────────────────────────────────────────────
+
+/**
+ * Run `netlify deploy --prod --dir <output>` via child_process.spawn.
+ * Inherits stdio so the user sees Netlify CLI progress.
+ * If netlify CLI is not found, prints friendly remediation instructions.
+ *
+ * @param {object} args
+ * @param {string} args.output      - Output directory to deploy
+ * @param {string|null} args.deploySite - Pass --site <id> to netlify deploy
+ * @returns {Promise<void>}
+ */
+async function runNetlifyDeploy({ output, deploySite }) {
+  const args = ["deploy", "--prod", "--dir", output];
+  if (deploySite) {
+    args.push("--site", deploySite);
+  }
+
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn("netlify", args, { stdio: "inherit" });
+    } catch {
+      process.stderr.write(
+        "To deploy automatically, install the Netlify CLI: `npm install -g netlify-cli`.\n" +
+        `Otherwise, you can manually run: cd ${output} && netlify deploy --prod --dir .\n`,
+      );
+      resolve();
+      return;
+    }
+
+    child.on("error", (err) => {
+      if (err.code === "ENOENT") {
+        process.stderr.write(
+          "To deploy automatically, install the Netlify CLI: `npm install -g netlify-cli`.\n" +
+          `Otherwise, you can manually run: cd ${output} && netlify deploy --prod --dir .\n`,
+        );
+      } else {
+        process.stderr.write(`netlify deploy error: ${err.message}\n`);
+      }
+      resolve();
+    });
+
+    child.on("close", (code) => {
+      if (code !== 0) {
+        process.stderr.write(`netlify deploy exited with code ${code}\n`);
+      }
+      resolve();
+    });
+  });
 }

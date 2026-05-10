@@ -126,6 +126,9 @@ program
   .description("Bundle the most recent scans of every saved site into a static-site directory for manual upload to Netlify or any static host")
   .option("-o, --output <dir>", "Output directory")
   .option("--password <pw>", "Embed SHA-256 of this password in a client-side gate")
+  .option("--no-client-gate", "Skip the client-side password gate (use Netlify dashboard Site Password instead)")
+  .option("--deploy", "After building the bundle, run `netlify deploy --prod` to push to Netlify")
+  .option("--deploy-site <site-id>", "Pass --site <id> to netlify deploy (for non-linked sites)")
   .option("--title <title>", "Title shown on the index page", "filecap audit fleet snapshot")
   .option("--include-site <name...>", "Only bundle these site nicknames")
   .option("--exclude-site <name...>", "Skip these site nicknames")
@@ -138,10 +141,20 @@ program
       new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19) + "Z",
     );
     const password = opts.password ?? null;
+    // Commander sets opts.clientGate = false when --no-client-gate is passed
+    const noClientGate = opts.clientGate === false;
+
+    if (noClientGate && password !== null) {
+      process.stderr.write("WARN: --password is ignored when --no-client-gate is set.\n");
+    }
+
     try {
       const result = await runWebRollup({
         output,
         password,
+        noClientGate,
+        deploy: opts.deploy ?? false,
+        deploySite: opts.deploySite ?? null,
         title: opts.title,
         includeSite: opts.includeSite ?? [],
         excludeSite: opts.excludeSite ?? [],
@@ -154,6 +167,11 @@ program
       const s = result.summary;
       process.stderr.write(`Bundled ${s.sitesIncluded} site(s) (${s.sitesSkipped} skipped) → ${s.outputDir}\n`);
       process.stderr.write(`Open ${path.join(s.outputDir, "index.html")} to preview\n`);
+      if (noClientGate) {
+        process.stderr.write(
+          "Note: Bundle has NO embedded password gate. Use your Netlify Pro plan's Site Password feature in the dashboard for server-side protection.\n",
+        );
+      }
     } catch (err) {
       process.stderr.write(`filecap web-rollup error: ${err.message}\n`);
       process.exit(1);

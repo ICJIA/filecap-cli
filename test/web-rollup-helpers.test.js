@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { computeHash, injectPasswordGate } from "../src/web/password-gate.js";
 import { generateRobotsTxt } from "../src/web/robots.js";
 import { darkModeCss, DESIGN_TOKENS } from "../src/web/styles.js";
+import { generateNetlifyToml } from "../src/web/netlify-config.js";
 
 describe("computeHash", () => {
   it("returns a 64-character lowercase hex string", () => {
@@ -98,5 +99,47 @@ describe("DESIGN_TOKENS", () => {
     expect(DESIGN_TOKENS.bgBase).toBe("#0a0a0a");
     expect(DESIGN_TOKENS.bgElevated).toBe("#161616");
     expect(DESIGN_TOKENS.accent).toBe("#60a5fa");
+  });
+});
+
+describe("generateNetlifyToml", () => {
+  it("returns a non-empty string", () => {
+    const toml = generateNetlifyToml();
+    expect(typeof toml).toBe("string");
+    expect(toml.length).toBeGreaterThan(0);
+  });
+
+  it("sets publish dir to '.'", () => {
+    const toml = generateNetlifyToml();
+    expect(toml).toContain('publish = "."');
+  });
+
+  it("has CSV cache-control rule with max-age=3600", () => {
+    const toml = generateNetlifyToml();
+    expect(toml).toContain('for = "/*.csv"');
+    expect(toml).toContain("max-age=3600");
+  });
+
+  it("has CSV Content-Disposition: attachment rule", () => {
+    const toml = generateNetlifyToml();
+    expect(toml).toContain('Content-Disposition = "attachment"');
+  });
+
+  it("has HTML cache-control rule with max-age=300", () => {
+    const toml = generateNetlifyToml();
+    expect(toml).toContain('for = "/*.html"');
+    expect(toml).toContain("max-age=300");
+  });
+
+  it("has X-Robots-Tag noindex on HTML pages", () => {
+    const toml = generateNetlifyToml();
+    expect(toml).toContain('X-Robots-Tag = "noindex, nofollow"');
+  });
+
+  it("has security headers on all pages", () => {
+    const toml = generateNetlifyToml();
+    expect(toml).toContain('X-Frame-Options = "DENY"');
+    expect(toml).toContain('X-Content-Type-Options = "nosniff"');
+    expect(toml).toContain('Referrer-Policy = "no-referrer"');
   });
 });

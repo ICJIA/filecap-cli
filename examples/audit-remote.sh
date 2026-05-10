@@ -705,15 +705,36 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
           continue
         fi
         echo
-        read -r -s -p "  Set a password? (Enter to skip; input hidden): " WEB_PW
-        echo
+        echo "  Password protection mode:"
+        echo "    n → none (open access)"
+        echo "    c → client-side gate (free; not real security; a SHA-256 prompt embedded in HTML)"
+        echo "    s → use Netlify Site Password (recommended; requires paid Netlify; set later in dashboard)"
+        read -r -p "  Choice [n]: " GATE_MODE
+        GATE_MODE="${GATE_MODE:-n}"
+
+        WEB_PW=""
+        case "$GATE_MODE" in
+          c|C) read -r -s -p "  Set a password for the client-side gate (input hidden): " WEB_PW; echo ;;
+          s|S) info "Bundle will be built without a client-side gate. After deploying, set the password in the Netlify dashboard." ;;
+        esac
+
         WEB_OUT="${HOME}/filecap-audits/_web-rollup/$(date -u +%Y%m%dT%H%M%SZ)"
         step "Building web rollup at ${WEB_OUT} ..."
         ROLLUP_ARGS=( --output "$WEB_OUT" )
-        [[ -n "$WEB_PW" ]] && ROLLUP_ARGS+=( --password "$WEB_PW" )
+        case "$GATE_MODE" in
+          c|C) [[ -n "$WEB_PW" ]] && ROLLUP_ARGS+=( --password "$WEB_PW" ) ;;
+          s|S) ROLLUP_ARGS+=( --no-client-gate ) ;;
+        esac
+
+        echo
+        read -r -p "  Auto-deploy to Netlify? [y/N]: " AUTO_DEPLOY
+        [[ "$AUTO_DEPLOY" =~ ^[Yy]$ ]] && ROLLUP_ARGS+=( --deploy )
+
         if npx --yes @icjia/filecap@latest web-rollup "${ROLLUP_ARGS[@]}"; then
           info "Bundle ready. To preview: open ${WEB_OUT}/index.html"
-          info "To deploy: drop the directory at https://app.netlify.com/drop"
+          if ! [[ "$AUTO_DEPLOY" =~ ^[Yy]$ ]]; then
+            info "To deploy: drop the directory at https://app.netlify.com/drop"
+          fi
           read -r -p "  Open the index now? [y/N]: " open_now
           [[ "$open_now" =~ ^[Yy]$ ]] && xopen "${WEB_OUT}/index.html"
         fi
