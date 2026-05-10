@@ -381,7 +381,7 @@ Bundle the most recent scans of every saved site into a static-site directory re
 | `--no-client-gate` | (off) | Skip the client-side gate JS. Use with Netlify dashboard Site Password for server-side enforcement. |
 | `--deploy` | (off) | After building, run `netlify deploy --prod` automatically. Requires Netlify CLI installed and logged in. |
 | `--deploy-site <site-id>` | (none) | Pass `--site <id>` to `netlify deploy` (for non-linked sites) |
-| `--title <title>` | `"filecap audit fleet snapshot"` | Title shown on the index page |
+| `--title <title>` | `"filecap fleet audit snapshot"` | Title shown on the index page |
 | `--include-site <name...>` | (all sites) | Only bundle these site nicknames |
 | `--exclude-site <name...>` | (none excluded) | Skip these site nicknames |
 | `--sites-file <path>` | `~/.filecap/sites.json` | Override saved-sites JSON path |

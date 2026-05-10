@@ -266,7 +266,7 @@ function renderCard(sr) {
 export function generateIndexHtml({
   siteResults,
   password = null,
-  title = "filecap audit fleet snapshot",
+  title = "filecap fleet audit snapshot",
   duplicateGroups = [],
   masterCsv = null, // { filename: string, fileCount: number, byteCount: number } | null
   duplicatesCsv = null, // { filename: string, groupCount: number, occurrenceCount: number, byteCount: number } | null
@@ -1064,13 +1064,13 @@ main {
 <body>
 
 <header class="site-header">
-  <span class="brand"><span>filecap</span> audit fleet snapshot</span>
+  <span class="brand"><span>filecap</span> fleet audit snapshot</span>
 </header>
 
 <main>
 
   <section class="hero">
-    <h1>ICJIA accessibility audit fleet</h1>
+    <h1>ICJIA accessibility fleet audit</h1>
     <p class="subtitle">Generated <time>${he(generatedAt)}</time> from ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
 
     <div class="hero-summary">

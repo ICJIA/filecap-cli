@@ -130,7 +130,7 @@ program
   .option("--no-client-gate", "Skip the client-side password gate (use Netlify dashboard Site Password instead)")
   .option("--deploy", "After building the bundle, run `netlify deploy --prod` to push to Netlify")
   .option("--deploy-site <site-id>", "Pass --site <id> to netlify deploy (for non-linked sites)")
-  .option("--title <title>", "Title shown on the index page", "filecap audit fleet snapshot")
+  .option("--title <title>", "Title shown on the index page", "filecap fleet audit snapshot")
   .option("--include-site <name...>", "Only bundle these site nicknames")
   .option("--exclude-site <name...>", "Skip these site nicknames")
   .option("--sites-file <path>", "Override saved-sites JSON path")
