@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import path from "node:path";
+import os from "node:os";
 import { runScan } from "../src/commands/scan.js";
 import { runRollup } from "../src/commands/rollup.js";
 import { runReport } from "../src/commands/report.js";
 import { runMcp } from "../src/commands/mcp.js";
+import { runWebRollup } from "../src/commands/web-rollup.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
 
@@ -114,6 +117,45 @@ program
       process.exit(result.exitCode);
     } catch (err) {
       process.stderr.write(`filecap: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("web-rollup")
+  .description("Bundle the most recent scans of every saved site into a static-site directory for manual upload to Netlify or any static host")
+  .option("-o, --output <dir>", "Output directory")
+  .option("--password <pw>", "Embed SHA-256 of this password in a client-side gate")
+  .option("--title <title>", "Title shown on the index page", "filecap audit fleet snapshot")
+  .option("--include-site <name...>", "Only bundle these site nicknames")
+  .option("--exclude-site <name...>", "Skip these site nicknames")
+  .option("--sites-file <path>", "Override saved-sites JSON path")
+  .action(async (opts) => {
+    const output = opts.output ?? path.join(
+      os.homedir(),
+      "filecap-audits",
+      "_web-rollup",
+      new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19) + "Z",
+    );
+    const password = opts.password ?? null;
+    try {
+      const result = await runWebRollup({
+        output,
+        password,
+        title: opts.title,
+        includeSite: opts.includeSite ?? [],
+        excludeSite: opts.excludeSite ?? [],
+        sitesFile: opts.sitesFile ?? null,
+      });
+      if (result.exitCode !== 0) {
+        process.stderr.write(`web-rollup error: ${result.error}\n`);
+        process.exit(result.exitCode);
+      }
+      const s = result.summary;
+      process.stderr.write(`Bundled ${s.sitesIncluded} site(s) (${s.sitesSkipped} skipped) → ${s.outputDir}\n`);
+      process.stderr.write(`Open ${path.join(s.outputDir, "index.html")} to preview\n`);
+    } catch (err) {
+      process.stderr.write(`filecap web-rollup error: ${err.message}\n`);
       process.exit(1);
     }
   });
