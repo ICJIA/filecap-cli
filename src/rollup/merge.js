@@ -86,16 +86,13 @@ export async function rollupInventories(inputPaths, outputPath, { strict = false
       permissionDenials: 0,
     };
     const sourceEntry = { ...header.metadata, stats: sourceStats };
-    // siteName, publicUrlBase, and auditLinkPattern are already spread from header.metadata
+    // siteName and publicUrlBase are already spread from header.metadata
     // if present; ensure they're only included when non-empty strings (schema allows optional).
     if (!sourceEntry.siteName) {
       delete sourceEntry.siteName;
     }
     if (!sourceEntry.publicUrlBase) {
       delete sourceEntry.publicUrlBase;
-    }
-    if (!sourceEntry.auditLinkPattern) {
-      delete sourceEntry.auditLinkPattern;
     }
     sources.push(sourceEntry);
 

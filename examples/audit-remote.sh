@@ -37,7 +37,6 @@
 #    - A friendly name for the server (used in the report header)
 #    - Website nickname (e.g. DVFR, i2i, vpp — press Enter to skip)
 #    - Public URL base (e.g. https://dvfr.icjia-api.cloud/uploads — press Enter to skip)
-#    - Whether to also generate a self-contained HTML report (optional)
 #
 #  WHERE OUTPUT GOES
 #    ~/filecap-audits/<server-ip>/
@@ -62,24 +61,20 @@
 #
 #  USAGE
 #    ./audit-remote.sh                                                              # interactive
-#    ./audit-remote.sh USER HOST REMOTE_PATH [SERVER_NAME] [SITE_NAME] [PUBLIC_URL_BASE] [AUDIT_LINK_PATTERN]
+#    ./audit-remote.sh USER HOST REMOTE_PATH [SERVER_NAME] [SITE_NAME] [PUBLIC_URL_BASE]
 #    ./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-strapi-prod DVFR https://dvfr.icjia-api.cloud/uploads
 #    ./audit-remote.sh --no-version-check                                           # skip update check
 #    SKIP_VERSION_CHECK=1 ./audit-remote.sh                                         # same, via env var
-#    RUN_AUDIT_ENRICH=y FILECAP_AUDIT_TOKEN=fap_xxx ./audit-remote.sh              # non-interactive enrich
 #
 #  NOTE: REMOTE_PATH must not contain spaces or shell metacharacters.
 #    Tilde paths such as ~/uploads are supported (the remote shell expands them).
 #    For paths with spaces, use the absolute path instead.
 #
-#  SAVED SITES (NEW)
+#  SAVED SITES
 #    On startup, the script offers a menu of previously-audited sites stored
 #    in ~/.filecap/sites.json. Pick a number to skip re-typing the SSH user,
 #    server IP, remote path, etc. New sites can be added; existing ones can
 #    be edited or deleted via the same menu.
-#
-#    The audit token is NEVER stored in this file. Keep it in env or your
-#    keychain (FILECAP_AUDIT_TOKEN env var).
 #
 # ============================================================================
 
@@ -311,7 +306,6 @@ fields = [
     ("SERVER_NAME_ARG", "name"),
     ("SITE_NAME_ARG", "siteName"),
     ("PUBLIC_URL_BASE_ARG", "publicUrlBase"),
-    ("AUDIT_LINK_PATTERN_ARG", "auditLinkPattern"),
 ]
 for var, key in fields:
     val = s.get(key) or ""
@@ -321,20 +315,19 @@ PYLOAD
 
 save_or_update_site() {
   ensure_sites_file
-  python3 - <<'PYSAVE' "$SITES_FILE" "$SERVER_NAME" "$SITE_NAME" "$SSH_USER" "$HOST" "$REMOTE_PATH" "$PUBLIC_URL_BASE" "$AUDIT_LINK_PATTERN"
+  python3 - <<'PYSAVE' "$SITES_FILE" "$SERVER_NAME" "$SITE_NAME" "$SSH_USER" "$HOST" "$REMOTE_PATH" "$PUBLIC_URL_BASE"
 import json, sys
 file_path = sys.argv[1]
 new_site = {
-    "name":             sys.argv[2],
-    "siteName":         sys.argv[3],
-    "user":             sys.argv[4],
-    "host":             sys.argv[5],
-    "remotePath":       sys.argv[6],
-    "publicUrlBase":    sys.argv[7],
-    "auditLinkPattern": sys.argv[8],
+    "name":          sys.argv[2],
+    "siteName":      sys.argv[3],
+    "user":          sys.argv[4],
+    "host":          sys.argv[5],
+    "remotePath":    sys.argv[6],
+    "publicUrlBase": sys.argv[7],
 }
 # Strip empty optional fields for cleanliness
-for k in ["siteName", "publicUrlBase", "auditLinkPattern"]:
+for k in ["siteName", "publicUrlBase"]:
     if not new_site.get(k):
         new_site.pop(k, None)
 with open(file_path) as f:
@@ -386,7 +379,7 @@ with open(src) as f:
     data = json.load(f)
 sites = data.get("sites", [])
 # Strip empty optional fields and any unexpected fields (e.g., never a token)
-allowed = {"name", "siteName", "user", "host", "remotePath", "publicUrlBase", "auditLinkPattern"}
+allowed = {"name", "siteName", "user", "host", "remotePath", "publicUrlBase"}
 clean = []
 for s in sites:
     c = {k: v for k, v in s.items() if k in allowed and v}
@@ -423,7 +416,7 @@ if not isinstance(incoming, dict) or "sites" not in incoming:
 new_sites = incoming.get("sites", [])
 if not isinstance(new_sites, list):
     print("ERROR: 'sites' is not a list", file=sys.stderr); sys.exit(2)
-allowed = {"name", "siteName", "user", "host", "remotePath", "publicUrlBase", "auditLinkPattern"}
+allowed = {"name", "siteName", "user", "host", "remotePath", "publicUrlBase"}
 cleaned = []
 for s in new_sites:
     if not isinstance(s, dict): continue
@@ -755,7 +748,6 @@ REMOTE_PATH_ARG="${3:-}"
 SERVER_NAME_ARG="${4:-}"
 SITE_NAME_ARG="${5:-${SITE_NAME_ARG:-}}"
 PUBLIC_URL_BASE_ARG="${6:-${PUBLIC_URL_BASE_ARG:-}}"
-AUDIT_LINK_PATTERN_ARG="${7:-${AUDIT_LINK_PATTERN_ARG:-}}"
 
 DEFAULT_SSH_USER="${FILECAP_DEFAULT_SSH_USER:-forge}"
 if [[ -z "$USER_ARG" ]]; then
@@ -795,17 +787,6 @@ if [[ -z "$PUBLIC_URL_BASE_ARG" ]]; then
 fi
 PUBLIC_URL_BASE="$PUBLIC_URL_BASE_ARG"
 
-# Optional: URL template for an external audit service
-# AUDIT_LINK_PATTERN_ARG may be pre-set by audit-fleet.sh via env var.
-if [[ -z "$AUDIT_LINK_PATTERN_ARG" ]]; then
-  echo
-  echo "Optional: a URL template for an external audit service (audit.icjia.app, etc.)"
-  echo "Placeholders: {publicUrl} {sha256} {filename} {path} {serverIp} {siteName}"
-  echo "Example: https://audit.icjia.app/?prefill={publicUrl}"
-  read -r -p "Audit link template (press Enter to skip): " AUDIT_LINK_PATTERN_ARG
-fi
-AUDIT_LINK_PATTERN="$AUDIT_LINK_PATTERN_ARG"
-
 SSH_USER="$USER_ARG"
 HOST="$HOST_ARG"
 REMOTE_PATH="$REMOTE_PATH_ARG"
@@ -819,13 +800,6 @@ if [[ "${AUDIT_HTML:-1}" == "0" ]]; then
   HTML_FLAG=""
 else
   HTML_FLAG="--html"
-fi
-
-# ── audit-enrich prompt (asked early so it's part of the config review) ──────
-RUN_AUDIT_ENRICH="${RUN_AUDIT_ENRICH:-}"
-if [[ -z "$RUN_AUDIT_ENRICH" ]]; then
-  echo
-  read -r -p "Enrich inventory with audit.icjia.app scores after the scan? [y/N]: " RUN_AUDIT_ENRICH
 fi
 
 # ── config review — loop until user confirms or aborts ──────────────────────
@@ -847,23 +821,17 @@ while :; do
   printf "  4. %-22s %s\n" "Friendly server name:" "$SERVER_NAME"
   printf "  5. %-22s %s\n" "Website nickname:"     "${SITE_NAME:-(none)}"
   printf "  6. %-22s %s\n" "Public URL prefix:"    "${PUBLIC_URL_BASE:-(none)}"
-  printf "  7. %-22s %s\n" "Audit link template:"  "${AUDIT_LINK_PATTERN:-(none)}"
   if [[ -n "$HTML_FLAG" ]]; then
-    printf "  8. %-22s %s\n" "HTML report:"        "Yes (always)"
+    printf "  7. %-22s %s\n" "HTML report:"        "Yes (always)"
   else
-    printf "  8. %-22s %s\n" "HTML report:"        "No (AUDIT_HTML=0)"
-  fi
-  if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
-    printf "  9. %-22s %s\n" "Enrich audit scores:" "Yes (will call audit.icjia.app — adds ~15-30 min)"
-  else
-    printf "  9. %-22s %s\n" "Enrich audit scores:" "No"
+    printf "  7. %-22s %s\n" "HTML report:"        "No (AUDIT_HTML=0)"
   fi
   echo
   printf "     %-22s %s\n" "Output destination:"   "${HOME}/filecap-audits/${HOST}/runs/<this run>/"
   echo
   echo "══════════════════════════════════════════════════════════════════════════"
   echo "  Press Enter (or y) to proceed."
-  echo "  Type a number 1-9 to edit that value."
+  echo "  Type a number 1-7 to edit that value."
   echo "  Type q to abort."
   read -r -p "  Choice: " CONFIRM_CONFIG
   case "$CONFIRM_CONFIG" in
@@ -902,11 +870,6 @@ while :; do
       PUBLIC_URL_BASE="$_new"
       ;;
     7)
-      echo "  Placeholders: {publicUrl} {sha256} {filename} {path} {serverIp} {siteName}"
-      read -r -p "  Audit link template (Enter to clear) [${AUDIT_LINK_PATTERN}]: " _new
-      AUDIT_LINK_PATTERN="$_new"
-      ;;
-    8)
       if [[ -n "$HTML_FLAG" ]]; then
         HTML_FLAG=""
         info "HTML report disabled."
@@ -915,12 +878,8 @@ while :; do
         info "HTML report enabled."
       fi
       ;;
-    9)
-      read -r -p "  Enrich audit scores after scan? [y/N]: " _new
-      RUN_AUDIT_ENRICH="$_new"
-      ;;
     *)
-      warn "Unrecognized: '${CONFIRM_CONFIG}'. Type 1-9, Enter, or q."
+      warn "Unrecognized: '${CONFIRM_CONFIG}'. Type 1-7, Enter, or q."
       ;;
   esac
 done
@@ -965,7 +924,6 @@ AUDIT_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   printf "SSH user     : %s\n" "${SSH_USER}"
   printf "Remote path  : %s\n" "${REMOTE_PATH}"
   [[ -n "$PUBLIC_URL_BASE" ]] && printf "Public URL base: %s\n" "${PUBLIC_URL_BASE}"
-  [[ -n "$AUDIT_LINK_PATTERN" ]] && printf "Audit link template: %s\n" "${AUDIT_LINK_PATTERN}"
   printf "Audit started: %s\n" "${AUDIT_TS}"
   printf "\n"
   printf "To locate a file on the remote:\n"
@@ -1050,8 +1008,6 @@ if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
   [[ -n "$SITE_NAME" ]] && NATIVE_SITE_ARGS="--site-name '${SITE_NAME}'"
   NATIVE_PUBURL_ARGS=""
   [[ -n "$PUBLIC_URL_BASE" ]] && NATIVE_PUBURL_ARGS="--public-url-base '${PUBLIC_URL_BASE}'"
-  NATIVE_AUDITLINK_ARGS=""
-  [[ -n "$AUDIT_LINK_PATTERN" ]] && NATIVE_AUDITLINK_ARGS="--audit-link-pattern '${AUDIT_LINK_PATTERN}'"
 
   # shellcheck disable=SC2029
   if ! ssh -o ConnectTimeout=30 "${SSH_USER}@${HOST}" \
@@ -1060,7 +1016,6 @@ if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
         --server-ip '${HOST}' \
         ${NATIVE_SITE_ARGS} \
         ${NATIVE_PUBURL_ARGS} \
-        ${NATIVE_AUDITLINK_ARGS} \
         -o -" \
       > "${INVENTORY}" 2> >(grep -v 'Warning:' >&2); then
     die "Remote filecap scan failed. Check stderr above for details."
@@ -1083,7 +1038,6 @@ else
   SCAN_ARGS=( "${MIRROR_DIR}" --server-name "${SERVER_NAME}" --server-ip "${HOST}" -o "${INVENTORY}" )
   [[ -n "$SITE_NAME" ]] && SCAN_ARGS+=( --site-name "${SITE_NAME}" )
   [[ -n "$PUBLIC_URL_BASE" ]] && SCAN_ARGS+=( --public-url-base "${PUBLIC_URL_BASE}" )
-  [[ -n "$AUDIT_LINK_PATTERN" ]] && SCAN_ARGS+=( --audit-link-pattern "$AUDIT_LINK_PATTERN" )
 
   if ! npx --yes @icjia/filecap@latest scan "${SCAN_ARGS[@]}" \
       2> >(grep -v 'Warning:' >&2); then
@@ -1148,34 +1102,6 @@ step "Generating filecap report ..."
 if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" ${HTML_FLAG} \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap report generation failed."
-fi
-
-# ── optional: enrich with audit scores from audit.icjia.app ─────────────────
-RUN_AUDIT_ENRICH="${RUN_AUDIT_ENRICH:-}"
-if [[ -z "$RUN_AUDIT_ENRICH" ]]; then
-  echo
-  read -r -p "Enrich inventory with audit.icjia.app scores? [y/N]: " RUN_AUDIT_ENRICH
-fi
-
-if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
-  if [[ -z "${FILECAP_AUDIT_TOKEN:-}" ]]; then
-    warn "FILECAP_AUDIT_TOKEN not set in env. Set it via: export FILECAP_AUDIT_TOKEN=fap_xxx"
-    read -r -s -p "Paste audit token (input hidden, used for this run only): " FILECAP_AUDIT_TOKEN
-    echo  # newline after silent read
-    export FILECAP_AUDIT_TOKEN
-  fi
-
-  step "Calling audit.icjia.app /api/bulk-from-inventory ..."
-  if npx --yes @icjia/filecap@latest audit-enrich "${INVENTORY}" -o "${INVENTORY}" \
-      2> >(grep -v 'Warning:' >&2); then
-    info "Audit scores merged into inventory"
-
-    step "Regenerating report with audit columns ..."
-    npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}/" ${HTML_FLAG} \
-        2> >(grep -v 'Warning:' >&2) || warn "Report regeneration failed (continuing)"
-  else
-    warn "audit-enrich failed (continuing without audit scores)"
-  fi
 fi
 
 # ── update 'latest' symlink ───────────────────────────────────────────────────

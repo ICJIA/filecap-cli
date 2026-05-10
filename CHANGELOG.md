@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-05-10
+
+### Removed
+
+- **audit.icjia.app integration dropped entirely.** The `audit-enrich` subcommand, `--audit-link-pattern` scan option, `filecap_audit_enrich` MCP tool, `auditBlockSchema` Zod shape, `audit` entry field, `auditLinkPattern` header metadata field, and all related logic in `merge.js`, `csv.js`, and `html.js` have been removed. The integration was tightly coupled to an external service and added maintenance surface with no payoff for the core accessibility-scoping use case. Inventories created with 1.0.x that contain `audit` blocks will still parse (unknown fields are ignored by Zod's `strip` default), but the blocks will not appear in reports.
+- **`filecap_audit_enrich` MCP tool removed.** The MCP server now exposes four tools: `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory`.
+- **audit-remote.sh and audit-fleet.sh audit-enrich prompts removed.** The "Enrich inventories with audit.icjia.app scores?" interactive prompt and all downstream `audit-enrich` shell calls have been removed from both example scripts. The `audit_link_pattern` column has been dropped from the fleet CSV input format.
+
+### Changed
+
+- **CSV and HTML report columns slimmed to 30 accessibility-critical fields.** Dropped: `flags`; all PDF metadata text fields (`pdfTitle`, `pdfAuthor`, `pdfSubject`, `pdfCreator`, `pdfProducer`, `pdfApproxWordCount`); most DOCX introspection counts that duplicate what's already captured (`docxWordCount`, `docxParagraphCount`, `docxSectionCount`, `docxTotalImageCount`); all XLSX introspection except `xlsxSheetCount`; all `audit*` columns. Kept: every field needed to scope remediation work and measure baseline accessibility coverage.
+
+[1.1.0]: https://github.com/ICJIA/filecap-cli/compare/v1.0.9...v1.1.0
+
 ## [1.0.9] — 2026-05-09
 
 ### Changed

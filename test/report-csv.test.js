@@ -75,17 +75,36 @@ describe("CSV_COLUMNS", () => {
     expect(col.label).not.toBe("Last modified");
   });
 
-  it("includes new metadata columns for PDF, DOCX, XLSX", () => {
+  it("includes accessibility-critical columns for PDF, DOCX, XLSX", () => {
     const names = CSV_COLUMNS.map((c) => c.name);
-    expect(names).toContain("pdfTitle");
-    expect(names).toContain("pdfAuthor");
-    expect(names).toContain("pdfApproxWordCount");
-    expect(names).toContain("docxTitle");
-    expect(names).toContain("docxAuthor");
-    expect(names).toContain("docxHeadingLevelsUsed");
-    expect(names).toContain("xlsxTitle");
-    expect(names).toContain("xlsxAuthor");
-    expect(names).toContain("xlsxTotalCells");
+    expect(names).toContain("pageCount");
+    expect(names).toContain("hasTextLayer");
+    expect(names).toContain("isImageOnly");
+    expect(names).toContain("hasTags");
+    expect(names).toContain("docxHasHeadings");
+    expect(names).toContain("docxAltTextCoverage");
+    expect(names).toContain("docxVagueLinkCount");
+    expect(names).toContain("xlsxSheetCount");
+  });
+
+  it("does not include dropped metadata columns", () => {
+    const names = CSV_COLUMNS.map((c) => c.name);
+    expect(names).not.toContain("pdfTitle");
+    expect(names).not.toContain("pdfAuthor");
+    expect(names).not.toContain("textLayerCoverage");
+    expect(names).not.toContain("hasOutline");
+    expect(names).not.toContain("hasSignatures");
+    expect(names).not.toContain("isLinearized");
+    expect(names).not.toContain("docxTitle");
+    expect(names).not.toContain("docxAuthor");
+    expect(names).not.toContain("docxHeadingLevelsUsed");
+    expect(names).not.toContain("xlsxSheetNames");
+    expect(names).not.toContain("xlsxTotalCells");
+    expect(names).not.toContain("auditLink");
+    expect(names).not.toContain("auditScore");
+    expect(names).not.toContain("auditGrade");
+    expect(names).not.toContain("auditReport");
+    expect(names).not.toContain("flags");
   });
 });
 
@@ -174,29 +193,25 @@ describe("writeCsv (single-instance input)", () => {
         hasFormFields: false,
         hasSignatures: false,
         encrypted: false,
-        producer: "Microsoft Word",
-        creator: "Word",
-        creationDate: "2024-01-01T00:00:00.000Z",
-        title: "Policy Doc",
-        author: "Jane Smith",
-        approxWordCount: 1500,
       },
     };
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
     const dataLine = csv.trim().split("\n")[1];
     const cells = dataLine.split(",");
     expect(cells[colIndex("pageCount")]).toBe("47");
-    expect(cells[colIndex("pdfTitle")]).toBe("Policy Doc");
-    expect(cells[colIndex("pdfAuthor")]).toBe("Jane Smith");
-    expect(cells[colIndex("pdfApproxWordCount")]).toBe("1500");
+    expect(cells[colIndex("hasTextLayer")]).toBe("Yes");
+    expect(cells[colIndex("isImageOnly")]).toBe("No");
+    expect(cells[colIndex("hasTags")]).toBe("No");
+    expect(cells[colIndex("hasFormFields")]).toBe("No");
+    expect(cells[colIndex("encrypted")]).toBe("No");
   });
 
-  it("joins flags with pipe", () => {
+  it("does not include the flags column in CSV output", () => {
     const entry = { ...baseEntry, flags: ["scanned-name-pattern", "filename-has-spaces"] };
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("flags")]).toBe("scanned-name-pattern|filename-has-spaces");
+    const headerRow = csv.split("\n")[0];
+    expect(headerRow).not.toContain("File-name flags");
+    expect(colIndex("flags")).toBe(-1);
   });
 });
 
@@ -341,13 +356,11 @@ describe("writeCsv (consolidated input)", () => {
 });
 
 describe("writeCsv header row escaping", () => {
-  it("escapes header labels containing commas or quotes", () => {
+  it("escapes header labels containing quotes", () => {
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
     const firstLine = csv.split("\n")[0];
     // DOCX: vague hyperlinks ("click here") — has quotes, needs escaping
     expect(firstLine).toContain('"DOCX: vague hyperlinks (""click here"")"');
-    // XLSX: default sheet names (Sheet1, Sheet2, …) — has comma, needs quoting
-    expect(firstLine).toContain('"XLSX: default sheet names (Sheet1, Sheet2, …)"');
   });
 
   it("leaves simple labels unquoted in the header", () => {
@@ -390,102 +403,3 @@ describe("writeCsv SHA-256 Excel text-formula wrapping", () => {
   });
 });
 
-describe("writeCsv auditLink column", () => {
-  it("emits an empty Audit Link when no auditLinkPattern is set", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("auditLink")]).toBe("");
-  });
-
-  it("expands {sha256} placeholder in audit link pattern", () => {
-    const headerWithPattern = {
-      ...baseHeader,
-      metadata: { ...baseHeader.metadata, auditLinkPattern: "https://audit.example.com/?hash={sha256}" },
-    };
-    const entry = { ...baseEntry, sha256: "deadbeef" };
-    const csv = writeCsv({ sourceHeader: headerWithPattern, entries: [entry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("auditLink")]).toBe("https://audit.example.com/?hash=deadbeef");
-  });
-
-  it("expands {publicUrl} placeholder using publicUrlBase + entry path", () => {
-    const headerWithBoth = {
-      ...baseHeader,
-      metadata: {
-        ...baseHeader.metadata,
-        publicUrlBase: "https://cdn.example.com/uploads",
-        auditLinkPattern: "https://audit.example.com/?url={publicUrl}",
-      },
-    };
-    const csv = writeCsv({ sourceHeader: headerWithBoth, entries: [baseEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    const expected = "https://audit.example.com/?url=" + encodeURIComponent("https://cdn.example.com/uploads/case.pdf");
-    expect(cells[colIndex("auditLink")]).toBe(expected);
-  });
-
-  it("emits empty string when pattern is set but publicUrlBase is absent and template uses only {publicUrl}", () => {
-    const headerWithPatternOnly = {
-      ...baseHeader,
-      metadata: { ...baseHeader.metadata, auditLinkPattern: "https://audit.example.com/?url={publicUrl}" },
-    };
-    const csv = writeCsv({ sourceHeader: headerWithPatternOnly, entries: [baseEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    // publicUrl resolves to "", so encoded empty string — link is still returned (pattern is set)
-    expect(cells[colIndex("auditLink")]).toContain("https://audit.example.com");
-  });
-});
-
-describe("writeCsv audit enrichment columns", () => {
-  const auditEntry = {
-    ...baseEntry,
-    audit: {
-      score: 84,
-      grade: "B",
-      reportId: "f06b5abc05c1f280a4975a1c0c95ce8d",
-      reportUrl: "https://audit.icjia.app/report/f06b5abc05c1f280a4975a1c0c95ce8d",
-      enrichedAt: "2026-05-09T12:00:00.000Z",
-    },
-  };
-
-  it("includes Audit score, Audit grade, and Audit report column headers", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
-    const headerRow = csv.split("\n")[0];
-    expect(headerRow).toContain("Audit score");
-    expect(headerRow).toContain("Audit grade");
-    expect(headerRow).toContain("Audit report");
-  });
-
-  it("renders score as '84%' when audit block is present", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [auditEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("auditScore")]).toBe("84%");
-  });
-
-  it("renders grade as 'B' when audit block is present", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [auditEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("auditGrade")]).toBe("B");
-  });
-
-  it("renders reportUrl in the Audit report column", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [auditEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("auditReport")]).toBe("https://audit.icjia.app/report/f06b5abc05c1f280a4975a1c0c95ce8d");
-  });
-
-  it("renders empty cells for all three audit columns when audit block is absent", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("auditScore")]).toBe("");
-    expect(cells[colIndex("auditGrade")]).toBe("");
-    expect(cells[colIndex("auditReport")]).toBe("");
-  });
-});

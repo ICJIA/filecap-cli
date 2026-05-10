@@ -48,14 +48,14 @@ ESM-only. Node 20+ required. ~25 test files; 200+ tests via vitest. Source under
 
 ## TL;DR for vendors and auditors
 
-You receive an `audit-file-list.csv` (58 columns, one row per file) with everything needed to scope and quote a remediation engagement:
+You receive an `audit-file-list.csv` (30 columns, one row per file) with everything needed to scope and quote a remediation engagement:
 
-- **Identification**: server name, website nickname, server IP, source folder on server, full file path on server, filename, extension.
+- **Identification**: server name, website nickname, server IP, source folder on server, full path, absolute path, public URL, filename, extension, category.
 - **Filesystem metadata**: size in bytes, last-modified timestamp, SHA-256 content hash (for cross-server dedup detection).
-- **Filename heuristics**: flags for scanned-document patterns, non-ASCII chars, very long names, etc.
-- **PDF introspection**: page count, has-text-layer (Yes/No), text coverage fraction, image-only flag (signals OCR needed), tag presence, outline/bookmarks, form fields, signatures, encryption, linearized, PDF version, document language, producer/creator, creation date, title, author, subject, keywords, PDF modification date, approximate word count.
-- **DOCX introspection**: has-headings, image count, alt-text coverage, table count, tables-have-headers, hyperlink count, vague-link count ("click here", "read more"), title, author, last-modified-by, word count, paragraph count, heading levels actually used (gap detection, e.g., `H1|H2|H4` flags a missing H3).
-- **XLSX introspection**: sheet count, sheet names, default-sheet-name count (Sheet1/Sheet2/etc.), has-header-rows, merged cell count, has-charts, has-images, title, author, total cells.
+- **PDF introspection**: page count, has-text-layer (Yes/No), image-only flag (signals OCR needed), tag presence, form fields, encryption, document language.
+- **DOCX introspection**: has-headings, image count, alt-text coverage, table count, tables-have-headers, vague-link count ("click here", "read more").
+- **XLSX introspection**: sheet count.
+- **Office-legacy flag**: whether the file is in a legacy Office format (`.doc`, `.xls`, `.ppt`).
 
 The "Server IP" and "Full file path on server" columns identify exactly where each file lives — you ssh into the server and download the file directly. Optionally accompanied by an `audit-file-list.html` rendering of the same data with sortable/searchable browser-based interface.
 
@@ -222,19 +222,6 @@ Generate vendor handoff package (CSV + summary + flagged lists) from an inventor
 |---|---|---|
 | `-o, --output <dir>` | `./filecap-report-<ts>/` | Output directory |
 | `--html` | (off) | Also write a self-contained sortable HTML report (`audit-file-list.html`) |
-
-### `filecap audit-enrich <inventory>`
-
-Enrich an inventory NDJSON with per-file accessibility scores from audit.icjia.app's bulk endpoint. Rewrites the NDJSON in place (or to a specified output) by adding an `audit` block to each PDF entry that the service could score.
-
-| Flag | Default | Description |
-|---|---|---|
-| `-o, --output <path>` | input path (in-place) | Write enriched NDJSON here |
-| `--api-base <url>` | `https://audit.icjia.app` | Audit service base URL |
-| `--auth-token <token>` | `$FILECAP_AUDIT_TOKEN` | Bearer token for the audit service |
-| `--verbose` | (off) | Print per-file progress to stderr |
-
-After enrichment, run `filecap report` again to regenerate the CSV/HTML with the three new audit columns: **Audit score**, **Audit grade**, and **Audit report** (clickable link to the saved report on audit.icjia.app).
 
 ### `filecap mcp`
 
@@ -534,7 +521,7 @@ Output directory contents:
 
 | File | Purpose |
 |---|---|
-| `audit-file-list.csv` | One row per file, 58 columns (the work-order vendors actually consume). Human-readable column headers. Booleans render as Yes/No. Filterable in Excel, Smartsheet, etc. |
+| `audit-file-list.csv` | One row per file, 30 columns (the work-order vendors actually consume). Human-readable column headers. Booleans render as Yes/No. Filterable in Excel, Smartsheet, etc. |
 | `audit-file-list.html` | (Only when `--html` is passed.) Self-contained interactive page — same data, sortable columns, full-text search, no external dependencies. Image-only PDFs highlighted. |
 | `audit-summary.txt` | Manager-friendly top-line numbers: file counts by category, total bytes, image-only PDF count, remediable count, heading coverage, alt-text coverage, and "What this means" observation bullets. |
 | `README.txt` | Plain-text guide to all files in this folder. Start here if you're not sure which file to open. |
@@ -545,24 +532,23 @@ Output directory contents:
 
 The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `filecap diff` command to detect changes. This division-of-labor decision is documented in the design doc and locks vendor workflow out of the inventory tool itself.
 
-**CSV column order** (58 columns, stable):
+**CSV column order** (30 columns, stable):
 
-`Server, Website, Server IP, Source folder on server, File location (relative to source folder), Full file path on server, File name, File extension, File type, Needs remediation, Size (bytes), Last modified, Content hash (SHA-256), Duplicate of, File-name flags, PDF: page count, PDF: has searchable text, PDF: text coverage (fraction), PDF: image-only (needs OCR), PDF: structurally tagged, PDF: has bookmarks/outline, PDF: has form fields, PDF: digitally signed, PDF: encrypted, PDF: web-optimized (linearized), PDF version, Document language, PDF producer, PDF creator, Created, PDF: title, PDF: author, PDF: subject, PDF: keywords, PDF: modified date, PDF: approximate word count, DOCX: has headings, DOCX: image count, DOCX: alt-text coverage (fraction), DOCX: table count, DOCX: tables have header rows, DOCX: hyperlink count, DOCX: vague hyperlinks ("click here"), DOCX: title, DOCX: author, DOCX: last modified by, DOCX: word count, DOCX: paragraph count, DOCX: heading levels used, XLSX: sheet count, XLSX: sheet names, XLSX: default sheet names (Sheet1, Sheet2, …), XLSX: has header rows, XLSX: merged cell count, XLSX: has charts, XLSX: has embedded images, XLSX: title, XLSX: author, XLSX: total cells, Legacy Office format`
+`Server, Website, Server IP, Last modified, Needs remediation, Source folder on server, File location (relative to source folder), Full file path on server, Public URL, File name, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of, PDF: page count, PDF: has searchable text, PDF: image-only (needs OCR), PDF: structurally tagged, PDF: has form fields, PDF: encrypted, Document language, DOCX: has headings, DOCX: image count, DOCX: alt-text coverage (fraction), DOCX: table count, DOCX: tables have header rows, DOCX: vague hyperlinks ("click here"), XLSX: sheet count, Legacy Office format`
 
-Column headers are human-facing labels (not raw field names). The `flags` / `DOCX: heading levels used` / `XLSX: sheet names` cells are pipe-separated (e.g., `scanned-name-pattern|filename-has-spaces`). Empty cells indicate the field doesn't apply to this file's type.
+Column headers are human-facing labels (not raw field names). Empty cells indicate the field doesn't apply to this file's type.
 
-**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). For consolidated inputs, the per-entry `serverName` is used and `serverIp` / `hostname` are looked up from the header's `metadata.sources[]` array. Both input shapes produce the same 58-column CSV — the consumer doesn't need to know which scanner/rollup pipeline produced the data.
+**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). For consolidated inputs, the per-entry `serverName` is used and `serverIp` / `hostname` are looked up from the header's `metadata.sources[]` array. Both input shapes produce the same 30-column CSV — the consumer doesn't need to know which scanner/rollup pipeline produced the data.
 
 ## MCP server (Phase 7)
 
-`filecap mcp` starts an stdio MCP server that exposes five tools AI agents can call during conversational audits:
+`filecap mcp` starts an stdio MCP server that exposes four tools AI agents can call during conversational audits:
 
 | Tool | What it does |
 |---|---|
 | `filecap_scan` | Walk a directory, produce an NDJSON inventory at the specified path |
 | `filecap_rollup` | Merge multiple per-server NDJSONs into a consolidated inventory |
 | `filecap_report` | Generate vendor handoff package (CSV + summary + flagged lists) |
-| `filecap_audit_enrich` | Enrich an inventory NDJSON with audit.icjia.app accessibility scores (score, grade, reportUrl per PDF) |
 | `filecap_query_inventory` | Filter/sort entries in an existing NDJSON by size, extension, flags, isImageOnly, etc. |
 
 ### Always-latest config (recommended)
@@ -690,54 +676,6 @@ After wiring up your client, ask the AI agent:
 
 If the tools are registered correctly, the agent will call them directly rather than suggesting you run the CLI manually.
 
-## Accessibility scores via audit.icjia.app
-
-filecap can optionally enrich an inventory with per-file accessibility scores from [audit.icjia.app](https://audit.icjia.app), the ICJIA-built tool that scores PDFs against WCAG 2.1 / ADA Title II requirements.
-
-### One-command workflow
-
-The audit scripts will prompt you ("Enrich inventory with audit.icjia.app scores? [y/N]"). If you say yes, they call audit.icjia.app's bulk endpoint, get a score and grade for every PDF whose `publicUrl` is reachable, and regenerate the report. The CSV and HTML now include **Audit score** (`84%`), **Audit grade** (**B**), and **Audit report** (clickable link to the saved report on audit.icjia.app) columns.
-
-### Direct CLI use
-
-```bash
-filecap audit-enrich inventory.ndjson \
-  --api-base https://audit.icjia.app \
-  --auth-token "$FILECAP_AUDIT_TOKEN"
-# (rewrites inventory.ndjson in place, adds audit blocks to PDF entries)
-
-filecap report inventory.ndjson -o ./report/ --html
-# (now produces report with audit score columns)
-```
-
-### Authentication
-
-You'll need a personal access token from audit.icjia.app. Set it as an env var:
-
-```bash
-export FILECAP_AUDIT_TOKEN="fap_yourtokenhere"
-```
-
-Best practice: store in macOS Keychain or a `~/.filecap/credentials` file with mode 600. **Never commit the token to git or paste it in chat/email.** filecap reads it only via env var.
-
-### The two audit columns explained
-
-The CSV and HTML reports have two columns that look similar but mean different things. Both link to audit.icjia.app; the difference is when the score is computed:
-
-| Column header in CSV | HTML link text | When to use |
-|---|---|---|
-| **Audit Link** | "View audit →" | On-demand. Click and audit.icjia.app fetches the file server-side and runs the analysis right then. No prior `audit-enrich` step required. Always available when `--audit-link-pattern` is set. |
-| **Audit Report** | "View report →" | Pre-saved. Populated only after running `filecap audit-enrich`, which calls `/api/bulk-from-inventory` and persists each result with a sharable report ID. Click and you see the saved report at `https://audit.icjia.app/report/<id>` instantly. |
-
-In practice, the workflow is:
-
-- **For a quick spot check** during a working session, click "View audit →" on any row. audit.icjia.app fetches the file via its public URL (no upload needed) and shows the score within ~30 seconds.
-- **For a finalized vendor handoff**, run `audit-enrich` once after the scan. Every PDF gets pre-computed scores stored persistently. The "View report →" links open instantly (no waiting), and the report URL is shareable — auditors can email a "View report →" link to a remediator for that specific file.
-
-Both columns can be present at the same time. If you set both `--audit-link-pattern` and run `audit-enrich`, every row has both clickable options.
-
-The on-demand path uses the new `POST /api/analyze-url` endpoint (added to audit.icjia.app in May 2026). The bulk path uses `POST /api/bulk-from-inventory` (also May 2026). Both require an audit.icjia.app personal access token; see [Authentication](#authentication) above.
-
 ## For auditors: self-contained audit scripts
 
 ### What this is
@@ -794,7 +732,7 @@ In interactive mode, the script asks a few questions. Here's what each one means
 
 After the script finishes, navigate to `~/filecap-audits/<server-ip>/latest/report/`. You'll find:
 
-- **`audit-file-list.csv`** — The main deliverable. One row per file, 58 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
+- **`audit-file-list.csv`** — The main deliverable. One row per file, 30 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
 - **`audit-file-list.html`** — A self-contained web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, and print-to-PDF. (Set `AUDIT_HTML=0` in the environment to suppress this file on rare occasions when you don't want it.)
 - **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.
@@ -834,11 +772,9 @@ Saved sites:
     q  →  quit
 ```
 
-Picking a number loads the site's full config and jumps straight to the **config review screen** (where you can override any field for this run by typing its number, e.g., `9` to toggle audit-enrich off temporarily).
+Picking a number loads the site's full config and jumps straight to the **config review screen** (where you can override any field for this run by typing its number).
 
 Picking `a` walks you through the prompts for a new site. At the end, the script asks "Save these settings as a named site for next time? [y/N]". Answer yes and the site is selectable from the menu thereafter.
-
-**The audit token is never stored in `sites.json`.** It stays in your `FILECAP_AUDIT_TOKEN` environment variable (or your system keychain). Lose your laptop and somebody finds the file? They get site IPs and paths but no credential to scan with.
 
 The file is created with mode `600` (user-only readable) inside `~/.filecap/` (mode `700`). Override the location with `FILECAP_SITES_FILE=/some/path` if you want to keep multiple sets of saved sites.
 
@@ -862,7 +798,7 @@ The preflight is read-only — no rsync, no scan, no audit. It returns to the me
 
 When external auditors join a project, you typically want them up and running fast. Two new menu options make this trivial:
 
-- **`x → export all sites to a JSON file`** — writes the current saved sites to a path you choose (default `~/Desktop/icjia-sites.json`). The file contains hostnames, paths, nicknames, public URLs, and audit link templates — but **never the audit token**.
+- **`x → export all sites to a JSON file`** — writes the current saved sites to a path you choose (default `~/Desktop/icjia-sites.json`). The file contains hostnames, paths, nicknames, and public URLs — but no credentials.
 - **`i → import sites from a JSON file`** — reads a sites JSON file, previews what would be imported, and asks: merge (add new sites by name, skip names that already exist) / replace (wipe current sites + use only the imported ones) / cancel.
 
 The intended workflow:

@@ -34,13 +34,14 @@
 #
 #  WHAT YOU WILL BE ASKED (interactive mode)
 #    - How many servers to audit
-#    - For each server: friendly name, SSH user, host/IP, remote uploads path, website nickname
+#    - For each server: friendly name, SSH user, host/IP, remote uploads path,
+#      website nickname, public URL prefix
 #
 #  CSV INPUT FORMAT (batch mode)
 #    No header row; lines starting with # are comments.
-#    Columns: server_name,user,host,remote_path[,site_name[,public_url_base[,audit_link_pattern]]]
+#    Columns: server_name,user,host,remote_path[,site_name[,public_url_base]]
 #    Examples:
-#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads,https://audit.icjia.app/?prefill={publicUrl}
+#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads
 #      i2i-strapi-prod,forge,10.0.0.5,/var/strapi/uploads,i2i
 #      vpp-strapi-prod,forge,10.0.0.6,/var/strapi/uploads
 #                  (4-column, 5-column, and 6-column rows still work — trailing columns are optional)
@@ -272,7 +273,6 @@ declare -a SRV_HOSTS=()
 declare -a SRV_PATHS=()
 declare -a SRV_SITES=()
 declare -a SRV_URLBASES=()
-declare -a SRV_AUDIT_LINK_PATTERNS=()
 
 CSV_FILE="${1:-}"
 
@@ -286,7 +286,7 @@ if [[ -n "$CSV_FILE" ]]; then
     [[ -z "$line" ]]       && continue
     [[ "$line" == \#* ]]   && continue
 
-    IFS=',' read -r _name _user _host _path _site _urlbase _auditlinkpattern <<< "$line"
+    IFS=',' read -r _name _user _host _path _site _urlbase <<< "$line"
     # trim whitespace
     _name="${_name// /}"
     _user="${_user// /}"
@@ -299,9 +299,6 @@ if [[ -n "$CSV_FILE" ]]; then
     # public_url_base is optional (6th column)
     _urlbase="${_urlbase:-}"
     _urlbase="$(echo "${_urlbase}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    # audit_link_pattern is optional (7th column)
-    _auditlinkpattern="${_auditlinkpattern:-}"
-    _auditlinkpattern="$(echo "${_auditlinkpattern}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$_name" || -z "$_user" || -z "$_host" || -z "$_path" ]]; then
       warn "Skipping malformed CSV line: ${line}"
@@ -314,7 +311,6 @@ if [[ -n "$CSV_FILE" ]]; then
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
     SRV_URLBASES+=("$_urlbase")
-    SRV_AUDIT_LINK_PATTERNS+=("$_auditlinkpattern")
   done < "$CSV_FILE"
 
   if [[ "${#SRV_NAMES[@]}" -eq 0 ]]; then
@@ -349,7 +345,6 @@ else
     done
     read -r -p "  Website nickname (e.g. DVFR, i2i, vpp; press Enter to skip): " _site
     read -r -p "  Public URL prefix (e.g. https://dvfr.icjia-api.cloud/uploads; press Enter to skip): " _urlbase
-    read -r -p "  Audit link template (e.g. https://audit.icjia.app/?prefill={publicUrl}; press Enter to skip): " _auditlinkpattern
 
     SRV_NAMES+=("$_name")
     SRV_USERS+=("$_user")
@@ -357,7 +352,6 @@ else
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
     SRV_URLBASES+=("$_urlbase")
-    SRV_AUDIT_LINK_PATTERNS+=("$_auditlinkpattern")
   done
 fi
 
@@ -385,25 +379,6 @@ if [[ "${AUDIT_HTML:-1}" == "0" ]]; then
 else
   export AUDIT_HTML=1
   HTML_FLAG="--html"
-fi
-
-# ── optional: enrich with audit.icjia.app scores ─────────────────────────────
-# Propagate the choice to per-server audit-remote.sh via env var so it doesn't
-# re-prompt for each server. The consolidated enrich step runs separately below.
-RUN_AUDIT_ENRICH="${RUN_AUDIT_ENRICH:-}"
-if [[ -z "$RUN_AUDIT_ENRICH" ]]; then
-  echo
-  read -r -p "Enrich inventories with audit.icjia.app scores? [y/N]: " RUN_AUDIT_ENRICH
-fi
-export RUN_AUDIT_ENRICH
-
-if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
-  if [[ -z "${FILECAP_AUDIT_TOKEN:-}" ]]; then
-    warn "FILECAP_AUDIT_TOKEN not set in env. Set it via: export FILECAP_AUDIT_TOKEN=fap_xxx"
-    read -r -s -p "Paste audit token (input hidden, used for this run only): " FILECAP_AUDIT_TOKEN
-    echo  # newline after silent read
-    export FILECAP_AUDIT_TOKEN
-  fi
 fi
 
 # ── fleet pre-validation ──────────────────────────────────────────────────────
@@ -509,11 +484,10 @@ for i in "${VALID_INDEXES[@]}"; do
   SRV_PATH="${SRV_PATHS[$i]}"
   SRV_SITE="${SRV_SITES[$i]:-}"
   SRV_URLBASE="${SRV_URLBASES[$i]:-}"
-  SRV_AUDIT_LINK_PATTERN="${SRV_AUDIT_LINK_PATTERNS[$i]:-}"
 
   printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
 
-  if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" AUDIT_LINK_PATTERN_ARG="${SRV_AUDIT_LINK_PATTERN}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+  if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
     # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
     # Fall back to scanning runs/ directly in case the symlink is missing.
     SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/latest/inventory.ndjson"
@@ -573,23 +547,6 @@ if ! npx --yes @icjia/filecap@latest report "${CONSOLIDATED}" \
   die "filecap report generation failed."
 fi
 info "Report generated"
-
-# ── optional: enrich consolidated inventory with audit scores ─────────────────
-if [[ "$RUN_AUDIT_ENRICH" =~ ^[Yy]$ ]]; then
-  CONSOLIDATED_NDJSON="${CONSOLIDATED}"
-  step "Enriching consolidated inventory with audit scores ..."
-  if npx --yes @icjia/filecap@latest audit-enrich "${CONSOLIDATED_NDJSON}" -o "${CONSOLIDATED_NDJSON}" \
-      2> >(grep -v 'Warning:' >&2); then
-    info "Audit scores merged into consolidated inventory"
-
-    step "Regenerating consolidated report with audit columns ..."
-    npx --yes @icjia/filecap@latest report "${CONSOLIDATED_NDJSON}" \
-        -o "${CONSOLIDATED_REPORT_DIR}" ${HTML_FLAG} \
-        2> >(grep -v 'Warning:' >&2) || warn "Consolidated report regeneration failed (continuing)"
-  else
-    warn "audit-enrich failed for consolidated inventory (continuing without audit scores)"
-  fi
-fi
 
 # ── MANAGER_SUMMARY.txt (python3) ─────────────────────────────────────────────
 MANAGER_SUMMARY="${FLEET_DIR}/MANAGER_SUMMARY.txt"

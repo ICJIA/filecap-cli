@@ -26,34 +26,6 @@ function formatCategory(cat) {
   return CATEGORY_LABELS[cat] ?? cat;
 }
 
-function expandAuditLinkTemplate(pattern, entry, sourceHeader, sourceMap, isConsolidated) {
-  let publicUrl = "";
-  let urlBase, siteName, serverIp;
-  if (isConsolidated) {
-    const src = sourceMap.get(entry.serverName);
-    urlBase = src?.publicUrlBase;
-    siteName = src?.siteName;
-    serverIp = src?.serverIp;
-  } else {
-    urlBase = sourceHeader.metadata?.publicUrlBase;
-    siteName = sourceHeader.metadata?.siteName;
-    serverIp = sourceHeader.metadata?.serverIp;
-  }
-  if (urlBase) {
-    const cleanBase = urlBase.replace(/\/+$/, "");
-    const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
-    publicUrl = `${cleanBase}/${cleanPath}`;
-  }
-
-  return pattern
-    .replace(/\{publicUrl\}/g, encodeURIComponent(publicUrl))
-    .replace(/\{sha256\}/g, encodeURIComponent(entry.sha256 ?? ""))
-    .replace(/\{filename\}/g, encodeURIComponent(entry.filename ?? ""))
-    .replace(/\{path\}/g, encodeURIComponent(entry.path ?? ""))
-    .replace(/\{serverIp\}/g, encodeURIComponent(serverIp ?? ""))
-    .replace(/\{siteName\}/g, encodeURIComponent(siteName ?? ""));
-}
-
 /**
  * Escape a value for safe insertion into HTML.
  * @param {*} s
@@ -111,21 +83,6 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
 
-  // Resolve audit link
-  let auditLink = "";
-  {
-    let pattern;
-    if (isConsolidated) {
-      const src = sourceMap.get(entry.serverName);
-      pattern = src?.auditLinkPattern ?? "";
-    } else {
-      pattern = sourceHeader.metadata?.auditLinkPattern ?? "";
-    }
-    if (pattern) {
-      auditLink = expandAuditLinkTemplate(pattern, entry, sourceHeader, sourceMap, isConsolidated);
-    }
-  }
-
   const intro = entry.introspection ?? null;
   const isPdf = intro?.kind === "pdf";
   const isDocx = intro?.kind === "docx";
@@ -152,62 +109,25 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.sizeBytes,
     entry.sha256 ?? "",
     duplicateOf,
-    (entry.flags ?? []).join("|"),
     // PDF
     isPdf ? intro.pageCount : "",
     isPdf ? intro.hasTextLayer : "",
-    isPdf ? (intro.textLayerCoverage ?? "") : "",
     isPdf ? intro.isImageOnly : "",
     isPdf ? intro.hasTags : "",
-    isPdf ? (intro.hasOutline ?? "") : "",
     isPdf ? intro.hasFormFields : "",
-    isPdf ? intro.hasSignatures : "",
     isPdf ? intro.encrypted : "",
-    isPdf ? (intro.isLinearized ?? "") : "",
-    isPdf ? (intro.pdfVersion ?? "") : "",
     intro?.documentLanguage ?? "",
-    isPdf ? (intro.producer ?? "") : "",
-    isPdf ? (intro.creator ?? "") : "",
-    isPdf ? (intro.creationDate ?? "") : "",
-    isPdf ? (intro.title ?? "") : "",
-    isPdf ? (intro.author ?? "") : "",
-    isPdf ? (intro.subject ?? "") : "",
-    isPdf ? (intro.keywords ?? "") : "",
-    isPdf ? (intro.modificationDate ?? "") : "",
-    isPdf ? (intro.approxWordCount ?? "") : "",
     // DOCX
     isDocx ? intro.hasHeadings : "",
     isDocx ? intro.imageCount : "",
     isDocx ? (intro.altTextCoverage ?? "") : "",
     isDocx ? intro.tableCount : "",
     isDocx ? (intro.tablesHaveHeaders ?? "") : "",
-    isDocx ? intro.hyperlinkCount : "",
     isDocx ? intro.vagueLinkCount : "",
-    isDocx ? (intro.title ?? "") : "",
-    isDocx ? (intro.author ?? "") : "",
-    isDocx ? (intro.lastModifiedBy ?? "") : "",
-    isDocx ? (intro.wordCount ?? "") : "",
-    isDocx ? (intro.paragraphCount ?? "") : "",
-    isDocx ? (intro.headingLevelsUsed ?? []).join("|") : "",
     // XLSX
     isXlsx ? intro.sheetCount : "",
-    isXlsx ? intro.sheetNames.join("|") : "",
-    isXlsx ? intro.defaultSheetNameCount : "",
-    isXlsx ? intro.hasHeaderRows : "",
-    isXlsx ? intro.mergedCellCount : "",
-    isXlsx ? intro.hasCharts : "",
-    isXlsx ? intro.hasImages : "",
-    isXlsx ? (intro.title ?? "") : "",
-    isXlsx ? (intro.author ?? "") : "",
-    isXlsx ? (intro.totalCells ?? "") : "",
     // Legacy
     isLegacy ? intro.format : "",
-    // Audit link
-    auditLink,
-    // Audit enrichment columns
-    entry.audit?.score !== undefined ? `${entry.audit.score}%` : "",
-    entry.audit?.grade ?? "",
-    entry.audit?.reportUrl ?? "",
   ];
 
   return raw.map(formatCellValue);
@@ -288,8 +208,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
 
   // ── build table rows ─────────────────────────────────────────────────────────
   const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
-  const auditLinkColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditLink");
-  const auditReportColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditReport");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -307,12 +225,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath }) 
       if (i === publicUrlColIdx && v !== "" && v !== null && v !== undefined) {
         const escaped = htmlEscape(v);
         return `<td><a href="${escaped}" target="_blank" rel="noopener noreferrer">${escaped}</a></td>`;
-      }
-      if (i === auditLinkColIdx && v !== "" && v !== null && v !== undefined) {
-        return `<td><a href="${htmlEscape(v)}" target="_blank" rel="noopener noreferrer" class="audit-link">View audit &#x2192;</a></td>`;
-      }
-      if (i === auditReportColIdx && v !== "" && v !== null && v !== undefined) {
-        return `<td><a href="${htmlEscape(v)}" target="_blank" rel="noopener noreferrer" class="audit-link">View report &#x2192;</a></td>`;
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -543,14 +455,6 @@ tr.flagged td { /* let row bg show through; border is the indicator */ }
   margin-left: 0.25em;
 }
 .badge-warn { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
-
-/* ── audit link ────────────────────────────────────────────── */
-.audit-link {
-  color: #2563eb;
-  text-decoration: none;
-  font-weight: 500;
-}
-.audit-link:hover { text-decoration: underline; }
 
 /* ── footer ────────────────────────────────────────────────── */
 footer {

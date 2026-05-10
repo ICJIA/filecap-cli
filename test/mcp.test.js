@@ -69,15 +69,15 @@ async function runMcpRequests(requests) {
 }
 
 describe("filecap mcp CLI", () => {
-  it("responds to tools/list with the five tool definitions", async () => {
+  it("responds to tools/list with the four tool definitions", async () => {
     const { responses } = await runMcpRequests([
       { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
     ]);
     const listResponse = responses.find((r) => r.id === 1);
     expect(listResponse).toBeDefined();
-    expect(listResponse.result.tools.length).toBe(5);
+    expect(listResponse.result.tools.length).toBe(4);
     const names = listResponse.result.tools.map((t) => t.name).sort();
-    expect(names).toEqual(["filecap_audit_enrich", "filecap_query_inventory", "filecap_report", "filecap_rollup", "filecap_scan"]);
+    expect(names).toEqual(["filecap_query_inventory", "filecap_report", "filecap_rollup", "filecap_scan"]);
   }, 15000);
 
   it("runs filecap_scan via tools/call and returns the inventory result", async () => {

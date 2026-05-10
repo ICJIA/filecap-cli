@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { TOOL_DEFINITIONS, dispatchTool } from "../src/mcp/tools.js";
 
 describe("TOOL_DEFINITIONS", () => {
-  it("exports five tools with names and JSON schemas", () => {
+  it("exports four tools with names and JSON schemas", () => {
     const names = TOOL_DEFINITIONS.map((t) => t.name).sort();
-    expect(names).toEqual(["filecap_audit_enrich", "filecap_query_inventory", "filecap_report", "filecap_rollup", "filecap_scan"]);
+    expect(names).toEqual(["filecap_query_inventory", "filecap_report", "filecap_rollup", "filecap_scan"]);
     for (const t of TOOL_DEFINITIONS) {
       expect(t.description).toBeTruthy();
       expect(t.inputSchema).toBeTruthy();

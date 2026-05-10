@@ -266,28 +266,6 @@ describe("writeHtml", () => {
     expect(html).toMatch(/All \(5\)/);
   });
 
-  it("renders audit-link column as clickable link when auditLinkPattern is set", async () => {
-    const headerWithPattern = {
-      ...sampleHeader,
-      metadata: {
-        ...sampleHeader.metadata,
-        auditLinkPattern: "https://audit.example.com/?hash={sha256}",
-      },
-    };
-    const out = path.join(tmpDir, "auditlink.html");
-    await writeHtml({ sourceHeader: headerWithPattern, entries: sampleEntries, sources: [headerWithPattern], outputPath: out });
-    const html = await fs.readFile(out, "utf8");
-    expect(html).toMatch(/class="audit-link"/);
-    expect(html).toMatch(/View audit/);
-  });
-
-  it("omits audit-link anchor when auditLinkPattern is absent", async () => {
-    const out = path.join(tmpDir, "no-auditlink.html");
-    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
-    const html = await fs.readFile(out, "utf8");
-    expect(html).not.toMatch(/class="audit-link"/);
-  });
-
   it("counts each category correctly in chip labels", async () => {
     const out = path.join(tmpDir, "chip-counts.html");
     const threeAndTwo = [
@@ -337,67 +315,6 @@ describe("writeHtml", () => {
     const html = await fs.readFile(out, "utf8");
     expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
     expect(html).not.toContain("Last modified");
-  });
-
-  // ── Audit enrichment columns ─────────────────────────────────────────────────
-
-  it("includes Audit score, Audit grade, and Audit report column headers in the table", async () => {
-    const out = path.join(tmpDir, "audit-headers.html");
-    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
-    const html = await fs.readFile(out, "utf8");
-    expect(html).toContain("Audit score");
-    expect(html).toContain("Audit grade");
-    expect(html).toContain("Audit report");
-  });
-
-  it("renders '84%' in the Audit score cell for an enriched entry", async () => {
-    const out = path.join(tmpDir, "audit-score.html");
-    const enriched = [{
-      ...sampleEntries[0],
-      audit: {
-        score: 84,
-        grade: "B",
-        reportId: "f06b5abc05c1f280a4975a1c0c95ce8d",
-        reportUrl: "https://audit.icjia.app/report/f06b5abc05c1f280a4975a1c0c95ce8d",
-        enrichedAt: "2026-05-09T12:00:00.000Z",
-      },
-    }];
-    await writeHtml({ sourceHeader: sampleHeader, entries: enriched, sources: [sampleHeader], outputPath: out });
-    const html = await fs.readFile(out, "utf8");
-    expect(html).toContain("<td>84%</td>");
-    expect(html).toContain("<td>B</td>");
-  });
-
-  it("renders Audit report cell as a clickable link with 'View report' text", async () => {
-    const out = path.join(tmpDir, "audit-report-link.html");
-    const reportUrl = "https://audit.icjia.app/report/f06b5abc05c1f280a4975a1c0c95ce8d";
-    const enriched = [{
-      ...sampleEntries[0],
-      audit: {
-        score: 84,
-        grade: "B",
-        reportId: "f06b5abc05c1f280a4975a1c0c95ce8d",
-        reportUrl,
-        enrichedAt: "2026-05-09T12:00:00.000Z",
-      },
-    }];
-    await writeHtml({ sourceHeader: sampleHeader, entries: enriched, sources: [sampleHeader], outputPath: out });
-    const html = await fs.readFile(out, "utf8");
-    expect(html).toMatch(new RegExp(`href="${reportUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
-    expect(html).toContain("View report");
-    // Must NOT say "View audit" for the report column (that text belongs to the auditLink column)
-    // The report link is distinct from the upload-page link
-    expect(html).toMatch(/View report/);
-  });
-
-  it("renders empty Audit score, grade, and report cells when audit block is absent", async () => {
-    const out = path.join(tmpDir, "audit-empty.html");
-    await writeHtml({ sourceHeader: sampleHeader, entries: [sampleEntries[0]], sources: [sampleHeader], outputPath: out });
-    const html = await fs.readFile(out, "utf8");
-    // The audit columns should exist as empty cells (no percentage, no grade letter, no report link)
-    expect(html).toContain('<th data-col="auditScore">Audit score</th>');
-    expect(html).toContain('<th data-col="auditGrade">Audit grade</th>');
-    expect(html).toContain('<th data-col="auditReport">Audit report</th>');
   });
 
   // ── Section 3: two-row chip filter ──────────────────────────────────────────
