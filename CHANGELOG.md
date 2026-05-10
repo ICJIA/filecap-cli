@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-05-10
+
+### Fixed
+
+- **README not displaying on npmjs.com.** The npm registry's per-version readme field was empty for every version since 1.0.0, even though `README.md` was present in every published tarball. Republished 1.1.1 via the explicit `npm pack` + `npm publish <tarball>` flow to force the registry to populate the per-version readme. The `./publish` script now uses this flow by default.
+
+[1.1.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.1.1
+
 ## [1.1.0] — 2026-05-10
 
 ### Removed

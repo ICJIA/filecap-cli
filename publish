@@ -43,6 +43,23 @@ fi
 echo "==> Running tests"
 npm test
 
+# Use npm pack + npm publish <tarball> for explicit control over what's
+# uploaded. The plain `npm publish` flow has historically left the registry's
+# per-version readme field empty even though README.md is in the tarball
+# (npmjs.com then renders "no README"). The explicit-tarball flow populates
+# the per-version readme correctly.
+publish_via_pack() {
+    echo "==> Building tarball via npm pack ..."
+    TARBALL=$(npm pack 2>&1 | tail -1)
+    if [ ! -f "$TARBALL" ]; then
+        echo "Refusing to publish: npm pack did not produce a tarball" >&2
+        exit 1
+    fi
+    echo "==> Publishing $TARBALL ..."
+    npm publish "./$TARBALL" --access public
+    rm -f "./$TARBALL"
+}
+
 if [ "$BUMP" = "first" ]; then
     VERSION=$(node -p "require('./package.json').version")
     echo "==> First-time publish at v$VERSION"
@@ -62,13 +79,13 @@ if [ "$BUMP" = "first" ]; then
     fi
     git push origin main
     git push origin "v$VERSION"
-    npm publish --access public
+    publish_via_pack
 else
     echo "==> Bumping version ($BUMP)"
     NEW_TAG=$(npm version "$BUMP" -m "Release v%s")
     echo "==> Publishing $NEW_TAG"
     git push origin main --follow-tags
-    npm publish --access public
+    publish_via_pack
 fi
 
 echo
