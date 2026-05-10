@@ -96,8 +96,8 @@ describe("darkModeCss", () => {
 
 describe("DESIGN_TOKENS", () => {
   it("exports bgBase, bgElevated, accent tokens", () => {
-    expect(DESIGN_TOKENS.bgBase).toBe("#0a0a0a");
-    expect(DESIGN_TOKENS.bgElevated).toBe("#161616");
+    expect(DESIGN_TOKENS.bgBase).toBe("#0d1117");
+    expect(DESIGN_TOKENS.bgElevated).toBe("#161b22");
     expect(DESIGN_TOKENS.accent).toBe("#60a5fa");
   });
 });
