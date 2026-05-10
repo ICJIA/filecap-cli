@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { runWebRollup } from "../src/commands/web-rollup.js";
+import {
+  runWebRollup,
+  normalizeStrapiFilename,
+  findCrossServerDuplicates,
+} from "../src/commands/web-rollup.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -549,5 +553,195 @@ describe("runWebRollup", () => {
     });
     expect(result.exitCode).toBe(2);
     expect(result.error).toMatch(/schema validation/i);
+  });
+});
+
+describe("normalizeStrapiFilename", () => {
+  it("strips Strapi's 10-char hex suffix before the extension", () => {
+    expect(normalizeStrapiFilename("report_a1b2c3d4e5.pdf")).toBe("report.pdf");
+  });
+  it("handles long filenames", () => {
+    expect(normalizeStrapiFilename("DVFR_Annual_Report_2023_FINAL_dee7ed44b6.pdf"))
+      .toBe("DVFR_Annual_Report_2023_FINAL.pdf");
+  });
+  it("preserves filenames without a hex suffix", () => {
+    expect(normalizeStrapiFilename("plain.pdf")).toBe("plain.pdf");
+  });
+  it("does not strip suffixes shorter or longer than 10 chars", () => {
+    expect(normalizeStrapiFilename("report_abc123.pdf")).toBe("report_abc123.pdf"); // 6
+    expect(normalizeStrapiFilename("report_abcdef0123456.pdf"))
+      .toBe("report_abcdef0123456.pdf"); // 13
+  });
+  it("does not strip uppercase or non-hex suffixes", () => {
+    expect(normalizeStrapiFilename("report_A1B2C3D4E5.pdf"))
+      .toBe("report_A1B2C3D4E5.pdf");
+    expect(normalizeStrapiFilename("report_xyz1234567.pdf"))
+      .toBe("report_xyz1234567.pdf");
+  });
+  it("handles empty / nullish input", () => {
+    expect(normalizeStrapiFilename("")).toBe("");
+    expect(normalizeStrapiFilename(null)).toBe("");
+    expect(normalizeStrapiFilename(undefined)).toBe("");
+  });
+});
+
+describe("findCrossServerDuplicates", () => {
+  const mk = (serverName, filename, opts = {}) => ({
+    serverName,
+    siteName: opts.siteName ?? serverName.toUpperCase(),
+    entry: {
+      filename,
+      path: opts.path ?? filename,
+      modifiedAt: opts.modifiedAt ?? "2024-01-01T00:00:00.000Z",
+      sizeBytes: opts.sizeBytes ?? 1024,
+      sha256: opts.sha256 ?? "hash-default",
+    },
+  });
+
+  it("returns empty when no filename appears on more than one server", () => {
+    const all = [
+      mk("dvfr", "a.pdf"),
+      mk("r3", "b.pdf"),
+    ];
+    expect(findCrossServerDuplicates(all)).toEqual([]);
+  });
+
+  it("groups exact duplicates (same hash) across two servers", () => {
+    const all = [
+      mk("dvfr", "report.pdf", { sha256: "h1" }),
+      mk("archive", "report.pdf", { sha256: "h1" }),
+    ];
+    const groups = findCrossServerDuplicates(all);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].normalizedFilename).toBe("report.pdf");
+    expect(groups[0].isExactDuplicate).toBe(true);
+    expect(groups[0].items).toHaveLength(2);
+  });
+
+  it("flags variant duplicates (same name, different hash) as not exact", () => {
+    const all = [
+      mk("dvfr", "report.pdf", { sha256: "h1" }),
+      mk("archive", "report.pdf", { sha256: "h2" }),
+    ];
+    const groups = findCrossServerDuplicates(all);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].isExactDuplicate).toBe(false);
+  });
+
+  it("normalises Strapi suffixes before grouping", () => {
+    const all = [
+      mk("dvfr", "report_a1b2c3d4e5.pdf", { sha256: "h1" }),
+      mk("archive", "report.pdf", { sha256: "h1" }),
+    ];
+    const groups = findCrossServerDuplicates(all);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].normalizedFilename).toBe("report.pdf");
+  });
+
+  it("sorts items within a group newest-first by modifiedAt", () => {
+    const all = [
+      mk("dvfr", "report.pdf", { modifiedAt: "2020-01-01T00:00:00Z", sha256: "old" }),
+      mk("archive", "report.pdf", { modifiedAt: "2025-06-15T00:00:00Z", sha256: "new" }),
+      mk("r3", "report.pdf", { modifiedAt: "2023-03-10T00:00:00Z", sha256: "mid" }),
+    ];
+    const groups = findCrossServerDuplicates(all);
+    expect(groups[0].items.map((i) => i.serverName)).toEqual(["archive", "r3", "dvfr"]);
+  });
+
+  it("ignores entries that appear multiple times on the same server only", () => {
+    const all = [
+      mk("dvfr", "x.pdf", { sha256: "h1" }),
+      mk("dvfr", "x.pdf", { sha256: "h2", path: "subdir/x.pdf" }),
+    ];
+    expect(findCrossServerDuplicates(all)).toEqual([]);
+  });
+
+  it("ignores empty filenames", () => {
+    const all = [
+      mk("dvfr", "", { sha256: "h1" }),
+      mk("archive", "", { sha256: "h2" }),
+    ];
+    expect(findCrossServerDuplicates(all)).toEqual([]);
+  });
+
+  it("sorts groups exact-first, then by normalised filename", () => {
+    const all = [
+      mk("dvfr", "zeta.pdf", { sha256: "z1" }),
+      mk("archive", "zeta.pdf", { sha256: "z1" }), // exact
+      mk("dvfr", "alpha.pdf", { sha256: "a1" }),
+      mk("archive", "alpha.pdf", { sha256: "a2" }), // variant
+    ];
+    const groups = findCrossServerDuplicates(all);
+    expect(groups.map((g) => g.normalizedFilename)).toEqual(["zeta.pdf", "alpha.pdf"]);
+    expect(groups[0].isExactDuplicate).toBe(true);
+    expect(groups[1].isExactDuplicate).toBe(false);
+  });
+});
+
+describe("runWebRollup — master CSV + duplicates", () => {
+  it("writes audit-file-list-master.csv to the output dir", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    expect(result.exitCode).toBe(0);
+    const masterPath = path.join(outputDir, "audit-file-list-master.csv");
+    const stat = await fs.stat(masterPath);
+    expect(stat.size).toBeGreaterThan(0);
+  });
+
+  it("master CSV header matches the per-site header and includes site rows", async () => {
+    const { sitesFile, outputDir, auditsBase, siteName } = await buildFixture({
+      siteServerName: "dvfr-prod",
+    });
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    const master = await fs.readFile(path.join(outputDir, "audit-file-list-master.csv"), "utf8");
+    expect(master).toContain("Server");
+    expect(master).toContain("File name");
+    // Body rows carry the server-name so manager can tell which site each row came from
+    expect(master).toContain("dvfr-prod");
+    // siteName (Website column) comes from sites.json fallback even when the
+    // NDJSON header didn't carry one
+    expect(master).toContain(siteName);
+  });
+
+  it("index.html links to the master CSV", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).toMatch(/href="audit-file-list-master\.csv"/);
+    expect(html).toContain("Master spreadsheet");
+  });
+
+  it("renders the duplicates section when two sites share a filename", async () => {
+    // Build a 2-site fixture where both sites have the same filename.
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    for (const sn of ["dvfr", "archive"]) {
+      const latestDir = path.join(auditsBase, sn, "latest");
+      await fs.mkdir(latestDir, { recursive: true });
+      await writeInventory(path.join(latestDir, "inventory.ndjson"), {
+        serverName: sn,
+        serverIp: sn === "dvfr" ? "10.0.0.1" : "10.0.0.2",
+        scannedAt: "2026-05-09T16:05:04.000Z",
+      });
+    }
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await writeSitesJson(sitesFile, [
+      { name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" },
+      { name: "archive", siteName: "Archive", host: "10.0.0.2", user: "forge", remotePath: "/uploads" },
+    ]);
+    const outputDir = path.join(tmpDir, "output");
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    expect(result.exitCode).toBe(0);
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).toContain("Files that appear on more than one server");
+    // Both inventories' seed entry is "doc.pdf"
+    expect(html).toContain("doc.pdf");
+    expect(html).toContain("not an error");
+  });
+
+  it("does not render duplicates section when no cross-server duplicates exist", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).not.toContain("Files that appear on more than one server");
   });
 });

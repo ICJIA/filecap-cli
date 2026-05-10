@@ -6,6 +6,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import { runReport } from "./report.js";
+import { writeCsv } from "../report/csv.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
@@ -35,6 +36,80 @@ const sitesFileSchema = z.object({
 });
 
 // ── helpers ────────────────────────────────────────────────────────────────────
+
+/**
+ * Strapi appends a 10-character lowercase hex hash to uploaded filenames
+ * (e.g. `report.pdf` → `report_a1b2c3d4e5.pdf`) so that two uploads with the
+ * same source name don't collide. For cross-server duplicate detection we need
+ * to compare the *logical* filename, so strip that suffix when present.
+ * Files that don't follow Strapi's pattern (e.g. files in the Archive
+ * /root/files tree) pass through unchanged.
+ */
+export function normalizeStrapiFilename(filename) {
+  if (!filename) return "";
+  return filename.replace(/_[a-f0-9]{10}(\.[^.]+)$/, "$1");
+}
+
+/**
+ * Group entries that appear under the same logical filename on more than one
+ * server. Hash equality across the group is what distinguishes "exact copy"
+ * from "same-name, different-content" (e.g., the file was edited on one site
+ * but not the other). Within each group, items are sorted newest-first by
+ * modifiedAt — the user can scan for the canonical version visually.
+ *
+ * @param {Array<{ entry: object, serverName: string, siteName: string }>} all
+ * @returns {Array<{ normalizedFilename: string, items: Array, isExactDuplicate: boolean }>}
+ */
+export function findCrossServerDuplicates(all) {
+  const byKey = new Map();
+  for (const item of all) {
+    const filename = item.entry?.filename ?? "";
+    const key = normalizeStrapiFilename(filename).toLowerCase();
+    if (!key) continue;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(item);
+  }
+
+  const groups = [];
+  for (const [key, items] of byKey) {
+    const serverSet = new Set(items.map((i) => i.serverName));
+    if (serverSet.size <= 1) continue; // only one server has it — not a cross-server duplicate
+
+    items.sort((a, b) => {
+      const ma = a.entry?.modifiedAt ?? "";
+      const mb = b.entry?.modifiedAt ?? "";
+      return String(mb).localeCompare(String(ma));
+    });
+
+    const flatItems = items.map((i) => ({
+      serverName: i.serverName,
+      siteName: i.siteName ?? "",
+      filename: i.entry?.filename ?? "",
+      path: i.entry?.path ?? "",
+      modifiedAt: i.entry?.modifiedAt ?? "",
+      sizeBytes: i.entry?.sizeBytes ?? 0,
+      sha256: i.entry?.sha256 ?? "",
+    }));
+
+    const hashSet = new Set(flatItems.map((i) => i.sha256).filter(Boolean));
+    const isExactDuplicate = hashSet.size <= 1;
+
+    groups.push({
+      normalizedFilename: key,
+      items: flatItems,
+      isExactDuplicate,
+    });
+  }
+
+  groups.sort((a, b) => {
+    if (a.isExactDuplicate !== b.isExactDuplicate) {
+      return a.isExactDuplicate ? -1 : 1;
+    }
+    return a.normalizedFilename.localeCompare(b.normalizedFilename);
+  });
+
+  return groups;
+}
 
 /**
  * Read and parse the first non-empty line of an NDJSON file (the header).
@@ -225,8 +300,13 @@ export async function runWebRollup({
   await fs.mkdir(output, { recursive: true });
   await fs.mkdir(path.join(output, "assets"), { recursive: true });
 
-  // 3. For each site, locate the latest inventory and generate outputs
+  // 3. For each site, locate the latest inventory and generate outputs.
+  //    We also accumulate every entry across every site (with its serverName
+  //    annotation) into `allEntries` so we can run cross-server duplicate
+  //    detection and build the "master spreadsheet" CSV after the loop.
   const siteResults = [];
+  const allEntries = []; // { entry, serverName, siteName }
+  const consolidatedSources = []; // per-site metadata for the master CSV
 
   for (const site of sites) {
     const siteKey = site.name;
@@ -287,6 +367,37 @@ export async function runWebRollup({
     // Compute per-site summary stats
     const summary = await computeSiteSummary(latestInv);
 
+    // Accumulate entries from this site's inventory for the master CSV +
+    // cross-server duplicate detection. We re-read the file here (small cost
+    // — the bigger work is rsync + scan, both already done) so the existing
+    // `runReport` path is left undisturbed.
+    const siteServerName = site.name;
+    const siteSiteName = site.siteName ?? site.name ?? "";
+    const stream2 = createReadStream(latestInv, { encoding: "utf8" });
+    const rl2 = readline.createInterface({ input: stream2, crlfDelay: Infinity });
+    for await (const line of rl2) {
+      if (!line.trim()) continue;
+      let obj;
+      try { obj = JSON.parse(line); } catch { continue; }
+      const kind = obj.kind ?? "";
+      if (kind === "filecap-inventory-header" || kind === "filecap-consolidated-header") continue;
+      if (kind === "filecap-inventory-footer" || kind === "filecap-consolidated-footer") continue;
+      // Stamp serverName on each entry — the consolidated CSV path in csv.js
+      // reads `entry.serverName` to look up the per-site metadata.
+      obj.serverName = siteServerName;
+      allEntries.push({ entry: obj, serverName: siteServerName, siteName: siteSiteName });
+    }
+
+    // Merge sites.json metadata (siteName, host, remotePath, publicUrlBase) on
+    // top of the NDJSON header — sites.json is authoritative for the
+    // user-visible nickname, and inventories from older scans may not carry
+    // the siteName field at all.
+    consolidatedSources.push({
+      ...header.metadata,
+      siteName: site.siteName ?? header.metadata?.siteName ?? "",
+      serverName: header.metadata?.serverName ?? siteServerName,
+    });
+
     siteResults.push({
       site,
       header,
@@ -301,10 +412,50 @@ export async function runWebRollup({
     return { exitCode: 2, error: "no sites had scans available — nothing to bundle" };
   }
 
-  // 6. Generate index.html
+  // 6a. Build the master CSV (every file across every site).
+  //     We synthesise a consolidated header so writeCsv() picks the
+  //     consolidated branch, which reads serverName off each entry and uses
+  //     the sources array to look up per-site metadata.
+  const masterCsvFilename = "audit-file-list-master.csv";
+  let masterCsvMeta = null;
+  if (allEntries.length > 0) {
+    const masterHeader = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: {
+        consolidatedAt: new Date().toISOString(),
+        filecapVersion: "web-rollup",
+        sources: consolidatedSources,
+      },
+    };
+    const masterCsvText = writeCsv({
+      sourceHeader: masterHeader,
+      entries: allEntries.map((it) => it.entry),
+      sources: consolidatedSources,
+    });
+    const masterCsvPath = path.join(output, masterCsvFilename);
+    await fs.writeFile(masterCsvPath, masterCsvText);
+    const masterStat = await fs.stat(masterCsvPath);
+    masterCsvMeta = {
+      filename: masterCsvFilename,
+      fileCount: allEntries.length,
+      byteCount: masterStat.size,
+    };
+  }
+
+  // 6b. Detect cross-server duplicates by normalised filename.
+  const duplicateGroups = findCrossServerDuplicates(allEntries);
+
+  // 6c. Generate index.html with master-CSV link + duplicates section
   const useClientGateForIndex = !noClientGate && password !== null;
   const passwordHash = useClientGateForIndex ? computeHash(password) : null;
-  const indexHtml = generateIndexHtml({ siteResults, password: passwordHash, title });
+  const indexHtml = generateIndexHtml({
+    siteResults,
+    password: passwordHash,
+    title,
+    masterCsv: masterCsvMeta,
+    duplicateGroups,
+  });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 
   // 7. Generate robots.txt

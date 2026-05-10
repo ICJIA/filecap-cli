@@ -68,6 +68,95 @@ function fmtGeneratedAt(d) {
  * @param {object} sr - siteResult entry
  * @returns {string}
  */
+function renderMasterCsvSection(masterCsv) {
+  if (!masterCsv || !masterCsv.filename) return "";
+  const fileCount = masterCsv.fileCount ?? 0;
+  const byteCount = masterCsv.byteCount ?? 0;
+  return `
+  <section class="section master-csv">
+    <h2>Master spreadsheet — every file across every server</h2>
+    <p>If you'd rather skim a single spreadsheet instead of per-site files, this combined CSV has every file from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from.</p>
+    <p class="master-csv-download">
+      <a class="cta-button" href="${he(masterCsv.filename)}" download>
+        Download <strong>${he(masterCsv.filename)}</strong>
+      </a>
+      <span class="master-csv-meta">${he(fileCount.toLocaleString())} files · ${he(humanBytes(byteCount))}</span>
+    </p>
+  </section>`;
+}
+
+function renderDuplicatesSection(groups) {
+  if (!groups || groups.length === 0) return "";
+
+  const exactCount = groups.filter((g) => g.isExactDuplicate).length;
+  const variantCount = groups.length - exactCount;
+
+  const rows = groups.map((g) => {
+    const items = g.items ?? [];
+    const itemRowsHtml = items
+      .map((it, idx) => {
+        const isNewest = idx === 0; // groups arrive sorted newest-first
+        const date = it.modifiedAt ? fmtDate(it.modifiedAt) : "—";
+        const size = humanBytes(it.sizeBytes ?? 0);
+        const hashShort = it.sha256 ? it.sha256.slice(0, 12) : "—";
+        const newestBadge = isNewest && items.length > 1 ? ` <span class="dup-newest">newest</span>` : "";
+        return `<tr>
+          <td>${he(it.siteName ?? it.serverName ?? "")}${newestBadge}</td>
+          <td>${he(it.filename)}</td>
+          <td>${he(date)}</td>
+          <td class="num">${he(size)}</td>
+          <td class="dup-hash">${he(hashShort)}</td>
+        </tr>`;
+      })
+      .join("\n");
+    const matchKind = g.isExactDuplicate
+      ? `<span class="dup-kind dup-exact">exact copy</span>`
+      : `<span class="dup-kind dup-variant">different content (likely different versions)</span>`;
+    return `<tbody class="dup-group">
+      <tr class="dup-group-header">
+        <td colspan="5">${he(g.normalizedFilename)} ${matchKind}</td>
+      </tr>
+      ${itemRowsHtml}
+    </tbody>`;
+  });
+
+  return `
+  <section class="section duplicates">
+    <h2>Files that appear on more than one server</h2>
+    <p>We found <strong>${he(groups.length.toLocaleString())} filenames</strong> that show up on more than one website above${
+      exactCount > 0 || variantCount > 0
+        ? ` — ${he(exactCount.toLocaleString())} exact ${exactCount === 1 ? "copy" : "copies"} (same content) and ${he(variantCount.toLocaleString())} ${variantCount === 1 ? "variant" : "variants"} (same filename, different content).`
+        : "."
+    }</p>
+
+    <details class="dup-explainer">
+      <summary>Why does this happen? (and why is a duplicate not an error?)</summary>
+      <p>ICJIA's web presence has evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository where reports, meeting minutes, and reference documents lived. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) developed their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context.</p>
+      <p>Files were sometimes updated on one server (typo fix, new revision, refreshed report) without being updated on the others. That's why a "duplicate" pair may have <strong>different content even though the filename matches</strong> — same file logically, different versions in practice.</p>
+      <p><strong>A duplicate is not an error.</strong> It just means the same filename appears in more than one place. When the timestamps differ, the <strong>newer file is usually the canonical version</strong> and the older copy may be intentionally archived or may simply be stale. When the timestamps match and the content hashes match, you have an exact copy — typically safe to consolidate.</p>
+      <p>Use this list as a <strong>cross-check</strong>, not a deletion queue: skim it for surprises, look at timestamp gaps, and coordinate with content owners before removing anything.</p>
+    </details>
+
+    <details class="dup-table-wrap" open>
+      <summary>Show the ${he(groups.length.toLocaleString())} duplicate filename groups</summary>
+      <div class="dup-scroll">
+        <table class="dup-table">
+          <thead>
+            <tr>
+              <th scope="col">Website</th>
+              <th scope="col">Filename (as stored)</th>
+              <th scope="col">Date published</th>
+              <th scope="col">Size</th>
+              <th scope="col">Content hash (first 12)</th>
+            </tr>
+          </thead>
+          ${rows.join("\n")}
+        </table>
+      </div>
+    </details>
+  </section>`;
+}
+
 function renderCard(sr) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const siteName = he(site.siteName ?? site.name ?? "");
@@ -138,7 +227,13 @@ function renderCard(sr) {
  * @param {string} args.title        - page title / H1 text
  * @returns {string} full HTML document
  */
-export function generateIndexHtml({ siteResults, password = null, title = "filecap audit fleet snapshot" }) {
+export function generateIndexHtml({
+  siteResults,
+  password = null,
+  title = "filecap audit fleet snapshot",
+  duplicateGroups = [],
+  masterCsv = null, // { filename: string, fileCount: number, byteCount: number } | null
+}) {
   // Fleet totals
   let fleetTotalFiles = 0;
   let fleetRemediable = 0;
@@ -591,6 +686,123 @@ main {
   .site-card { page-break-inside: avoid; }
   details.tech-details { display: none; }
 }
+
+/* ── master-csv download section ───────────────────────────────────────── */
+.master-csv .master-csv-download {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.master-csv .cta-button {
+  display: inline-block;
+  padding: 0.6rem 1rem;
+  background: #1f6feb;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 600;
+  border: 1px solid #1f6feb;
+  transition: background 120ms ease;
+}
+.master-csv .cta-button:hover { background: #388bfd; }
+.master-csv .cta-button:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.master-csv-meta { color: #8b949e; font-size: 0.95rem; }
+
+/* ── duplicates section ────────────────────────────────────────────────── */
+.duplicates .dup-explainer {
+  margin: 1rem 0;
+  padding: 0.8rem 1rem;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+}
+.duplicates .dup-explainer summary {
+  font-weight: 600;
+  cursor: pointer;
+  color: #79c0ff;
+}
+.duplicates .dup-explainer summary:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.duplicates .dup-explainer p { margin: 0.5rem 0; line-height: 1.55; }
+
+.dup-table-wrap {
+  margin-top: 1rem;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+}
+.dup-table-wrap > summary {
+  font-weight: 600;
+  cursor: pointer;
+  color: #79c0ff;
+  margin-bottom: 0.6rem;
+}
+.dup-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid #21262d;
+}
+.dup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.dup-table th, .dup-table td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid #21262d;
+  text-align: left;
+  vertical-align: top;
+}
+.dup-table th { color: #c9d1d9; background: #161b22; position: sticky; top: 0; }
+.dup-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.dup-table td.dup-hash { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #8b949e; }
+.dup-group-header td {
+  background: #0d1117;
+  border-top: 2px solid #30363d;
+  padding-top: 0.7rem;
+  color: #c9d1d9;
+}
+.dup-kind {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  vertical-align: middle;
+}
+.dup-exact { background: #1f6feb; color: #ffffff; }
+.dup-variant { background: #d29922; color: #1c2128; }
+.dup-newest {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  background: #238636;
+  color: #ffffff;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+@media print {
+  .duplicates .dup-explainer { background: #ffffff !important; border-color: #ccc; }
+  .duplicates .dup-explainer summary { color: #000; }
+  .dup-table-wrap { background: #ffffff !important; border-color: #ccc; }
+  .dup-table-wrap > summary { color: #000; }
+  .dup-table th { background: #f5f5f5; color: #000; }
+  .dup-group-header td { background: #fafafa; color: #000; border-top-color: #ccc; }
+  .master-csv .cta-button { background: #fff; color: #000; border-color: #000; }
+}
 </style>
 </head>
 <body>
@@ -713,6 +925,9 @@ main {
 ${cardsHtml}
     </div>
   </section>
+
+${renderMasterCsvSection(masterCsv)}
+${renderDuplicatesSection(duplicateGroups)}
 
 </main>
 
