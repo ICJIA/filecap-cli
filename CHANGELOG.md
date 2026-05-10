@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] — 2026-05-10
+
+### Added
+
+- **`audit-file-duplicates.csv`** — dedicated CSV of every cross-server duplicate occurrence, written into the bundle alongside the master CSV. Nine columns (Normalised filename, Match type, Group size, Website, Server, Date published, Size, Path, SHA-256 first 12), one row per occurrence so the audit lead can sort/filter/pivot in Excel — pivot by Website to see what each site has in common with Archive, or by Match type to focus on `variant` rows (same filename, different content) where content actually drifted. Download link added to the duplicates section on the index page.
+
+### Changed
+
+- **Duplicates table consolidated to one row per filename group** (was one row per file occurrence). For the ICJIA fleet that's 718 rows instead of ~1,800, and the per-page rendering drops the bundle's index.html from ~600 KB to ~270 KB. Columns: Filename, Match (exact / variant badge), Sites, Copies, Newest → oldest date, Total size. The detailed per-occurrence view lives in `audit-file-duplicates.csv` now.
+- **Explainer copy** points readers toward `variant` rows (same filename, different content) as the more interesting cases — those are where someone updated a document on one site but not another. `exact` rows are usually intentional reposts.
+
+### Removed
+
+- **`.gitkeep` and `.gitignore` filtered out of the duplicates view.** These are placeholder/marker files that always exist as duplicates by design; including them was pure noise. Filter is case-insensitive and matches the exact filename only — files like `post-gitkeep-cleanup.pdf` still appear as duplicates if they actually exist on multiple servers.
+
+[1.5.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.5.1
+
 ## [1.5.0] — 2026-05-10
 
 ### Added

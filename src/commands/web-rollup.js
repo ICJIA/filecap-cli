@@ -50,6 +50,13 @@ export function normalizeStrapiFilename(filename) {
   return filename.replace(/_[a-f0-9]{10}(\.[^.]+)$/, "$1");
 }
 
+// Filenames that are always-duplicates by design and would clutter the
+// cross-server duplicates view without giving the audit lead any useful
+// signal. `.gitkeep` and `.gitignore` exist purely to preserve empty
+// directories in git-tracked upload trees; they don't represent content
+// the user uploaded.
+const DUPLICATE_SKIP_FILENAMES = new Set([".gitkeep", ".gitignore"]);
+
 /**
  * Group entries that appear under the same logical filename on more than one
  * server. Hash equality across the group is what distinguishes "exact copy"
@@ -64,6 +71,7 @@ export function findCrossServerDuplicates(all) {
   const byKey = new Map();
   for (const item of all) {
     const filename = item.entry?.filename ?? "";
+    if (DUPLICATE_SKIP_FILENAMES.has(filename.toLowerCase())) continue;
     const key = normalizeStrapiFilename(filename).toLowerCase();
     if (!key) continue;
     if (!byKey.has(key)) byKey.set(key, []);
@@ -109,6 +117,55 @@ export function findCrossServerDuplicates(all) {
   });
 
   return groups;
+}
+
+/**
+ * Build a flat CSV listing every occurrence of a cross-server duplicate.
+ * Different from the on-page table (which shows one row per group) — this CSV
+ * gives the audit lead one row per file so they can sort / filter / pivot in
+ * Excel. Same row data feeds the on-page summary; this is just the long form.
+ *
+ * @param {Array<{ normalizedFilename: string, items: Array, isExactDuplicate: boolean }>} groups
+ * @returns {string} CSV text (LF-terminated, RFC 4180-ish quoting)
+ */
+export function writeDuplicatesCsv(groups) {
+  const cell = (v) => {
+    const s = String(v ?? "");
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const header = [
+    "Normalised filename",
+    "Match type",
+    "Group size",
+    "Website",
+    "Server",
+    "Date published",
+    "Size (bytes)",
+    "Path",
+    "Content hash (SHA-256, first 12)",
+  ];
+  const lines = [header.map(cell).join(",")];
+  for (const g of groups) {
+    const matchType = g.isExactDuplicate ? "exact copy" : "different content";
+    const groupSize = g.items.length;
+    for (const item of g.items) {
+      lines.push(
+        [
+          g.normalizedFilename,
+          matchType,
+          String(groupSize),
+          item.siteName ?? "",
+          item.serverName ?? "",
+          item.modifiedAt ?? "",
+          String(item.sizeBytes ?? 0),
+          item.path ?? "",
+          item.sha256 ? item.sha256.slice(0, 12) : "",
+        ].map(cell).join(","),
+      );
+    }
+  }
+  return lines.join("\n") + "\n";
 }
 
 /**
@@ -443,8 +500,24 @@ export async function runWebRollup({
     };
   }
 
-  // 6b. Detect cross-server duplicates by normalised filename.
+  // 6b. Detect cross-server duplicates by normalised filename, then write the
+  //     per-occurrence duplicates CSV alongside the master CSV.
   const duplicateGroups = findCrossServerDuplicates(allEntries);
+  const duplicatesCsvFilename = "audit-file-duplicates.csv";
+  let duplicatesCsvMeta = null;
+  if (duplicateGroups.length > 0) {
+    const dupCsv = writeDuplicatesCsv(duplicateGroups);
+    const dupPath = path.join(output, duplicatesCsvFilename);
+    await fs.writeFile(dupPath, dupCsv);
+    const dupStat = await fs.stat(dupPath);
+    const occurrenceCount = duplicateGroups.reduce((s, g) => s + g.items.length, 0);
+    duplicatesCsvMeta = {
+      filename: duplicatesCsvFilename,
+      groupCount: duplicateGroups.length,
+      occurrenceCount,
+      byteCount: dupStat.size,
+    };
+  }
 
   // 6c. Generate index.html with master-CSV link + duplicates section
   const useClientGateForIndex = !noClientGate && password !== null;
@@ -455,6 +528,7 @@ export async function runWebRollup({
     title,
     masterCsv: masterCsvMeta,
     duplicateGroups,
+    duplicatesCsv: duplicatesCsvMeta,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 

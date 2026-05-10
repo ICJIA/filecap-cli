@@ -6,6 +6,7 @@ import {
   runWebRollup,
   normalizeStrapiFilename,
   findCrossServerDuplicates,
+  writeDuplicatesCsv,
 } from "../src/commands/web-rollup.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -743,5 +744,123 @@ describe("runWebRollup — master CSV + duplicates", () => {
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
     expect(html).not.toContain("Files that appear on more than one server");
+  });
+});
+
+describe("findCrossServerDuplicates — placeholder filtering", () => {
+  const mk = (serverName, filename) => ({
+    serverName,
+    siteName: serverName,
+    entry: {
+      filename,
+      path: filename,
+      modifiedAt: "2024-01-01T00:00:00Z",
+      sizeBytes: 0,
+      sha256: "x",
+    },
+  });
+
+  it("skips .gitkeep when it appears on multiple servers", () => {
+    const all = [mk("dvfr", ".gitkeep"), mk("archive", ".gitkeep")];
+    expect(findCrossServerDuplicates(all)).toEqual([]);
+  });
+  it("skips .gitignore when it appears on multiple servers", () => {
+    const all = [mk("dvfr", ".gitignore"), mk("archive", ".gitignore")];
+    expect(findCrossServerDuplicates(all)).toEqual([]);
+  });
+  it("skip is case-insensitive (.GitKeep / .GITIGNORE both filtered)", () => {
+    const all = [
+      mk("dvfr", ".GitKeep"), mk("archive", ".GITKEEP"),
+      mk("r3", ".GITIGNORE"), mk("i2i", ".gitignore"),
+    ];
+    expect(findCrossServerDuplicates(all)).toEqual([]);
+  });
+  it("does NOT skip real filenames that contain 'gitkeep' as a substring", () => {
+    const all = [
+      mk("dvfr", "post-gitkeep-cleanup.pdf"),
+      mk("archive", "post-gitkeep-cleanup.pdf"),
+    ];
+    expect(findCrossServerDuplicates(all)).toHaveLength(1);
+  });
+});
+
+describe("writeDuplicatesCsv", () => {
+  const grp = {
+    normalizedFilename: "report.pdf",
+    isExactDuplicate: true,
+    items: [
+      { serverName: "dvfr", siteName: "DVFR", path: "report.pdf", modifiedAt: "2025-01-01T00:00:00Z", sizeBytes: 1024, sha256: "abc1234567890def" },
+      { serverName: "archive", siteName: "Archive", path: "library/report.pdf", modifiedAt: "2020-01-01T00:00:00Z", sizeBytes: 1024, sha256: "abc1234567890def" },
+    ],
+  };
+
+  it("emits a header row + one row per occurrence", () => {
+    const csv = writeDuplicatesCsv([grp]);
+    const lines = csv.trim().split("\n");
+    expect(lines).toHaveLength(3); // header + 2 occurrences
+  });
+
+  it("header includes the expected columns", () => {
+    const csv = writeDuplicatesCsv([grp]);
+    const header = csv.split("\n")[0];
+    expect(header).toContain("Normalised filename");
+    expect(header).toContain("Match type");
+    expect(header).toContain("Website");
+    expect(header).toContain("Server");
+    expect(header).toContain("Path");
+  });
+
+  it("includes the website nick + server-name on each occurrence row", () => {
+    const csv = writeDuplicatesCsv([grp]);
+    expect(csv).toContain("DVFR");
+    expect(csv).toContain("Archive");
+    expect(csv).toContain("dvfr");
+    expect(csv).toContain("archive");
+  });
+
+  it("truncates SHA-256 to the first 12 chars", () => {
+    const csv = writeDuplicatesCsv([grp]);
+    expect(csv).toContain("abc123456789");
+    expect(csv).not.toContain("abc1234567890def");
+  });
+
+  it("labels variant groups as 'different content'", () => {
+    const variantGrp = { ...grp, isExactDuplicate: false };
+    const csv = writeDuplicatesCsv([variantGrp]);
+    expect(csv).toContain("different content");
+  });
+});
+
+describe("runWebRollup — duplicates CSV", () => {
+  it("writes audit-file-duplicates.csv when cross-server duplicates exist", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    for (const sn of ["dvfr", "archive"]) {
+      const latestDir = path.join(auditsBase, sn, "latest");
+      await fs.mkdir(latestDir, { recursive: true });
+      await writeInventory(path.join(latestDir, "inventory.ndjson"), {
+        serverName: sn, serverIp: sn === "dvfr" ? "10.0.0.1" : "10.0.0.2",
+      });
+    }
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await writeSitesJson(sitesFile, [
+      { name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" },
+      { name: "archive", siteName: "Archive", host: "10.0.0.2", user: "forge", remotePath: "/uploads" },
+    ]);
+    const outputDir = path.join(tmpDir, "output");
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const dupCsvPath = path.join(outputDir, "audit-file-duplicates.csv");
+    const stat = await fs.stat(dupCsvPath);
+    expect(stat.size).toBeGreaterThan(0);
+
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(html).toContain("audit-file-duplicates.csv");
+  });
+
+  it("does not write the duplicates CSV when no cross-server duplicates exist", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    const dupCsvPath = path.join(outputDir, "audit-file-duplicates.csv");
+    await expect(fs.stat(dupCsvPath)).rejects.toThrow();
   });
 });

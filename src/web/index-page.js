@@ -85,40 +85,46 @@ function renderMasterCsvSection(masterCsv) {
   </section>`;
 }
 
-function renderDuplicatesSection(groups) {
+function renderDuplicatesSection(groups, duplicatesCsv) {
   if (!groups || groups.length === 0) return "";
 
   const exactCount = groups.filter((g) => g.isExactDuplicate).length;
   const variantCount = groups.length - exactCount;
 
-  const rows = groups.map((g) => {
+  // One row per group — easier to scan than the per-item-row version. The
+  // per-occurrence detail lives in audit-file-duplicates.csv for pivot work.
+  const groupRows = groups.map((g) => {
     const items = g.items ?? [];
-    const itemRowsHtml = items
-      .map((it, idx) => {
-        const isNewest = idx === 0; // groups arrive sorted newest-first
-        const date = it.modifiedAt ? fmtDate(it.modifiedAt) : "—";
-        const size = humanBytes(it.sizeBytes ?? 0);
-        const hashShort = it.sha256 ? it.sha256.slice(0, 12) : "—";
-        const newestBadge = isNewest && items.length > 1 ? ` <span class="dup-newest">newest</span>` : "";
-        return `<tr>
-          <td>${he(it.siteName ?? it.serverName ?? "")}${newestBadge}</td>
-          <td>${he(it.filename)}</td>
-          <td>${he(date)}</td>
-          <td class="num">${he(size)}</td>
-          <td class="dup-hash">${he(hashShort)}</td>
-        </tr>`;
-      })
-      .join("\n");
-    const matchKind = g.isExactDuplicate
-      ? `<span class="dup-kind dup-exact">exact copy</span>`
-      : `<span class="dup-kind dup-variant">different content (likely different versions)</span>`;
-    return `<tbody class="dup-group">
-      <tr class="dup-group-header">
-        <td colspan="5">${he(g.normalizedFilename)} ${matchKind}</td>
-      </tr>
-      ${itemRowsHtml}
-    </tbody>`;
+    const dates = items.map((i) => i.modifiedAt).filter(Boolean).sort();
+    const newest = dates[dates.length - 1] ?? "";
+    const oldest = dates[0] ?? "";
+    const totalBytes = items.reduce((s, i) => s + (i.sizeBytes ?? 0), 0);
+    const sites = items.map((i) => he(i.siteName || i.serverName || "")).join(", ");
+    const matchBadge = g.isExactDuplicate
+      ? `<span class="dup-kind dup-exact">exact</span>`
+      : `<span class="dup-kind dup-variant">variant</span>`;
+    const datesText = (newest && oldest && newest !== oldest)
+      ? `${he(fmtDate(newest))} <span class="dup-dim">↓</span> ${he(fmtDate(oldest))}`
+      : he(newest ? fmtDate(newest) : "—");
+    return `<tr>
+      <td class="dup-filename">${he(g.normalizedFilename)}</td>
+      <td>${matchBadge}</td>
+      <td>${sites}</td>
+      <td class="num">${he(String(items.length))}</td>
+      <td class="dup-dates">${datesText}</td>
+      <td class="num">${he(humanBytes(totalBytes))}</td>
+    </tr>`;
   });
+
+  const csvDownloadHtml = duplicatesCsv && duplicatesCsv.filename
+    ? `<p class="dup-csv-download">
+        <a class="cta-button" href="${he(duplicatesCsv.filename)}" download>
+          Download <strong>${he(duplicatesCsv.filename)}</strong>
+        </a>
+        <span class="master-csv-meta">${he((duplicatesCsv.groupCount ?? 0).toLocaleString())} filenames · ${he((duplicatesCsv.occurrenceCount ?? 0).toLocaleString())} occurrences · ${he(humanBytes(duplicatesCsv.byteCount ?? 0))}</span>
+      </p>
+      <p class="dup-csv-blurb">The CSV has one row per occurrence — useful in Excel for sorting by site, by date, or by match type. The on-page table below shows one row per filename group.</p>`
+    : "";
 
   return `
   <section class="section duplicates">
@@ -127,30 +133,35 @@ function renderDuplicatesSection(groups) {
       exactCount > 0 || variantCount > 0
         ? ` — ${he(exactCount.toLocaleString())} exact ${exactCount === 1 ? "copy" : "copies"} (same content) and ${he(variantCount.toLocaleString())} ${variantCount === 1 ? "variant" : "variants"} (same filename, different content).`
         : "."
-    }</p>
+    } <code>.gitkeep</code> and <code>.gitignore</code> are filtered out — those are placeholder files that always exist as duplicates by design.</p>
+
+    ${csvDownloadHtml}
 
     <details class="dup-explainer">
       <summary>Why does this happen? (and why is a duplicate not an error?)</summary>
       <p>ICJIA's web presence has evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository where reports, meeting minutes, and reference documents lived. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) developed their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context.</p>
-      <p>Files were sometimes updated on one server (typo fix, new revision, refreshed report) without being updated on the others. That's why a "duplicate" pair may have <strong>different content even though the filename matches</strong> — same file logically, different versions in practice.</p>
-      <p><strong>A duplicate is not an error.</strong> It just means the same filename appears in more than one place. When the timestamps differ, the <strong>newer file is usually the canonical version</strong> and the older copy may be intentionally archived or may simply be stale. When the timestamps match and the content hashes match, you have an exact copy — typically safe to consolidate.</p>
+      <p>Files were sometimes updated on one server (typo fix, new revision, refreshed report) without being updated on the others. That's why a "duplicate" pair may have <strong>different content even though the filename matches</strong> — same file logically, different versions in practice. Those are flagged as <span class="dup-kind dup-variant">variant</span> below; identical-content duplicates are flagged as <span class="dup-kind dup-exact">exact</span>.</p>
+      <p><strong>A duplicate is not an error.</strong> It just means the same filename appears in more than one place. The <em>variant</em> rows are usually more interesting than the <em>exact</em> ones — those are the cases where someone updated the document on one site but not another, and you may want to reconcile them.</p>
       <p>Use this list as a <strong>cross-check</strong>, not a deletion queue: skim it for surprises, look at timestamp gaps, and coordinate with content owners before removing anything.</p>
     </details>
 
     <details class="dup-table-wrap" open>
-      <summary>Show the ${he(groups.length.toLocaleString())} duplicate filename groups</summary>
+      <summary>Summary table — ${he(groups.length.toLocaleString())} filename groups (one row each)</summary>
       <div class="dup-scroll">
         <table class="dup-table">
           <thead>
             <tr>
-              <th scope="col">Website</th>
-              <th scope="col">Filename (as stored)</th>
-              <th scope="col">Date published</th>
-              <th scope="col">Size</th>
-              <th scope="col">Content hash (first 12)</th>
+              <th scope="col">Filename (normalised)</th>
+              <th scope="col">Match</th>
+              <th scope="col">Sites</th>
+              <th scope="col">Copies</th>
+              <th scope="col">Newest → oldest</th>
+              <th scope="col">Total size</th>
             </tr>
           </thead>
-          ${rows.join("\n")}
+          <tbody>
+            ${groupRows.join("\n")}
+          </tbody>
         </table>
       </div>
     </details>
@@ -233,6 +244,7 @@ export function generateIndexHtml({
   title = "filecap audit fleet snapshot",
   duplicateGroups = [],
   masterCsv = null, // { filename: string, fileCount: number, byteCount: number } | null
+  duplicatesCsv = null, // { filename: string, groupCount: number, occurrenceCount: number, byteCount: number } | null
 }) {
   // Fleet totals
   let fleetTotalFiles = 0;
@@ -765,12 +777,38 @@ main {
 .dup-table th { color: #c9d1d9; background: #161b22; position: sticky; top: 0; }
 .dup-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dup-table td.dup-hash { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #8b949e; }
-.dup-group-header td {
-  background: #0d1117;
-  border-top: 2px solid #30363d;
-  padding-top: 0.7rem;
+.dup-filename {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   color: #c9d1d9;
+  word-break: break-word;
+  max-width: 30ch;
 }
+.dup-dates { font-size: 0.85rem; color: #c9d1d9; white-space: nowrap; }
+.dup-dim { color: #6e7681; padding: 0 0.2rem; }
+.dup-csv-download {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 0.3rem 0;
+}
+.dup-csv-download .cta-button {
+  display: inline-block;
+  padding: 0.55rem 0.95rem;
+  background: #1f6feb;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 600;
+  border: 1px solid #1f6feb;
+  transition: background 120ms ease;
+}
+.dup-csv-download .cta-button:hover { background: #388bfd; }
+.dup-csv-download .cta-button:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.dup-csv-blurb { color: #8b949e; font-size: 0.92rem; margin-top: 0.2rem; }
 .dup-kind {
   display: inline-block;
   margin-left: 0.6rem;
@@ -927,7 +965,7 @@ ${cardsHtml}
   </section>
 
 ${renderMasterCsvSection(masterCsv)}
-${renderDuplicatesSection(duplicateGroups)}
+${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
 
 </main>
 
