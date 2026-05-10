@@ -245,7 +245,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.5.6 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
+**v1.5.7 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
 
 | Phase | Version | Status | Deliverable |
 |---|---|---|---|
@@ -264,7 +264,7 @@ npx vitest run test/web-rollup.test.js
 | 13 | v1.3.0 | shipped | Red/blue team security audit (17 findings, all Critical and Moderate fixed) |
 | 14 | v1.3.x | shipped | Auto-detected `sites.json` for fleet script; opt-in `~/.filecap/config.json` `webRollup.autoDeploy`; bearer-token support (`~/.filecap/secrets.json`) |
 | 15 | v1.4.x | shipped | CSV/HTML deliverable trimmed to 14 columns; click-and-drag horizontal pan on every table |
-| 16 | v1.5.x | shipped | Cross-server duplicates with action explainer; master CSV + duplicates CSV in bundle; infographic hero; table-styling consistency across the app |
+| 16 | v1.5.x | shipped | Cross-server duplicates with action explainer; master CSV + duplicates CSV in bundle; infographic hero; table-styling consistency; "Back to fleet index" navigation on per-site detail pages; footer links to GitHub + CHANGELOG |
 | — | vNext | deferred | Strapi-aware mode (separate package); content-type sanity check on URL preflight |
 
 ### Production deployment

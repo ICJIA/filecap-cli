@@ -403,7 +403,9 @@ export async function runWebRollup({
     const tempDir = path.join(output, `.__tmp_${baseName}`);
     await fs.mkdir(tempDir, { recursive: true });
 
-    const reportResult = await runReport({ input: latestInv, outputDir: tempDir, html: true });
+    // Web-rollup bundles index.html as a sibling of each per-site report —
+    // pass backHref so each detail page has a "← Back to fleet index" link.
+    const reportResult = await runReport({ input: latestInv, outputDir: tempDir, html: true, backHref: "index.html" });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
       await fs.rm(tempDir, { recursive: true, force: true });

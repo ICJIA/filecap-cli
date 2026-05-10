@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.7] — 2026-05-10
+
+### Added
+
+- **"← Back to fleet index" sticky bar at the top of each per-site detail page** when the report is part of a web-rollup bundle. Always visible (`position: sticky`); link goes to `index.html` in the same directory. Standalone single-site audits don't render the bar (no `index.html` sibling to link to) — `runReport` only emits it when `backHref` is passed by `web-rollup`. Hidden in print stylesheet so paper output stays clean.
+- **CHANGELOG link in both footers.** The per-site report footer (which already linked to GitHub) gained a CHANGELOG link; the bundle index footer gained both (GitHub + CHANGELOG). Both open in a new tab with `rel="noopener noreferrer"`.
+
+### Changed
+
+- **Wording: "audit fleet" → "fleet audit"** everywhere (index H1, brand bar, default title, MCP tool default, README docs). "Fleet audit" reads as the right noun phrase ("an audit of a fleet"); the prior order parsed awkwardly.
+
+[1.5.7]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.5.7
+
 ## [1.5.6] — 2026-05-10
 
 ### Changed
