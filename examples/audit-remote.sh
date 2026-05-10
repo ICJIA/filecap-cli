@@ -43,21 +43,21 @@
 #    - Public URL base (e.g. https://dvfr.icjia-api.cloud/uploads — press Enter to skip)
 #
 #  WHERE OUTPUT GOES
-#    ~/filecap-audits/<server-ip>/
-#      ├── mirror/                           shared local rsync copy (incremental)
+#    ~/filecap-audits/<server-name>/    (e.g., dvfr-strapi-prod, not 192.241.146.85)
+#      ├── mirror/                       shared local rsync copy (incremental)
 #      ├── runs/
-#      │   ├── 20260509-143000Z/             each run gets its own timestamped dir (UTC)
-#      │   │   ├── SOURCE_INFO.txt           provenance: who, what, when
-#      │   │   ├── inventory.ndjson          raw scan output
+#      │   ├── 20260509-143000Z/         each run gets its own timestamped dir (UTC)
+#      │   │   ├── SOURCE_INFO.txt
+#      │   │   ├── inventory.ndjson
 #      │   │   └── report/
-#      │   │       ├── audit-file-list.csv   vendor work-order
-#      │   │       ├── audit-file-list.html  (only if --html or "yes" answered)
-#      │   │       ├── audit-summary.txt     counts by category, manager-friendly
-#      │   │       ├── README.txt            explains all artifacts
+#      │   │       ├── audit-file-list.csv
+#      │   │       ├── audit-file-list.html
 #      │   │       └── ...
-#      │   ├── 20260516-093000Z/
-#      │   └── 20260523-100000Z/
-#      └── latest -> runs/20260523-100000Z   symlink, updated after each run
+#      │   └── 20260516-093000Z/
+#      └── latest -> runs/<most-recent-ts>
+#
+#    Multiple sites on the same physical server (shared IP) each get their
+#    own directory — keyed by the friendly server name, not the IP.
 #
 #    Re-running the script against the same server preserves history — each
 #    run lands in its own timestamped subdirectory. The 'latest' symlink always
@@ -904,7 +904,7 @@ while :; do
     printf "  7. %-22s %s\n" "HTML report:"        "No (AUDIT_HTML=0)"
   fi
   echo
-  printf "     %-22s %s\n" "Output destination:"   "${HOME}/filecap-audits/${HOST}/runs/<this run>/"
+  printf "     %-22s %s\n" "Output destination:"   "${HOME}/filecap-audits/${SERVER_NAME}/runs/<this run>/"
   echo
   echo "══════════════════════════════════════════════════════════════════════════"
   echo "  Press Enter (or y) to proceed."
@@ -977,7 +977,20 @@ elif [[ "$SAVE_AFTER_RUN" == "force" ]]; then
 fi
 
 # ── work directory ────────────────────────────────────────────────────────────
-WORK_DIR="${HOME}/filecap-audits/${HOST}"
+# Check for legacy IP-keyed audit directories that suggest the user has
+# pre-1.2.2 data. Print a one-line advisory pointing at the new layout.
+if [[ -d "${HOME}/filecap-audits/${HOST}" && ! -d "${HOME}/filecap-audits/${SERVER_NAME}" ]]; then
+  warn "Legacy audit directory found at ~/filecap-audits/${HOST}/"
+  warn "  As of 1.2.2, audit dirs are keyed by server-name. New runs will go to:"
+  warn "  ~/filecap-audits/${SERVER_NAME}/"
+  warn "  The old directory is harmless but orphaned. To migrate manually:"
+  warn "    mv ~/filecap-audits/${HOST} ~/filecap-audits/${SERVER_NAME}"
+fi
+
+# Key the work directory by server-name (not host IP) so multiple sites
+# on the same physical server (common with Forge / shared-IP setups)
+# get their own dedicated audit directory.
+WORK_DIR="${HOME}/filecap-audits/${SERVER_NAME}"
 MIRROR_DIR="${WORK_DIR}/mirror"
 
 RUN_TS=$(date -u +"%Y%m%d-%H%M%SZ")

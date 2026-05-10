@@ -48,12 +48,14 @@
 #
 #  WHERE OUTPUT GOES
 #    Per-server results land in timestamped run dirs (preserved across re-runs):
-#      ~/filecap-audits/<server-ip>/runs/<utc-timestamp>/
+#      ~/filecap-audits/<server-name>/runs/<utc-timestamp>/
 #        ├── SOURCE_INFO.txt
 #        ├── inventory.ndjson
 #        └── report/
-#    A 'latest' symlink at ~/filecap-audits/<server-ip>/latest points to the
-#    most recent successful run for each server.
+#    A 'latest' symlink at ~/filecap-audits/<server-name>/latest points to the
+#    most recent successful run for each server. Each site gets its own directory
+#    keyed by server-name (not IP) so multiple sites on the same physical server
+#    (common with Forge / shared-IP setups) never overwrite each other.
 #
 #    Fleet-consolidated output goes to a timestamped fleet dir:
 #      ~/filecap-audits/_fleet/<timestamp>/
@@ -533,11 +535,12 @@ for i in "${VALID_INDEXES[@]}"; do
     SRV_DURATIONS+=("$(( $(date +%s) - SRV_PHASE_START ))")
     # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
     # Fall back to scanning runs/ directly in case the symlink is missing.
-    SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/latest/inventory.ndjson"
+    # Dirs are keyed by server-name (not host IP) since 1.2.2.
+    SRC_INVENTORY="${HOME}/filecap-audits/${SRV_NAME}/latest/inventory.ndjson"
     if [[ ! -f "$SRC_INVENTORY" ]]; then
-      LATEST_RUN=$(ls -1t "${HOME}/filecap-audits/${SRV_HOST}/runs" 2>/dev/null | head -1)
+      LATEST_RUN=$(ls -1t "${HOME}/filecap-audits/${SRV_NAME}/runs" 2>/dev/null | head -1)
       if [[ -n "$LATEST_RUN" ]]; then
-        SRC_INVENTORY="${HOME}/filecap-audits/${SRV_HOST}/runs/${LATEST_RUN}/inventory.ndjson"
+        SRC_INVENTORY="${HOME}/filecap-audits/${SRV_NAME}/runs/${LATEST_RUN}/inventory.ndjson"
       fi
     fi
     DEST_INVENTORY="${INVENTORIES_DIR}/${SRV_NAME}.ndjson"
@@ -551,7 +554,7 @@ for i in "${VALID_INDEXES[@]}"; do
       SRV_FILE_COUNTS+=("${_srv_files:-0}")
       SRV_BYTE_COUNTS+=("${_srv_bytes:-0}")
     else
-      warn "audit-remote succeeded but inventory not found for: ${SRV_HOST}"
+      warn "audit-remote succeeded but inventory not found for: ${SRV_NAME}"
       printf "  %s — inventory file missing after audit\n" "$SRV_NAME" >> "$FAILED_SERVERS_TXT"
       (( FAIL_COUNT++ )) || true
       SRV_FILE_COUNTS+=("0")

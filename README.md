@@ -188,7 +188,7 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 >    ```
 >
 > 5. Answer the prompts (SSH user, server IP, path to uploads, optional website nickname).
-> 6. The deliverable is at `~/filecap-audits/<server-ip>/latest/report/`. Open `audit-file-list.csv` (Excel/Numbers/Sheets) or `audit-file-list.html` (any browser).
+> 6. The deliverable is at `~/filecap-audits/<server-name>/latest/report/`. Open `audit-file-list.csv` (Excel/Numbers/Sheets) or `audit-file-list.html` (any browser).
 > 7. Email the entire `report/` folder to your remediation vendor.
 
 ## CLI reference
@@ -754,7 +754,7 @@ chmod +x audit-remote.sh
 ./audit-remote.sh
 ```
 
-The script walks you through the rest interactively. It asks a few questions (see below), connects to the server, collects the inventory, and writes the output to `~/filecap-audits/<server-ip>/latest/report/`. When it's done, it prints the path to the results.
+The script walks you through the rest interactively. It asks a few questions (see below), connects to the server, collects the inventory, and writes the output to `~/filecap-audits/<server-name>/latest/report/`. When it's done, it prints the path to the results.
 
 If you already know all the details and want to skip the prompts, you can pass them directly:
 
@@ -775,7 +775,7 @@ In interactive mode, the script asks a few questions. Here's what each one means
 
 ### What you get
 
-After the script finishes, navigate to `~/filecap-audits/<server-ip>/latest/report/`. You'll find:
+After the script finishes, navigate to `~/filecap-audits/<server-name>/latest/report/`. You'll find:
 
 - **`audit-file-list.csv`** — The main deliverable. One row per file, 30 columns covering file type, size, PDF page count, image-only flag, DOCX heading and alt-text data, and more. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
@@ -903,10 +903,10 @@ Output lands in `~/filecap-audits/_fleet/<timestamp>/` and includes a per-server
 
 ### Re-running audits over time
 
-Running the audit against the same server multiple times preserves history. Each run lands in its own timestamped subdirectory under `~/filecap-audits/<server-ip>/runs/`, and a `latest/` symlink at the workdir root points to the most recent successful run.
+Running the audit against the same server multiple times preserves history. Each run lands in its own timestamped subdirectory under `~/filecap-audits/<server-name>/runs/`, and a `latest/` symlink at the workdir root points to the most recent successful run.
 
 ```
-~/filecap-audits/192.241.146.85/
+~/filecap-audits/dvfr-strapi-prod/
 ├── mirror/                              (shared local copy)
 ├── runs/
 │   ├── 20260509-143000Z/                ← May 9 audit
@@ -921,9 +921,17 @@ Practical implications:
 
 - **The `mirror/` directory is shared across runs.** rsync handles incremental updates — only changed files transfer each time, so subsequent runs are fast.
 - **Each run is self-contained.** You can zip `runs/<timestamp>/` and email it without including any other run.
-- **The `latest/` symlink is your shortcut to "the current report":** `open ~/filecap-audits/<ip>/latest/report/audit-file-list.csv`.
+- **The `latest/` symlink is your shortcut to "the current report":** `open ~/filecap-audits/<server-name>/latest/report/audit-file-list.csv`.
 - **Old runs accumulate.** They're tiny (typically tens to hundreds of KB each) but if you're running daily over many months, you may want to occasionally `rm -rf` the oldest runs.
 - **No conflicts when re-running** — two runs in the same minute would land in distinct timestamped dirs (UTC seconds resolution).
+
+**Multiple sites on one physical server.** If your fleet has multiple Strapi sites sharing an IP (common with Forge-style hosting), each site gets its own audit directory keyed by the server-name (the friendly identifier you set when adding the site, like `dvfr-strapi-prod`). They never collide.
+
+Pre-1.2.2 audit dirs at `~/filecap-audits/<server-ip>/` are orphaned but not deleted. Migrate manually with `mv`:
+
+```
+mv ~/filecap-audits/192.241.146.85 ~/filecap-audits/dvfr-strapi-prod
+```
 
 The fleet script (`audit-fleet.sh`) follows the same pattern: each fleet run goes to `~/filecap-audits/_fleet/<timestamp>/` and a `~/filecap-audits/_fleet/latest` symlink points to the most recent run.
 
@@ -1046,7 +1054,7 @@ We'll prioritize this if there's clear demand from organizations that genuinely 
 For completeness, the full directory layout written by `audit-remote.sh`:
 
 ```
-~/filecap-audits/<server-ip>/
+~/filecap-audits/<server-name>/          (e.g., dvfr-strapi-prod — keyed by name, not IP)
 ├── mirror/                     Local rsync copy of remote files (shared across runs)
 ├── runs/
 │   ├── 20260509-143000Z/       Each run gets its own timestamped subdirectory (UTC)
@@ -1130,7 +1138,7 @@ After scanning your fleet, the `filecap web-rollup` subcommand bundles every sit
 filecap web-rollup --output ~/Desktop/icjia-fleet
 ```
 
-Reads `~/.filecap/sites.json` (the saved-sites file managed by `audit-remote.sh`) and the most-recent inventory at `~/filecap-audits/<host>/latest/inventory.ndjson` for each site. Sites without a recent scan are skipped with a warning.
+Reads `~/.filecap/sites.json` (the saved-sites file managed by `audit-remote.sh`) and the most-recent inventory at `~/filecap-audits/<server-name>/latest/inventory.ndjson` for each site. Sites without a recent scan are skipped with a warning.
 
 ### Password protection — two options
 

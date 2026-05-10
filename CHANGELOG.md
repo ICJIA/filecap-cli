@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] — 2026-05-10
+
+### Fixed
+
+- **Audit work directories now keyed by server-name instead of server IP.** Many Strapi fleets host multiple sites on the same physical server (e.g., 10 sites across 3 IPs is common with Forge). The pre-1.2.2 layout used `~/filecap-audits/<ip>/` which meant scanning two sites on the same IP would overwrite each other's local mirror and `latest` symlink. The new layout uses `~/filecap-audits/<server-name>/` (e.g., `dvfr-strapi-prod`, `r3-strapi-prod`, `i2i-strapi-prod`), giving each site its own dedicated audit directory regardless of how many share an IP. Applies to `audit-remote.sh`, `audit-fleet.sh`, and `filecap web-rollup`'s inventory lookup.
+
+### Migration
+
+- Pre-1.2.2 audit directories at `~/filecap-audits/<ip>/` are still readable but no longer referenced. To migrate existing data: `mv ~/filecap-audits/<ip> ~/filecap-audits/<server-name>`. The audit script prints a one-line advisory when it detects a legacy IP-keyed directory and the new server-name dir doesn't exist yet.
+
+[1.2.2]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.2.2
+
 ## [1.2.1] — 2026-05-10
 
 ### Changed

@@ -77,7 +77,8 @@ async function buildFixture({
   scannedAt = "2026-05-09T16:05:04.000Z",
 } = {}) {
   const auditsBase = path.join(tmpDir, "filecap-audits");
-  const latestDir = path.join(auditsBase, ip, "latest");
+  // As of 1.2.2, audit dirs are keyed by server-name (not host IP).
+  const latestDir = path.join(auditsBase, siteServerName, "latest");
   await fs.mkdir(latestDir, { recursive: true });
   const invPath = path.join(latestDir, "inventory.ndjson");
   await writeInventory(invPath, { serverName: siteServerName, serverIp: ip, scannedAt });
@@ -285,7 +286,8 @@ describe("runWebRollup", () => {
     const auditsBase = path.join(tmpDir, "filecap-audits");
 
     for (const [name, ip] of [["dvfr", "10.0.1.1"], ["i2i", "10.0.1.2"]]) {
-      const latestDir = path.join(auditsBase, ip, "latest");
+      // Audit dirs keyed by server-name (not IP) since 1.2.2.
+      const latestDir = path.join(auditsBase, name, "latest");
       await fs.mkdir(latestDir, { recursive: true });
       await writeInventory(path.join(latestDir, "inventory.ndjson"), { serverName: name, serverIp: ip });
     }
@@ -315,7 +317,8 @@ describe("runWebRollup", () => {
     const auditsBase = path.join(tmpDir, "filecap-audits");
 
     for (const [name, ip] of [["dvfr", "10.0.2.1"], ["i2i", "10.0.2.2"]]) {
-      const latestDir = path.join(auditsBase, ip, "latest");
+      // Audit dirs keyed by server-name (not IP) since 1.2.2.
+      const latestDir = path.join(auditsBase, name, "latest");
       await fs.mkdir(latestDir, { recursive: true });
       await writeInventory(path.join(latestDir, "inventory.ndjson"), { serverName: name, serverIp: ip });
     }

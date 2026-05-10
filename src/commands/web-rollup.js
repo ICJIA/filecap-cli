@@ -188,31 +188,31 @@ export async function runWebRollup({
   const siteResults = [];
 
   for (const site of sites) {
-    const ip = site.host;
-    if (!ip) {
-      process.stderr.write(`WARN: skipping ${site.siteName ?? site.name ?? "(unnamed)"}: no host configured\n`);
+    const siteKey = site.name;
+    if (!siteKey) {
+      process.stderr.write(`WARN: skipping ${site.siteName ?? "(unnamed)"}: no server name configured\n`);
       continue;
     }
 
     const auditsBase = _auditsBase ?? path.join(os.homedir(), "filecap-audits");
-    const latestInv = path.join(auditsBase, ip, "latest", "inventory.ndjson");
+    const latestInv = path.join(auditsBase, siteKey, "latest", "inventory.ndjson");
     let stat;
     try { stat = await fs.stat(latestInv); } catch { stat = null; }
 
     if (!stat) {
-      process.stderr.write(`WARN: skipping ${site.siteName ?? site.name ?? ip}: no scan at ${latestInv}\n`);
+      process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: no scan at ${latestInv}\n`);
       continue;
     }
 
     // Read the header to get the scan timestamp
     const header = await readNdjsonHeader(latestInv);
     if (!header) {
-      process.stderr.write(`WARN: skipping ${site.siteName ?? site.name ?? ip}: cannot parse inventory header\n`);
+      process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: cannot parse inventory header\n`);
       continue;
     }
 
     const scanTimestamp = formatScanTimestamp(header.metadata?.scannedAt);
-    const siteLabelForSlug = site.siteName ?? site.name ?? ip;
+    const siteLabelForSlug = site.siteName ?? siteKey;
     const baseName = `${slug(siteLabelForSlug)}-${scanTimestamp}`;
 
     // 4. Run runReport against the latest inventory in a temp dir
@@ -221,7 +221,7 @@ export async function runWebRollup({
 
     const reportResult = await runReport({ input: latestInv, outputDir: tempDir, html: true });
     if (reportResult.exitCode !== 0) {
-      process.stderr.write(`WARN: skipping ${site.siteName ?? site.name ?? ip}: report generation failed (${reportResult.error ?? ""})\n`);
+      process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
       await fs.rm(tempDir, { recursive: true, force: true });
       continue;
     }
