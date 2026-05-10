@@ -145,18 +145,18 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
       <p>Use this list as a <strong>cross-check</strong>, not a deletion queue: skim it for surprises, look at timestamp gaps, and coordinate with content owners before removing anything.</p>
     </details>
 
-    <details class="dup-table-wrap" open>
+    <details class="dup-table-details" open>
       <summary>Summary table — ${he(groups.length.toLocaleString())} filename groups (one row each)</summary>
-      <div class="dup-scroll">
+      <div class="dup-pan-wrap" data-dup-pan>
         <table class="dup-table">
           <thead>
             <tr>
-              <th scope="col">Filename (normalised)</th>
-              <th scope="col">Match</th>
-              <th scope="col">Sites</th>
-              <th scope="col">Copies</th>
-              <th scope="col">Newest → oldest</th>
-              <th scope="col">Total size</th>
+              <th scope="col" class="dup-col-filename">Filename (normalised)</th>
+              <th scope="col" class="dup-col-match">Match</th>
+              <th scope="col" class="dup-col-sites">Sites</th>
+              <th scope="col" class="dup-col-copies">Copies</th>
+              <th scope="col" class="dup-col-dates">Newest → oldest</th>
+              <th scope="col" class="dup-col-size">Total size</th>
             </tr>
           </thead>
           <tbody>
@@ -745,43 +745,102 @@ main {
 }
 .duplicates .dup-explainer p { margin: 0.5rem 0; line-height: 1.55; }
 
-.dup-table-wrap {
+.dup-table-details {
   margin-top: 1rem;
   background: #161b22;
   border: 1px solid #21262d;
   border-radius: 4px;
   padding: 0.6rem 0.8rem;
 }
-.dup-table-wrap > summary {
+.dup-table-details > summary {
   font-weight: 600;
   cursor: pointer;
   color: #79c0ff;
   margin-bottom: 0.6rem;
 }
-.dup-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-top: 1px solid #21262d;
+.dup-table-details > summary:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
+/* Duplicates scroll wrapper — same patterns as the per-site report's
+   .table-wrap: horizontal overflow with -webkit-overflow-scrolling for iOS
+   momentum, grab/grabbing cursor for mouse drag-pan, sticky first column +
+   sticky header so the filename / column labels stay anchored. */
+.dup-pan-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 70vh;
+  border-top: 1px solid #21262d;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  border-radius: 2px;
+}
+.dup-pan-wrap.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+.dup-pan-wrap.is-panning * { user-select: none !important; }
 .dup-table {
-  width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.9rem;
 }
 .dup-table th, .dup-table td {
-  padding: 0.45rem 0.6rem;
+  padding: 0.55rem 0.85rem;
   border-bottom: 1px solid #21262d;
   text-align: left;
   vertical-align: top;
+  white-space: nowrap;
 }
-.dup-table th { color: #c9d1d9; background: #161b22; position: sticky; top: 0; }
+.dup-table thead th {
+  position: sticky;
+  top: 0;
+  background: #161b22;
+  color: #c9d1d9;
+  z-index: 2;
+  border-bottom: 1px solid #30363d;
+  font-weight: 600;
+}
+.dup-table tbody tr:hover { background: #1c2128; }
+.dup-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+
+/* Per-column sizing — keeps each column legible without crushing the wide
+   columns (filename, sites, dates) into 1-word strips. The table sets
+   width:max-content so anything over the viewport scrolls horizontally
+   rather than wrapping. */
+.dup-col-filename { min-width: 28ch; }
+.dup-col-match    { min-width: 10ch; }
+.dup-col-sites    { min-width: 18ch; }
+.dup-col-copies   { min-width: 7ch; text-align: right; }
+.dup-col-dates    { min-width: 24ch; }
+.dup-col-size     { min-width: 9ch; text-align: right; }
+
 .dup-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dup-table td.dup-hash { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #8b949e; }
 .dup-filename {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   color: #c9d1d9;
+  position: sticky;
+  left: 0;
+  background: #0d1117;
+  z-index: 1;
+  border-right: 1px solid #21262d;
+  /* Filename can be long — wrap inside the sticky cell rather than blow
+     the column out to 80+ chars. */
+  white-space: normal !important;
   word-break: break-word;
-  max-width: 30ch;
+  max-width: 42ch;
+}
+.dup-table tbody tr:nth-child(even) .dup-filename { background: #0e141b; }
+.dup-table tbody tr:hover .dup-filename { background: #1c2128; }
+.dup-table thead th.dup-col-filename {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #161b22;
+  border-right: 1px solid #30363d;
 }
 .dup-dates { font-size: 0.85rem; color: #c9d1d9; white-space: nowrap; }
 .dup-dim { color: #6e7681; padding: 0 0.2rem; }
@@ -835,8 +894,12 @@ main {
 @media print {
   .duplicates .dup-explainer { background: #ffffff !important; border-color: #ccc; }
   .duplicates .dup-explainer summary { color: #000; }
-  .dup-table-wrap { background: #ffffff !important; border-color: #ccc; }
-  .dup-table-wrap > summary { color: #000; }
+  .dup-table-details { background: #ffffff !important; border-color: #ccc; }
+  .dup-table-details > summary { color: #000; }
+  .dup-pan-wrap { background: #ffffff !important; }
+  .dup-table thead th { background: #f5f5f5; color: #000; }
+  .dup-filename { background: #ffffff !important; color: #000; }
+  .dup-table tbody tr:nth-child(even) .dup-filename { background: #fafafa !important; }
   .dup-table th { background: #f5f5f5; color: #000; }
   .dup-group-header td { background: #fafafa; color: #000; border-top-color: #ccc; }
   .master-csv .cta-button { background: #fff; color: #000; border-color: #000; }
@@ -973,6 +1036,60 @@ ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
   <span>Generated by filecap. For questions, contact the audit administrator.</span>
   <span>Generated ${he(generatedAt)}</span>
 </footer>
+
+<script>
+/* Drag-to-pan for the duplicates table, mirroring the per-site report's
+   pan behaviour. Mouse-only — touch users get native overflow scrolling
+   (with iOS momentum) for free via overflow-x:auto + -webkit-overflow-scrolling.
+   5px threshold so small clicks still select text and interactive elements
+   still fire. setPointerCapture keeps the drag alive even if the cursor
+   leaves the wrapper. */
+(function() {
+  const wraps = document.querySelectorAll("[data-dup-pan]");
+  if (wraps.length === 0) return;
+  const PAN_THRESHOLD = 5;
+
+  wraps.forEach(function (wrap) {
+    let start = null;
+    let panning = false;
+
+    wrap.addEventListener("pointerdown", function (e) {
+      if (e.pointerType !== "mouse") return;
+      if (e.button !== 0) return;
+      if (e.target.closest("a, button, input, select, [role='button']")) return;
+      start = { x: e.clientX, scrollLeft: wrap.scrollLeft, pointerId: e.pointerId };
+    });
+
+    wrap.addEventListener("pointermove", function (e) {
+      if (!start || e.pointerId !== start.pointerId) return;
+      const dx = e.clientX - start.x;
+      if (!panning) {
+        if (Math.abs(dx) < PAN_THRESHOLD) return;
+        panning = true;
+        wrap.classList.add("is-panning");
+        try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+        const sel = window.getSelection && window.getSelection();
+        if (sel && sel.removeAllRanges) sel.removeAllRanges();
+      }
+      if (panning) {
+        e.preventDefault();
+        wrap.scrollLeft = start.scrollLeft - dx;
+      }
+    });
+
+    function endPan(e) {
+      if (!start) return;
+      if (e.pointerId !== undefined && e.pointerId !== start.pointerId) return;
+      start = null;
+      panning = false;
+      wrap.classList.remove("is-panning");
+    }
+    wrap.addEventListener("pointerup", endPan);
+    wrap.addEventListener("pointercancel", endPan);
+    wrap.addEventListener("pointerleave", endPan);
+  });
+})();
+</script>
 
 </body>
 </html>`;

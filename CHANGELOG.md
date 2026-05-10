@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] — 2026-05-10
+
+### Changed
+
+- **Duplicates summary table styled to match the per-site report tables.** The 1.5.1 consolidated table read as squished — too-narrow columns, full filenames wrapping mid-word, no visual hierarchy. Now: per-column `min-width` (filename 28ch, sites 18ch, dates 24ch, …) so each column gets the space it needs and the table overflows horizontally rather than crushing; sticky first column (filename) stays anchored when you scroll right; sticky header row so column labels stay visible when you scroll down; row hover + alternating-row backgrounds; max-height with vertical scroll inside the wrapper. Same dark-palette treatment as the per-site report tables for visual consistency.
+- **Click-and-drag horizontal pan on the duplicates table.** Mouse-drag horizontal pan with the same 5px-threshold / Pointer-Events / `setPointerCapture` pattern from the per-site reports (so single clicks still select text and hit links, drags pan smoothly even if the cursor leaves the wrapper). Touch panning was already native via `overflow-x: auto` with iOS momentum scroll preserved — that path is unchanged.
+
+[1.5.2]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.5.2
+
 ## [1.5.1] — 2026-05-10
 
 ### Added
