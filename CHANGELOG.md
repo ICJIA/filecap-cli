@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`filecap web-rollup` subcommand.** Bundles the most recent scan of every saved site into a self-contained static-site directory (index.html fleet overview, per-site HTML reports, downloadable CSVs, `robots.txt`). Optional client-side password gate via `--password`. Output defaults to `~/filecap-audits/_web-rollup/<UTC-timestamp>/`. Ready for drag-and-drop to Netlify or any static host.
 - **`filecap_web_rollup` MCP tool.** Exposes the web-rollup orchestrator to AI agents (Claude Desktop, Claude Code, etc.). The MCP server now advertises five tools.
 - **`w` menu option in `audit-remote.sh`.** Selecting `w` in the saved-sites menu prompts for an optional password and runs `filecap web-rollup` against all saved sites, then offers to open the resulting `index.html`.
+- **`netlify.toml` in the bundle.** Auto-generated config with sensible cache headers (CSV cached 1h with `Content-Disposition: attachment`; HTML cached 5m with `X-Robots-Tag: noindex`), security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`), and the publish directory set to `.`. Drag-and-drop or Git-connected Netlify deployments work without any dashboard build-config tweaks.
+- **`--no-client-gate` flag.** Skip embedding the client-side password gate JS in the bundle. Use this when relying on Netlify's paid Site Password feature for server-side authentication; the client-side gate is unnecessary (and overlaps awkwardly). If `--password` is also passed, it is ignored and a warning is printed.
+- **`--deploy` flag.** After building the bundle, run `netlify deploy --prod --dir <output>` automatically. Combines build + push into a single command. Requires `netlify` CLI installed and `netlify login` already done. Prints friendly install instructions if the CLI is missing at runtime.
+- **`--deploy-site <site-id>` flag.** Pass `--site <id>` to `netlify deploy` for non-linked sites.
+- **`audit-remote.sh` `w` menu now offers three password modes** (none / client-side / Netlify Site Password) plus an optional auto-deploy prompt after building.
 
 ### Changed
 
