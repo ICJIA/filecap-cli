@@ -405,7 +405,15 @@ export async function runWebRollup({
 
     // Web-rollup bundles index.html as a sibling of each per-site report —
     // pass backHref so each detail page has a "← Back to fleet index" link.
-    const reportResult = await runReport({ input: latestInv, outputDir: tempDir, html: true, backHref: "index.html" });
+    // csvHref points at the renamed per-site CSV (web-rollup renames
+    // audit-file-list.csv to <slug>-<timestamp>.csv in step 5 below).
+    const reportResult = await runReport({
+      input: latestInv,
+      outputDir: tempDir,
+      html: true,
+      backHref: "index.html",
+      csvHref: `${baseName}.csv`,
+    });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
       await fs.rm(tempDir, { recursive: true, force: true });

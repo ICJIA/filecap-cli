@@ -135,7 +135,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
  *                                        Standalone single-site audits omit
  *                                        this (nothing to navigate back to).
  */
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -304,11 +304,11 @@ body {
   padding: 1rem 1.5rem;
 }
 .report-back-bar {
-  /* Sticky bar at the top of every per-site detail page in the bundle, so
-     "how do I get back?" is answered before the user even sees the data.
-     Skipped (the whole nav is omitted) when the report is standalone — no
-     index.html to link to. Negative margin breaks out of the body padding
-     so the bar spans the full viewport width. */
+  /* Sticky bar at the top of every per-site detail page. Two actions:
+     back-to-fleet on the left (when bundled), download CSV on the right
+     (always useful — the HTML shows the basics, the CSV is what people
+     do real work in). Negative margin breaks out of body padding so the
+     bar spans the full viewport width. */
   position: sticky;
   top: 0;
   z-index: 100;
@@ -316,6 +316,11 @@ body {
   border-bottom: 1px solid #21262d;
   padding: 0.55rem 1.5rem;
   margin: -1rem -1.5rem 1rem -1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 .report-back-link {
   display: inline-block;
@@ -333,6 +338,25 @@ body {
   outline: 2px solid #58a6ff;
   outline-offset: 2px;
   background: rgba(88,166,255,0.08);
+}
+.report-csv-link {
+  /* CSV is the real deliverable — render the link as a prominent button
+     so it reads as a primary action, not an afterthought. */
+  display: inline-block;
+  background: #1f6feb;
+  color: #ffffff !important;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 4px;
+  border: 1px solid #1f6feb;
+  transition: background 120ms ease;
+}
+.report-csv-link:hover { background: #388bfd; text-decoration: none; }
+.report-csv-link:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
 }
 h1 { font-size: 1.4rem; margin: 0 0 0.25rem; color: #e5e5e5; letter-spacing: -0.02em; }
 h2 { font-size: 1.1rem; margin: 1.25rem 0 0.5rem; color: #e5e5e5; font-weight: 600; }
@@ -601,10 +625,13 @@ footer {
 </head>
 <body>
 
-${backHref ? `<nav class="report-back-bar" aria-label="Fleet navigation">
-  <a class="report-back-link" href="${htmlEscape(backHref)}">
+${(backHref || csvHref) ? `<nav class="report-back-bar" aria-label="Report navigation">
+  ${backHref ? `<a class="report-back-link" href="${htmlEscape(backHref)}">
     <span aria-hidden="true">&larr;</span> Back to fleet index
-  </a>
+  </a>` : '<span></span>'}
+  ${csvHref ? `<a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
+    <span aria-hidden="true">&#x2913;</span> Download spreadsheet (CSV)
+  </a>` : ''}
 </nav>` : ""}
 <h1>filecap inventory report</h1>
 
