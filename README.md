@@ -844,20 +844,23 @@ Some sites — typically intranet content libraries or staff-only document porta
 
 **Two ways to provide the token, env var wins when both are present:**
 
+> **ICJIA-specific note.** Of the seven public ICJIA Strapi sites, only `intranet` (server-name `intranet-api-prod`) requires a bearer token. Its JWT is **valid for 15 days**, so plan to rotate twice a month. The 1Password CLI workflow below makes that a one-time setup; the secrets-file workflow is one line to edit each rotation.
+
 **Option 1 — env var (recommended for security-conscious / 1Password / direnv users).** Set `FILECAP_BEARER_TOKEN_<SERVER_NAME_UPPER_SNAKE>` in the shell environment before running the script. The token never touches disk:
 
 ```bash
-# One-off, in the current shell
-export FILECAP_BEARER_TOKEN_INFONET_STRAPI_PROD="eyJhbGciOi..."
+# One-off, in the current shell — token lives until the shell exits
+export FILECAP_BEARER_TOKEN_INTRANET_API_PROD="eyJhbGciOi..."
 ./audit-fleet.sh
 
-# Or via 1Password CLI — pulls fresh from your vault each invocation
+# 1Password CLI — store the JWT in your vault once, pull fresh on each run.
+# When the 15-day token rotates, update the vault item; nothing else changes.
 op run --env-file=.env -- ./audit-fleet.sh
 # where .env is:
-# FILECAP_BEARER_TOKEN_INFONET_STRAPI_PROD=op://Private/infonet-jwt/credential
+# FILECAP_BEARER_TOKEN_INTRANET_API_PROD=op://Private/intranet-jwt/credential
 ```
 
-The env-var name is the server-name (the `name` field in `sites.json`) uppercased with hyphens replaced by underscores: `infonet-strapi-prod` → `FILECAP_BEARER_TOKEN_INFONET_STRAPI_PROD`.
+The env-var name is the server-name (the `name` field in `sites.json`) uppercased with hyphens replaced by underscores: `intranet-api-prod` → `FILECAP_BEARER_TOKEN_INTRANET_API_PROD`.
 
 **Option 2 — `~/.filecap/secrets.json` file.** Edit once, persists across runs. The file is local-only — never bundled, never exported via the saved-sites menu, never sent to a remediator:
 
@@ -865,28 +868,31 @@ The env-var name is the server-name (the `name` field in `sites.json`) uppercase
 {
   "version": 1,
   "tokens": {
-    "infonet-strapi-prod": "eyJhbGciOi..."
+    "intranet-api-prod": "eyJhbGciOi..."
   }
 }
 ```
 
 ```bash
-# Set restrictive permissions
 chmod 600 ~/.filecap/secrets.json
+# Validate the JSON before running the audit — a syntax error here causes the
+# audit script to silently treat the token as unset and the URL HEAD-probe to
+# fail with the same warning you'd see if no token had been configured at all.
+python3 -m json.tool < ~/.filecap/secrets.json > /dev/null && echo "OK"
 ```
 
-When the token rotates (commonly every 30 days for JWT auth), update the one line in `secrets.json` and the next run picks it up. No code change, no re-deploy.
+When the JWT rotates (every 15 days for ICJIA's intranet token), update the one line in `secrets.json` and the next run picks it up. No code change, no re-deploy. If you forget to rotate, you'll see "URL FAILED" warnings during preflight — the audit itself still completes via SSH+rsync, but the public-URL HEAD probe stops succeeding. If you'd rather not touch a file every two weeks, use the 1Password CLI flow (Option 1) and just update the vault item.
 
-**Optional hint in `sites.json`.** If you maintain `sites.json` for distribution to other auditors, add `"requiresBearerToken": true` to each entry that needs one — it's purely informational, but tells anyone receiving the bundle "you'll need to ask the audit lead for the JWT separately." The token itself never goes in `sites.json`.
+**Optional hint in `sites.json`.** Add `"requiresBearerToken": true` to each entry that needs one — purely informational, tells anyone receiving the bundle "you'll need to ask the audit lead for the JWT separately." The token itself never goes in `sites.json`.
 
 ```json
 {
-  "name": "infonet-strapi-prod",
-  "siteName": "Infonet",
+  "name": "intranet-api-prod",
+  "siteName": "Intranet",
   "user": "forge",
   "host": "192.241.146.85",
-  "remotePath": "/home/forge/infonet.icjia-api.cloud/strapi_v4/public/uploads",
-  "publicUrlBase": "https://infonet.icjia.illinois.gov/uploads",
+  "remotePath": "/home/forge/intranet.icjia-api.cloud/intranet-api/public/uploads",
+  "publicUrlBase": "https://intranet.icjia.cloud/uploads",
   "requiresBearerToken": true
 }
 ```
