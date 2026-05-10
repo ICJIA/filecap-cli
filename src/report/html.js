@@ -83,12 +83,6 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
 
-  const intro = entry.introspection ?? null;
-  const isPdf = intro?.kind === "pdf";
-  const isDocx = intro?.kind === "docx";
-  const isXlsx = intro?.kind === "xlsx";
-  const isLegacy = intro?.kind === "office-legacy";
-
   const duplicateOf = entry.duplicateOf
     ? `${entry.duplicateOf.serverName}:${entry.duplicateOf.path}`
     : "";
@@ -98,7 +92,6 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     siteName,
     serverIp,
     entry.modifiedAt,
-    entry.remediable === true ? "Yes — needs accessibility audit" : entry.remediable === false ? "No — reference file (image, placeholder, etc.)" : "",
     scannedPath,
     entry.path,
     entry.absolutePath,
@@ -109,25 +102,6 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.sizeBytes,
     entry.sha256 ?? "",
     duplicateOf,
-    // PDF
-    isPdf ? intro.pageCount : "",
-    isPdf ? intro.hasTextLayer : "",
-    isPdf ? intro.isImageOnly : "",
-    isPdf ? intro.hasTags : "",
-    isPdf ? intro.hasFormFields : "",
-    isPdf ? intro.encrypted : "",
-    intro?.documentLanguage ?? "",
-    // DOCX
-    isDocx ? intro.hasHeadings : "",
-    isDocx ? intro.imageCount : "",
-    isDocx ? (intro.altTextCoverage ?? "") : "",
-    isDocx ? intro.tableCount : "",
-    isDocx ? (intro.tablesHaveHeaders ?? "") : "",
-    isDocx ? intro.vagueLinkCount : "",
-    // XLSX
-    isXlsx ? intro.sheetCount : "",
-    // Legacy
-    isLegacy ? intro.format : "",
   ];
 
   return raw.map(formatCellValue);

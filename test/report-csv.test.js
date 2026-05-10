@@ -63,11 +63,6 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[3].label).toBe("Date published");
   });
 
-  it("fifth column (index 4) is remediable with label 'Remediation needed?'", () => {
-    expect(CSV_COLUMNS[4].name).toBe("remediable");
-    expect(CSV_COLUMNS[4].label).toBe("Remediation needed?");
-  });
-
   it("modifiedAt column label is 'Date published' not 'Last modified'", () => {
     const col = CSV_COLUMNS.find((c) => c.name === "modifiedAt");
     expect(col).toBeDefined();
@@ -75,16 +70,23 @@ describe("CSV_COLUMNS", () => {
     expect(col.label).not.toBe("Last modified");
   });
 
-  it("includes accessibility-critical PDF columns", () => {
+  it("does not include the remediable column (dropped in 1.4.1)", () => {
     const names = CSV_COLUMNS.map((c) => c.name);
-    expect(names).toContain("pageCount");
-    expect(names).toContain("hasTextLayer");
-    expect(names).toContain("isImageOnly");
-    expect(names).toContain("hasTags");
+    expect(names).not.toContain("remediable");
   });
 
-  it("does not include DOCX or XLSX introspection columns (dropped in 1.4.0)", () => {
+  it("does not include format-specific introspection columns (dropped in 1.4.x)", () => {
     const names = CSV_COLUMNS.map((c) => c.name);
+    // PDF introspection columns dropped in 1.4.1
+    expect(names).not.toContain("pageCount");
+    expect(names).not.toContain("hasTextLayer");
+    expect(names).not.toContain("isImageOnly");
+    expect(names).not.toContain("hasTags");
+    expect(names).not.toContain("hasFormFields");
+    expect(names).not.toContain("encrypted");
+    expect(names).not.toContain("documentLanguage");
+    expect(names).not.toContain("officeLegacyFormat");
+    // DOCX/XLSX dropped in 1.4.0
     expect(names).not.toContain("docxHasHeadings");
     expect(names).not.toContain("docxImageCount");
     expect(names).not.toContain("docxAltTextCoverage");
@@ -121,59 +123,9 @@ describe("writeCsv header row uses human-readable labels", () => {
     const headerRow = csv.trim().split("\n")[0];
     expect(headerRow).toContain("Server");
     expect(headerRow).toContain("File name");
-    expect(headerRow).toContain("Remediation needed?");
-    expect(headerRow).toContain("PDF: page count");
+    expect(headerRow).toContain("File location (relative to source folder)");
+    expect(headerRow).toContain("Public URL");
     expect(headerRow).not.toBe(CSV_COLUMNS.map((c) => c.name).join(","));
-  });
-});
-
-describe("writeCsv boolean rendering", () => {
-  it("renders boolean true as Yes and false as No", () => {
-    const entry = {
-      ...baseEntry,
-      remediable: true,
-      introspection: {
-        kind: "pdf",
-        pageCount: 5,
-        hasTextLayer: true,
-        isImageOnly: false,
-        hasTags: false,
-        hasFormFields: false,
-        hasSignatures: false,
-        encrypted: false,
-      },
-    };
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-
-    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility audit");
-    expect(cells[colIndex("hasTextLayer")]).toBe("Yes");
-    expect(cells[colIndex("isImageOnly")]).toBe("No");
-  });
-
-  it("remediable true cell value is 'Yes — needs accessibility audit'", () => {
-    const entry = { ...baseEntry, remediable: true };
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("remediable")]).toBe("Yes — needs accessibility audit");
-  });
-
-  it("remediable false cell value is 'No — reference file (image, placeholder, etc.)'", () => {
-    const entry = { ...baseEntry, remediable: false };
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
-    // The value contains a comma so it is quoted in CSV — check the full line
-    const fullLine = csv.trim().split("\n")[1];
-    expect(fullLine).toContain("No — reference file (image, placeholder, etc.)");
-  });
-
-  it("renders empty string for missing introspection fields", () => {
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("pageCount")]).toBe("");
-    expect(cells[colIndex("hasTextLayer")]).toBe("");
   });
 });
 
@@ -186,31 +138,6 @@ describe("writeCsv (single-instance input)", () => {
     });
     const lines = csv.trim().split("\n");
     expect(lines.length).toBe(2);
-  });
-
-  it("populates introspection-derived columns from PDF entries", () => {
-    const entry = {
-      ...baseEntry,
-      introspection: {
-        kind: "pdf",
-        pageCount: 47,
-        hasTextLayer: true,
-        isImageOnly: false,
-        hasTags: false,
-        hasFormFields: false,
-        hasSignatures: false,
-        encrypted: false,
-      },
-    };
-    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
-    const dataLine = csv.trim().split("\n")[1];
-    const cells = dataLine.split(",");
-    expect(cells[colIndex("pageCount")]).toBe("47");
-    expect(cells[colIndex("hasTextLayer")]).toBe("Yes");
-    expect(cells[colIndex("isImageOnly")]).toBe("No");
-    expect(cells[colIndex("hasTags")]).toBe("No");
-    expect(cells[colIndex("hasFormFields")]).toBe("No");
-    expect(cells[colIndex("encrypted")]).toBe("No");
   });
 
   it("does not include the flags column in CSV output", () => {

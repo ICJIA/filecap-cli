@@ -1,36 +1,27 @@
 import { csvCell, boolToYesNo } from "./format.js";
 
+// CSV / HTML deliverable columns. Keeps only what a remediator needs to find
+// and price each file. All format-specific introspection (PDF page count,
+// image-only/OCR flag, DOCX heading coverage, XLSX sheet count, document
+// language, legacy Office format hint, etc.) was dropped in 1.4.0/1.4.1 —
+// remediators open the file in Adobe Acrobat / Word / Excel and see the same
+// properties directly. The full introspection is still carried in the NDJSON
+// inventory for tooling that wants it (MCP query_inventory, custom reports).
 export const CSV_COLUMNS = [
-  { name: "serverName",               label: "Server" },
-  { name: "siteName",                 label: "Website" },
-  { name: "serverIp",                 label: "Server IP" },
-  { name: "modifiedAt",               label: "Date published" },
-  { name: "remediable",               label: "Remediation needed?" },
-  { name: "scannedPath",              label: "Source folder on server" },
-  { name: "path",                     label: "File location (relative to source folder)" },
-  { name: "absolutePath",             label: "Full file path on server" },
-  { name: "publicUrl",                label: "Public URL" },
-  { name: "filename",                 label: "File name" },
-  { name: "extension",                label: "File extension" },
-  { name: "category",                 label: "File type" },
-  { name: "sizeBytes",                label: "Size (bytes)" },
-  { name: "sha256",                   label: "Content hash (SHA-256)" },
-  { name: "duplicateOf",              label: "Duplicate of" },
-  { name: "pageCount",                label: "PDF: page count" },
-  { name: "hasTextLayer",             label: "PDF: has searchable text" },
-  { name: "isImageOnly",              label: "PDF: image-only (needs OCR)" },
-  { name: "hasTags",                  label: "PDF: structurally tagged" },
-  { name: "hasFormFields",            label: "PDF: has form fields" },
-  { name: "encrypted",                label: "PDF: encrypted" },
-  { name: "documentLanguage",         label: "Document language" },
-  // DOCX and XLSX-specific introspection columns (heading-style coverage, alt
-  // text, merged cells, etc.) were removed in 1.4.0. Remediators have tools
-  // (Word, Excel, Adobe Acrobat) that surface those properties directly; the
-  // CSV / HTML deliverable focuses on the fields they need to *find* and *price*
-  // each file: filename, path, type, server, size, duplicate marker, public URL.
-  // The underlying NDJSON still carries the full introspection for any future
-  // tooling that needs it (e.g., MCP query_inventory, custom reports).
-  { name: "officeLegacyFormat",       label: "Legacy Office format" },
+  { name: "serverName",   label: "Server" },
+  { name: "siteName",     label: "Website" },
+  { name: "serverIp",     label: "Server IP" },
+  { name: "modifiedAt",   label: "Date published" },
+  { name: "scannedPath",  label: "Source folder on server" },
+  { name: "path",         label: "File location (relative to source folder)" },
+  { name: "absolutePath", label: "Full file path on server" },
+  { name: "publicUrl",    label: "Public URL" },
+  { name: "filename",     label: "File name" },
+  { name: "extension",    label: "File extension" },
+  { name: "category",     label: "File type" },
+  { name: "sizeBytes",    label: "Size (bytes)" },
+  { name: "sha256",       label: "Content hash (SHA-256)" },
+  { name: "duplicateOf",  label: "Duplicate of" },
 ];
 
 /**
@@ -65,12 +56,6 @@ function formatValue(v) {
   return v;
 }
 
-function formatRemediable(remediable) {
-  if (remediable === true) return "Yes — needs accessibility audit";
-  if (remediable === false) return "No — reference file (image, placeholder, etc.)";
-  return "";
-}
-
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   let base;
   if (isConsolidated) {
@@ -103,12 +88,6 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
 
-  const intro = entry.introspection ?? null;
-  const isPdf = intro?.kind === "pdf";
-  const isDocx = intro?.kind === "docx";
-  const isXlsx = intro?.kind === "xlsx";
-  const isLegacy = intro?.kind === "office-legacy";
-
   const duplicateOf = entry.duplicateOf
     ? `${entry.duplicateOf.serverName}:${entry.duplicateOf.path}`
     : "";
@@ -118,7 +97,6 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     siteName,
     serverIp,
     entry.modifiedAt,
-    formatRemediable(entry.remediable),
     scannedPath,
     entry.path,
     entry.absolutePath,
@@ -130,31 +108,12 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     (() => {
       const hash = entry.sha256 ?? "";
       if (!hash) return "";
-      // Wrap in Excel text-formula syntax so Excel does NOT auto-convert to scientific notation.
-      // The cell renders as the literal hash string in Excel, Numbers, Google Sheets, and any
-      // tool that follows CSV escaping rules.
+      // Wrap in Excel text-formula syntax so Excel does NOT auto-convert to
+      // scientific notation. The cell renders as the literal hash string in
+      // Excel, Numbers, Google Sheets, and any tool that follows CSV escaping.
       return `="${hash}"`;
     })(),
     duplicateOf,
-    // PDF
-    isPdf ? intro.pageCount : "",
-    isPdf ? intro.hasTextLayer : "",
-    isPdf ? intro.isImageOnly : "",
-    isPdf ? intro.hasTags : "",
-    isPdf ? intro.hasFormFields : "",
-    isPdf ? intro.encrypted : "",
-    intro?.documentLanguage ?? "",
-    // DOCX
-    isDocx ? intro.hasHeadings : "",
-    isDocx ? intro.imageCount : "",
-    isDocx ? (intro.altTextCoverage ?? "") : "",
-    isDocx ? intro.tableCount : "",
-    isDocx ? (intro.tablesHaveHeaders ?? "") : "",
-    isDocx ? intro.vagueLinkCount : "",
-    // XLSX
-    isXlsx ? intro.sheetCount : "",
-    // Legacy
-    isLegacy ? intro.format : "",
   ];
 }
 

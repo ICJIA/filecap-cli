@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] — 2026-05-10
+
+### Fixed
+
+- **Bug from 1.4.0: data rows had more cells than the header had labels.** When DOCX/XLSX columns were dropped from `CSV_COLUMNS`, the corresponding values in `buildRow()` / `buildRowValues()` were left in place. Result: per-site CSVs and HTML tables emitted 8 trailing cells without matching column headers, which Excel and the HTML table rendered as columns labeled `0`, `1`, `2`, … (the array indices) on the right edge. Both row-builders are now in sync with `CSV_COLUMNS`.
+
+### Removed
+
+- **PDF-specific introspection columns dropped from CSV / HTML.** Removed: `pageCount`, `hasTextLayer`, `isImageOnly`, `hasTags`, `hasFormFields`, `encrypted`, plus the format-agnostic `documentLanguage` and `officeLegacyFormat`. Same reasoning as the 1.4.0 DOCX/XLSX drop: remediators have Adobe Acrobat / Word / Excel and can read these properties directly from each file. The deliverable focuses on what's needed to *find* and *price* each file.
+- **`Remediation needed?` column dropped.** Same reasoning — remediators classify files themselves once they can see the list. The `remediable` field is still on every entry in the underlying NDJSON (used by MCP `query_inventory`, the index-page stat cards, and the HTML report's category-filter chips). Only the per-row spreadsheet column is gone.
+
+The CSV / HTML now has 14 columns total: Server, Website, Server IP, Date published, Source folder, File location, Full file path, Public URL, File name, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of. Down from ~30 in 1.3.x.
+
+[1.4.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.4.1
+
 ## [1.4.0] — 2026-05-10
 
 ### Removed
