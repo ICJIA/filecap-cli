@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] — 2026-05-10
+
+### Changed
+
+- **Hero stat block rewritten as an infographic** instead of three side-by-side numbers. Three elements stacked vertically:
+  1. **Big total** — single huge headline number (`clamp(3.5em, 9vw, 6em)`) above an uppercase "TOTAL FILES SCANNED ACROSS N WEBSITES" label, so a manager sees the headline before reading anything else.
+  2. **Proportional split bar** — horizontal stacked bar with the remediable segment (orange gradient) sized by count and the reference segment (grey gradient) sized by count, each labeled with its absolute number, what-it-is, and percentage. The bar visually conveys the ratio at a glance — managers can see "most of the fleet needs audit work" without doing math. Has an `aria-label` describing both segments for screen-reader users. On viewports under 640px the segments stack vertically.
+  3. **Arithmetic equation** — `14,914 total = 11,097 need accessibility audit + 3,817 don't`, in a low-key bordered box, so the number relationship is spelled out for managers who want to verify the math.
+
+The old `.hero-stat-row` with three separate stat blocks is removed.
+
+[1.5.5]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.5.5
+
 ## [1.5.4] — 2026-05-10
 
 ### Changed

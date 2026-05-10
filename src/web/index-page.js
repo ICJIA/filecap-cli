@@ -427,28 +427,124 @@ main {
   color: #e5e5e5;
   margin: 0 0 1.5em;
 }
-.hero-summary .hero-stat-row {
-  display: flex;
-  gap: 2em;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-.hero-summary .stat-block {
+/* ── infographic-style hero split ────────────────────────────── */
+.fleet-total-headline-block {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  margin: 1.5em 0 0.7em 0;
 }
-.hero-summary .stat-block .stat-num {
-  font-size: 3.5em;
+.fleet-total-headline {
+  font-size: clamp(3.5em, 9vw, 6em);
   font-weight: 700;
+  color: #58a6ff;
   line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
-.hero-summary .stat-block.total .stat-num { color: #58a6ff; }
-.hero-summary .stat-block.remediable .stat-num { color: #fbbf24; }
-.hero-summary .stat-block.reference .stat-num { color: #999999; }
-.hero-summary .stat-block .stat-label {
+.fleet-total-headline-label {
   font-size: 1em;
-  color: #999999;
-  margin-top: 0.5em;
+  color: #8b949e;
+  margin-top: 0.4em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Proportional split bar — flex:N 0 0 weights each segment by its count.
+   On a fleet of 14,914 with 11,097 remediable, the yellow segment is
+   ~74% of the bar; the grey segment is ~26%. */
+.fleet-split-bar {
+  display: flex;
+  height: clamp(4rem, 9vh, 5.5rem);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 0.5em 0 1em 0;
+  background: #1c2128;
+  border: 1px solid #21262d;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.fleet-split-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3em 0.6em;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  transition: filter 120ms ease;
+}
+.fleet-split-segment:hover { filter: brightness(1.06); }
+.fleet-split-num {
+  font-size: 1.5em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.fleet-split-label {
+  font-size: 0.8em;
+  font-weight: 500;
+  opacity: 0.85;
+  margin-top: 0.25em;
+  /* Hide the label when the segment is too narrow to fit it gracefully —
+     the number + percentage still convey the story. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.fleet-split-pct {
+  font-size: 0.78em;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-top: 0.15em;
+}
+.fleet-split-remediable {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #1c2128;
+}
+.fleet-split-reference {
+  background: linear-gradient(135deg, #6e7681 0%, #484f58 100%);
+  color: #ffffff;
+}
+
+/* The equation underneath spells out the arithmetic in case the bar is
+   too abstract — "14,914 = 11,097 need audit + 3,817 don't". */
+.fleet-equation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.3em 0.6em;
+  margin: 0 0 1.2em 0;
+  padding: 0.6em 0.8em;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+  font-size: 1.02rem;
+  text-align: center;
+}
+.fleet-eq-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #c9d1d9;
+}
+.fleet-eq-cap {
+  color: #8b949e;
+  font-size: 0.92em;
+}
+.fleet-eq-op {
+  color: #6e7681;
+  font-weight: 700;
+  font-size: 1.15em;
+  padding: 0 0.2em;
+}
+
+@media (max-width: 640px) {
+  .fleet-split-bar { flex-direction: column; height: auto; }
+  .fleet-split-segment { padding: 0.8em 0.6em; }
+  .fleet-split-label { font-size: 0.9em; }
+  .fleet-equation { font-size: 0.95rem; padding: 0.5em 0.4em; }
 }
 
 /* ── explanation section ───────────────────────────────────────── */
@@ -696,8 +792,15 @@ main {
   h1, h2, h3 { color: #000; }
   .hero { background: #f8f8f8; border-color: #ccc; }
   .hero-summary p.lead { color: #000; }
-  .hero-summary .stat-block.remediable .stat-num { color: #d97706; }
-  .hero-summary .stat-block.reference .stat-num { color: #555; }
+  .fleet-total-headline { color: #0066cc; }
+  .fleet-total-headline-label { color: #444; }
+  .fleet-split-bar { border: 1px solid #999; box-shadow: none; }
+  .fleet-split-remediable { background: #d97706 !important; color: #fff; }
+  .fleet-split-reference { background: #6e7681 !important; color: #fff; }
+  .fleet-equation { background: #f5f5f5 !important; border-color: #ccc; }
+  .fleet-eq-num { color: #000; }
+  .fleet-eq-cap { color: #444; }
+  .fleet-eq-op { color: #666; }
   .explanation { break-inside: avoid; }
   .explanation-card { background: #f8f8f8; border: 1px solid #ccc; border-left: none; border-radius: 0; }
   .explanation-card p { color: #000; }
@@ -972,19 +1075,34 @@ main {
         We scanned ${he(String(siteCount))} ICJIA website${siteCount !== 1 ? "s" : ""} and found
         <strong>${he(fleetTotalFiles.toLocaleString())}</strong> files in total.
       </p>
-      <p class="hero-stat-row">
-        <span class="stat-block total">
-          <span class="stat-num">${he(fleetTotalFiles.toLocaleString())}</span>
-          <span class="stat-label">total files</span>
-        </span>
-        <span class="stat-block remediable">
-          <span class="stat-num">${he(fleetRemediable.toLocaleString())}</span>
-          <span class="stat-label">need accessibility audit</span>
-        </span>
-        <span class="stat-block reference">
-          <span class="stat-num">${he(fleetNonRemediable.toLocaleString())}</span>
-          <span class="stat-label">don&#39;t</span>
-        </span>
+
+      <div class="fleet-total-headline-block">
+        <span class="fleet-total-headline">${he(fleetTotalFiles.toLocaleString())}</span>
+        <span class="fleet-total-headline-label">total files scanned across ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</span>
+      </div>
+
+      <div class="fleet-split-bar" role="img" aria-label="${he(fleetTotalFiles.toLocaleString())} total files: ${he(fleetRemediable.toLocaleString())} need accessibility audit (${he(String(fleetTotalFiles > 0 ? Math.round((fleetRemediable / fleetTotalFiles) * 100) : 0))} percent), ${he(fleetNonRemediable.toLocaleString())} don't (${he(String(fleetTotalFiles > 0 ? Math.round((fleetNonRemediable / fleetTotalFiles) * 100) : 0))} percent)">
+        <div class="fleet-split-segment fleet-split-remediable" style="flex: ${he(String(fleetRemediable))} 0 0">
+          <span class="fleet-split-num">${he(fleetRemediable.toLocaleString())}</span>
+          <span class="fleet-split-label">need accessibility audit</span>
+          <span class="fleet-split-pct">${he(String(fleetTotalFiles > 0 ? Math.round((fleetRemediable / fleetTotalFiles) * 100) : 0))}%</span>
+        </div>
+        <div class="fleet-split-segment fleet-split-reference" style="flex: ${he(String(fleetNonRemediable))} 0 0">
+          <span class="fleet-split-num">${he(fleetNonRemediable.toLocaleString())}</span>
+          <span class="fleet-split-label">don&#39;t need work</span>
+          <span class="fleet-split-pct">${he(String(fleetTotalFiles > 0 ? Math.round((fleetNonRemediable / fleetTotalFiles) * 100) : 0))}%</span>
+        </div>
+      </div>
+
+      <p class="fleet-equation">
+        <span class="fleet-eq-num">${he(fleetTotalFiles.toLocaleString())}</span>
+        <span class="fleet-eq-cap">total</span>
+        <span class="fleet-eq-op">=</span>
+        <span class="fleet-eq-num">${he(fleetRemediable.toLocaleString())}</span>
+        <span class="fleet-eq-cap">need accessibility audit</span>
+        <span class="fleet-eq-op">+</span>
+        <span class="fleet-eq-num">${he(fleetNonRemediable.toLocaleString())}</span>
+        <span class="fleet-eq-cap">don&#39;t</span>
       </p>
     </div>
   </section>
