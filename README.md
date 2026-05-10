@@ -1054,6 +1054,81 @@ The scripts run a tool-presence and Node-version preflight at startup and abort 
 
 Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The `audit-remote.sh` script sidesteps this by detecting Node 16 (or any Node < 20) on the remote and pulling the files down via rsync, then running filecap on the auditor's local machine. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
 
+## Publishing a fleet snapshot to Netlify
+
+`filecap web-rollup` bundles the most recent scan of every saved site into a single self-contained static-site directory you can share with managers or stakeholders — no server required.
+
+### What the bundle contains
+
+```
+~/filecap-audits/_web-rollup/2026-05-10T13-42-00Z/
+├── index.html                    landing page: fleet totals + per-site cards
+├── robots.txt                    User-agent: *  Disallow: /
+├── assets/
+│   └── style.css                 shared design tokens
+├── dvfr-20260509-160504Z.html    per-site interactive HTML report
+├── dvfr-20260509-160504Z.csv     per-site CSV (downloadable)
+├── i2i-20260510-093000Z.html
+└── i2i-20260510-093000Z.csv
+```
+
+The index page shows a fleet overview (total files, files needing remediation, breakdown by type) and one card per site. Each card links directly to that site's HTML report and CSV download.
+
+### Running the rollup
+
+```bash
+filecap web-rollup
+```
+
+Or with options:
+
+```bash
+filecap web-rollup --output ~/Desktop/fleet-snapshot --password "mypassword" --title "ICJIA Fleet — May 2026"
+```
+
+The `audit-remote.sh` menu also has a `w` option that prompts for an optional password and calls this command automatically.
+
+### Three deployment paths
+
+**Option A — Netlify drag-and-drop (zero setup)**
+
+1. Visit https://app.netlify.com/drop
+2. Drag the entire output directory onto the drop zone
+3. Netlify gives you a randomly-named URL within seconds
+4. Optionally rename the site in Netlify settings
+
+**Option B — Netlify CLI (scriptable)**
+
+```bash
+cd ~/filecap-audits/_web-rollup/2026-05-10T13-42-00Z
+netlify deploy --prod --dir .
+```
+
+**Option C — Git-connected Netlify site (auto-deploy on push)**
+
+1. Create a private `icjia-filecap-snapshots/` Git repo
+2. After each web-rollup, copy the output into the repo, commit, and push
+3. Netlify watches the repo and deploys on every push
+4. URL stays stable; auditors bookmark it once
+
+### Password gate
+
+Pass `--password` to embed a client-side SHA-256 gate on every page in the bundle. Users see a `prompt()` for the password; correct entry stores a hash in `sessionStorage` so navigation within the session does not re-prompt.
+
+**Caveats — this is "ward off the curious" protection only:**
+
+- Anyone with DevTools or view-source can read the embedded hash
+- CSV files served at direct URLs are NOT covered by the prompt
+- For real access control use Netlify's paid Visitor Access feature or an HTTP Basic Auth function
+
+### robots.txt
+
+Every bundle includes `robots.txt` with `Disallow: /` and a `<meta name="robots">` noindex tag on every page. This does not prevent direct-URL access but does ask search engines not to index the content.
+
+### Dark-mode reports
+
+The per-site HTML reports (`audit-file-list.html`) and the index page share a single dark-mode design system. This is also the default visual style when `filecap report --html` is run directly — there is no separate light/dark toggle.
+
 ## What filecap does not do
 
 - Perform full WCAG conformance auditing (that's [audit.icjia.app](https://audit.icjia.app)'s job, per-file)

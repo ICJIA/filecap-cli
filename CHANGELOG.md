@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-10
+
+### Added
+
+- **`filecap web-rollup` subcommand.** Bundles the most recent scan of every saved site into a self-contained static-site directory (index.html fleet overview, per-site HTML reports, downloadable CSVs, `robots.txt`). Optional client-side password gate via `--password`. Output defaults to `~/filecap-audits/_web-rollup/<UTC-timestamp>/`. Ready for drag-and-drop to Netlify or any static host.
+- **`filecap_web_rollup` MCP tool.** Exposes the web-rollup orchestrator to AI agents (Claude Desktop, Claude Code, etc.). The MCP server now advertises five tools.
+- **`w` menu option in `audit-remote.sh`.** Selecting `w` in the saved-sites menu prompts for an optional password and runs `filecap web-rollup` against all saved sites, then offers to open the resulting `index.html`.
+
+### Changed
+
+- **Dark-mode reskin of per-site HTML reports.** `filecap report --html` now produces a dark-mode report matching the web-rollup design system (background `#0a0a0a`, accent `#60a5fa`, amber remediable indicators). This applies to every direct `filecap report --html` invocation as well as per-site files in a web-rollup bundle — single visual language everywhere. Includes `@media print` that inverts to white background + black text.
+- **`robots.txt` and `<meta name="robots">` noindex on all bundle pages.** Prevents search-engine indexing of published bundles.
+
+[1.2.0]: https://github.com/ICJIA/filecap-cli/compare/v1.1.1...v1.2.0
+
 ## [1.1.1] — 2026-05-10
 
 ### Fixed
