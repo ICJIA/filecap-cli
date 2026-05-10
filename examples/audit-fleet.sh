@@ -18,7 +18,8 @@
 #    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
 #    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
 #    chmod +x audit-fleet.sh audit-remote.sh
-#    ./audit-fleet.sh                  # interactive
+#    ./audit-fleet.sh                  # auto-detects ~/.filecap/sites.json, else interactive
+#    ./audit-fleet.sh sites.json       # batch mode from JSON bundle
 #    ./audit-fleet.sh servers.csv      # batch mode from CSV file
 #    ./audit-fleet.sh --no-version-check           # skip update check
 #    SKIP_VERSION_CHECK=1 ./audit-fleet.sh         # same, via env var
@@ -36,6 +37,22 @@
 #    - How many servers to audit
 #    - For each server: friendly name, SSH user, host/IP, remote uploads path,
 #      website nickname, public URL prefix
+#
+#  JSON INPUT FORMAT (bundle mode — for sharing with remediators / managers)
+#    Drop a sites.json file (the same format used by ~/.filecap/sites.json)
+#    into the current dir, or into ~/.filecap/, and the fleet script picks it
+#    up automatically with no positional argument. Example structure:
+#      {
+#        "version": 1,
+#        "sites": [
+#          { "name": "dvfr-strapi-prod", "siteName": "DVFR", "user": "forge",
+#            "host": "192.241.146.85",
+#            "remotePath": "/home/forge/dvfr.icjia-api.cloud/strapi_v4/public/uploads",
+#            "publicUrlBase": "https://dvfr.icjia-api.cloud/uploads" }
+#        ]
+#      }
+#    siteName and publicUrlBase are optional. Hand the file plus both .sh
+#    scripts to a remediator with SSH access — they run ./audit-fleet.sh.
 #
 #  CSV INPUT FORMAT (batch mode)
 #    No header row; lines starting with # are comments.
@@ -308,9 +325,61 @@ declare -a SRV_PATHS=()
 declare -a SRV_SITES=()
 declare -a SRV_URLBASES=()
 
-CSV_FILE="${1:-}"
+INPUT_FILE="${1:-}"
 
-if [[ -n "$CSV_FILE" ]]; then
+# Auto-detect ~/.filecap/sites.json when no positional arg is given.
+# This is the "bundle workflow" — a remediator drops the saved-sites file in
+# place and runs ./audit-fleet.sh with no args.
+if [[ -z "$INPUT_FILE" ]] && [[ -f "${HOME}/.filecap/sites.json" ]]; then
+  INPUT_FILE="${HOME}/.filecap/sites.json"
+  step "No input file specified — using ${INPUT_FILE}"
+fi
+
+if [[ -n "$INPUT_FILE" ]] && [[ "$INPUT_FILE" == *.json ]]; then
+  # ── JSON / sites.json bundle mode ─────────────────────────────────────────
+  if [[ ! -f "$INPUT_FILE" ]]; then
+    die "JSON file not found: ${INPUT_FILE}"
+  fi
+  step "Loading server list from JSON bundle: ${INPUT_FILE}"
+
+  # Parse via python3 (already a script dep). Emit one TSV row per site:
+  #   name<TAB>user<TAB>host<TAB>remotePath<TAB>siteName<TAB>publicUrlBase
+  # Tab is safe — none of these fields contain tabs.
+  while IFS=$'\t' read -r _name _user _host _path _site _urlbase; do
+    if [[ -z "$_name" || -z "$_user" || -z "$_host" || -z "$_path" ]]; then
+      warn "Skipping incomplete entry in JSON: name='${_name}' user='${_user}' host='${_host}' path='${_path}'"
+      continue
+    fi
+    SRV_NAMES+=("$_name")
+    SRV_USERS+=("$_user")
+    SRV_HOSTS+=("$_host")
+    SRV_PATHS+=("$_path")
+    SRV_SITES+=("$_site")
+    SRV_URLBASES+=("$_urlbase")
+  done < <(python3 - "$INPUT_FILE" <<'PYJSON'
+import json, sys
+with open(sys.argv[1], 'r', encoding='utf-8') as fh:
+    data = json.load(fh)
+for s in data.get("sites", []):
+    fields = [
+        s.get("name", ""),
+        s.get("user", ""),
+        s.get("host", ""),
+        s.get("remotePath", ""),
+        s.get("siteName", ""),
+        s.get("publicUrlBase", ""),
+    ]
+    print("\t".join(fields))
+PYJSON
+)
+
+  if [[ "${#SRV_NAMES[@]}" -eq 0 ]]; then
+    die "No valid server entries found in ${INPUT_FILE}."
+  fi
+  info "Loaded ${#SRV_NAMES[@]} server(s) from JSON"
+
+elif [[ -n "$INPUT_FILE" ]]; then
+  CSV_FILE="$INPUT_FILE"
   if [[ ! -f "$CSV_FILE" ]]; then
     die "CSV file not found: ${CSV_FILE}"
   fi

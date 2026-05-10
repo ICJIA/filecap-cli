@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] — 2026-05-10
+
+### Fixed
+
+- **`audit-remote.sh` rsync-stats parsing on macOS.** The script greped for `"Number of regular files transferred:"` (modern GNU rsync wording) but Apple's bundled `rsync` writes `"Number of files transferred:"` without the `regular`. With `set -o pipefail`, the no-match grep returned non-zero, which failed the assignment, which tripped `set -e` — the audit silently exited between rsync completion and the local scan with no error message. Symptom: every macOS fleet audit reported "0 succeeded, N failed" with empty inventories despite rsync clearly working. Grep now uses `(regular )?` to match either wording and is wrapped to tolerate no-match.
+
+### Added
+
+- **`audit-fleet.sh` accepts `~/.filecap/sites.json` directly.** Pass any `.json` path as the positional arg, or run with no arg and the script auto-detects `~/.filecap/sites.json` if present. Eliminates the sites.json → CSV conversion step. Enables the bundle-distribution workflow: hand a remediator the two `.sh` scripts plus a `sites.json` file, they drop it into `~/.filecap/` and run `./audit-fleet.sh` — no further configuration needed (assuming SSH keys are already authorized on the target servers).
+
+[1.3.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.3.1
+
 ## [1.3.0] — 2026-05-10
 
 ### Security

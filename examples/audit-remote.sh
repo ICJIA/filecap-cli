@@ -1157,11 +1157,12 @@ else
     die "rsync failed. Check SSH connectivity / permissions and retry."
   fi
   RSYNC_PHASE_DURATION=$(( $(date +%s) - RSYNC_PHASE_START ))
-  # Parse rsync --stats output for transferred counts
-  RSYNC_FILES=$(grep -i 'Number of regular files transferred:' "${RSYNC_TMPOUT}" 2>/dev/null | awk '{print $NF}' | tr -d ',')
-  RSYNC_BYTES=$(grep -i 'Total transferred file size:' "${RSYNC_TMPOUT}" 2>/dev/null | awk '{print $NF}' | tr -d ',')
-  # macOS rsync may report "Total transferred file size: 1,234 bytes" — strip commas
-  RSYNC_BYTES=$(echo "${RSYNC_BYTES}" | tr -d ',')
+  # Parse rsync --stats output for transferred counts.
+  # macOS rsync (BSD) emits "Number of files transferred:"; modern GNU rsync (Linux)
+  # emits "Number of regular files transferred:". Match either; suppress pipefail
+  # set -e if grep finds no match (legitimate when rsync stats are unavailable).
+  RSYNC_FILES=$( { grep -iE 'Number of (regular )?files transferred:' "${RSYNC_TMPOUT}" 2>/dev/null || true; } | awk '{print $NF}' | tr -d ',')
+  RSYNC_BYTES=$( { grep -i 'Total transferred file size:' "${RSYNC_TMPOUT}" 2>/dev/null || true; } | awk '{print $NF}' | tr -d ',')
   [[ -z "$RSYNC_FILES" ]] && RSYNC_FILES="?"
   [[ -z "$RSYNC_BYTES" || ! "$RSYNC_BYTES" =~ ^[0-9]+$ ]] && RSYNC_BYTES="?"
   rm -f "${RSYNC_TMPOUT}"
