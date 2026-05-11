@@ -464,4 +464,16 @@ describe("writeHtml", () => {
     const html = await fs.readFile(outputPath, "utf8");
     expect(html).toContain("DVFR");
   });
+
+  it("falls back to literal title when both siteFullName and siteName are missing", async () => {
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: sampleHeader,  // no siteName in metadata
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    expect(html).toMatch(/<h1>filecap inventory report<\/h1>/);
+  });
 });

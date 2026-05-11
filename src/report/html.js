@@ -715,7 +715,7 @@ ${(backHref || csvHref) ? `<nav class="report-back-bar" aria-label="Report navig
     <span aria-hidden="true">&#x2913;</span> Download spreadsheet (CSV)
   </a>` : ''}
 </nav>` : ""}
-<h1>${htmlEscape(siteFullName ?? siteName ?? "filecap inventory report")}</h1>
+<h1>${htmlEscape(siteFullName || siteName || "filecap inventory report")}</h1>
 
 <div class="meta-grid">${metaGridHtml}
 </div>
