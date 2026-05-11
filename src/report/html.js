@@ -135,7 +135,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
  *                                        Standalone single-site audits omit
  *                                        this (nothing to navigate back to).
  */
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -242,7 +242,11 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const hostname = meta?.hostname ?? "";
   const scannedPath = meta?.scannedPath ?? "";
   const scannedAt = meta?.scannedAt ?? "";
-  const publicUrlBase = meta?.publicUrlBase ?? "";
+  // Prefer the siteUrl param (passed by web-rollup from sites.json), then
+  // anything carried in the NDJSON header (scan / future writers may add it),
+  // and finally publicUrlBase (the file-server URL) as a last resort so older
+  // standalone audits still surface something useful.
+  const publicUrlBase = siteUrl ?? meta?.siteUrl ?? meta?.publicUrlBase ?? "";
 
   let metaGridHtml;
   let titleSuffix;

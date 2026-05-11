@@ -30,7 +30,16 @@ const siteEntrySchema = z
     // Git mode fields (ignored for strapi type)
     gitRepo: z.string().optional(),
     publicPath: z.string().optional(),
+    // The CMS/API URL where files are actually served from (used to build
+    // per-file clickable URLs in the CSV / HTML table). For Strapi/Nuxt
+    // fleets this is the *.icjia-api.cloud/uploads URL, not the public
+    // frontend, because the frontend doesn't proxy /uploads to the backend.
     publicUrlBase: z.string().optional(),
+    // The front-end homepage URL the public visits (e.g. dvfr.illinois.gov).
+    // Shown on the bundle index site cards + per-site report meta-grid as
+    // the "this is the site" link. Different from publicUrlBase, which
+    // is the file server. Optional; falls back to publicUrlBase when omitted.
+    siteUrl: z.string().optional(),
     // Informational hint — when true, the public URL requires an Authorization
     // header; the audit script looks for the token in ~/.filecap/secrets.json or
     // a FILECAP_BEARER_TOKEN_<SERVER_NAME> env var. The token itself never lives
@@ -423,12 +432,15 @@ export async function runWebRollup({
     // pass backHref so each detail page has a "← Back to fleet index" link.
     // csvHref points at the renamed per-site CSV (web-rollup renames
     // audit-file-list.csv to <slug>-<timestamp>.csv in step 5 below).
+    // siteUrl is the site's front-end homepage URL from sites.json (e.g.
+    // dvfr.illinois.gov), distinct from publicUrlBase (the file server).
     const reportResult = await runReport({
       input: latestInv,
       outputDir: tempDir,
       html: true,
       backHref: "index.html",
       csvHref: `${baseName}.csv`,
+      siteUrl: site.siteUrl ?? null,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);

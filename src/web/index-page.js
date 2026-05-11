@@ -198,10 +198,14 @@ function renderCard(sr) {
   const siteName = he(site.siteName ?? site.name ?? "");
   const hostname = he(site.host ?? "");
   const ip = he(sr.header?.metadata?.serverIp ?? site.host ?? "");
-  // Prefer sites.json publicUrlBase (authoritative), fall back to the NDJSON
-  // header in case an older inventory had it set there but sites.json didn't.
-  const publicUrlBaseRaw = site.publicUrlBase ?? sr.header?.metadata?.publicUrlBase ?? "";
-  const publicUrlBase = he(publicUrlBaseRaw);
+  // Prefer siteUrl (the public front-end homepage) for the card's "visit
+  // site" link — that's what a manager wants to click. Fall back to
+  // publicUrlBase (the file server) when siteUrl is omitted, so older
+  // sites.json entries keep working. Per-file URLs in the CSV/HTML still
+  // use publicUrlBase — those need to hit the API server where files live.
+  const siteUrlRaw = site.siteUrl ?? site.publicUrlBase ?? sr.header?.metadata?.publicUrlBase ?? "";
+  const publicUrlBase = he(siteUrlRaw);
+  const publicUrlBaseRaw = siteUrlRaw;
 
   const totalFiles = summary?.totalFiles ?? 0;
   const remediable = summary?.remediable ?? 0;

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] — 2026-05-11
+
+### Added
+
+- **`siteUrl` field on sites.json entries — the front-end homepage URL** that visitors see (e.g. `https://dvfr.illinois.gov/`), distinct from `publicUrlBase` (the file-server URL like `https://dvfr.icjia-api.cloud/uploads` that backs per-file clickable links in the CSV/HTML reports). The bundle index site cards and per-site report meta-grid now display `siteUrl` as the "Public URL" link — manager clicks it and lands on the site's homepage, not the API server's uploads directory. Falls back to `publicUrlBase` (then NDJSON header's publicUrlBase) when `siteUrl` is omitted, so existing entries keep working unchanged.
+- **Threading `siteUrl` through `runReport` → `writeHtml`** so per-site detail pages render the correct URL regardless of whether the NDJSON header carries the field. Standalone `filecap report` calls (no `siteUrl` arg) fall back to the inventory's metadata as before.
+
+[1.6.3]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.3
+
 ## [1.6.2] — 2026-05-11
 
 ### Added
