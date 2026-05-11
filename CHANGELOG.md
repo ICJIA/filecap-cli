@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] — 2026-05-11
+
+### Added
+
+- **Optional `siteFullName` field in `~/.filecap/sites.json`.** Each site can now declare a verbose human name alongside its short nickname (`siteName`). The full name flows through `web-rollup → report → writeHtml` and is rendered as the card title on the fleet index and the H1 on the per-site detail page. Sites without `siteFullName` cleanly fall back to `siteName` — zero-config compatibility for existing fleets.
+- **Manager-friendly card anatomy on the fleet index.** Each site card now leads with the full name (large, bold) and a small uppercase nickname above it (`#c0cdda`, weight 800 — comfortably above WCAG AA 2.1 contrast at small sizes). Below the title: a two-up "tile" pair — total files (blue, `#4dabf7`) and files needing audit (amber, `#ffa84d`) — with the numbers blown up to ~3.6em weight 900. Below the tiles, a CSS-only donut (conic-gradient + `::after` mask, no SVG/JS) shows the audit-share percentage in the centre, accompanied by a plain-English caption ("Two-thirds need audit · 69 of 102 files") so a manager grasps the share without reading a chart. A row of file-type chips (PDFs / Office / images) sits below the donut, with a meta strip ("38 MB · scanned May 11") and the large CTA pinned to the bottom of every card via `margin-top: auto`. Equal-height alignment across the row is guaranteed by reserving fixed vertical slots for every block.
+- **Same hero pattern on the per-site detail page.** A new `.dp-hero` block at the top of each `<site>.html` mirrors the index card: nickname + big full name + two-up tiles + donut on its own row + plain-English caption. Numbers go a notch bigger here (~4em) because the page is wider than a card. The existing meta-grid, filter chips, row-marker legend, "image-only PDFs need OCR" chip, CSV download button, and file table all sit below — **unchanged**.
+- **Donut chart is pure CSS** (`conic-gradient` ramp + `::after` mask). No SVG, no chart library, no JavaScript dependency. Renders identically online and offline.
+
+### Changed
+
+- **Card grid switches from 3-col to 2-col at desktop** (and collapses to 1-col below 820 px viewport). Each card gets significantly more horizontal room, which is what lets the hero numbers scale up and the donut sit on its own row.
+- **`--fc-text-muted` token bumped from `#666666` to `#9aa5b1`** for WCAG AA 4.5:1 contrast against the card-gradient background. The legacy `#666666` was 3.0:1, below AA for normal text on `#18202b`.
+- **Design tokens added to `src/web/styles.js`** for the new palette: `total` (#4dabf7), `audit` (#ffa84d), `totalTileBg`, `auditTileBg`, `nickname` (#c0cdda), `cardBgTop` / `cardBgBot`, `ctaBg`, `ctaFg`. Emitted as `--fc-*` CSS custom properties from `darkModeCss()`.
+- **`renderCard` is now exported** from `src/web/index-page.js` so it can be unit-tested directly. Was previously a local helper. New test file `test/index-page.test.js` adds 7 cases covering the new anatomy.
+
+[1.7.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.0
+
 ## [1.6.7] — 2026-05-11
 
 ### Added
