@@ -36,10 +36,20 @@ describe("renderCard", () => {
     expect(html).toContain(">DVFR<");
   });
 
-  it("renders both total and audit numbers in two-up tiles", () => {
+  it("falls back to siteName when siteFullName is an empty string", () => {
+    const sr = { ...baseSr, site: { ...baseSr.site, siteFullName: "" } };
+    const html = renderCard(sr);
+    expect(html).toMatch(/<h3 class="full-name">DVFR<\/h3>/);
+  });
+
+  it("renders the total tile with the total-files number (not swapped)", () => {
     const html = renderCard(baseSr);
-    expect(html).toMatch(/<span class="num">102<\/span>/);
-    expect(html).toMatch(/<span class="num">69<\/span>/);
+    expect(html).toMatch(/<div class="tile total"><span class="num">102<\/span>/);
+  });
+
+  it("renders the audit tile with the audit-needed number (not swapped)", () => {
+    const html = renderCard(baseSr);
+    expect(html).toMatch(/<div class="tile audit"><span class="num">69<\/span>/);
   });
 
   it("emits a donut element with inline --pct custom property", () => {
@@ -58,5 +68,12 @@ describe("renderCard", () => {
     const html = renderCard(sr);
     expect(html).toMatch(/<span class="num">0<\/span>/);
     expect(html).toMatch(/--pct:0%/);
+  });
+
+  it("makes the whole card clickable via a stretched-link <a> with aria-label", () => {
+    const html = renderCard(baseSr);
+    expect(html).toMatch(
+      /<a class="card-stretched-link" href="dvfr-2026\.html" aria-label="View detailed report for Domestic Violence Fatality Review">/,
+    );
   });
 });

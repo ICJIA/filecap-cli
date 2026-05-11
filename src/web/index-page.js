@@ -196,7 +196,9 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
 export function renderCard(sr) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const nickname = he(site.siteName ?? site.name ?? "");
-  const fullName = he(site.siteFullName ?? site.siteName ?? site.name ?? "");
+  // `||` (not `??`) so an empty-string siteFullName falls through to siteName.
+  // Same rationale as commit 01c1d4e on the detail-page H1.
+  const fullName = he(site.siteFullName || site.siteName || site.name || "");
   const hostname = he(site.host ?? "");
   const ip = he(sr.header?.metadata?.serverIp ?? site.host ?? "");
 
@@ -255,6 +257,7 @@ export function renderCard(sr) {
     : "";
 
   return `<article class="site-card">
+  <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
   <header class="card-head">
     <p class="nickname">${nickname}</p>
     <h3 class="full-name">${fullName}</h3>
@@ -672,7 +675,7 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
-/* ─── Site-card anatomy v1.7.0 ─── */
+/* ─── Site-card anatomy v1.7.0 + v1.7.1 clickable card ─── */
 .site-card {
   display: flex;
   flex-direction: column;
@@ -683,6 +686,40 @@ main {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.32);
   min-height: 540px;
   color: var(--fc-text-primary, #e5e5e5);
+  /* v1.7.1 — whole card is clickable (stretched-link pattern) with
+     a hover lift so the affordance is obvious. The actual <a> overlay
+     sits absolutely positioned at z-index 0; siblings get z-index 1. */
+  position: relative;
+  cursor: pointer;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+.site-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  border-color: #4dabf7;
+}
+.site-card:focus-within {
+  outline: 3px solid #4dabf7;
+  outline-offset: 4px;
+}
+.site-card .card-stretched-link {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  /* hide the empty-text content from screen readers' visual rendering;
+     aria-label provides the accessible name */
+  text-indent: -9999px;
+  overflow: hidden;
+}
+.site-card .card-stretched-link:focus { outline: none; }
+.site-card > *:not(.card-stretched-link) {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-card { transition: none; }
+  .site-card:hover { transform: none; }
 }
 .site-card .card-head { text-align: center; margin-bottom: 18px; }
 .site-card .nickname {
@@ -751,9 +788,12 @@ main {
 .site-card .donut {
   width: 130px; height: 130px;
   border-radius: 50%;
+  /* --pct is emitted with a "%" suffix (e.g. "--pct:67.6%"). CSS calc()
+     cannot multiply two percentages, so we use the var directly as a
+     percentage stop. */
   background: conic-gradient(
-    #ffa84d 0 calc(var(--pct, 0) * 1%),
-    rgba(77, 171, 247, 0.45) calc(var(--pct, 0) * 1%) 100%
+    #ffa84d 0 var(--pct, 0%),
+    rgba(77, 171, 247, 0.45) var(--pct, 0%) 100%
   );
   display: flex; align-items: center; justify-content: center;
   position: relative;

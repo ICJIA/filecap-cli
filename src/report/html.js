@@ -467,9 +467,11 @@ a:hover { color: #93c5fd; text-decoration: underline; }
 .dp-hero .dp-donut {
   width: 150px; height: 150px;
   border-radius: 50%;
+  /* --pct is emitted with a "%" suffix. CSS calc() cannot multiply two
+     percentages, so we use the var directly as a percentage stop. */
   background: conic-gradient(
-    #ffa84d 0 calc(var(--pct, 0) * 1%),
-    rgba(77, 171, 247, 0.45) calc(var(--pct, 0) * 1%) 100%
+    #ffa84d 0 var(--pct, 0%),
+    rgba(77, 171, 247, 0.45) var(--pct, 0%) 100%
   );
   display: flex; align-items: center; justify-content: center;
   position: relative;

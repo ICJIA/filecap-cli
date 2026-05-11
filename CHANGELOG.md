@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] — 2026-05-11
+
+### Fixed
+
+- **Donut chart now renders.** The v1.7.0 CSS used `calc(var(--pct, 0) * 1%)` for the conic-gradient stop, but `--pct` is emitted with a `%` suffix (e.g. `--pct: 67.6%`) and CSS `calc()` cannot multiply two percentages — every browser silently rejected the property and `background-image` resolved to `none`, so the donut was invisible on every fleet-index card and every per-site detail page. Replaced both `calc(var(--pct, 0) * 1%)` references (one in `src/web/index-page.js`, one in `src/report/html.js`) with the direct `var(--pct, 0%)` percentage stop. The donut now renders correctly on the fleet index AND on every per-site detail page.
+
+### Added
+
+- **Whole-card clickability + hover lift on the fleet index.** Every site card is now itself a click target that navigates to the detailed report — a manager can click anywhere on the card body, not just on the small "View detailed report →" button. Implemented via the standard "stretched-link" pattern: an absolutely-positioned `<a class="card-stretched-link">` overlay covers the card area and inherits its border-radius; child interactive elements (`View detailed report` button, `Download spreadsheet` button, site-url link, technical-details disclosure) sit above the overlay at `z-index: 1` so they still work independently. On hover, the card translates up by 4 px, the shadow deepens, and the border tints to the accent blue — visually obvious affordance. `:focus-within` paints a 3 px accent-blue focus ring around the whole card for keyboard users. Honours `@media (prefers-reduced-motion: reduce)` to disable the lift animation for users who request reduced motion.
+- **Empty-string `siteFullName` falls back to `siteName`** on the fleet index (matches the same treatment already applied to the detail-page H1 in v1.7.0 commit `01c1d4e`). Changed `siteFullName ?? siteName ?? site.name` (which only falls through on `null` / `undefined`) to `siteFullName || siteName || site.name` (which also falls through on `""`).
+
+### Tests
+
+- 3 net new tests in `test/index-page.test.js`: empty-string `siteFullName` fallback; tightened the previously-loose "two-up tiles" assertion into two separate tile-bound assertions so a future total/audit number swap actually fails (mirrors the equivalent dp-hero tightening in v1.7.0 commit `552f116`); new "stretched-link" markup assertion. 371/371 passing.
+
+[1.7.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.1
+
 ## [1.7.0] — 2026-05-11
 
 ### Added
