@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.5] — 2026-05-11
+
+### Added
+
+- **"Image-only PDFs / need OCR (N)" filter chip on per-site detail pages.** Yellow-bordered chip in the primary filter bar. Conditionally rendered — only appears when the site has at least one image-only PDF in its inventory (no noise on sites that have none). Clicking it filters the table to just the rows where the PDF has no text layer; these are typically the most expensive remediation work because they need OCR before tagging is possible. Yellow accent matches the existing image-only row tint so the chip is visually tied to the rows it surfaces.
+
+[1.6.5]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.5
+
 ## [1.6.4] — 2026-05-11
 
 ### Added

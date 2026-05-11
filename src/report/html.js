@@ -186,12 +186,21 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     .map((cat) => `<button class="chip" data-category="${htmlEscape(cat)}">${htmlEscape(formatCategory(cat))} (${categoryCounts[cat]})</button>`)
     .join(" ");
 
+  // Optional "image-only PDFs" chip — only rendered if at least one row would
+  // match. These rows have no text layer (scanned PDFs, no OCR) and are
+  // typically the most expensive remediation work, so giving the auditor a
+  // one-click filter to look at them is worth the chip slot.
+  const imageOnlyChipHtml = imageOnlyCount > 0
+    ? `<button class="chip chip-warn" data-filter="image-only">Image-only PDFs / need OCR (${imageOnlyCount})</button>`
+    : "";
+
   const filterBarHtml = `
   <section class="filter-bar filter-bar-primary">
     <strong>Show:</strong>
     <button class="chip chip-active" data-filter="remediable">Remediable only (${remediableCount})</button>
     <button class="chip" data-filter="reference">Reference only (${nonRemediableCount})</button>
     <button class="chip" data-filter="all">All (${totalFiles})</button>
+    ${imageOnlyChipHtml}
   </section>
   <section class="filter-bar filter-bar-secondary">
     <strong>Or by type:</strong>
@@ -439,6 +448,24 @@ a:hover { color: #93c5fd; text-decoration: underline; }
   color: #0d1117;
   border-color: #60a5fa;
   font-weight: 600;
+}
+
+.chip-warn {
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+.chip-warn:hover {
+  background: #1a1400;
+  border-color: #fbbf24;
+}
+.chip-warn.chip-active {
+  background: #fbbf24;
+  color: #0d1117;
+  border-color: #fbbf24;
+}
+.chip-warn.chip-active:hover {
+  background: #fcd34d;
+  border-color: #fcd34d;
 }
 
 .chip-active:hover {
@@ -815,6 +842,7 @@ ${rowsHtml}
       if (activeFilter === "all") matchFilter = true;
       else if (activeFilter === "remediable") matchFilter = REMEDIABLE_CATS.indexOf(cat) >= 0;
       else if (activeFilter === "reference") matchFilter = REMEDIABLE_CATS.indexOf(cat) < 0;
+      else if (activeFilter === "image-only") matchFilter = row.classList.contains("image-only");
       else matchFilter = true;
       const matchCategory = !activeCategory || cat === activeCategory;
       const rowData = data[i];
