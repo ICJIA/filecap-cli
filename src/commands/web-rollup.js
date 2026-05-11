@@ -40,6 +40,11 @@ const siteEntrySchema = z
     // the "this is the site" link. Different from publicUrlBase, which
     // is the file server. Optional; falls back to publicUrlBase when omitted.
     siteUrl: z.string().optional(),
+    // Long-form, manager-friendly title for the site (e.g. "Domestic Violence
+    // Fatality Review"). Distinct from `siteName` (short slug/nickname like
+    // "DVFR"). Used as the per-site report's <h1> heading; falls back to
+    // siteName when omitted. Optional.
+    siteFullName: z.string().optional(),
     // Informational hint — when true, the public URL requires an Authorization
     // header; the audit script looks for the token in ~/.filecap/secrets.json or
     // a FILECAP_BEARER_TOKEN_<SERVER_NAME> env var. The token itself never lives
@@ -441,6 +446,7 @@ export async function runWebRollup({
       backHref: "index.html",
       csvHref: `${baseName}.csv`,
       siteUrl: site.siteUrl ?? null,
+      siteFullName: site.siteFullName ?? null,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
@@ -506,7 +512,7 @@ export async function runWebRollup({
     });
 
     siteResults.push({
-      site,
+      site: { ...site, siteFullName: site.siteFullName ?? null },
       header,
       summary,
       htmlFile: `${baseName}.html`,

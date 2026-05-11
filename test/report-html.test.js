@@ -439,4 +439,29 @@ describe("writeHtml", () => {
     );
     expect(htmlWithoutJsonBlock).not.toContain('"><img src=x onerror=alert(1)>');
   });
+
+  it("uses siteFullName for the page title when provided", async () => {
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: sampleHeader,
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+      siteFullName: "Domestic Violence Fatality Review",
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    expect(html).toContain("Domestic Violence Fatality Review");
+  });
+
+  it("falls back to siteName when siteFullName is not provided", async () => {
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: { ...sampleHeader, metadata: { ...sampleHeader.metadata, siteName: "DVFR" } },
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    expect(html).toContain("DVFR");
+  });
 });

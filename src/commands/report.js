@@ -78,7 +78,7 @@ For more details: https://github.com/ICJIA/filecap-cli
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null }) {
+export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null }) {
   let header;
   const entries = [];
 
@@ -144,6 +144,9 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
       // Web-rollup passes the site's front-end homepage URL here so the
       // meta-grid "Public URL" row shows the site (not the file server).
       siteUrl,
+      // Manager-friendly title from sites.json (e.g. "Domestic Violence
+      // Fatality Review"). Falls back to siteName in the h1 when null.
+      siteFullName,
     });
   }
 

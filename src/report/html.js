@@ -135,7 +135,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
  *                                        Standalone single-site audits omit
  *                                        this (nothing to navigate back to).
  */
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -715,7 +715,7 @@ ${(backHref || csvHref) ? `<nav class="report-back-bar" aria-label="Report navig
     <span aria-hidden="true">&#x2913;</span> Download spreadsheet (CSV)
   </a>` : ''}
 </nav>` : ""}
-<h1>filecap inventory report</h1>
+<h1>${htmlEscape(siteFullName ?? siteName ?? "filecap inventory report")}</h1>
 
 <div class="meta-grid">${metaGridHtml}
 </div>

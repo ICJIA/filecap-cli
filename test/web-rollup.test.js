@@ -1000,3 +1000,43 @@ describe("runWebRollup — duplicates CSV", () => {
     await expect(fs.stat(dupCsvPath)).rejects.toThrow();
   });
 });
+
+describe("runWebRollup — siteFullName plumbing", () => {
+  it("threads siteFullName into the generated per-site HTML", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    const latestDir = path.join(auditsBase, "dvfr-strapi-prod", "latest");
+    await fs.mkdir(latestDir, { recursive: true });
+    await writeInventory(path.join(latestDir, "inventory.ndjson"), {
+      serverName: "dvfr-strapi-prod",
+      serverIp: "1.2.3.4",
+      hostname: "dvfr.example.com",
+    });
+
+    const sitesFile = path.join(tmpDir, "sites-fullname.json");
+    await writeSitesJson(sitesFile, [
+      {
+        name: "dvfr-strapi-prod",
+        siteName: "DVFR",
+        siteFullName: "Domestic Violence Fatality Review",
+        user: "forge",
+        host: "1.2.3.4",
+        remotePath: "/uploads",
+      },
+    ]);
+
+    const outputDir = path.join(tmpDir, "output-fullname");
+    const result = await runWebRollup({
+      sitesFile,
+      output: outputDir,
+      _auditsBase: auditsBase,
+      password: null,
+    });
+    expect(result.exitCode).toBe(0);
+
+    const files = await fs.readdir(outputDir);
+    const dvfrHtml = files.find((f) => f.startsWith("dvfr-") && f.endsWith(".html"));
+    expect(dvfrHtml).toBeDefined();
+    const html = await fs.readFile(path.join(outputDir, dvfrHtml), "utf8");
+    expect(html).toContain("Domestic Violence Fatality Review");
+  });
+});
