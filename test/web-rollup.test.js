@@ -555,6 +555,142 @@ describe("runWebRollup", () => {
     expect(result.exitCode).toBe(2);
     expect(result.error).toMatch(/schema validation/i);
   });
+
+  // ── type: "git" static-site entries (v1.6.0) ────────────────────────────────
+
+  it("accepts a sites.json entry with type:git + gitRepo + publicPath", async () => {
+    const sitesFile = path.join(tmpDir, "git-site.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [
+          {
+            name: "vpp-git",
+            siteName: "VPP",
+            type: "git",
+            gitRepo: "https://github.com/ICJIA/icjia-vpp-2025.git",
+            publicPath: "public",
+            publicUrlBase: "https://vpp.illinois.gov",
+          },
+        ],
+      }),
+    );
+    // No inventory exists for vpp-git, so web-rollup will fail with
+    // "no sites had scans available" — that's exit code 2 and proves the
+    // schema accepted the entry. (We can't easily exercise the full path
+    // without setting up an inventory fixture.)
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-git"),
+      sitesFile,
+      _auditsBase: path.join(tmpDir, "no-such-base"),
+    });
+    expect(result.error).not.toMatch(/schema validation/i);
+  });
+
+  it("accepts a sites.json entry without `type` (defaults to strapi, back-compat)", async () => {
+    const sitesFile = path.join(tmpDir, "no-type.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [
+          { name: "dvfr", siteName: "DVFR", user: "forge", host: "1.2.3.4", remotePath: "/uploads" },
+        ],
+      }),
+    );
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-no-type"),
+      sitesFile,
+      _auditsBase: path.join(tmpDir, "no-such-base"),
+    });
+    expect(result.error).not.toMatch(/schema validation/i);
+  });
+
+  it("rejects type:git without gitRepo (refine)", async () => {
+    const sitesFile = path.join(tmpDir, "git-no-repo.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [{ name: "vpp-git", type: "git", publicPath: "public" }],
+      }),
+    );
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-git-no-repo"),
+      sitesFile,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.error).toMatch(/schema validation/i);
+    expect(result.error).toMatch(/gitRepo/);
+  });
+
+  it("rejects an unknown type value", async () => {
+    const sitesFile = path.join(tmpDir, "bad-type.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [{ name: "weird", type: "ftp", host: "1.2.3.4" }],
+      }),
+    );
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-bad-type"),
+      sitesFile,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.error).toMatch(/schema validation/i);
+  });
+
+  it("accepts a mixed-mode sites.json (strapi + git entries side-by-side)", async () => {
+    const sitesFile = path.join(tmpDir, "mixed.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [
+          { name: "dvfr", siteName: "DVFR", user: "forge", host: "1.2.3.4", remotePath: "/uploads" },
+          {
+            name: "vpp-git",
+            siteName: "VPP",
+            type: "git",
+            gitRepo: "https://github.com/ICJIA/icjia-vpp-2025.git",
+            publicPath: "public",
+          },
+        ],
+      }),
+    );
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-mixed"),
+      sitesFile,
+      _auditsBase: path.join(tmpDir, "no-such-base"),
+    });
+    expect(result.error).not.toMatch(/schema validation/i);
+  });
+
+  it("rejects unknown top-level field on a git entry (.strict() still applies)", async () => {
+    const sitesFile = path.join(tmpDir, "git-extra.json");
+    await fs.writeFile(
+      sitesFile,
+      JSON.stringify({
+        version: 1,
+        sites: [
+          {
+            name: "vpp-git",
+            type: "git",
+            gitRepo: "https://github.com/ICJIA/icjia-vpp-2025.git",
+            injectedField: "x",
+          },
+        ],
+      }),
+    );
+    const result = await runWebRollup({
+      output: path.join(tmpDir, "out-git-extra"),
+      sitesFile,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.error).toMatch(/schema validation/i);
+  });
 });
 
 describe("normalizeStrapiFilename", () => {

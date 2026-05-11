@@ -327,9 +327,10 @@ set -- "${NEW_ARGS[@]+"${NEW_ARGS[@]}"}"
 check_required_tools
 check_script_version
 
-# ── locate sibling audit-remote.sh ───────────────────────────────────────────
+# ── locate sibling audit-remote.sh / audit-static.sh ─────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUDIT_REMOTE="${SCRIPT_DIR}/audit-remote.sh"
+AUDIT_STATIC="${SCRIPT_DIR}/audit-static.sh"
 
 if [[ ! -x "$AUDIT_REMOTE" ]]; then
   die "audit-remote.sh not found or not executable at: ${AUDIT_REMOTE}
@@ -337,6 +338,10 @@ if [[ ! -x "$AUDIT_REMOTE" ]]; then
     curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
     chmod +x audit-remote.sh"
 fi
+
+# audit-static.sh is only required when any saved-site entry has `"type": "git"`;
+# we defer the missing-file error to the per-site invocation so users on a
+# pure-strapi fleet aren't blocked.
 
 # ── fleet / timestamp setup ───────────────────────────────────────────────────
 FLEET_TS=$(date -u +"%Y%m%d-%H%M%S")
@@ -349,13 +354,18 @@ step "Fleet output dir: ${FLEET_DIR}"
 mkdir -p "${INVENTORIES_DIR}" "${CONSOLIDATED_REPORT_DIR}"
 
 # ── parse server list ─────────────────────────────────────────────────────────
-# Arrays: names, users, hosts, paths, sites, urlbases, auditlinkpatterns (parallel indexed)
+# Arrays parallel-indexed: names, users, hosts, paths, sites, urlbases for
+# Strapi entries; types, gitRepos, publicPaths for git static-site entries.
+# A given index is one or the other — SRV_TYPES[i] tells which.
 declare -a SRV_NAMES=()
 declare -a SRV_USERS=()
 declare -a SRV_HOSTS=()
 declare -a SRV_PATHS=()
 declare -a SRV_SITES=()
 declare -a SRV_URLBASES=()
+declare -a SRV_TYPES=()
+declare -a SRV_GITREPOS=()
+declare -a SRV_PUBLICPATHS=()
 
 INPUT_FILE="${1:-}"
 
@@ -375,19 +385,41 @@ if [[ -n "$INPUT_FILE" ]] && [[ "$INPUT_FILE" == *.json ]]; then
   step "Loading server list from JSON bundle: ${INPUT_FILE}"
 
   # Parse via python3 (already a script dep). Emit one TSV row per site:
-  #   name<TAB>user<TAB>host<TAB>remotePath<TAB>siteName<TAB>publicUrlBase
-  # Tab is safe — none of these fields contain tabs.
-  while IFS=$'\t' read -r _name _user _host _path _site _urlbase; do
-    if [[ -z "$_name" || -z "$_user" || -z "$_host" || -z "$_path" ]]; then
-      warn "Skipping incomplete entry in JSON: name='${_name}' user='${_user}' host='${_host}' path='${_path}'"
-      continue
-    fi
+  #   name<TAB>user<TAB>host<TAB>remotePath<TAB>siteName<TAB>publicUrlBase<TAB>type<TAB>gitRepo<TAB>publicPath
+  # Tab is safe — none of these fields contain tabs. `type` defaults to "strapi"
+  # for entries without the field, preserving back-compat with existing
+  # sites.json files.
+  while IFS=$'\t' read -r _name _user _host _path _site _urlbase _type _gitrepo _publicpath; do
+    # Default type for backward compatibility
+    _type="${_type:-strapi}"
+    case "$_type" in
+      strapi)
+        if [[ -z "$_name" || -z "$_user" || -z "$_host" || -z "$_path" ]]; then
+          warn "Skipping incomplete strapi entry: name='${_name}' user='${_user}' host='${_host}' path='${_path}'"
+          continue
+        fi
+        ;;
+      git)
+        if [[ -z "$_name" || -z "$_gitrepo" ]]; then
+          warn "Skipping incomplete git entry: name='${_name}' gitRepo='${_gitrepo}'"
+          continue
+        fi
+        _publicpath="${_publicpath:-public}"
+        ;;
+      *)
+        warn "Skipping entry with unknown type='${_type}' (expected 'strapi' or 'git'): ${_name}"
+        continue
+        ;;
+    esac
     SRV_NAMES+=("$_name")
     SRV_USERS+=("$_user")
     SRV_HOSTS+=("$_host")
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
     SRV_URLBASES+=("$_urlbase")
+    SRV_TYPES+=("$_type")
+    SRV_GITREPOS+=("$_gitrepo")
+    SRV_PUBLICPATHS+=("$_publicpath")
   done < <(python3 - "$INPUT_FILE" <<'PYJSON'
 import json, sys
 with open(sys.argv[1], 'r', encoding='utf-8') as fh:
@@ -400,6 +432,9 @@ for s in data.get("sites", []):
         s.get("remotePath", ""),
         s.get("siteName", ""),
         s.get("publicUrlBase", ""),
+        s.get("type", "strapi") or "strapi",
+        s.get("gitRepo", ""),
+        s.get("publicPath", ""),
     ]
     print("\t".join(fields))
 PYJSON
@@ -446,6 +481,10 @@ elif [[ -n "$INPUT_FILE" ]]; then
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
     SRV_URLBASES+=("$_urlbase")
+    # CSV mode is strapi-only by design (git entries are JSON-only).
+    SRV_TYPES+=("strapi")
+    SRV_GITREPOS+=("")
+    SRV_PUBLICPATHS+=("")
   done < "$CSV_FILE"
 
   if [[ "${#SRV_NAMES[@]}" -eq 0 ]]; then
@@ -487,6 +526,10 @@ else
     SRV_PATHS+=("$_path")
     SRV_SITES+=("$_site")
     SRV_URLBASES+=("$_urlbase")
+    # Interactive mode is strapi-only by design (git entries are JSON-only).
+    SRV_TYPES+=("strapi")
+    SRV_GITREPOS+=("")
+    SRV_PUBLICPATHS+=("")
   done
 fi
 
@@ -533,6 +576,26 @@ for i in "${!SRV_NAMES[@]}"; do
   host="${SRV_HOSTS[$i]}"
   path_="${SRV_PATHS[$i]}"
   urlbase="${SRV_URLBASES[$i]:-}"
+  srv_type="${SRV_TYPES[$i]:-strapi}"
+  git_repo="${SRV_GITREPOS[$i]:-}"
+
+  # Git-type sites: check repo accessibility via `git ls-remote` instead of SSH.
+  # Skip the rest of the strapi-specific preflight (Node detection, du, URL HEAD).
+  if [[ "$srv_type" == "git" ]]; then
+    if [[ ! -x "$AUDIT_STATIC" ]]; then
+      printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s %-8s\n" "$name" "git" "NO SCRIPT" "-" "audit-static.sh" "-"
+      SKIPPED_REASONS+=("$name: audit-static.sh missing at $AUDIT_STATIC (curl it from filecap-cli/examples/)")
+      continue
+    fi
+    if ! git ls-remote --exit-code --heads "$git_repo" >/dev/null 2>&1; then
+      printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s %-8s\n" "$name" "git" "UNREACHABLE" "-" "$git_repo" "-"
+      SKIPPED_REASONS+=("$name: git ls-remote failed (private repo? run 'gh auth login' or set FILECAP_GITHUB_TOKEN)")
+      continue
+    fi
+    printf "  %-22s %-18s ${G}%-12s${N} %-10s %-22s %-8s\n" "$name" "git" "OK" "-" "$git_repo" "-"
+    VALID_INDEXES+=("$i")
+    continue
+  fi
 
   if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "${user}@${host}" true 2>/dev/null; then
     printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s %-8s\n" "$name" "$host" "UNREACHABLE" "-" "-" "-"
@@ -640,12 +703,30 @@ for i in "${VALID_INDEXES[@]}"; do
   SRV_PATH="${SRV_PATHS[$i]}"
   SRV_SITE="${SRV_SITES[$i]:-}"
   SRV_URLBASE="${SRV_URLBASES[$i]:-}"
-
-  printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
+  SRV_TYPE="${SRV_TYPES[$i]:-strapi}"
+  SRV_GITREPO="${SRV_GITREPOS[$i]:-}"
+  SRV_PUBLICPATH="${SRV_PUBLICPATHS[$i]:-public}"
 
   SRV_PHASE_START=$(date +%s)
   SRV_BEARER=$(get_bearer_token "$SRV_NAME")
-  if BEARER_TOKEN="${SRV_BEARER}" SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+
+  if [[ "$SRV_TYPE" == "git" ]]; then
+    printf "\n${B}==> Auditing %s (git: %s)${N}\n" "$SRV_NAME" "$SRV_GITREPO"
+    INVOKE_OK=0
+    if SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 \
+       "$AUDIT_STATIC" "$SRV_GITREPO" "$SRV_PUBLICPATH" "$SRV_NAME"; then
+      INVOKE_OK=1
+    fi
+  else
+    printf "\n${B}==> Auditing %s (%s)${N}\n" "$SRV_NAME" "$SRV_HOST"
+    INVOKE_OK=0
+    if BEARER_TOKEN="${SRV_BEARER}" SITE_NAME_ARG="${SRV_SITE}" PUBLIC_URL_BASE_ARG="${SRV_URLBASE}" SKIP_VERSION_CHECK=1 \
+       "$AUDIT_REMOTE" "$SRV_USER" "$SRV_HOST" "$SRV_PATH" "$SRV_NAME"; then
+      INVOKE_OK=1
+    fi
+  fi
+
+  if [[ "$INVOKE_OK" -eq 1 ]]; then
     SRV_DURATIONS+=("$(( $(date +%s) - SRV_PHASE_START ))")
     # Prefer the inventory via the 'latest' symlink (confirmed-successful run).
     # Fall back to scanning runs/ directly in case the symlink is missing.

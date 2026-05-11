@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-05-11
+
+### Added
+
+- **`type: "git"` site mode for self-contained static-site (Nuxt) repos.** Audits sites whose PDFs live inside a GitHub repo's `/public/` folder rather than on a CMS host. `sites.json` gets three new optional fields: `type` (enum `"strapi"` | `"git"`, defaults to `"strapi"`), `gitRepo` (the clone URL — required when type is `git`), and `publicPath` (the directory inside the repo to scan, defaults to `"public"`).
+- **`examples/audit-static.sh`** — sibling to `audit-remote.sh`. Shallow-clones the repo to `~/filecap-audits/<name>/clone/` (or fetches + resets if already cloned), runs the existing `filecap scan` on the configured `publicPath`, and rewrites each entry's `absolutePath` to a GitHub source URL of the form `https://github.com/<owner>/<repo>/tree/<branch>/<publicPath>/<rel-path>` — clickable, portable, points at the source-of-truth. Default branch is detected from `git symbolic-ref refs/remotes/origin/HEAD`; falls back to `main`.
+- **`audit-fleet.sh` branches on `type`** during both pre-validation and the per-site audit loop. Git-type entries get a `git ls-remote --exit-code` preflight (instead of SSH+du), then dispatch to `audit-static.sh`; strapi-type entries keep their existing SSH+rsync flow. Mixed sites.json (strapi + git side-by-side) works in a single fleet run; output drops into the same per-site directory layout (`runs/<ts>/inventory.ndjson` + `latest/` symlink), so `filecap web-rollup` picks up git-type entries unchanged.
+- **Auth resolution chain for git operations**: (1) `gh auth status` (preferred — uses gh's credential helper transparently), (2) `FILECAP_GITHUB_TOKEN` env var (`x-access-token:<pat>` interpolation, never written to disk, scrubbed from `.git/config` after clone), (3) anonymous (public repos only). No PAT prompt, no SSH key requirement.
+
+### Tests
+
+- 6 new tests for the schema extension covering: accepts `type: "git"` + `gitRepo` + `publicPath`; accepts entries omitting `type` (defaults to strapi); rejects `type: "git"` without `gitRepo` (Zod refine); rejects unknown `type` value; accepts mixed strapi+git sites.json; `.strict()` still rejects unknown extra fields on git entries.
+
+[1.6.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.0
+
 ## [1.5.8] — 2026-05-10
 
 ### Added

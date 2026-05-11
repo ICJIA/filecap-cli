@@ -18,9 +18,18 @@ const siteEntrySchema = z
   .object({
     name: z.string().min(1),
     siteName: z.string().optional(),
+    // Audit mode. "strapi" (default) means SSH+rsync against a CMS host using
+    // host/user/remotePath. "git" means shallow-clone a static-site repo and
+    // scan a directory inside it (e.g. Nuxt's /public). Existing sites omit
+    // the field and validate as "strapi" implicitly.
+    type: z.enum(["strapi", "git"]).optional(),
+    // Strapi mode fields (ignored for git type)
     user: z.string().optional(),
     host: z.string().optional(),
     remotePath: z.string().optional(),
+    // Git mode fields (ignored for strapi type)
+    gitRepo: z.string().optional(),
+    publicPath: z.string().optional(),
     publicUrlBase: z.string().optional(),
     // Informational hint — when true, the public URL requires an Authorization
     // header; the audit script looks for the token in ~/.filecap/secrets.json or
@@ -28,7 +37,14 @@ const siteEntrySchema = z
     // in this file — sites.json is shareable, secrets.json is local-only.
     requiresBearerToken: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (entry) => entry.type !== "git" || (typeof entry.gitRepo === "string" && entry.gitRepo.length > 0),
+    {
+      message: "type 'git' requires a non-empty `gitRepo`",
+      path: ["gitRepo"],
+    },
+  );
 
 const sitesFileSchema = z.object({
   version: z.number().optional(),

@@ -245,7 +245,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.5.8 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
+**v1.6.0 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
 
 | Phase | Version | Status | Deliverable |
 |---|---|---|---|
@@ -265,6 +265,7 @@ npx vitest run test/web-rollup.test.js
 | 14 | v1.3.x | shipped | Auto-detected `sites.json` for fleet script; opt-in `~/.filecap/config.json` `webRollup.autoDeploy`; bearer-token support (`~/.filecap/secrets.json`) |
 | 15 | v1.4.x | shipped | CSV/HTML deliverable trimmed to 14 columns; click-and-drag horizontal pan on every table |
 | 16 | v1.5.x | shipped | Cross-server duplicates with action explainer; master CSV + duplicates CSV in bundle; infographic hero; table-styling consistency; "Back to fleet index" navigation on per-site detail pages; footer links to GitHub + CHANGELOG |
+| 17 | v1.6.0 | shipped | `type: "git"` site mode — audit self-contained static-site (Nuxt) repos by shallow-cloning + scanning the repo's `/public/` folder. Mixed strapi + git fleets in one bundle. |
 | — | vNext | deferred | Strapi-aware mode (separate package); content-type sanity check on URL preflight |
 
 ### Production deployment
@@ -951,6 +952,38 @@ When the JWT rotates (every 15 days for ICJIA's intranet token), update the one 
 ```
 
 **Security notes.** The token is fed to `curl` via stdin (`--header @-`), not argv, so it never appears in `ps aux`. The `secrets.json` file is read only when needed; nothing writes the token to logs, the report bundle, or any output artifact. Audit work directories never contain the token. If the token leaks, rotate it on the issuing server and update `secrets.json` (or the env var); the leaked one stops working without any change to filecap.
+
+### Static-site (Nuxt-style) repos — `type: "git"`
+
+Some sites are self-contained static-site builds (Nuxt, Astro, Vite, plain HTML) — no CMS, no Strapi server. PDFs and assets live inside the repo's `/public/` folder and ship as-is when the site builds. There's no host to SSH into. For these, use `type: "git"` in `sites.json`:
+
+```json
+{
+  "name": "vpp-git",
+  "siteName": "VPP",
+  "type": "git",
+  "gitRepo": "https://github.com/ICJIA/icjia-vpp-2025.git",
+  "publicPath": "public",
+  "publicUrlBase": "https://vpp.illinois.gov"
+}
+```
+
+When `audit-fleet.sh` encounters this entry, it dispatches to `audit-static.sh` instead of `audit-remote.sh`. The script shallow-clones the repo to `~/filecap-audits/vpp-git/clone/`, runs `filecap scan` on the `/public` directory, and rewrites every entry's `absolutePath` to a GitHub source URL like `https://github.com/ICJIA/icjia-vpp-2025/tree/main/public/docs/file.pdf` — so a vendor clicking through in the bundle CSV lands on the file's source on github.com (with full git history). Subsequent runs `git fetch` and reset to the latest default-branch commit; clones don't redo from scratch.
+
+**Private repos: auth via `gh CLI` (recommended)** or `FILECAP_GITHUB_TOKEN`:
+
+```bash
+# Recommended — once per machine, persistent:
+gh auth login
+
+# Alternative — env var (token never on disk):
+export FILECAP_GITHUB_TOKEN=ghp_yourPATwithRepoScope
+./examples/audit-fleet.sh
+```
+
+Auth resolution order on every run: `gh CLI` (if logged in) → `FILECAP_GITHUB_TOKEN` env var → anonymous (public-repo only). With private repos and neither set, the audit fails fast with a clear error pointing at this setup.
+
+Mixed fleets work in one run — `sites.json` can have any mix of strapi and git entries; `filecap web-rollup` bundles them into the same index page, master CSV, and duplicates section. The Bundle's per-site report for a git-type site shows the GitHub source URL in the "Full file path on server" column instead of an SSH path.
 
 ### How to use it (single server)
 
