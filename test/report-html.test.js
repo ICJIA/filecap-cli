@@ -474,6 +474,29 @@ describe("writeHtml", () => {
       outputPath,
     });
     const html = await fs.readFile(outputPath, "utf8");
-    expect(html).toMatch(/<h1>filecap inventory report<\/h1>/);
+    expect(html).toMatch(/<h1[^>]*>filecap inventory report<\/h1>/);
+  });
+
+  it("renders the new dp-hero block with two-up tiles + donut row", async () => {
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: { ...sampleHeader, metadata: { ...sampleHeader.metadata, siteName: "DVFR" } },
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+      siteFullName: "Domestic Violence Fatality Review",
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    // dp-hero container
+    expect(html).toMatch(/<header class="dp-hero">/);
+    // Two-up tiles (sampleEntries has 2 remediable entries -> 2 total / 2 audit -> 100%)
+    expect(html).toMatch(/<div class="dp-tile dp-total">[\s\S]*<span class="dp-num">2<\/span>/);
+    expect(html).toMatch(/<div class="dp-tile dp-audit">[\s\S]*<span class="dp-num">2<\/span>/);
+    // Donut on its own row
+    expect(html).toMatch(/<div class="dp-donut-row">[\s\S]*<div class="dp-donut"[^>]*style="--pct:100%/);
+    // Plain-English caption
+    expect(html).toMatch(/<p class="dp-donut-caption">/);
+    // The full title appears in the h1
+    expect(html).toMatch(/<h1[^>]*>Domestic Violence Fatality Review<\/h1>/);
   });
 });

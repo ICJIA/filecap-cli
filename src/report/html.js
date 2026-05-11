@@ -298,6 +298,30 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     entries.map((entry) => buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }))
   ).replace(/<\/script/gi, "<\\/script");
 
+  // ── hero block (v1.7.0 manager-friendly rollup redesign, decision D7) ────────
+  // Replaces the top <h1> with the same "infographic" pattern used by the index
+  // card (Q5 Variant 1): nickname -> big full name -> two-up tiles (total +
+  // audit) -> donut on its own row -> plain-English caption. All values are
+  // pre-computed here; the template literal below just interpolates them.
+  // CSS for these `dp-*` classes lands in Task 6 of the plan.
+  const heroTotal = totalFiles;
+  const heroAudit = remediableCount;
+  const heroPctRaw = heroTotal > 0 ? (heroAudit / heroTotal) * 100 : 0;
+  const heroPct = Math.round(heroPctRaw * 10) / 10;
+  const heroPctInt = Math.round(heroPctRaw);
+  let heroPhrase;
+  if (heroTotal === 0)             heroPhrase = "No files inventoried";
+  else if (heroPctInt === 0)       heroPhrase = "No files need audit";
+  else if (heroPctInt <= 12)       heroPhrase = "A small share need audit";
+  else if (heroPctInt <= 28)       heroPhrase = "About a quarter need audit";
+  else if (heroPctInt <= 42)       heroPhrase = "About a third need audit";
+  else if (heroPctInt <= 58)       heroPhrase = "About half need audit";
+  else if (heroPctInt <= 72)       heroPhrase = "Two-thirds need audit";
+  else if (heroPctInt <= 88)       heroPhrase = "Most need audit";
+  else                              heroPhrase = "Nearly all need audit";
+  const heroTitle = htmlEscape(siteFullName || siteName || "filecap inventory report");
+  const heroNick = htmlEscape(siteName ?? "");
+
   // ── assemble HTML ─────────────────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -715,7 +739,18 @@ ${(backHref || csvHref) ? `<nav class="report-back-bar" aria-label="Report navig
     <span aria-hidden="true">&#x2913;</span> Download spreadsheet (CSV)
   </a>` : ''}
 </nav>` : ""}
-<h1>${htmlEscape(siteFullName || siteName || "filecap inventory report")}</h1>
+<header class="dp-hero">
+  ${heroNick ? `<p class="dp-nickname">${heroNick}</p>` : ""}
+  <h1 class="dp-title">${heroTitle}</h1>
+  <div class="dp-nums">
+    <div class="dp-tile dp-total"><span class="dp-num">${heroTotal.toLocaleString()}</span><span class="dp-lbl">total files</span></div>
+    <div class="dp-tile dp-audit"><span class="dp-num">${heroAudit.toLocaleString()}</span><span class="dp-lbl">need audit</span></div>
+  </div>
+  <div class="dp-donut-row">
+    <div class="dp-donut" style="--pct:${heroPct}%"><div class="dp-pct">${heroPctInt}%<small>need audit</small></div></div>
+    <p class="dp-donut-caption"><strong>${heroPhrase}</strong> &middot; ${heroAudit.toLocaleString()} of ${heroTotal.toLocaleString()} files</p>
+  </div>
+</header>
 
 <div class="meta-grid">${metaGridHtml}
 </div>
