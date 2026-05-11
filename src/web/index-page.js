@@ -198,6 +198,10 @@ function renderCard(sr) {
   const siteName = he(site.siteName ?? site.name ?? "");
   const hostname = he(site.host ?? "");
   const ip = he(sr.header?.metadata?.serverIp ?? site.host ?? "");
+  // Prefer sites.json publicUrlBase (authoritative), fall back to the NDJSON
+  // header in case an older inventory had it set there but sites.json didn't.
+  const publicUrlBaseRaw = site.publicUrlBase ?? sr.header?.metadata?.publicUrlBase ?? "";
+  const publicUrlBase = he(publicUrlBaseRaw);
 
   const totalFiles = summary?.totalFiles ?? 0;
   const remediable = summary?.remediable ?? 0;
@@ -235,6 +239,7 @@ function renderCard(sr) {
   return `<article class="site-card">
   <header>
     <h3>${siteName}</h3>
+    ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
     <p class="scan-meta">${scanMeta}</p>
   </header>
   <div class="big-stat">
@@ -696,6 +701,16 @@ main {
   color: #999999;
   margin-top: 0.2rem;
 }
+.site-card .site-url {
+  font-size: 0.82rem;
+  margin: 0.15rem 0 0.25rem 0;
+  word-break: break-all;
+}
+.site-card .site-url a {
+  color: #58a6ff;
+  text-decoration: none;
+}
+.site-card .site-url a:hover { text-decoration: underline; }
 .site-card .scan-meta {
   font-size: 0.8rem;
   color: #666666;

@@ -242,6 +242,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const hostname = meta?.hostname ?? "";
   const scannedPath = meta?.scannedPath ?? "";
   const scannedAt = meta?.scannedAt ?? "";
+  const publicUrlBase = meta?.publicUrlBase ?? "";
 
   let metaGridHtml;
   let titleSuffix;
@@ -271,7 +272,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   <span class="meta-label">IP:</span>           <span>${htmlEscape(serverIp)}</span>
   <span class="meta-label">Hostname:</span>     <span>${htmlEscape(hostname)}</span>
   <span class="meta-label">Scanned path:</span> <span>${htmlEscape(scannedPath)}</span>
-  <span class="meta-label">Scanned at:</span>   <span>${htmlEscape(scannedAt)}</span>`;
+  <span class="meta-label">Scanned at:</span>   <span>${htmlEscape(scannedAt)}</span>
+  ${publicUrlBase !== "" ? `<span class="meta-label">Public URL:</span>   <span><a href="${htmlEscape(publicUrlBase)}" target="_blank" rel="noopener noreferrer">${htmlEscape(publicUrlBase)}</a></span>` : ""}`;
   }
 
   // ── embed data as JSON for client-side search/sort ────────────────────────────

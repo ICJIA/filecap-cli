@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] — 2026-05-11
+
+### Added
+
+- **Public URL displayed in two places** for every site:
+  - **Bundle index site card**: under the site name (h3), a small blue link showing the site's `publicUrlBase` (e.g. `https://dvfr.icjia-api.cloud/uploads`, `https://vpp.illinois.gov` for VPP-git). Clicking opens the actual site in a new tab. Hidden when the site has no `publicUrlBase` configured.
+  - **Per-site detail page meta-grid**: a new "Public URL:" row alongside Server, IP, Hostname, Scanned path, Scanned at. Linked, same target/rel attrs as the index card. Skipped for consolidated reports (which already list the websites separately).
+
+The data is pulled from `sites.json`'s `publicUrlBase` first (authoritative — the source of truth for what's deployed), falling back to the NDJSON header's `publicUrlBase` for inventories whose sites.json entry doesn't have it.
+
+[1.6.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.1
+
 ## [1.6.0] — 2026-05-11
 
 ### Added
