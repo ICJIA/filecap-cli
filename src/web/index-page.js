@@ -146,29 +146,45 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
 
   return `
   <section class="section duplicates">
-    <h2>Files that appear on more than one server</h2>
-    <p>We found <strong>${he(groups.length.toLocaleString())} filenames</strong> that show up on more than one website above${
-      exactCount > 0 || variantCount > 0
-        ? ` — ${he(exactCount.toLocaleString())} exact ${exactCount === 1 ? "copy" : "copies"} (same content) and ${he(variantCount.toLocaleString())} ${variantCount === 1 ? "variant" : "variants"} (same filename, different content).`
-        : "."
-    } <code>.gitkeep</code> and <code>.gitignore</code> are filtered out — those are placeholder files that always exist as duplicates by design.</p>
+    <header class="dup-hero">
+      <p class="dup-eyebrow">Cross-server file map</p>
+      <h2 class="dup-title">${he(groups.length.toLocaleString())} files appear on more than one site</h2>
+      <p class="dup-subtitle"><strong>This is normal — not a webmaster error.</strong> The same PDF might be linked from DVFR, ICJIA, and the Archive simultaneously, and a copy lives on each site. We're listing them here so you can <strong>remediate the file once and push the fix to every site that hosts it</strong>, instead of paying a vendor to remediate the same document three times.</p>
+      <div class="dup-stat-tiles">
+        <div class="dup-tile dup-tile-exact">
+          <span class="dup-tile-num">${he(exactCount.toLocaleString())}</span>
+          <span class="dup-tile-lbl">exact ${exactCount === 1 ? "copy" : "copies"}</span>
+          <span class="dup-tile-sub">same filename, same content on every site</span>
+        </div>
+        <div class="dup-tile dup-tile-variant">
+          <span class="dup-tile-num">${he(variantCount.toLocaleString())}</span>
+          <span class="dup-tile-lbl">${variantCount === 1 ? "variant" : "variants"}</span>
+          <span class="dup-tile-sub">same filename, content differs between sites</span>
+        </div>
+      </div>
+    </header>
 
     ${csvDownloadHtml}
 
-    <details class="dup-explainer">
-      <summary>Why does this happen? (and what should I do with each kind?)</summary>
-      <p>ICJIA's web presence has evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository where reports, meeting minutes, and reference documents lived. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) developed their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context. Files were sometimes updated on one server without being updated on the others — that's why a "duplicate" pair may have <strong>different content even though the filename matches</strong>.</p>
+    <section class="dup-explainer-open">
+      <h3 class="dup-explainer-open-h3">Why are we showing you this?</h3>
+      <p>ICJIA's web presence has evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository where reports, meeting minutes, and reference documents lived. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) developed their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context. Files were sometimes updated on one server without being updated on the others — that's why a "duplicate" pair may have <strong>different content even though the filename matches</strong>. <code>.gitkeep</code> and <code>.gitignore</code> are filtered out (placeholder files that always exist as duplicates by design).</p>
 
-      <p><strong>A duplicate is not an error.</strong> It just means the same filename appears in more than one place. Use this list as a <strong>cross-check</strong>, not a deletion queue.</p>
+      <p class="dup-not-error"><strong>A duplicate is not an error.</strong> It is not the webmaster's fault. It just means the same filename appears in more than one place — typically because the same document was meant to be visible on multiple sites. Use this list as a <strong>cross-check</strong>, not a deletion queue.</p>
 
-      <h3 class="dup-explainer-h3"><span class="dup-kind dup-exact">exact</span> &mdash; same content hash on every server</h3>
-      <p>The byte-for-byte identical file exists in N places. Remediate it <strong>once</strong> on the canonical copy (typically the newest or most-frequently-linked one), then push the corrected file to the other servers' CMSes <em>using the same filename</em>. <strong>Don't delete the duplicates</strong> — most of these files are referenced by CMS entries on each site, and removing the file would break the link on that site's page. The goal is "one corrected file appearing in N places," not "one file existing in one place."</p>
+      <div class="dup-kind-cards">
+        <div class="dup-kind-card dup-kind-card-exact">
+          <h4 class="dup-kind-card-h4"><span class="dup-kind dup-exact">exact</span> — same content on every site</h4>
+          <p>Byte-for-byte identical file in N places. <strong>Remediate it once</strong> on the canonical copy (typically the newest or most-frequently-linked one), then push the corrected file to the other sites' CMSes using the same filename. <strong>Don't delete the duplicates</strong> — most are referenced by CMS entries on each site; removing them would break the link. The goal is "one corrected file appearing in N places," not "one file existing in one place."</p>
+        </div>
+        <div class="dup-kind-card dup-kind-card-variant">
+          <h4 class="dup-kind-card-h4"><span class="dup-kind dup-variant">variant</span> — same filename, different content</h4>
+          <p>The file was edited on one server and the others still hold the older version. <strong>Each variant likely needs its own remediation pass</strong>. Open each in the table below to check whether they're truly distinct documents or whether one is the canonical version the others should be replaced with. Once you decide, either remediate all variants individually, or remediate the canonical one and overwrite the others (treating it like an <em>exact</em> case going forward).</p>
+        </div>
+      </div>
 
-      <h3 class="dup-explainer-h3"><span class="dup-kind dup-variant">variant</span> &mdash; same filename, different content hash</h3>
-      <p>The file was edited on one server and the other servers still hold the older version. <strong>Each variant likely needs its own remediation pass</strong> — the differences between versions might be substantive (corrected data, new section, refreshed cover page) or trivial (single typo fix, re-export from a different tool). Open each variant in the links above to check whether they're truly distinct documents or one is the canonical version the others should be replaced with. Once you decide, either remediate all variants individually, or remediate the canonical one and overwrite the others (treating it like an <em>exact</em> case going forward).</p>
-
-      <p class="dup-caveat"><strong>Heads up on false positives.</strong> Cross-server matching strips Strapi's appended 10-character hex hash before comparing filenames (so <code>report_a1b2c3d4e5.pdf</code> matches <code>report_xxxxxxxxxx.pdf</code>). Two unrelated files that happen to follow the same naming convention before the hash can be flagged as a <em>variant</em> here even though they're logically different documents. The <em>exact</em> match (matching content hash) is the high-confidence signal; <em>variant</em> matches are worth looking at but should be opened to confirm.</p>
-    </details>
+      <p class="dup-caveat"><strong>Heads up on false positives.</strong> Cross-server matching strips Strapi's appended 10-character hex hash before comparing filenames (so <code>report_a1b2c3d4e5.pdf</code> matches <code>report_xxxxxxxxxx.pdf</code>). Two unrelated files that happen to follow the same naming convention before the hash can be flagged as a <em>variant</em> here even though they're logically different documents. The <em>exact</em> match (same content hash) is the high-confidence signal; <em>variant</em> matches are worth opening to confirm.</p>
+    </section>
 
     <details class="dup-table-details" open>
       <summary>Summary table — ${he(groups.length.toLocaleString())} filename groups (one row each)</summary>
@@ -859,6 +875,11 @@ main {
   display: flex; flex-direction: column; gap: 10px;
 }
 .site-card .actions .btn {
+  /* v1.7.2: explicit position+z-index 2 puts the action buttons unambiguously
+     above the stretched-link overlay (z-index 0) so clicks land on the button
+     and the download attribute fires correctly. */
+  position: relative;
+  z-index: 2;
   display: inline-block;
   padding: 16px 22px;
   border-radius: 14px;
@@ -966,7 +987,132 @@ main {
 }
 .master-csv-meta { color: #8b949e; font-size: 0.95rem; }
 
-/* ── duplicates section ────────────────────────────────────────────────── */
+/* ── duplicates section — v1.7.2 big visual treatment ─────────────────── */
+.duplicates .dup-hero {
+  background: linear-gradient(180deg, #18202b 0%, #141a23 100%);
+  border: 1px solid #2a323d;
+  border-radius: 22px;
+  padding: 36px 36px 28px;
+  margin: 0 0 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.32);
+}
+.duplicates .dup-eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.82em;
+  font-weight: 800;
+  color: #c0cdda;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.duplicates .dup-title {
+  margin: 0 0 14px;
+  font-size: 2.4em;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+.duplicates .dup-subtitle {
+  margin: 0 0 22px;
+  font-size: 1.05em;
+  line-height: 1.5;
+  color: #d4dae0;
+  max-width: 78ch;
+}
+.duplicates .dup-subtitle strong { color: #ffffff; }
+.duplicates .dup-stat-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 8px;
+}
+@media (max-width: 720px) {
+  .duplicates .dup-stat-tiles { grid-template-columns: 1fr; }
+  .duplicates .dup-title { font-size: 1.8em; }
+  .duplicates .dup-hero { padding: 24px 22px 20px; }
+}
+.duplicates .dup-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 22px 20px;
+  border-radius: 16px;
+}
+.duplicates .dup-tile-exact   { background: rgba(77, 171, 247, 0.10); border: 1px solid rgba(77, 171, 247, 0.30); }
+.duplicates .dup-tile-variant { background: rgba(255, 168, 77, 0.12); border: 1px solid rgba(255, 168, 77, 0.32); }
+.duplicates .dup-tile-num {
+  font-size: 3.2em;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.duplicates .dup-tile-exact   .dup-tile-num { color: #4dabf7; }
+.duplicates .dup-tile-variant .dup-tile-num { color: #ffa84d; }
+.duplicates .dup-tile-lbl {
+  margin-top: 4px;
+  font-size: 0.95em;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: lowercase;
+  letter-spacing: 0.01em;
+}
+.duplicates .dup-tile-sub {
+  margin-top: 6px;
+  font-size: 0.85em;
+  color: #9aa5b1;
+  line-height: 1.4;
+}
+.duplicates .dup-explainer-open {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin: 0 0 24px;
+  color: #d4dae0;
+  line-height: 1.55;
+}
+.duplicates .dup-explainer-open p { margin: 0.6rem 0; }
+.duplicates .dup-explainer-open-h3 {
+  margin: 0 0 0.8rem;
+  font-size: 1.2em;
+  font-weight: 700;
+  color: #ffffff;
+}
+.duplicates .dup-not-error {
+  margin: 1rem 0 1.3rem !important;
+  padding: 14px 18px;
+  background: rgba(77, 171, 247, 0.08);
+  border-left: 3px solid #4dabf7;
+  border-radius: 6px;
+  color: #e8ecf1;
+}
+.duplicates .dup-kind-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 1.4rem 0;
+}
+@media (max-width: 820px) {
+  .duplicates .dup-kind-cards { grid-template-columns: 1fr; }
+}
+.duplicates .dup-kind-card {
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: #0d1117;
+  border: 1px solid #21262d;
+}
+.duplicates .dup-kind-card-exact   { border-color: rgba(77, 171, 247, 0.32); }
+.duplicates .dup-kind-card-variant { border-color: rgba(255, 168, 77, 0.34); }
+.duplicates .dup-kind-card-h4 {
+  margin: 0 0 0.6rem;
+  font-size: 1.05em;
+  font-weight: 700;
+  color: #ffffff;
+}
+.duplicates .dup-kind-card p { margin: 0; font-size: 0.95em; }
+
+/* Legacy collapsible explainer kept for back-compat if reactivated later */
 .duplicates .dup-explainer {
   margin: 1rem 0;
   padding: 0.8rem 1rem;

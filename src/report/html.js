@@ -91,11 +91,11 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     serverName,
     siteName,
     serverIp,
+    publicUrl,
     entry.modifiedAt,
     scannedPath,
     entry.path,
     entry.absolutePath,
-    publicUrl,
     entry.filename,
     entry.extension,
     entry.category,
@@ -631,16 +631,24 @@ a:hover { color: #93c5fd; text-decoration: underline; }
 }
 #row-count { font-size: 12px; color: #999999; }
 
-/* ── table wrapper ─────────────────────────────────────────── */
+/* ── table wrapper (v1.7.2: scrolls both axes, touch-friendly) ──────────── */
 .table-wrap {
-  overflow-x: auto;
+  /* 'overflow: auto' activates BOTH axes - horizontal for wide tables, and
+     vertical so the file table is bounded by a scrollable pane instead of
+     pushing the page footer hundreds of viewport-heights down. Per CSS spec,
+     'overflow-x: auto' alone leaves 'overflow-y: visible', which combined
+     with max-height would clip rather than scroll. Explicit 'auto' here
+     fixes that. */
+  overflow: auto;
   border: 1px solid #21262d;
   border-radius: 4px;
-  max-height: 70vh;
+  max-height: 75vh;
+  /* Momentum scrolling on iOS; touch-action lets the browser handle native
+     two-finger / single-finger pan in both axes without delay. */
   -webkit-overflow-scrolling: touch;
-  /* Drag-to-pan affordance: open hand cursor over the wrapper. JS enables a
-     mouse drag-pan with a 5px threshold so single clicks still select text.
-     Touch panning is native via overflow-x:auto + -webkit-overflow-scrolling. */
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+  /* Drag-to-pan affordance for mouse users; touch panning is native. */
   cursor: grab;
 }
 .table-wrap.is-panning {
@@ -653,9 +661,13 @@ a:hover { color: #93c5fd; text-decoration: underline; }
 
 /* ── scrollable container (alias for table-wrap) ───────────── */
 .table-scroll {
-  overflow-x: auto;
+  /* v1.7.2: same dual-axis scroll + touch behaviour as .table-wrap so any
+     non-file-table data (category breakdown, etc.) is equally touch-pannable. */
+  overflow: auto;
   width: 100%;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
 }
 
 /* ── sticky first column ───────────────────────────────────── */

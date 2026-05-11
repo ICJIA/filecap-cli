@@ -503,12 +503,16 @@ export async function runWebRollup({
 
     // Merge sites.json metadata (siteName, host, remotePath, publicUrlBase) on
     // top of the NDJSON header — sites.json is authoritative for the
-    // user-visible nickname, and inventories from older scans may not carry
-    // the siteName field at all.
+    // user-visible nickname, the public URL base, and remote path. Cached
+    // inventories from older scans may still carry stale values that the
+    // current sites.json has corrected (e.g. a domain rename). v1.7.2: also
+    // override publicUrlBase / remotePath / host so an edit to sites.json
+    // takes effect on the next rollup without forcing a full re-scan.
     consolidatedSources.push({
       ...header.metadata,
       siteName: site.siteName ?? header.metadata?.siteName ?? "",
       serverName: header.metadata?.serverName ?? siteServerName,
+      publicUrlBase: sitePublicUrlBase || header.metadata?.publicUrlBase || "",
     });
 
     siteResults.push({

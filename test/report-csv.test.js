@@ -58,9 +58,14 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[2].label).toBe("Server IP");
   });
 
-  it("fourth column is modifiedAt with label Date published", () => {
-    expect(CSV_COLUMNS[3].name).toBe("modifiedAt");
-    expect(CSV_COLUMNS[3].label).toBe("Date published");
+  it("fourth column is publicUrl with label Public URL (promoted in v1.7.2)", () => {
+    expect(CSV_COLUMNS[3].name).toBe("publicUrl");
+    expect(CSV_COLUMNS[3].label).toBe("Public URL");
+  });
+
+  it("fifth column is modifiedAt with label Date published", () => {
+    expect(CSV_COLUMNS[4].name).toBe("modifiedAt");
+    expect(CSV_COLUMNS[4].label).toBe("Date published");
   });
 
   it("modifiedAt column label is 'Date published' not 'Last modified'", () => {

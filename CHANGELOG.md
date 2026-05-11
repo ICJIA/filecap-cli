@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] — 2026-05-11
+
+### Changed
+
+- **CSV column order — Public URL promoted from column 8 to column 4.** Managers and remediators open the public URL more often than any other column; under the old layout it was buried four columns deep, requiring horizontal scrolling on most viewports. The new order is: Server, Website, Server IP, **Public URL**, Date published, Source folder, File location, Full path, File name, … New v1.7.2 test pins `CSV_COLUMNS[3]` to `publicUrl`; the existing `colIndex("publicUrl")` lookups in the test suite already used dynamic indexing so they all kept working without further changes.
+- **Per-site detail-page table now scrolls both axes with touch-pan support.** The `.table-wrap` rule used `overflow-x: auto` only, which combined with `max-height: 70vh` clipped vertical overflow rather than scrolling it; tables longer than the viewport pushed the page footer off-screen on iPad/iPhone. Switched to `overflow: auto` so both axes are scrollable, raised `max-height` to `75vh`, added `touch-action: pan-x pan-y` so iOS/Android handle native two-finger pan in both directions without delay, and `overscroll-behavior: contain` so the inner scroll doesn't bubble up to the page. `.table-scroll` (the wider container used by some non-file-table sections) got the same treatment.
+- **`web-rollup` now honours `sites.json`'s `publicUrlBase` over the cached inventory header's value** for the master CSV. The old code spread `header.metadata` into `consolidatedSources` without overriding `publicUrlBase`, so a domain rename in `sites.json` was silently ignored on the next rollup unless the per-site inventory was re-scanned. The new code explicitly overrides `publicUrlBase` with `sitePublicUrlBase` (already computed earlier from `site.publicUrlBase ?? header.metadata?.publicUrlBase`) so the comment-promised "sites.json is authoritative" behaviour is actually enforced.
+
+### Added
+
+- **Big visual "duplicates" treatment on the fleet index.** The "Files that appear on more than one server" section is now an infographic-style banner — eyebrow label ("Cross-server file map"), 2.4 em weight-900 title with the actual filename count, and a 2-up tile pair showing exact-copy count (blue) and variant count (amber). Below the banner is a now-open-by-default explainer that leads with **"This is normal — not a webmaster error"** and explains the agency-history reason (Archive used to be the library; each program later got its own site and copies were pushed to each). The collapsible details block was replaced with a permanent panel because managers were scrolling past the small h2 and the collapsed details summary without realising what the section meant.
+- **VPP `publicUrlBase` fixed** in `~/.filecap/sites.json` (`vpp.illinois.gov` → `vpp.icjia.illinois.gov`) so per-file links resolve to the live CMS. Re-scanned VPP so the cached inventory header carries the corrected domain forward.
+
+### Fixed
+
+- **Card CTA buttons now have explicit `position: relative; z-index: 2`** so the v1.7.1 stretched-link overlay can never accidentally swallow the "Download spreadsheet" click. The visual effect is the same — empty card areas still navigate to the detailed report — but the bottom buttons are guaranteed clickable independently. New v1.7.2 test asserts the download `<a>` is rendered as a separate element with the `download` attribute outside the stretched link.
+
+[1.7.2]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.2
+
 ## [1.7.1] — 2026-05-11
 
 ### Fixed

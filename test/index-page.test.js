@@ -76,4 +76,11 @@ describe("renderCard", () => {
       /<a class="card-stretched-link" href="dvfr-2026\.html" aria-label="View detailed report for Domestic Violence Fatality Review">/,
     );
   });
+
+  it("renders the CSV-download button as a separate <a download> inside .actions", () => {
+    const html = renderCard(baseSr);
+    expect(html).toMatch(
+      /<a href="dvfr-2026\.csv" class="btn btn-secondary" download>Download spreadsheet<\/a>/,
+    );
+  });
 });

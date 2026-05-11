@@ -869,7 +869,11 @@ describe("runWebRollup — master CSV + duplicates", () => {
     const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
     expect(result.exitCode).toBe(0);
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).toContain("Files that appear on more than one server");
+    // v1.7.2: section heading rewritten as "<count> files appear on more
+    // than one site". Section class stays `.duplicates`; assert on a stable
+    // marker that survives copywriting.
+    expect(html).toContain("Cross-server file map");
+    expect(html).toMatch(/section class="section duplicates"/);
     // Both inventories' seed entry is "doc.pdf"
     expect(html).toContain("doc.pdf");
     expect(html).toContain("not an error");
@@ -879,7 +883,8 @@ describe("runWebRollup — master CSV + duplicates", () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).not.toContain("Files that appear on more than one server");
+    expect(html).not.toContain("Cross-server file map");
+    expect(html).not.toMatch(/section class="section duplicates"/);
   });
 });
 

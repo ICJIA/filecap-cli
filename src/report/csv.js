@@ -7,15 +7,18 @@ import { csvCell, boolToYesNo } from "./format.js";
 // remediators open the file in Adobe Acrobat / Word / Excel and see the same
 // properties directly. The full introspection is still carried in the NDJSON
 // inventory for tooling that wants it (MCP query_inventory, custom reports).
+// v1.7.2: Public URL promoted from column 8 → column 4 so it's visible without
+// horizontal scrolling. Managers and remediators open the URL more often than
+// any other column, so it belongs near the front of the row.
 export const CSV_COLUMNS = [
   { name: "serverName",   label: "Server" },
   { name: "siteName",     label: "Website" },
   { name: "serverIp",     label: "Server IP" },
+  { name: "publicUrl",    label: "Public URL" },
   { name: "modifiedAt",   label: "Date published" },
   { name: "scannedPath",  label: "Source folder on server" },
   { name: "path",         label: "File location (relative to source folder)" },
   { name: "absolutePath", label: "Full file path on server" },
-  { name: "publicUrl",    label: "Public URL" },
   { name: "filename",     label: "File name" },
   { name: "extension",    label: "File extension" },
   { name: "category",     label: "File type" },
@@ -96,11 +99,11 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     serverName,
     siteName,
     serverIp,
+    publicUrl,
     entry.modifiedAt,
     scannedPath,
     entry.path,
     entry.absolutePath,
-    publicUrl,
     entry.filename,
     entry.extension,
     entry.category,
