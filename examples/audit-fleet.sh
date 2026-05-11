@@ -639,23 +639,33 @@ for i in "${!SRV_NAMES[@]}"; do
   # HEAD-check the public URL base if one was given for this server.
   # When a bearer token is available (env var or secrets.json), include it via
   # stdin (--header @-) so it does not appear in `ps aux` argv.
+  #
+  # Any HTTP response (200-499) means the host is up. Strapi-style hosts
+  # typically return 404 for the bare /uploads index because directory
+  # listing is disabled — that's expected and is not a reachability
+  # problem for the individual file URLs. Only 5xx or connection failure
+  # is treated as FAILED here.
   url_status="-"
   if [[ -n "$urlbase" ]]; then
     site_token=$(get_bearer_token "$name")
     if [[ -n "$site_token" ]]; then
-      if printf 'Authorization: Bearer %s\n' "$site_token" \
-          | curl -fsSL --head --header @- --connect-timeout 5 --max-time 10 "$urlbase" >/dev/null 2>&1; then
-        url_status="${G}OK*${N}"
+      url_code=$(printf 'Authorization: Bearer %s\n' "$site_token" \
+          | curl -sS -o /dev/null --head -w "%{http_code}" --header @- \
+                --connect-timeout 5 --max-time 10 "$urlbase" 2>/dev/null || echo "000")
+      if [[ "$url_code" =~ ^[2-4][0-9][0-9]$ ]]; then
+        url_status="${G}${url_code}*${N}"
       else
-        url_status="${R}FAILED${N}"
-        URL_WARNINGS+=("$name: public URL did not respond with bearer auth (HEAD ${urlbase})")
+        url_status="${R}${url_code:-000}${N}"
+        URL_WARNINGS+=("$name: public URL did not respond with bearer auth (HEAD ${urlbase} → HTTP ${url_code:-000})")
       fi
     else
-      if curl -fsSL --head --connect-timeout 5 --max-time 10 "$urlbase" >/dev/null 2>&1; then
-        url_status="${G}OK${N}"
+      url_code=$(curl -sS -o /dev/null --head -w "%{http_code}" \
+                --connect-timeout 5 --max-time 10 "$urlbase" 2>/dev/null || echo "000")
+      if [[ "$url_code" =~ ^[2-4][0-9][0-9]$ ]]; then
+        url_status="${G}${url_code}${N}"
       else
-        url_status="${R}FAILED${N}"
-        URL_WARNINGS+=("$name: public URL did not respond (HEAD ${urlbase})")
+        url_status="${R}${url_code:-000}${N}"
+        URL_WARNINGS+=("$name: public URL did not respond (HEAD ${urlbase} → HTTP ${url_code:-000})")
       fi
     fi
   fi

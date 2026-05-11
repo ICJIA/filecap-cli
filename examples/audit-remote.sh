@@ -1096,22 +1096,26 @@ fi
 
 if [[ -n "$PUBLIC_URL_BASE" ]]; then
   step "Verifying public URL is reachable: ${PUBLIC_URL_BASE}"
-  url_ok=1
+  # Any HTTP response (200-499) means the host is up and serving requests.
+  # Strapi (and most static-uploads hosts) returns 404 for the bare
+  # /uploads index because directory listing is disabled — that's expected
+  # and does not indicate the individual file URLs are broken. Only treat
+  # 5xx, "000" (connection failure), or empty as a real reachability
+  # problem.
+  url_code=""
   if [[ -n "${BEARER_TOKEN:-}" ]]; then
     info "Using bearer token for Authorization header (site requires auth)"
-    if printf 'Authorization: Bearer %s\n' "${BEARER_TOKEN}" \
-        | curl -fsSL --head --header @- --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" >/dev/null 2>&1; then
-      url_ok=0
-    fi
+    url_code=$(printf 'Authorization: Bearer %s\n' "${BEARER_TOKEN}" \
+        | curl -sS -o /dev/null --head -w "%{http_code}" --header @- \
+              --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" 2>/dev/null || echo "000")
   else
-    if curl -fsSL --head --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" >/dev/null 2>&1; then
-      url_ok=0
-    fi
+    url_code=$(curl -sS -o /dev/null --head -w "%{http_code}" \
+              --connect-timeout 5 --max-time 10 "$PUBLIC_URL_BASE" 2>/dev/null || echo "000")
   fi
-  if [[ "$url_ok" -eq 0 ]]; then
-    info "Public URL responded successfully"
+  if [[ "$url_code" =~ ^[2-4][0-9][0-9]$ ]]; then
+    info "Public URL responded with HTTP ${url_code} (host reachable)"
   else
-    warn "Public URL did not respond (HEAD ${PUBLIC_URL_BASE})."
+    warn "Public URL did not respond (HEAD ${PUBLIC_URL_BASE} → HTTP ${url_code:-000})."
     warn "This may be due to a typo, network restrictions, or the site being temporarily down."
     if [[ -z "${BEARER_TOKEN:-}" ]]; then
       warn "If the site requires authentication, set FILECAP_BEARER_TOKEN_${SERVER_NAME//-/_} or add an entry to ~/.filecap/secrets.json."

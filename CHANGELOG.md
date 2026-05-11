@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.7] — 2026-05-11
+
+### Added
+
+- **`examples/audit-fleet-auto.sh`** — non-interactive wrapper around `audit-fleet.sh`. Drives the inner script under `expect` so the four interactive prompts that gate a fleet run (fleet-level "Proceed with audit of N server(s)?", per-server "Choice:" config-review, per-server "Continue anyway?" on URL HEAD failure, per-server "Proceed anyway?" on low local disk) all get auto-answered. The naive `echo y | ./audit-fleet.sh` pipeline doesn't work because the SSH calls in audit-fleet's pre-validation loop inherit (and drain) stdin, so `read` later sees EOF and `set -e` aborts silently before the prompt is reached; an `expect`-allocated pty side-steps that. Honours `SKIP_VERSION_CHECK` (defaults to 1) and `AUDIT_HTML` (defaults to 1). Same exit code as `audit-fleet.sh`. Requires `expect` (preinstalled on macOS; `apt install expect` on Debian).
+
+### Changed
+
+- **URL HEAD reachability check accepts HTTP 200–499 as "host reachable"** (in both `audit-fleet.sh` pre-validation and `audit-remote.sh` per-server check). Previously the check used `curl -fsSL --head`, which fails on any 4xx response and triggered an interactive "Continue anyway? [y/N]:" prompt for every Strapi-style site — those sites return **404 on the bare `/uploads`** because directory listing is disabled, even though the individual file URLs underneath are fine. The check now captures the HTTP code via `curl -sS -o /dev/null -w "%{http_code}"` and only treats 5xx, `000` (connection failure), or empty as a real reachability problem. The fleet pre-validation status column now shows the actual HTTP code (e.g. `404`, `200`) instead of `OK` / `FAILED`. Eight of ICJIA's existing fleet sites stopped throwing spurious prompts as a result.
+
+[1.6.7]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.7
+
 ## [1.6.6] — 2026-05-11
 
 ### Security
