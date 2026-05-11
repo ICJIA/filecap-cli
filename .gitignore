@@ -57,6 +57,9 @@ desktop.ini
 # Netlify CLI cache (auto-generated when running `netlify deploy` from this dir)
 .netlify/
 
+# Superpowers brainstorming visual-companion mockups (session-local)
+.superpowers/
+
 # Filecap-specific — generated inventory artifacts at repo root (dev/test scratch).
 # Test fixtures under test/fixtures/ are NOT ignored (no leading slash on those paths).
 /*.ndjson
