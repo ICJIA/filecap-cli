@@ -292,6 +292,34 @@ The site is **password-protected** (Netlify Pro Site Password — server-side en
 
 Deploy mechanics: `filecap web-rollup` automatically pushes to this Netlify site whenever `webRollup.autoDeploy: true` is set in `~/.filecap/config.json` (with `deploySite: "icjia-fleet-audit"`). To force a fresh deploy after a new audit, run `./examples/audit-fleet.sh && filecap web-rollup`. No `--deploy` flag needed.
 
+#### "Wait — if it's password-protected, why can I still 'view source' on the gate page?"
+
+This is a common observation, and the short answer is: **what you're viewing the source of is Netlify's challenge page, not the underlying fleet rollup.** Until you authenticate, the actual inventory content (site names, file paths, public URLs, totals, the per-site CSVs, the master CSV — *everything* you'd consider sensitive) is never sent to your browser at all.
+
+You can verify this for yourself in three seconds:
+
+```bash
+curl -i https://icjia-fleet-audit.netlify.app/
+```
+
+Returns `HTTP/2 401` and roughly 3.5 KB of body. That body is Netlify's password-challenge HTML — a `<form>`, some Netlify-managed CSS, and a brand stripe. Grep it for anything from our fleet:
+
+```bash
+curl -sS https://icjia-fleet-audit.netlify.app/ | grep -iE "dvfr|icjia|illinois|\.pdf|\.csv"
+# (no matches — the challenge page contains zero references to our data)
+```
+
+And try to fetch a specific inventory file directly without authenticating:
+
+```bash
+curl -i https://icjia-fleet-audit.netlify.app/audit-file-list-master.csv
+# HTTP/2 401 — even when you ask for a specific path, you get the challenge page
+```
+
+The gate is enforced at Netlify's edge (server-side), not by JavaScript in your browser. There is no "underlying source" to peek at on the gate page because no underlying content has been served. Once you enter the password, Netlify sets an auth cookie and proxies the real content; before that, every URL returns the same 3.5 KB challenge page.
+
+**For the genuinely paranoid:** we have a documented fallback design (Option B in the project's internal-security notes) using a Netlify Edge Function that serves *our own* gate page from this repo's source, so the gate HTML is auditable in-tree rather than coming from Netlify's template. We haven't implemented it because the current setup demonstrably leaks nothing; the edge-function path is reserved for the day someone formally requests it. If you have that need, file a GitHub issue and we'll prioritise it.
+
 ## Quick start
 
 ```bash

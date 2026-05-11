@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.5] — 2026-05-11
+
+### Documentation
+
+- **README — "Wait, if it's password-protected, why can I still view-source on the gate page?" section** under Production deployment. Common observation from people who reach the gate page; the short answer is that what they're viewing the source of is Netlify's challenge page, not the underlying fleet rollup. The new section walks the reader through three `curl` commands they can run to verify that the actual inventory content (site names, file paths, public URLs, CSVs) is never served until they authenticate — including a grep against the 3.5 KB challenge body that returns zero matches for any fleet identifier, and a direct request for `audit-file-list-master.csv` that returns `HTTP 401` instead of the file. Also documents a known fallback design (custom Netlify Edge Function serving our own gate HTML from in-tree source for full auditability) that's intentionally not yet implemented; the section explains why and points readers at GitHub Issues if they need it.
+
+[1.7.5]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.5
+
 ## [1.7.4] — 2026-05-11
 
 ### Documentation
