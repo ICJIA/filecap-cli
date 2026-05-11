@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] — 2026-05-11
+
+### Added
+
+- **"What are the colored row markers?" legend on per-site detail pages**, rendered as an aside note immediately above the inventory table. Two visual swatches that mirror the actual table styling: a yellow-left-bordered swatch for flagged-filename rows (spaces / non-ASCII / overlong / scanner-default name patterns like `Scan_20240115_001.pdf`), and a faint-yellow-tinted swatch for image-only PDF rows (scanned, no text layer — needs OCR before remediation, typically the most expensive work). The legend is hard to miss but doesn't dominate — small font, dedicated card, sits between the filter chips and the table.
+
+[1.6.4]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.4
+
 ## [1.6.3] — 2026-05-11
 
 ### Added

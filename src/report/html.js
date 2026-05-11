@@ -557,6 +557,55 @@ tr.image-only { background: #111000; }
 tr.flagged { border-left: 3px solid #fbbf24; }
 tr.flagged td { /* let row bg show through; border is the indicator */ }
 
+/* ── row-marker legend (immediately above the table) ─────────── */
+.row-marker-legend {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-left: 4px solid #fbbf24;
+  border-radius: 4px;
+  padding: 0.8rem 1rem 0.7rem 1rem;
+  margin: 0.5rem 0 1rem 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.row-marker-legend h3 {
+  margin: 0 0 0.4rem 0;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: #e5e5e5;
+}
+.row-marker-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0.35rem 0;
+  color: #c9d1d9;
+}
+.row-marker-row code {
+  background: #0d1117;
+  padding: 0.05em 0.4em;
+  border-radius: 3px;
+  font-size: 0.92em;
+}
+.row-marker-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1.5em;
+  height: 1.5em;
+  margin-top: 0.1em;
+  border-radius: 2px;
+}
+.row-marker-flagged {
+  /* Mirror the actual yellow left border on flagged rows. */
+  border-left: 3px solid #fbbf24;
+  background: #0d1117;
+}
+.row-marker-imageonly {
+  /* Mirror the actual image-only row tint. */
+  background: #111000;
+  border: 1px solid #1a1400;
+}
+
 /* ── badge ─────────────────────────────────────────────────── */
 .badge {
   display: inline-block;
@@ -704,6 +753,18 @@ ${filterBarHtml}
   <input type="search" id="search" placeholder="Filter by filename, path, server…" aria-label="Filter table rows">
   <span id="row-count"></span>
 </div>
+
+<aside class="row-marker-legend" role="note" aria-label="Row marker key">
+  <h3>What are the colored row markers in the table?</h3>
+  <p class="row-marker-row">
+    <span class="row-marker-swatch row-marker-flagged" aria-hidden="true"></span>
+    <strong>Yellow vertical bar on the left edge of a row</strong> — the filename has been flagged for human review: it contains spaces, non-ASCII characters, exceeds 200 chars, or matches a default scanner output pattern like <code>Scan_20240115_001.pdf</code>. Often correlates with files that were OCR'd from paper. Worth a quick rename or close look before remediation.
+  </p>
+  <p class="row-marker-row">
+    <span class="row-marker-swatch row-marker-imageonly" aria-hidden="true"></span>
+    <strong>Faint yellow row tint</strong> — the file is an <em>image-only PDF</em> (scanned, no text layer). Needs OCR before it can be tagged for screen readers. Typically the most expensive remediation work — a vendor will price these higher than text-based PDFs.
+  </p>
+</aside>
 
 <div class="table-wrap table-scroll">
   <table id="inventory-table" aria-label="File inventory">
