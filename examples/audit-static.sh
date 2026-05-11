@@ -83,17 +83,35 @@ fi
 
 # ── auth resolution ──────────────────────────────────────────────────────────
 # Order: gh CLI (if logged in) -> FILECAP_GITHUB_TOKEN -> anonymous
-TOKEN_URL=""
+#
+# FC-2026-018 mitigation: when FILECAP_GITHUB_TOKEN is used, the token is
+# injected via the GIT_CONFIG_* env vars (http.extraheader) rather than baked
+# into a URL passed as a git command-line argument. argv is visible to other
+# local users via `ps aux`; env vars are not (process environment requires
+# same-UID read access on macOS/Linux). The token never appears in argv.
+USE_GIT_TOKEN_ENV=0
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   info "Using gh CLI credential helper for git operations"
 elif [[ -n "${FILECAP_GITHUB_TOKEN:-}" ]]; then
-  # Build an https URL with the PAT inline; used only for the clone/fetch
-  # command, never written to disk.
-  TOKEN_URL="https://x-access-token:${FILECAP_GITHUB_TOKEN}@github.com/${OWNER}/${REPO_BASENAME}.git"
-  info "Using FILECAP_GITHUB_TOKEN for git operations"
+  USE_GIT_TOKEN_ENV=1
+  info "Using FILECAP_GITHUB_TOKEN via GIT_CONFIG_* env (not visible in ps aux)"
 else
   info "No gh auth / FILECAP_GITHUB_TOKEN — assuming repo is public"
 fi
+
+# Shell function that wraps `git ...` with the auth header in env vars when
+# FILECAP_GITHUB_TOKEN is set. Token stays in the process environment for
+# this single invocation, never in argv.
+git_with_auth() {
+  if [[ "$USE_GIT_TOKEN_ENV" == "1" ]]; then
+    GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0=http.extraheader \
+    GIT_CONFIG_VALUE_0="Authorization: Bearer ${FILECAP_GITHUB_TOKEN}" \
+      git "$@"
+  else
+    git "$@"
+  fi
+}
 
 # ── work directory ────────────────────────────────────────────────────────────
 WORKDIR="${HOME}/filecap-audits/${SERVER_NAME}"
@@ -110,18 +128,15 @@ step "Audit: ${SERVER_NAME} (${GIT_REPO})"
 info "Work dir: ${WORKDIR}"
 
 # ── clone or update ───────────────────────────────────────────────────────────
-CLONE_URL_FOR_FETCH="${TOKEN_URL:-$GIT_REPO}"
+# Always use the clean GIT_REPO URL (no token interpolation). git_with_auth
+# adds the Authorization header via env vars when needed.
 
 if [[ -d "${CLONE_DIR}/.git" ]]; then
   step "Updating existing clone ..."
-  if [[ -n "$TOKEN_URL" ]]; then
-    git -C "${CLONE_DIR}" remote set-url origin "${TOKEN_URL}"
-  fi
-  # Do NOT pipe `git fetch` through `head` — head closing the pipe early sends
-  # SIGPIPE back to git, making it return non-zero even on a successful fetch.
-  # Let the output stream freely; if there's actual failure, git's stderr is
-  # captured and surfaced via the exit code.
-  if ! git -C "${CLONE_DIR}" fetch --depth=1 origin; then
+  # Make sure the on-disk remote URL is the clean URL (in case an earlier
+  # version of this script wrote a token-bearing URL into .git/config).
+  git -C "${CLONE_DIR}" remote set-url origin "${GIT_REPO}"
+  if ! git_with_auth -C "${CLONE_DIR}" fetch --depth=1 origin; then
     die "git fetch failed — check repo URL or auth (gh auth status / FILECAP_GITHUB_TOKEN)"
   fi
   # Detect default branch from the remote HEAD; fall back to main
@@ -129,21 +144,14 @@ if [[ -d "${CLONE_DIR}/.git" ]]; then
     | sed 's|^origin/||' || echo "main")
   [[ -z "$DEFAULT_BRANCH" ]] && DEFAULT_BRANCH="main"
   git -C "${CLONE_DIR}" reset --hard "origin/${DEFAULT_BRANCH}" >/dev/null
-  # Scrub token from remote URL so it doesn't sit on disk in .git/config
-  git -C "${CLONE_DIR}" remote set-url origin "${GIT_REPO}"
 else
   step "Cloning ${GIT_REPO} ..."
-  # Same SIGPIPE rationale as above — no `| head` after git clone.
-  if ! git clone --depth=1 "${CLONE_URL_FOR_FETCH}" "${CLONE_DIR}"; then
+  if ! git_with_auth clone --depth=1 "${GIT_REPO}" "${CLONE_DIR}"; then
     die "git clone failed — repo may be private (set FILECAP_GITHUB_TOKEN or run 'gh auth login') or URL may be wrong"
   fi
   DEFAULT_BRANCH=$(git -C "${CLONE_DIR}" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null \
     | sed 's|^origin/||' || echo "main")
   [[ -z "$DEFAULT_BRANCH" ]] && DEFAULT_BRANCH="main"
-  # Scrub token from remote URL post-clone
-  if [[ -n "$TOKEN_URL" ]]; then
-    git -C "${CLONE_DIR}" remote set-url origin "${GIT_REPO}"
-  fi
 fi
 
 COMMIT_SHA=$(git -C "${CLONE_DIR}" rev-parse HEAD)

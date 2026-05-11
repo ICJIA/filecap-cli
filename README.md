@@ -116,8 +116,11 @@ So: yes, "just count the files" is a one-liner. But the count alone won't help y
 ## Security audit
 
 filecap is open source and tries to be transparent about its security posture.
-The full audit findings and mitigations are in `docs/security/audit-2026-05-10.md`.
-The summary below is for managers and auditors.
+The full audit findings and mitigations are in `docs/security/audit-2026-05-10.md`
+(initial 1.3.0 baseline audit) and `docs/security/audit-2026-05-11.md` (re-audit
+of every release through 1.6.5, covering the bearer-token store, git-clone
+audit script, master/duplicates CSV exposure surface, deploy-time review, and
+inline-JS additions). The summary below is for managers and auditors.
 
 ### What we protect
 
@@ -183,6 +186,11 @@ Findings below come from the 1.3.0 red/blue team audit. Versions 1.3.1 through 1
 | FC-2026-015 | Low | CSP header missing from netlify.toml | Deferred (inline scripts require unsafe-inline) |
 | FC-2026-016 | Note | Client-side gate is not real security (by design) | Documented |
 | FC-2026-017 | Note | Inventory NDJSON contains server metadata | Accepted (required for vendor work-order) |
+| FC-2026-018 | Moderate | `audit-static.sh` exposed `FILECAP_GITHUB_TOKEN` via argv to `git clone` / `git remote set-url` | Fixed in 1.6.6 (token now passed via GIT_CONFIG_* env vars, not URL) |
+| FC-2026-019 | Note | Master CSV + duplicates CSV in bundle increase data-exposure surface | Accepted (mitigated by Netlify Pro Site Password) |
+| FC-2026-020 | Note | `~/.filecap/secrets.json` readable by same-UID processes | Accepted (standard user-account trust model; env-var override available for 1Password CLI users) |
+| FC-2026-021 | Note | `audit-static.sh` clone dir trusts repo contents | Accepted (same as Strapi mirror; auditor only clones repos they trust) |
+| FC-2026-022 | Note | New inline JS in HTML reports (1.4.0+) reviewed for XSS | No new findings — all handlers use class-list / dataset reads, no innerHTML/eval |
 
 ### Changes since 1.3.0 (security-relevant)
 
@@ -206,7 +214,8 @@ Acknowledged within 5 business days.
 ### How to verify the audit yourself
 
 ```bash
-cat docs/security/audit-2026-05-10.md
+cat docs/security/audit-2026-05-10.md    # initial 1.3.0 audit
+cat docs/security/audit-2026-05-11.md    # re-audit covering 1.3.1 - 1.6.5
 npm audit
 npx vitest run test/report-html.test.js
 npx vitest run test/mcp-tools.test.js
@@ -245,7 +254,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.6.5 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
+**v1.6.6 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
 
 | Phase | Version | Status | Deliverable |
 |---|---|---|---|

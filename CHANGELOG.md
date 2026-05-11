@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.6] — 2026-05-11
+
+### Security
+
+- **Red/blue team re-audit covering 1.3.1 through 1.6.5** (full findings: `docs/security/audit-2026-05-11.md`). 5 new findings: 1 Moderate (fixed below), 4 Notes (accepted with documented mitigations). 0 production CVEs (`npm audit --omit=dev` clean). 356/356 tests green.
+- **FC-2026-018 (Moderate) — fixed.** `audit-static.sh` was exposing the optional `FILECAP_GITHUB_TOKEN` PAT in `ps aux` argv for the ~10-second window of each `git clone` / `git remote set-url` call. The script previously inlined the token into the URL (`https://x-access-token:<TOKEN>@github.com/...`); on macOS and Linux, process arguments are world-readable, so any local user could see the token. The `gh CLI` auth path (the documented preferred option) was never affected. Fix: a new `git_with_auth` helper passes the PAT via the `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_0=http.extraheader` / `GIT_CONFIG_VALUE_0` env-var triple instead — process environment is only readable by the same UID, so the token is no longer visible to other local users. Clone URL is always the clean `https://github.com/<owner>/<repo>.git`. Existing `.git/config` files with token-bearing URLs from earlier runs are scrubbed on the next invocation.
+- **FC-2026-019 / 020 / 021 / 022 — Notes, accepted.** Master / duplicates CSV data-exposure surface (mitigated by Netlify Pro Site Password — verified HTTP 401 on every artifact), secrets.json same-UID readability (standard user-account trust boundary), audit-static.sh clone dir trust (same as Strapi mirrors), and new inline JS in HTML reports (reviewed for XSS — all handlers use class-list / dataset reads, no innerHTML or eval). Documented in the audit doc and README findings table.
+
+[1.6.6]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.6
+
 ## [1.6.5] — 2026-05-11
 
 ### Added
