@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] — 2026-05-11
+
+### Added
+
+- **Strict mode in `audit-fleet.sh`: refuse to roll up a partial fleet.** When any per-site audit fails (SSH/clone/scan), the script now aborts before the consolidation + rollup step instead of quietly shipping a bundle that's missing sites. The auditor sees a clear "X of Y site(s) failed; refusing to roll up" error pointing at `failed_servers.txt` plus per-mode debugging hints (SSH, git, URL HEAD). Pass `--allow-partial` (or set `AUDIT_ALLOW_PARTIAL=1`) to opt out and ship a partial bundle anyway.
+
+### Fixed
+
+- **JSON loader bug shifting fields for `type:"git"` entries.** The TSV loader inside `audit-fleet.sh` used `IFS=$'\t'` for `read`, but bash collapses consecutive whitespace separators (tab is in bash's whitespace set), destroying the empty `user`/`host`/`remotePath` fields a git site has and shifting every subsequent field left by three positions. Result: `vpp-git` was parsed as `type=strapi`, `host=publicUrlBase`, and got routed through the SSH preflight where it failed with `UNREACHABLE`. Switched the separator to ASCII unit-separator (`\x1f`) — outside bash's whitespace set, so consecutive empties are preserved. Existing strapi-only `sites.json` files were unaffected because their entries always had all four fields populated.
+- **`audit-static.sh` `git fetch`/`git clone` failing on the "update existing clone" path.** The script piped `git fetch` and `git clone` output through `| head -20`, which closed the pipe early and sent SIGPIPE back to git, making it return non-zero even on successful fetches/clones. Removed the truncation — output flows freely now and only real failures trigger the error branch.
+
+### Changed
+
+- **Site cards on the bundle index now show the site's URL** under the site name (small blue link), and the **per-site detail page meta-grid** has a new "Public URL:" row. Pulled from `sites.json publicUrlBase` first, falling back to the NDJSON header. (Frontend-vs-API URL distinction is a follow-up — currently using whatever `publicUrlBase` is set to.)
+
+[1.6.2]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.6.2
+
 ## [1.6.1] — 2026-05-11
 
 ### Added

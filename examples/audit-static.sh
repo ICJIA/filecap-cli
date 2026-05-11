@@ -117,7 +117,11 @@ if [[ -d "${CLONE_DIR}/.git" ]]; then
   if [[ -n "$TOKEN_URL" ]]; then
     git -C "${CLONE_DIR}" remote set-url origin "${TOKEN_URL}"
   fi
-  if ! git -C "${CLONE_DIR}" fetch --depth=1 origin 2>&1 | grep -v "^From " | head -20; then
+  # Do NOT pipe `git fetch` through `head` — head closing the pipe early sends
+  # SIGPIPE back to git, making it return non-zero even on a successful fetch.
+  # Let the output stream freely; if there's actual failure, git's stderr is
+  # captured and surfaced via the exit code.
+  if ! git -C "${CLONE_DIR}" fetch --depth=1 origin; then
     die "git fetch failed — check repo URL or auth (gh auth status / FILECAP_GITHUB_TOKEN)"
   fi
   # Detect default branch from the remote HEAD; fall back to main
@@ -129,7 +133,8 @@ if [[ -d "${CLONE_DIR}/.git" ]]; then
   git -C "${CLONE_DIR}" remote set-url origin "${GIT_REPO}"
 else
   step "Cloning ${GIT_REPO} ..."
-  if ! git clone --depth=1 "${CLONE_URL_FOR_FETCH}" "${CLONE_DIR}" 2>&1 | head -20; then
+  # Same SIGPIPE rationale as above — no `| head` after git clone.
+  if ! git clone --depth=1 "${CLONE_URL_FOR_FETCH}" "${CLONE_DIR}"; then
     die "git clone failed — repo may be private (set FILECAP_GITHUB_TOKEN or run 'gh auth login') or URL may be wrong"
   fi
   DEFAULT_BRANCH=$(git -C "${CLONE_DIR}" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null \

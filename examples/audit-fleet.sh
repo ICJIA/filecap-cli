@@ -312,15 +312,22 @@ PYTOK
   fi
 }
 
-# ── strip --no-version-check from args before positional parsing ──────────────
+# ── strip known flags from args before positional parsing ────────────────────
 NEW_ARGS=()
 for a in "$@"; do
-  if [[ "$a" == "--no-version-check" ]]; then
-    SKIP_VERSION_CHECK=1
-    export SKIP_VERSION_CHECK
-  else
-    NEW_ARGS+=("$a")
-  fi
+  case "$a" in
+    --no-version-check)
+      SKIP_VERSION_CHECK=1
+      export SKIP_VERSION_CHECK
+      ;;
+    --allow-partial)
+      AUDIT_ALLOW_PARTIAL=1
+      export AUDIT_ALLOW_PARTIAL
+      ;;
+    *)
+      NEW_ARGS+=("$a")
+      ;;
+  esac
 done
 set -- "${NEW_ARGS[@]+"${NEW_ARGS[@]}"}"
 
@@ -774,6 +781,29 @@ done
 
 printf "\n"
 step "Per-server audits complete: ${SUCCESS_COUNT} succeeded, ${FAIL_COUNT} failed"
+
+# ── strict mode: refuse to consolidate / roll up when any site failed ────────
+# Default behavior is strict — if ANY per-site audit failed, abort before the
+# consolidation step so the fleet output never reflects a half-broken state.
+# Override with --allow-partial (or AUDIT_ALLOW_PARTIAL=1) for runs where you
+# explicitly want a partial bundle.
+if [[ "${FAIL_COUNT}" -gt 0 ]]; then
+  if [[ "${AUDIT_ALLOW_PARTIAL:-0}" == "1" ]]; then
+    warn "Continuing with partial bundle (${FAIL_COUNT} site(s) failed; AUDIT_ALLOW_PARTIAL=1 set)."
+  else
+    echo >&2
+    die "${FAIL_COUNT} of $((SUCCESS_COUNT + FAIL_COUNT)) site(s) failed; refusing to roll up a partial fleet.
+
+  Fix the failures listed in ${FAILED_SERVERS_TXT} and re-run, OR re-run with
+  AUDIT_ALLOW_PARTIAL=1 ./audit-fleet.sh (or pass --allow-partial) to ship the
+  bundle anyway with the failed sites missing.
+
+  Common fixes:
+    SSH failures   - re-check 'ssh forge@<host> true' and the README's SSH setup
+    git failures   - re-check 'gh auth status' or rotate FILECAP_GITHUB_TOKEN
+    URL HEAD fails - check the publicUrlBase in ~/.filecap/sites.json"
+  fi
+fi
 
 # ── check we have something to consolidate ────────────────────────────────────
 INVENTORY_FILES=()
