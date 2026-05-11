@@ -193,23 +193,19 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
   </section>`;
 }
 
-function renderCard(sr) {
+export function renderCard(sr) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
-  const siteName = he(site.siteName ?? site.name ?? "");
+  const nickname = he(site.siteName ?? site.name ?? "");
+  const fullName = he(site.siteFullName ?? site.siteName ?? site.name ?? "");
   const hostname = he(site.host ?? "");
   const ip = he(sr.header?.metadata?.serverIp ?? site.host ?? "");
-  // Prefer siteUrl (the public front-end homepage) for the card's "visit
-  // site" link — that's what a manager wants to click. Fall back to
-  // publicUrlBase (the file server) when siteUrl is omitted, so older
-  // sites.json entries keep working. Per-file URLs in the CSV/HTML still
-  // use publicUrlBase — those need to hit the API server where files live.
+
   const siteUrlRaw = site.siteUrl ?? site.publicUrlBase ?? sr.header?.metadata?.publicUrlBase ?? "";
-  const publicUrlBase = he(siteUrlRaw);
   const publicUrlBaseRaw = siteUrlRaw;
+  const publicUrlBase = he(siteUrlRaw);
 
   const totalFiles = summary?.totalFiles ?? 0;
   const remediable = summary?.remediable ?? 0;
-  const nonRemediable = totalFiles - remediable;
   const totalBytes = summary?.totalBytes ?? 0;
   const byCategory = summary?.byCategory ?? {};
 
@@ -220,17 +216,35 @@ function renderCard(sr) {
     (byCategory["presentation"] ?? 0) +
     (byCategory["office-legacy"] ?? 0) +
     (byCategory["legacy-office"] ?? 0);
+  const imageCount = byCategory["image"] ?? 0;
 
-  const breakdownItems = [];
-  if (pdfCount > 0) breakdownItems.push(`<li>${pdfCount.toLocaleString()} PDF${pdfCount !== 1 ? "s" : ""}</li>`);
-  if (officeCount > 0) breakdownItems.push(`<li>${officeCount.toLocaleString()} Office doc${officeCount !== 1 ? "s" : ""}</li>`);
-  const breakdownHtml = breakdownItems.length > 0
-    ? `<ul class="breakdown">${breakdownItems.join("")}</ul>`
-    : "";
+  // Audit-share percentage — rounded to 1 decimal so the conic-gradient is
+  // smooth but the percent badge in the donut stays short.
+  const pctRaw = totalFiles > 0 ? (remediable / totalFiles) * 100 : 0;
+  const pct = Math.round(pctRaw * 10) / 10;
+  const pctInt = Math.round(pctRaw);
 
-  const scanMeta = `Scanned ${he(fmtDate(scannedAt))} &middot; ${he(humanBytes(totalBytes))}`;
+  // Plain-English caption rounded to colloquial buckets so a manager
+  // doesn't have to read a percentage to grasp the share.
+  let phrase;
+  if (totalFiles === 0)             phrase = "No files inventoried";
+  else if (pctInt === 0)            phrase = "No files need audit";
+  else if (pctInt <= 12)            phrase = "A small share need audit";
+  else if (pctInt <= 28)            phrase = "About a quarter need audit";
+  else if (pctInt <= 42)            phrase = "About a third need audit";
+  else if (pctInt <= 58)            phrase = "About half need audit";
+  else if (pctInt <= 72)            phrase = "Two-thirds need audit";
+  else if (pctInt <= 88)            phrase = "Most need audit";
+  else                              phrase = "Nearly all need audit";
 
-  // Only show details element if there's a hostname or IP
+  const chipsHtml = [
+    pdfCount   > 0 ? `<span class="chip chip-pdf"><svg class="ico"><use href="#i-file"/></svg>${pdfCount.toLocaleString()} PDF${pdfCount !== 1 ? "s" : ""}</span>` : "",
+    officeCount > 0 ? `<span class="chip chip-doc"><svg class="ico"><use href="#i-file"/></svg>${officeCount.toLocaleString()} Office</span>` : "",
+    imageCount > 0 ? `<span class="chip chip-img"><svg class="ico"><use href="#i-img"/></svg>${imageCount.toLocaleString()} image${imageCount !== 1 ? "s" : ""}</span>` : "",
+  ].filter(Boolean).join("");
+
+  const scanMeta = `${he(humanBytes(totalBytes))} &middot; scanned ${he(fmtDate(scannedAt))}`;
+
   const hasTechDetails = hostname || (ip && ip !== hostname);
   const techDetailsHtml = hasTechDetails
     ? `<details class="tech-details">
@@ -241,20 +255,21 @@ function renderCard(sr) {
     : "";
 
   return `<article class="site-card">
-  <header>
-    <h3>${siteName}</h3>
+  <header class="card-head">
+    <p class="nickname">${nickname}</p>
+    <h3 class="full-name">${fullName}</h3>
     ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
-    <p class="scan-meta">${scanMeta}</p>
   </header>
-  <div class="big-stat">
-    <span class="number">${he(totalFiles.toLocaleString())}</span>
-    <span class="label">total files inventoried</span>
+  <div class="nums">
+    <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
+    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">need audit</span></div>
   </div>
-  <div class="remediation-summary">
-    <p class="remediable-count">${he(remediable.toLocaleString())} need accessibility audit</p>
-    ${breakdownHtml}
-    <p class="reference-count muted">${he(nonRemediable.toLocaleString())} other (mostly images)</p>
+  <div class="donut-row">
+    <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>need audit</small></div></div>
+    <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span></div>
   </div>
+  ${chipsHtml ? `<div class="chips">${chipsHtml}</div>` : ""}
+  <p class="scan-meta">${scanMeta}</p>
   ${techDetailsHtml}
   <div class="actions">
     <a href="${he(htmlFile)}" class="btn btn-primary">View detailed report &rarr;</a>
@@ -1081,6 +1096,13 @@ main {
 </style>
 </head>
 <body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+    <symbol id="i-img"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><polyline points="21 15 16 10 5 21"/></symbol>
+  </defs>
+</svg>
 
 <header class="site-header">
   <span class="brand"><span>filecap</span> fleet audit snapshot</span>
