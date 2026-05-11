@@ -490,10 +490,10 @@ describe("writeHtml", () => {
     // dp-hero container
     expect(html).toMatch(/<header class="dp-hero">/);
     // Two-up tiles (sampleEntries has 2 remediable entries -> 2 total / 2 audit -> 100%)
-    expect(html).toMatch(/<div class="dp-tile dp-total">[\s\S]*<span class="dp-num">2<\/span>/);
-    expect(html).toMatch(/<div class="dp-tile dp-audit">[\s\S]*<span class="dp-num">2<\/span>/);
+    expect(html).toMatch(/<div class="dp-tile dp-total"><span class="dp-num">2<\/span>/);
+    expect(html).toMatch(/<div class="dp-tile dp-audit"><span class="dp-num">2<\/span>/);
     // Donut on its own row
-    expect(html).toMatch(/<div class="dp-donut-row">[\s\S]*<div class="dp-donut"[^>]*style="--pct:100%/);
+    expect(html).toMatch(/<div class="dp-donut-row">\s*<div class="dp-donut"[^>]*style="--pct:100%/);
     // Plain-English caption
     expect(html).toMatch(/<p class="dp-donut-caption">/);
     // The full title appears in the h1
