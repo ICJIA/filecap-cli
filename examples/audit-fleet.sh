@@ -384,12 +384,17 @@ if [[ -n "$INPUT_FILE" ]] && [[ "$INPUT_FILE" == *.json ]]; then
   fi
   step "Loading server list from JSON bundle: ${INPUT_FILE}"
 
-  # Parse via python3 (already a script dep). Emit one TSV row per site:
-  #   name<TAB>user<TAB>host<TAB>remotePath<TAB>siteName<TAB>publicUrlBase<TAB>type<TAB>gitRepo<TAB>publicPath
-  # Tab is safe — none of these fields contain tabs. `type` defaults to "strapi"
-  # for entries without the field, preserving back-compat with existing
-  # sites.json files.
-  while IFS=$'\t' read -r _name _user _host _path _site _urlbase _type _gitrepo _publicpath; do
+  # Parse via python3 (already a script dep). Emit one row per site with
+  # fields separated by ASCII unit-separator (US, 0x1f):
+  #   name<US>user<US>host<US>remotePath<US>siteName<US>publicUrlBase<US>type<US>gitRepo<US>publicPath
+  #
+  # We use US instead of TAB because bash's `read` collapses consecutive
+  # whitespace characters (space, tab, newline) when IFS is set to one of
+  # them, which destroys empty fields. A type:"git" site has empty
+  # user/host/remotePath; with TAB the four consecutive tabs would collapse
+  # to one and shift every subsequent field left by three positions. US is
+  # not a whitespace character, so consecutive empties are preserved.
+  while IFS=$'\x1f' read -r _name _user _host _path _site _urlbase _type _gitrepo _publicpath; do
     # Default type for backward compatibility
     _type="${_type:-strapi}"
     case "$_type" in
@@ -424,6 +429,7 @@ if [[ -n "$INPUT_FILE" ]] && [[ "$INPUT_FILE" == *.json ]]; then
 import json, sys
 with open(sys.argv[1], 'r', encoding='utf-8') as fh:
     data = json.load(fh)
+US = "\x1f"
 for s in data.get("sites", []):
     fields = [
         s.get("name", ""),
@@ -436,7 +442,7 @@ for s in data.get("sites", []):
         s.get("gitRepo", ""),
         s.get("publicPath", ""),
     ]
-    print("\t".join(fields))
+    print(US.join(fields))
 PYJSON
 )
 
