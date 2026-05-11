@@ -31,6 +31,8 @@ The included `audit-remote.sh` script automates the entire workflow against any 
 
 As of 1.2.0, you can also publish the latest snapshot to a URL that your whole team can bookmark — one command bundles everything and deploys to Netlify. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot).
 
+**New in 1.7.x — manager-friendly visual redesign.** The fleet rollup now reads like an infographic instead of a spreadsheet. Each site is a large card with the site's full name in bold, two big colour-coded numbers (total files in blue, files-needing-audit in amber), a donut chart showing the audit-share percentage, plain-English captions ("Two-thirds need audit"), and file-type chips. The whole card is one big click target — anywhere on it takes you to that site's detailed report; the per-card "Download spreadsheet" button still works independently. The detail page for each site opens with the same hero pattern at larger size; below it, the file table now scrolls both horizontally and vertically with touch-friendly two-finger pan, and you can click-and-drag the right edge of any column header to resize that column. The "Public URL" column was promoted to position 4 (was column 8) so a vendor can see and click the link to each file without horizontal scrolling. See the [v1.7.x CHANGELOG entries](CHANGELOG.md) for the full list of visual changes.
+
 → Skip to [Quick start for managers](#quick-start-for-managers) for handoff instructions.
 
 ---
@@ -45,7 +47,9 @@ As of 1.2.0: `filecap web-rollup` bundles the most recent scan of every saved si
 
 Two distribution shapes: `filecap` CLI invoked directly via npx, plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where filecap actually ran.
 
-ESM-only. Node 20+ required. ~27 test files; 288 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
+ESM-only. Node 20+ required. 30 test files; 375 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
+
+**v1.7.x infographic rollup.** `renderCard` (now exported from `src/web/index-page.js`) emits a `<article class="site-card">` containing nickname → big full name (`siteFullName` from sites.json, falls back to `siteName`) → two-up tiles (total + audit, color-coded #4dabf7 / #ffa84d) → CSS-only conic-gradient donut on its own row with audit-share percentage → file-type chips → meta strip → CTA. Whole card is clickable via the standard stretched-link pattern; the bottom CTAs sit explicitly at `z-index: 2` so the overlay can't intercept their clicks. Per-site detail pages use the same hero pattern via `dp-hero` classes in `src/report/html.js`. Detail-page tables now use `table-layout: fixed` with a `<colgroup>` emitting initial column widths; each `<th>` carries a pointer-event resize handle on its right edge that updates the matching `<col>` width on drag. Pure CSS / vanilla JS — no chart library, no preprocessor.
 
 → Skip to [Quick start](#quick-start) for installation and basic usage.
 
@@ -254,7 +258,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.6.6 shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. Bundle includes cross-server duplicates detection (1.5.0) with a manager-friendly infographic hero (1.5.5), a master CSV combining every file from every server (1.5.0), a per-occurrence duplicates CSV for pivot in Excel (1.5.1), and visual consistency across every data table in the app (1.5.6). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
+**v1.7.x shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional, with the v1.7.x manager-friendly visual redesign deployed: infographic-style site cards on the fleet index, matching hero pattern on per-site detail pages, big colour-coded "total files + need audit" numbers with a CSS-only donut chart, plain-English audit-share captions, clickable cards with hover elevation, two-axis touch-friendly table scrolling, resizable detail-page columns (drag the right edge of any column header), and a redesigned "Files that appear on more than one server" duplicates section that explains in plain English that duplicates are normal and not a webmaster error. Bundle still includes cross-server duplicates detection (1.5.0), a master CSV combining every file from every server (1.5.0), and a per-occurrence duplicates CSV for pivot in Excel (1.5.1). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
 
 | Phase | Version | Status | Deliverable |
 |---|---|---|---|
@@ -275,6 +279,7 @@ npx vitest run test/web-rollup.test.js
 | 15 | v1.4.x | shipped | CSV/HTML deliverable trimmed to 14 columns; click-and-drag horizontal pan on every table |
 | 16 | v1.5.x | shipped | Cross-server duplicates with action explainer; master CSV + duplicates CSV in bundle; infographic hero; table-styling consistency; "Back to fleet index" navigation on per-site detail pages; footer links to GitHub + CHANGELOG |
 | 17 | v1.6.0 | shipped | `type: "git"` site mode — audit self-contained static-site (Nuxt) repos by shallow-cloning + scanning the repo's `/public/` folder. Mixed strapi + git fleets in one bundle. |
+| 18 | v1.7.x | shipped | Manager-friendly visual redesign: optional `siteFullName` field in `sites.json` plumbed end-to-end; 2-col infographic card grid with big two-up tiles, CSS-only donut, plain-English captions, file-type chips, clickable cards with hover elevation; matching `dp-hero` pattern on per-site detail pages; "Public URL" promoted to column 4; two-axis touch-pannable tables; resizable detail-page columns (drag right edge of any `<th>`); big visual duplicates section with always-visible plain-English explainer |
 | — | vNext | deferred | Strapi-aware mode (separate package); content-type sanity check on URL preflight |
 
 ### Production deployment
@@ -440,6 +445,8 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
 ```
 
 `siteName` and `publicUrlBase` are optional. Omitting them is valid. Old inventories without them continue to validate.
+
+**As of 1.7.0:** sites.json entries also accept an optional `siteFullName` — a verbose, human-readable name like `"Domestic Violence Fatality Review"` alongside the short nickname `"DVFR"` in `siteName`. The full name is rendered as the card title on the fleet index and the `<h1>` on the per-site detail page; sites without `siteFullName` keep using `siteName` as the title. `siteFullName` lives in sites.json, not in the inventory header — it's a per-publication choice, not a per-scan property.
 
 **Example file entry (PDF):**
 
@@ -970,10 +977,12 @@ Some sites are self-contained static-site builds (Nuxt, Astro, Vite, plain HTML)
 {
   "name": "vpp-git",
   "siteName": "VPP",
+  "siteFullName": "Violence Prevention Project",
   "type": "git",
   "gitRepo": "https://github.com/ICJIA/icjia-vpp-2025.git",
   "publicPath": "public",
-  "publicUrlBase": "https://vpp.illinois.gov"
+  "publicUrlBase": "https://vpp.icjia.illinois.gov",
+  "siteUrl": "https://vpp.illinois.gov/"
 }
 ```
 

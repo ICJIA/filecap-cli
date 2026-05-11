@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4] — 2026-05-11
+
+### Documentation
+
+- **README refresh for v1.7.x.** Manager TL;DR now mentions the v1.7.x infographic redesign (large cards, two-up colour-coded numbers, donut chart, plain-English captions, clickable cards, resizable detail-page columns, "Public URL" promoted to column 4) and points to `CHANGELOG.md` for the full release-by-release breakdown. Developer TL;DR is brought current: 30 test files / 375 tests; renderCard exported from `src/web/index-page.js`; `dp-hero` classes on per-site detail pages; CSS-only conic-gradient donut; `table-layout: fixed` + `<colgroup>` for resizable columns. Status section pinned to `v1.7.x shipped`, with a new row 18 in the phase-status table covering the visual redesign work (siteFullName plumbing, 2-col grid, donut, clickable cards, two-axis touch pan, column resize, big duplicates section). Schema docs now mention the optional `siteFullName` field. The `type: "git"` example was updated to the correct VPP domain (`vpp.icjia.illinois.gov`) and shows the full set of v1.7 fields (`siteFullName`, `siteUrl`, `publicUrlBase`). No code changes — this release exists so the npm registry's README mirrors the GitHub state.
+
+[1.7.4]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.4
+
 ## [1.7.3] — 2026-05-11
 
 ### Added
