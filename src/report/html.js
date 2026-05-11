@@ -239,7 +239,35 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     .join("\n");
 
   // ── header columns ───────────────────────────────────────────────────────────
-  const headerCells = CSV_COLUMNS.map((col) => `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}</th>`).join("");
+  // v1.7.3: per-column initial widths emitted into a <colgroup> so the table
+  // uses `table-layout: fixed`, which lets the user click-and-drag the right
+  // edge of any <th> to resize that column. Widths are starting points
+  // tuned to the typical content of each column.
+  const COL_INITIAL_PX = {
+    serverName:   140,
+    siteName:     110,
+    serverIp:     130,
+    publicUrl:    300,
+    modifiedAt:   170,
+    scannedPath:  220,
+    path:         260,
+    absolutePath: 300,
+    filename:     220,
+    extension:    90,
+    category:     110,
+    sizeBytes:    110,
+    sha256:       220,
+    duplicateOf:  220,
+  };
+  const colgroupHtml = `<colgroup>${
+    CSV_COLUMNS.map((col) => {
+      const w = COL_INITIAL_PX[col.name] ?? 140;
+      return `<col data-col="${htmlEscape(col.name)}" style="width:${w}px">`;
+    }).join("")
+  }</colgroup>`;
+  const headerCells = CSV_COLUMNS.map((col) =>
+    `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}<span class="col-resize-handle" data-resize-handle aria-hidden="true"></span></th>`
+  ).join("");
 
   // ── server/scan metadata display ─────────────────────────────────────────────
   // Per-site reports pull from top-level metadata fields. Consolidated fleet
@@ -688,6 +716,12 @@ a:hover { color: #93c5fd; text-decoration: underline; }
 /* ── data table ────────────────────────────────────────────── */
 table {
   border-collapse: collapse;
+  /* v1.7.3: switched to table-layout: fixed so the user can click-and-drag
+     the right edge of any <th> to resize that column. Widths are read from
+     the emitted <colgroup>; the table width adapts to the sum of column
+     widths so the parent .table-wrap can scroll horizontally as columns
+     expand. */
+  table-layout: fixed;
   width: max-content;
   min-width: 100%;
   font-size: 12px;
@@ -699,6 +733,7 @@ thead {
   background: #161b22;
 }
 thead th {
+  position: relative;          /* anchor for .col-resize-handle */
   padding: 0.45rem 0.65rem;
   text-align: left;
   white-space: nowrap;
@@ -706,6 +741,38 @@ thead th {
   cursor: pointer;
   user-select: none;
   color: #e5e5e5;
+  overflow: hidden;            /* clip the header label when col is narrow */
+  text-overflow: ellipsis;
+}
+/* v1.7.3: column-resize handle on the right edge of each header cell.
+   8px wide hit zone (touch-friendly), 2px visual indicator on hover. */
+.col-resize-handle {
+  position: absolute;
+  top: 0; right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+  touch-action: none;          /* let pointer events drive the resize */
+}
+.col-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 4px; bottom: 4px; right: 3px;
+  width: 2px;
+  background: transparent;
+  border-radius: 1px;
+  transition: background 120ms ease;
+}
+.col-resize-handle:hover::after,
+.col-resize-handle.is-active::after {
+  background: #4dabf7;
+}
+.table-wrap.is-resizing,
+.table-wrap.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 thead th:hover { background: #1a1a1a; }
 thead th.sort-asc::after  { content: " ▲"; font-size: 10px; color: #60a5fa; }
@@ -953,6 +1020,7 @@ ${filterBarHtml}
 
 <div class="table-wrap table-scroll">
   <table id="inventory-table" aria-label="File inventory">
+    ${colgroupHtml}
     <thead><tr>${headerCells}</tr></thead>
     <tbody id="inventory-body">
 ${rowsHtml}
@@ -1118,7 +1186,8 @@ ${rowsHtml}
     if (e.pointerType !== "mouse") return;
     if (e.button !== 0) return;
     // Don't start drag on interactive children (links, buttons, sort headers, inputs)
-    if (e.target.closest("a, button, input, select, [role='button']")) return;
+    // or on the v1.7.3 column-resize handles.
+    if (e.target.closest("a, button, input, select, [role='button'], [data-resize-handle]")) return;
     start = {
       x: e.clientX,
       scrollLeft: wrap.scrollLeft,
@@ -1155,6 +1224,71 @@ ${rowsHtml}
   wrap.addEventListener("pointerup", endPan);
   wrap.addEventListener("pointercancel", endPan);
   wrap.addEventListener("pointerleave", endPan);
+})();
+
+/* ── v1.7.3 column-resize: drag the right edge of any <th> to resize the
+   column. Each handle has data-resize-handle and its <th> has data-col
+   matching a <col data-col="..."> in the table's <colgroup>. We update the
+   <col>'s style.width so the column actually resizes regardless of cell
+   content (works because table-layout is fixed). Pointer events handle
+   both mouse and touch. */
+(function() {
+  const wrap = document.querySelector(".table-wrap");
+  if (!wrap) return;
+  const table = wrap.querySelector("table");
+  if (!table) return;
+  const cols = Array.from(table.querySelectorAll("colgroup col"));
+  if (cols.length === 0) return;
+  const handles = wrap.querySelectorAll(".col-resize-handle");
+  if (handles.length === 0) return;
+
+  const MIN_WIDTH = 60;
+  const colByName = new Map(cols.map((c) => [c.getAttribute("data-col"), c]));
+
+  handles.forEach(function (handle) {
+    let state = null;
+
+    handle.addEventListener("pointerdown", function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      const th = handle.parentElement;
+      if (!th) return;
+      const colName = th.getAttribute("data-col");
+      const col = colByName.get(colName);
+      if (!col) return;
+      // Measure the column's CURRENT rendered width so the drag is relative
+      // to whatever it is right now (initial 220px, or a previous resize).
+      const startW = th.getBoundingClientRect().width;
+      state = { startX: e.clientX, startW: startW, pointerId: e.pointerId, col: col };
+      handle.classList.add("is-active");
+      wrap.classList.add("is-resizing");
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    handle.addEventListener("pointermove", function (e) {
+      if (!state || e.pointerId !== state.pointerId) return;
+      const dx = e.clientX - state.startX;
+      const newW = Math.max(MIN_WIDTH, state.startW + dx);
+      state.col.style.width = newW + "px";
+    });
+
+    function endResize(e) {
+      if (!state) return;
+      if (e.pointerId !== undefined && e.pointerId !== state.pointerId) return;
+      handle.classList.remove("is-active");
+      wrap.classList.remove("is-resizing");
+      try { handle.releasePointerCapture(state.pointerId); } catch (_) {}
+      state = null;
+    }
+    handle.addEventListener("pointerup",     endResize);
+    handle.addEventListener("pointercancel", endResize);
+
+    // Prevent click from bubbling up to the <th> sort handler when the user
+    // releases without dragging (a stationary click on the 8px handle is
+    // still a "resize intent," not a sort intent).
+    handle.addEventListener("click", function (e) { e.stopPropagation(); });
+  });
 })();
 </script>
 

@@ -303,7 +303,9 @@ describe("writeHtml", () => {
     const out = path.join(tmpDir, "date-published-header.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
+    // v1.7.3: th now contains the label plus a column-resize handle span,
+    // so the assertion checks the open-tag + label, not the entire <th>...</th>.
+    expect(html).toMatch(/<th data-col="modifiedAt">Date published<span class="col-resize-handle"/);
     expect(html).not.toContain("Last modified");
   });
 
@@ -498,5 +500,35 @@ describe("writeHtml", () => {
     expect(html).toMatch(/<p class="dp-donut-caption">/);
     // The full title appears in the h1
     expect(html).toMatch(/<h1[^>]*>Domestic Violence Fatality Review<\/h1>/);
+  });
+
+  it("emits a <colgroup> with one <col> per CSV column for table-layout: fixed (v1.7.3 column resize)", async () => {
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: sampleHeader,
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    expect(html).toMatch(/<colgroup>/);
+    // sanity-check three cols at expected positions
+    expect(html).toMatch(/<col data-col="serverName" style="width:140px">/);
+    expect(html).toMatch(/<col data-col="publicUrl" style="width:300px">/);
+    expect(html).toMatch(/<col data-col="filename" style="width:220px">/);
+  });
+
+  it("renders a column-resize handle inside every <th> (v1.7.3 column resize)", async () => {
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: sampleHeader,
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    // every th has the handle; there are 14 CSV_COLUMNS so there must be 14 handles
+    const handles = html.match(/<span class="col-resize-handle"/g) || [];
+    expect(handles.length).toBe(14);
   });
 });

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] — 2026-05-11
+
+### Added
+
+- **Resizable columns on the per-site detail-page file table.** Click-and-drag the right edge of any column header to resize that column. Touch users can drag too — the 8 px hit zone uses pointer events with `touch-action: none` so the browser hands the drag to the resize logic instead of starting a horizontal pan. Implementation: each `<th>` gets a small absolutely-positioned `<span class="col-resize-handle">` on its right edge (subtle 2 px blue indicator on hover); the table emits a `<colgroup>` with one `<col data-col="…">` per CSV column carrying an initial width; JS pointermove updates the `<col>`'s style.width. Table is now `table-layout: fixed` so column widths are authoritative (was `auto`, which let cell content override `<col>` widths). The existing sort-on-click (header label area), filter-bar chips, sticky first column, and v1.7.2 two-axis touch panning of the table viewport all continue to work — the resize handle's `pointerdown` stops propagation so it doesn't trigger sort or pan, and the existing pan code's "bail on interactive child" selector was extended to also bail on `[data-resize-handle]`. Initial per-column widths are tuned to typical content: 90 px for File extension, 110 px for narrow text, 170 px for Date published, 220 px for filenames / paths, 300 px for Public URL and Full file path. Minimum after a drag is 60 px so a column can't be shrunk past readability.
+
+[1.7.3]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.3
+
 ## [1.7.2] — 2026-05-11
 
 ### Changed
