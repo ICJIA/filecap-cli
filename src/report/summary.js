@@ -36,7 +36,7 @@ export function buildAuditScopeBlock(entries) {
   const W = 66; // total width of box lines
   const DLINE = "═".repeat(W);
   const SLINE = "─".repeat(W);
-  const DCOUNT_LABEL = "  AUDIT SCOPE — files needing accessibility remediation:";
+  const DCOUNT_LABEL = "  AUDIT SCOPE — files that may need accessibility remediation:";
   const OCOUNT_LABEL = "  OTHER FILES (no direct remediation in the file itself):";
 
   // AUDIT SCOPE box
@@ -44,16 +44,16 @@ export function buildAuditScopeBlock(entries) {
   lines.push(`${DCOUNT_LABEL.padEnd(W - String(remediableCount).length - 1)}${remediableCount}`);
   lines.push(DLINE);
   lines.push("");
-  lines.push(`  ${"PDFs".padEnd(32)}${padL(pdfCount, 5)}    (need structural tagging,`);
+  lines.push(`  ${"PDFs".padEnd(32)}${padL(pdfCount, 5)}    (may need structural tagging,`);
   lines.push(`  ${"".padEnd(37)}alt text on images, heading`);
   lines.push(`  ${"".padEnd(37)}structure, etc.)`);
-  lines.push(`  ${"Word documents (.docx)".padEnd(32)}${padL(officeCount, 5)}    (need heading styles, table`);
+  lines.push(`  ${"Word documents (.docx)".padEnd(32)}${padL(officeCount, 5)}    (may need heading styles, table`);
   lines.push(`  ${"".padEnd(37)}header rows, alt text, etc.)`);
   lines.push(`  ${"Excel files (.xlsx)".padEnd(32)}${padL(spreadsheetCount, 5)}`);
   lines.push(`  ${"PowerPoint (.pptx)".padEnd(32)}${padL(presentationCount, 5)}`);
-  lines.push(`  ${"Legacy Office (.doc/.xls)".padEnd(32)}${padL(legacyCount, 5)}    (need conversion + remediation)`);
+  lines.push(`  ${"Legacy Office (.doc/.xls)".padEnd(32)}${padL(legacyCount, 5)}    (may need conversion + remediation)`);
   lines.push(`  ${"".padEnd(32)}${"────"}`);
-  lines.push(`  ${"Total needing work:".padEnd(32)}${padL(remediableCount, 5)}    ← THIS IS THE AUDIT WORKLOAD`);
+  lines.push(`  ${"Total that may need work:".padEnd(32)}${padL(remediableCount, 5)}    ← THIS IS THE AUDIT WORKLOAD`);
   lines.push("");
 
   // OTHER FILES divider
@@ -101,10 +101,10 @@ function buildObservations(data) {
     if (imageOnlyCount === 0) {
       bullets.push(`All ${pdfCount} PDFs are text-based — no OCR needed (good news, OCR is expensive)`);
     } else {
-      bullets.push(`${imageOnlyCount} of ${pdfCount} PDFs are image-only — these need OCR before remediation`);
+      bullets.push(`${imageOnlyCount} of ${pdfCount} PDFs are image-only — these may need OCR before remediation`);
     }
     if (taggedCount === 0) {
-      bullets.push(`No PDFs are tagged — all ${pdfCount} need structural tagging`);
+      bullets.push(`No PDFs are tagged — all ${pdfCount} may need structural tagging`);
     } else if (taggedCount < pdfCount) {
       bullets.push(`${pdfCount - taggedCount} of ${pdfCount} PDFs lack structural tags`);
     }
@@ -208,8 +208,8 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
   lines.push("-----------");
   lines.push(`  Total files:                ${totalFiles}`);
   lines.push(`  Total size:                 ${humanizeBytes(totalBytes)}`);
-  lines.push(`  Files needing remediation:  ${remediableCount} (${pct(remediableCount, totalFiles)} of total)`);
-  lines.push(`  Files not requiring work:   ${notRemediable}`);
+  lines.push(`  Files that may need remediation:  ${remediableCount} (${pct(remediableCount, totalFiles)} of total)`);
+  lines.push(`  Files that may not need work:     ${notRemediable}`);
   lines.push(`  Unique files:               ${uniqueCount}`);
   lines.push(`  Duplicate copies:           ${duplicateCount}`);
   lines.push(`  Bytes saved if deduped:     ${humanizeBytes(duplicateBytes)}`);
@@ -313,7 +313,7 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
     lines.push("  None in this audit.");
   } else {
     lines.push(`  Born-digital (text-based):    ${pdfWithIntro.filter((e) => !e.introspection.isImageOnly).length}`);
-    lines.push(`  Image-only (needs OCR):       ${imageOnlyCount}`);
+    lines.push(`  Image-only (may need OCR):    ${imageOnlyCount}`);
     lines.push(`  Already structurally tagged:  ${taggedCount}`);
     lines.push(`  Encrypted:                    ${encryptedPdfs}`);
     lines.push(`  Digitally signed:             ${signedPdfs}`);

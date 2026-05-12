@@ -74,7 +74,7 @@ describe("writeSummary — single-server", () => {
     expect(text).toContain("Source location:  /var/uploads");
     expect(text).toContain("The numbers");
     expect(text).toContain("Total files:                6");
-    expect(text).toContain("Files needing remediation:");
+    expect(text).toContain("Files that may need remediation:");
     expect(text).toContain("PDFs (2 files)");
     expect(text).toContain("Word documents");
     expect(text).toContain("Excel files");
@@ -257,8 +257,8 @@ describe("buildAuditScopeBlock", () => {
 
   it("remediable + non-remediable equals total entries", () => {
     const text = buildAuditScopeBlock(scopeEntries);
-    // Extract count from "Total needing work:" line
-    const needingMatch = text.match(/Total needing work:\s+(\d+)/);
+    // Extract count from "Total that may need work:" line (v1.7.8 softened)
+    const needingMatch = text.match(/Total that may need work:\s+(\d+)/);
     const nonRemMatch  = text.match(/Total non-remediation:\s+(\d+)/);
     expect(needingMatch).not.toBeNull();
     expect(nonRemMatch).not.toBeNull();

@@ -457,8 +457,11 @@ describe("runWebRollup", () => {
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
 
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).toContain("Files needing remediation");
-    expect(html).toContain("Files NOT requiring remediation");
+    // v1.7.8 softened both headings: "Files needing remediation" →
+    // "Files that may need remediation"; "Files NOT requiring remediation"
+    // → "Files that may not need remediation". Don't be prescriptive.
+    expect(html).toContain("Files that may need remediation");
+    expect(html).toContain("Files that may not need remediation");
   });
 
   it("index.html by-type tables skip rows where count is zero", async () => {

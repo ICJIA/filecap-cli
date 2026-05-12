@@ -179,7 +179,7 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
         </div>
         <div class="dup-kind-card dup-kind-card-variant">
           <h4 class="dup-kind-card-h4"><span class="dup-kind dup-variant">variant</span> — same filename, different content</h4>
-          <p>The file was edited on one server and the others still hold the older version. <strong>Each variant likely needs its own remediation pass</strong>. Open each in the table below to check whether they're truly distinct documents or whether one is the canonical version the others should be replaced with. Once you decide, either remediate all variants individually, or remediate the canonical one and overwrite the others (treating it like an <em>exact</em> case going forward).</p>
+          <p>The file was edited on one server and the others still hold the older version. <strong>Each variant may need its own remediation pass</strong>. Open each in the table below to check whether they're truly distinct documents or whether one is the canonical version the others should be replaced with. Once you decide, either remediate all variants individually, or remediate the canonical one and overwrite the others (treating it like an <em>exact</em> case going forward).</p>
         </div>
       </div>
 
@@ -216,6 +216,31 @@ const ACCESS_CHIP_LABEL = {
   github: "GitHub repo / access required",
   server: "Server / SSH required",
 };
+
+// Same clipboard-outline icon as src/report/html.js's COPY_ICON_SVG — kept
+// in lock-step visually. Duplicated rather than imported so the two pages
+// stay decoupled (changes to one don't risk regressing the other).
+const COPY_ICON_SVG = '<svg class="meta-copy-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4.25" y="3.25" width="8.5" height="10.5" rx="1.25"/><path d="M10.75 3.25V2.75a1 1 0 0 0-1-1h-2.5a1 1 0 0 0-1 1v0.5"/></svg>';
+
+/**
+ * Wrap a value in a flex container with the value text + a copy-to-clipboard
+ * button on the right. Used inside the per-card <details class="tech-details">
+ * disclosure so a remediator can copy the site's website nickname, IP,
+ * hostname, scanned path, and public URL straight from the index page
+ * without first opening the detail page. The button copies the *raw* value
+ * (passed verbatim to data-copy); displayHtml lets the rendered cell be
+ * richer (e.g. an <a> wrapping the URL) without affecting what gets copied.
+ *
+ * @param {string} value - raw text that goes on the clipboard
+ * @param {string|null} displayHtml - HTML to render (defaults to escaped value)
+ * @param {string} label - aria-label suffix, e.g. "IP address"
+ * @returns {string}
+ */
+function copyableValue(value, displayHtml, label) {
+  if (value === undefined || value === null || value === "") return "<span></span>";
+  const display = displayHtml ?? he(value);
+  return `<span class="meta-value">${display}<button type="button" class="meta-copy" data-copy="${he(value)}" aria-label="Copy ${he(label || "value")} to clipboard" title="Copy to clipboard">${COPY_ICON_SVG}<span class="meta-copy-feedback" aria-hidden="true">Copied</span></button></span>`;
+}
 
 export function renderCard(sr) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
@@ -256,14 +281,14 @@ export function renderCard(sr) {
   // doesn't have to read a percentage to grasp the share.
   let phrase;
   if (totalFiles === 0)             phrase = "No files inventoried";
-  else if (pctInt === 0)            phrase = "No files need audit";
-  else if (pctInt <= 12)            phrase = "A small share need audit";
-  else if (pctInt <= 28)            phrase = "About a quarter need audit";
-  else if (pctInt <= 42)            phrase = "About a third need audit";
-  else if (pctInt <= 58)            phrase = "About half need audit";
-  else if (pctInt <= 72)            phrase = "Two-thirds need audit";
-  else if (pctInt <= 88)            phrase = "Most need audit";
-  else                              phrase = "Nearly all need audit";
+  else if (pctInt === 0)            phrase = "No files may need audit";
+  else if (pctInt <= 12)            phrase = "A small share may need audit";
+  else if (pctInt <= 28)            phrase = "About a quarter may need audit";
+  else if (pctInt <= 42)            phrase = "About a third may need audit";
+  else if (pctInt <= 58)            phrase = "About half may need audit";
+  else if (pctInt <= 72)            phrase = "Two-thirds may need audit";
+  else if (pctInt <= 88)            phrase = "Most may need audit";
+  else                              phrase = "Nearly all may need audit";
 
   const chipsHtml = [
     pdfCount   > 0 ? `<span class="chip chip-pdf"><svg class="ico"><use href="#i-file"/></svg>${pdfCount.toLocaleString()} PDF${pdfCount !== 1 ? "s" : ""}</span>` : "",
@@ -273,12 +298,31 @@ export function renderCard(sr) {
 
   const scanMeta = `${he(humanBytes(totalBytes))} &middot; scanned ${he(fmtDate(scannedAt))}`;
 
-  const hasTechDetails = hostname || (ip && ip !== hostname);
+  // v1.7.8: expanded tech-details now mirrors the per-site detail page's
+  // meta-grid (website, IP, hostname, scanned path, public URL) with a
+  // copy-to-clipboard button on every row so a remediator can grab any of
+  // these strings without first opening the detail page. Raw values flow
+  // into data-copy; the cells render the escaped value (or, for the URL, an
+  // <a target="_blank"> so the user can still visit the live site).
+  const techWebsiteRaw = site.siteName ?? site.name ?? "";
+  const techIpRaw = sr.header?.metadata?.serverIp ?? "";
+  const techHostnameRaw = sr.header?.metadata?.hostname ?? site.host ?? "";
+  const techScannedPathRaw = sr.header?.metadata?.scannedPath ?? "";
+  const techUrlRaw = siteUrlRaw;
+
+  const techFieldsPopulated = [techWebsiteRaw, techIpRaw, techHostnameRaw, techScannedPathRaw, techUrlRaw].filter(Boolean).length;
+  const hasTechDetails = techFieldsPopulated > 0;
+
   const techDetailsHtml = hasTechDetails
     ? `<details class="tech-details">
     <summary>Technical details</summary>
-    ${hostname ? `<p class="hostname">${hostname}</p>` : ""}
-    ${ip && ip !== hostname ? `<p class="ip">${ip}</p>` : ""}
+    <div class="tech-grid">
+      ${techWebsiteRaw ? `<span class="tech-label">Website:</span>${copyableValue(techWebsiteRaw, null, "site nickname")}` : ""}
+      ${techIpRaw ? `<span class="tech-label">IP:</span>${copyableValue(techIpRaw, null, "IP address")}` : ""}
+      ${techHostnameRaw ? `<span class="tech-label">Hostname:</span>${copyableValue(techHostnameRaw, null, "hostname")}` : ""}
+      ${techScannedPathRaw ? `<span class="tech-label">Path:</span>${copyableValue(techScannedPathRaw, null, "scanned path")}` : ""}
+      ${techUrlRaw ? `<span class="tech-label">URL:</span>${copyableValue(techUrlRaw, `<a href="${he(techUrlRaw)}" target="_blank" rel="noopener noreferrer">${he(techUrlRaw)}</a>`, "public URL")}` : ""}
+    </div>
   </details>`
     : "";
 
@@ -292,10 +336,10 @@ export function renderCard(sr) {
   </header>
   <div class="nums">
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
-    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">need audit</span></div>
+    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span></div>
   </div>
   <div class="donut-row">
-    <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>need audit</small></div></div>
+    <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>may need audit</small></div></div>
     <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span></div>
   </div>
   ${chipsHtml ? `<div class="chips">${chipsHtml}</div>` : ""}
@@ -763,7 +807,9 @@ main {
   pointer-events: none;
 }
 .site-card .actions .btn,
-.site-card .tech-details summary {
+.site-card .tech-details summary,
+.site-card .tech-details .meta-copy,
+.site-card .tech-details .meta-value a {
   pointer-events: auto;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -934,6 +980,83 @@ main {
 .site-card .tech-details summary { cursor: pointer; }
 .site-card .tech-details .hostname,
 .site-card .tech-details .ip { margin: 4px 0 0; }
+/* v1.7.8 — expanded tech-details: 5-row mini-grid mirroring the per-site
+   detail page's meta-grid (website, IP, hostname, scanned path, public URL)
+   with a copy-to-clipboard button on every row. Label is monospace + muted
+   so the value reads as the foreground content. Long values (scanned path)
+   word-break so the card width stays bounded. */
+.site-card .tech-details .tech-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 0.8rem;
+  margin: 8px 0 0;
+  align-items: center;
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.92em;
+}
+.site-card .tech-details .tech-label {
+  font-weight: 700;
+  color: var(--fc-text-muted, #9aa5b1);
+}
+.site-card .tech-details .meta-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  color: #d4dae0;
+  word-break: break-all;
+}
+.site-card .tech-details .meta-value > a {
+  color: var(--fc-accent, #4dabf7);
+  text-decoration: none;
+  word-break: break-all;
+}
+.site-card .tech-details .meta-value > a:hover { text-decoration: underline; }
+.site-card .tech-details .meta-copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid #2a323d;
+  border-radius: 4px;
+  color: #9aa5b1;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  overflow: hidden;
+  vertical-align: middle;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease, width 140ms ease;
+}
+.site-card .tech-details .meta-copy:hover {
+  background: rgba(88, 166, 255, 0.10);
+  color: #58a6ff;
+  border-color: #58a6ff;
+}
+.site-card .tech-details .meta-copy:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.site-card .tech-details .meta-copy.copied {
+  width: 64px;
+  color: #66d9a3;
+  border-color: #66d9a3;
+  background: rgba(102, 217, 163, 0.10);
+}
+.site-card .tech-details .meta-copy-icon { width: 13px; height: 13px; flex: none; }
+.site-card .tech-details .meta-copy-feedback {
+  display: none;
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+.site-card .tech-details .meta-copy.copied .meta-copy-icon { display: none; }
+.site-card .tech-details .meta-copy.copied .meta-copy-feedback { display: inline; }
 
 .site-card .actions {
   margin-top: auto;             /* pin to bottom of card */
@@ -1441,7 +1564,7 @@ main {
   </section>
 
   <section class="explanation">
-    <h2>Why aren&#39;t all ${he(fleetTotalFiles.toLocaleString())} files counted as needing work?</h2>
+    <h2>Why aren&#39;t all ${he(fleetTotalFiles.toLocaleString())} files counted as possibly needing work?</h2>
 
     <p>
       Good question — the number of files we found and the number that
@@ -1485,7 +1608,7 @@ main {
         </p>
         <p>
           A handful of other files — text files, READMEs, empty placeholder
-          files — also don&#39;t need remediation. They&#39;re listed for
+          files — also may not need remediation. They&#39;re listed for
           completeness too.
         </p>
       </div>
@@ -1497,7 +1620,7 @@ main {
 
     <div class="by-type-grid">
       <div class="by-type-column remediable">
-        <h3>Files needing remediation</h3>
+        <h3>Files that may need remediation</h3>
         <p class="caption">
           Vendor scope — these documents will be processed file by file.
         </p>
@@ -1510,9 +1633,9 @@ main {
       </div>
 
       <div class="by-type-column reference">
-        <h3>Files NOT requiring remediation</h3>
+        <h3>Files that may not need remediation</h3>
         <p class="caption">
-          Handled separately by site editors — or simply don&#39;t apply.
+          Handled separately by site editors — or simply may not apply.
         </p>
         <table>
           <tbody>${referenceRowsHtml}</tbody>
@@ -1596,6 +1719,57 @@ ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
     wrap.addEventListener("pointerup", endPan);
     wrap.addEventListener("pointercancel", endPan);
     wrap.addEventListener("pointerleave", endPan);
+  });
+})();
+
+/* v1.7.8 — clipboard handler for the expanded tech-details on each site
+   card. One delegated listener on document.body covers every copy
+   button regardless of how many cards the page has. stopPropagation +
+   preventDefault so the click is consumed by the button alone and never
+   bubbles to the stretched-link (which would navigate to the detail
+   page mid-copy). navigator.clipboard.writeText preferred; falls back
+   to a hidden-textarea + execCommand("copy") on file:// loads and very
+   old browsers. */
+(function () {
+  "use strict";
+  function flashCopied(btn) {
+    btn.classList.add("copied");
+    if (btn._copiedTimer) clearTimeout(btn._copiedTimer);
+    btn._copiedTimer = setTimeout(function () {
+      btn.classList.remove("copied");
+      btn._copiedTimer = null;
+    }, 1400);
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest ? e.target.closest(".meta-copy") : null;
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var text = btn.getAttribute("data-copy");
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        flashCopied(btn);
+      }).catch(function () {
+        if (fallbackCopy(text)) flashCopied(btn);
+      });
+    } else {
+      if (fallbackCopy(text)) flashCopied(btn);
+    }
   });
 })();
 </script>

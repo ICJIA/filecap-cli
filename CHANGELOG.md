@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.8] — 2026-05-12
+
+### Added
+
+- **Expanded "Technical details" disclosure on every index-page card, with copy-to-clipboard buttons on every row.** The pre-v1.7.8 collapsed section showed only `hostname` and `ip` as two terse `<p>` lines. It now shows a five-row mini-grid mirroring the per-site detail page's meta-grid — **Website**, **IP**, **Hostname**, **Path**, **URL** — with a copy button on each so a remediator can grab any of these strings straight from the fleet index without first opening the detail page. The URL row keeps a clickable `<a target="_blank">` alongside the copy button so both intents (visit, paste) work in one place. Click feedback: the button widens, swaps the clipboard icon for a green "Copied" tag for 1.4 s, then snaps back. Implementation uses the same `navigator.clipboard.writeText` + `execCommand("copy")` fallback pair as v1.7.7's detail-page buttons; a small `COPY_ICON_SVG` + `copyableValue(...)` helper duplicate of the detail-page code lives in `src/web/index-page.js` so the two pages stay decoupled (a change to one doesn't risk regressing the other). pointer-events: auto is added for `.tech-details .meta-copy` and `.tech-details .meta-value a` so the copy buttons and URL link remain interactive even though the card-wide stretched-link covers them. The clipboard handler `stopPropagation`'s and `preventDefault`'s the click so the stretched-link never fires mid-copy. 6 new tests cover the five label/value rows, the data-copy raw values, the URL link's coexistence with the copy button, and the omit-when-empty fallback path.
+
+### Changed
+
+- **Gentler language throughout the rollup outputs: "needs/need remediation" → "may need remediation"; "need audit" → "may need audit".** The pre-v1.7.8 phrasing read as prescriptive ("Two-thirds need audit", "files need remediation", "Files needing remediation") — telling managers and remediators what *has* to happen. The new phrasing is accurate but soft: filecap surfaces files that *may* warrant a closer accessibility review, and the actual remediation decision is up to the audit team and the content owner. Touches every user-visible surface where the old wording appeared: the index-page card phrase buckets (`No files may need audit`, `A small share may need audit`, ..., `Nearly all may need audit`), the audit tile label, the donut caption, the "by-file-type" column headings (`Files that may need remediation` / `Files that may not need remediation`), the duplicates explainer ("Each variant **may need** its own remediation pass"), the per-site detail page's dp-hero (same phrase buckets), the stat-card label (`files may need remediation`), the row-color legend (`May need OCR before...`), the `audit-summary.txt` text deliverable (the `AUDIT SCOPE` label, the per-category captions, the per-server breakdown line, the totals row, the bullet point on image-only PDFs, the PDF detail line), and the `README.txt` template's "files that may need remediation" intro plus the renamed "What 'May need remediation' means" glossary entry. Phrasing in code comments was left alone — comments aren't manager-facing.
+
+[1.7.8]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.8
+
 ## [1.7.7] — 2026-05-12
 
 ### Fixed

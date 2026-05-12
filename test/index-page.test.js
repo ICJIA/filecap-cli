@@ -120,6 +120,90 @@ describe("renderCard", () => {
   });
 });
 
+describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
+  const sr = {
+    site: {
+      name: "dvfr-strapi-prod",
+      siteName: "DVFR",
+      siteFullName: "Domestic Violence Fatality Review",
+      siteUrl: "https://dvfr.illinois.gov/",
+      host: "1.2.3.4",
+    },
+    summary: { totalFiles: 10, remediable: 5, totalBytes: 1000, byCategory: { pdf: 5 } },
+    htmlFile: "dvfr-2026.html",
+    csvFile: "dvfr-2026.csv",
+    scannedAt: "2026-05-11T14:00:00.000Z",
+    header: {
+      metadata: {
+        serverIp: "192.241.146.85",
+        hostname: "dvfr.example.com",
+        scannedPath: "/home/forge/dvfr.icjia-api.cloud/dvfr-api/public/uploads",
+      },
+    },
+  };
+
+  it("renders a tech-grid with all five label/value pairs", () => {
+    const html = renderCard(sr);
+    expect(html).toContain('<div class="tech-grid">');
+    expect(html).toMatch(/<span class="tech-label">Website:<\/span>/);
+    expect(html).toMatch(/<span class="tech-label">IP:<\/span>/);
+    expect(html).toMatch(/<span class="tech-label">Hostname:<\/span>/);
+    expect(html).toMatch(/<span class="tech-label">Path:<\/span>/);
+    expect(html).toMatch(/<span class="tech-label">URL:<\/span>/);
+  });
+
+  it("emits exactly five copy buttons inside tech-details, one per row", () => {
+    const html = renderCard(sr);
+    const techStart = html.indexOf('<details class="tech-details">');
+    const techEnd = html.indexOf('</details>', techStart);
+    expect(techStart).toBeGreaterThan(-1);
+    expect(techEnd).toBeGreaterThan(techStart);
+    const techBlock = html.slice(techStart, techEnd);
+    const buttons = techBlock.match(/<button[^>]*class="meta-copy"/g) || [];
+    expect(buttons.length).toBe(5);
+  });
+
+  it("each copy button carries the raw value in data-copy", () => {
+    const html = renderCard(sr);
+    expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="DVFR"/);
+    expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="192\.241\.146\.85"/);
+    expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="dvfr\.example\.com"/);
+    expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="\/home\/forge\/dvfr\.icjia-api\.cloud\/dvfr-api\/public\/uploads"/);
+    expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="https:\/\/dvfr\.illinois\.gov\/"/);
+  });
+
+  it("the URL row renders a clickable <a target=_blank> alongside the copy button", () => {
+    const html = renderCard(sr);
+    expect(html).toMatch(/<span class="tech-label">URL:<\/span><span class="meta-value"><a href="https:\/\/dvfr\.illinois\.gov\/" target="_blank" rel="noopener noreferrer">https:\/\/dvfr\.illinois\.gov\/<\/a><button[^>]*class="meta-copy"[^>]*data-copy="https:\/\/dvfr\.illinois\.gov\/"/);
+  });
+
+  it("omits rows whose value is empty (e.g. no hostname recorded)", () => {
+    const srNoHostname = {
+      ...sr,
+      site: { ...sr.site, host: "" },
+      header: { metadata: { ...sr.header.metadata, hostname: "" } },
+    };
+    const html = renderCard(srNoHostname);
+    expect(html).not.toMatch(/<span class="tech-label">Hostname:<\/span>/);
+    // Should still have 4 buttons (Website, IP, Path, URL)
+    const techStart = html.indexOf('<details class="tech-details">');
+    const techEnd = html.indexOf('</details>', techStart);
+    const techBlock = html.slice(techStart, techEnd);
+    const buttons = techBlock.match(/<button[^>]*class="meta-copy"/g) || [];
+    expect(buttons.length).toBe(4);
+  });
+
+  it("omits the entire tech-details section when no fields populated", () => {
+    const srEmpty = {
+      ...sr,
+      site: { name: "x", siteName: "", host: "" },
+      header: { metadata: {} },
+    };
+    const html = renderCard(srEmpty);
+    expect(html).not.toContain('<details class="tech-details">');
+  });
+});
+
 describe("index page CSS (v1.7.7 whole-card click fix)", () => {
   // The fix lives in the <style> block emitted by generateIndexHtml: it
   // pins pointer-events: none on every non-interactive descendant of
@@ -138,6 +222,9 @@ describe("index page CSS (v1.7.7 whole-card click fix)", () => {
   });
 
   it("re-enables pointer-events on the action buttons + tech-details summary", () => {
-    expect(html).toMatch(/\.site-card \.actions \.btn,\s*\.site-card \.tech-details summary\s*\{[^}]*pointer-events:\s*auto/);
+    // v1.7.8 extended the allowlist to also include .tech-details .meta-copy
+    // and .tech-details .meta-value a (the URL link inside tech-details), so
+    // the regex matches the leading two selectors plus a flexible tail.
+    expect(html).toMatch(/\.site-card \.actions \.btn,\s*\.site-card \.tech-details summary[\s\S]{0,200}\{\s*pointer-events:\s*auto/);
   });
 });

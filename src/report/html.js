@@ -387,14 +387,14 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const heroPctInt = Math.round(heroPctRaw);
   let heroPhrase;
   if (heroTotal === 0)             heroPhrase = "No files inventoried";
-  else if (heroPctInt === 0)       heroPhrase = "No files need audit";
-  else if (heroPctInt <= 12)       heroPhrase = "A small share need audit";
-  else if (heroPctInt <= 28)       heroPhrase = "About a quarter need audit";
-  else if (heroPctInt <= 42)       heroPhrase = "About a third need audit";
-  else if (heroPctInt <= 58)       heroPhrase = "About half need audit";
-  else if (heroPctInt <= 72)       heroPhrase = "Two-thirds need audit";
-  else if (heroPctInt <= 88)       heroPhrase = "Most need audit";
-  else                              heroPhrase = "Nearly all need audit";
+  else if (heroPctInt === 0)       heroPhrase = "No files may need audit";
+  else if (heroPctInt <= 12)       heroPhrase = "A small share may need audit";
+  else if (heroPctInt <= 28)       heroPhrase = "About a quarter may need audit";
+  else if (heroPctInt <= 42)       heroPhrase = "About a third may need audit";
+  else if (heroPctInt <= 58)       heroPhrase = "About half may need audit";
+  else if (heroPctInt <= 72)       heroPhrase = "Two-thirds may need audit";
+  else if (heroPctInt <= 88)       heroPhrase = "Most may need audit";
+  else                              heroPhrase = "Nearly all may need audit";
   const heroTitle = htmlEscape(siteFullName || siteName || "filecap inventory report");
   const heroNick = htmlEscape(siteName ?? "");
 
@@ -1111,10 +1111,10 @@ ${(backHref || csvHref) ? `<nav class="report-back-bar" aria-label="Report navig
   <h1 class="dp-title">${heroTitle}</h1>
   <div class="dp-nums">
     <div class="dp-tile dp-total"><span class="dp-num">${heroTotal.toLocaleString()}</span><span class="dp-lbl">total files</span></div>
-    <div class="dp-tile dp-audit"><span class="dp-num">${heroAudit.toLocaleString()}</span><span class="dp-lbl">need audit</span></div>
+    <div class="dp-tile dp-audit"><span class="dp-num">${heroAudit.toLocaleString()}</span><span class="dp-lbl">may need audit</span></div>
   </div>
   <div class="dp-donut-row">
-    <div class="dp-donut" style="--pct:${heroPct}%"><div class="dp-pct">${heroPctInt}%<small>need audit</small></div></div>
+    <div class="dp-donut" style="--pct:${heroPct}%"><div class="dp-pct">${heroPctInt}%<small>may need audit</small></div></div>
     <p class="dp-donut-caption"><strong>${heroPhrase}</strong> &middot; ${heroAudit.toLocaleString()} of ${heroTotal.toLocaleString()} files</p>
   </div>
 </header>
@@ -1128,7 +1128,7 @@ ${accessPanelHtml}
   <div class="stat-card remediable">
     <div class="stat-heading">Audit work</div>
     <div class="stat-number">${remediableCount}</div>
-    <div class="stat-label">files need remediation</div>
+    <div class="stat-label">files may need remediation</div>
     <ul class="stat-detail">
       ${pdfCount > 0 ? `<li>${pdfCount} PDF${pdfCount === 1 ? "" : "s"}</li>` : ""}
       ${officeCount > 0 ? `<li>${officeCount} Office doc${officeCount === 1 ? "" : "s"}</li>` : ""}
@@ -1193,7 +1193,7 @@ ${filterBarHtml}
   </p>
   <p class="row-marker-row">
     <span class="row-marker-swatch row-marker-imageonly" aria-hidden="true"></span>
-    <strong>Faint yellow row tint</strong> — the file is an <em>image-only PDF</em> (scanned, no text layer). Needs OCR before it can be tagged for screen readers. Typically the most expensive remediation work — a vendor will price these higher than text-based PDFs.
+    <strong>Faint yellow row tint</strong> — the file is an <em>image-only PDF</em> (scanned, no text layer). May need OCR before it can be tagged for screen readers. Typically the most expensive remediation work — a vendor will price these higher than text-based PDFs.
   </p>
 </aside>
 
