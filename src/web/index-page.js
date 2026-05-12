@@ -913,7 +913,16 @@ main {
   margin: 6px 0 18px;
 }
 .site-card .donut {
-  width: 130px; height: 130px;
+  /* v1.7.10: bumped from 130x130 → 180x180 (and ::after inset 14 → 22)
+     so the inner hole's horizontal chord at the y-position of the
+     "MAY NEED AUDIT" caption is comfortably wider than the text. Pre-
+     v1.7.10 the inner hole was 102 px diameter and "may need audit" was
+     ~101 px wide — at the chord-narrower bottom of the .pct box the text
+     bled into the colored ring, reading as "the text is offset". With a
+     136 px inner hole the chord at +/- 20 px from center (where the
+     bottom of the .pct sits) is ~130 px, leaving ~10 px of clearance on
+     each side of "may need audit". */
+  width: 180px; height: 180px;
   border-radius: 50%;
   /* --pct is emitted with a "%" suffix (e.g. "--pct:67.6%"). CSS calc()
      cannot multiply two percentages, so we use the var directly as a
@@ -929,14 +938,14 @@ main {
 .site-card .donut::after {
   content: "";
   position: absolute;
-  inset: 14px;
+  inset: 22px;
   background: #141a23;
   border-radius: 50%;
 }
 .site-card .donut .pct {
   position: relative; z-index: 1;
   font-weight: 900;
-  font-size: 1.5em;
+  font-size: 1.7em;
   color: #ffa84d;
   line-height: 1;
   /* v1.7.9: center both the percentage and the <small> caption inside the

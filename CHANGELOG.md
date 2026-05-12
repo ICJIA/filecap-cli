@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.10] — 2026-05-12
+
+### Changed
+
+- **Index-card donut grown from 130 × 130 px to 180 × 180 px (and the inner-hole inset from 14 to 22 px) so "MAY NEED AUDIT" comfortably fits inside the inner hole.** v1.7.9's `text-align: center` fix put the .pct flex item perfectly at the donut's geometric center (verified at exactly 0 px offset), but the small caption — at 113 px wide after v1.7.8's softening — was effectively the same width as the 102 px inner-hole diameter, so the text's edges touched the colored ring at the y-positions where the circular chord is narrower than the diameter. Result: even though the text was centered, it visually read as "off" because the caption was crowding the orange/blue ring at the corners. The new 180 × 180 donut yields a 136 px inner hole; "may need audit" sits ~10 px clear of the ring on each side and ~75 px clear around the percentage. Percentage glyph upsized in lock-step from 1.5 em to 1.7 em (matching the per-site detail page's `.dp-pct`). No other layout change on the card; the donut-row's caption column shrinks ~50 px to absorb the bump, which still leaves plenty of room for "Two-thirds may need audit · 69 of 102 files" on a single line at any sane viewport.
+
+[1.7.10]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.10
+
 ## [1.7.9] — 2026-05-12
 
 ### Fixed
