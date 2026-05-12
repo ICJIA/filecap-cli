@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.12] — 2026-05-12
+
+### Fixed
+
+- **Image-only PDF row tint now actually visible on the per-site detail page's file table — and applies across every cell, not just the first.** Hidden CSS-specificity bug present since the original v1.0.2 row-marker code: `tbody tr:nth-child(even/odd) { background: ... }` (selector specificity 0,1,2) outranked `tr.image-only { background: #111000 }` (0,1,1), so the row-level tint never won. Only `tr.image-only td:first-child` (also 0,1,2, plus later in source order) rendered — leaving a barely-perceptible marker on the leftmost column and nothing on the rest of the row. The result was that the "faint yellow row tint" legend entry described a marker that was essentially invisible against the dark `#0d1117` page background. Fixed by retargeting at `tbody tr.image-only td` (0,1,3, beats the striping) and bumping the color from a luminance-twin-of-page-bg `#111000` to a clearly-amber `#3a2c08` (with `#4d3a0c` on the first-cell marker stripe). Legend swatch (`.row-marker-imageonly`) updated to match the new color so the legend accurately mirrors what the row looks like. Text contrast on the new background remains ≥ 8 : 1 against the `#e5e5e5` foreground — comfortably above WCAG AA.
+
+[1.7.12]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.12
+
 ## [1.7.11] — 2026-05-12
 
 ### Changed

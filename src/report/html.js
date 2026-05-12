@@ -970,8 +970,16 @@ td a { color: #60a5fa; }
 td a:hover { color: #93c5fd; text-decoration: underline; }
 
 /* ── row state classes ─────────────────────────────────────── */
-tr.image-only td:first-child { background: #1a1400; }
-tr.image-only { background: #111000; }
+/* v1.7.12 — image-only tint now applies across every cell of the row (not
+   just the first cell) and is noticeably yellower so a manager scanning the
+   table can see the flag at a glance. Pre-v1.7.12 the "tbody tr:nth-child(even)"
+   striping rule above (specificity 0,1,2) outranked "tr.image-only" (0,1,1),
+   so the row-level tint never won — only "tr.image-only td:first-child" (0,1,2,
+   plus later in source order) rendered, leaving a barely-visible marker on the
+   first column. New rules target "tbody tr.image-only td" (0,1,3) so the tint
+   beats both the striping and the per-row backgrounds. */
+tbody tr.image-only td { background: #3a2c08; }
+tbody tr.image-only td:first-child { background: #4d3a0c; }
 tr.flagged { border-left: 3px solid #fbbf24; }
 tr.flagged td { /* let row bg show through; border is the indicator */ }
 
@@ -1069,9 +1077,10 @@ tr.flagged td { /* let row bg show through; border is the indicator */ }
   background: #0d1117;
 }
 .row-marker-imageonly {
-  /* Mirror the actual image-only row tint. */
-  background: #111000;
-  border: 1px solid #1a1400;
+  /* v1.7.12 — mirror the new, more visible image-only row tint
+     (tbody tr.image-only td background above). */
+  background: #3a2c08;
+  border: 1px solid #4d3a0c;
 }
 /* On narrow viewports, collapse the table to a stacked layout so cells
    don't squeeze each other into single-character columns. */
