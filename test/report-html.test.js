@@ -531,4 +531,101 @@ describe("writeHtml", () => {
     const handles = html.match(/<span class="col-resize-handle"/g) || [];
     expect(handles.length).toBe(14);
   });
+
+  describe("access-method panel (v1.7.6)", () => {
+    it("renders a Strapi-CMS access panel when accessKind is 'strapi'", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+        accessKind: "strapi",
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).toMatch(/<section class="access-panel access-strapi"/);
+      expect(html).toContain("Strapi CMS / SSH required");
+      expect(html).toContain("Strapi CMS instance on a remote Linux host");
+      expect(html).toContain("OpenSSH public key");
+      expect(html).toContain("Contact IDS at ICJIA");
+    });
+
+    it("renders a GitHub access panel when accessKind is 'github'", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+        accessKind: "github",
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).toMatch(/<section class="access-panel access-github"/);
+      expect(html).toContain("GitHub repo / access required");
+      expect(html).toContain("GitHub.com account");
+      expect(html).toContain("ICJIA organization access");
+      expect(html).toContain("Contact IDS at ICJIA");
+    });
+
+    it("renders a Server access panel when accessKind is 'server'", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+        accessKind: "server",
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).toMatch(/<section class="access-panel access-server"/);
+      expect(html).toContain("Server / SSH required");
+      expect(html).toContain("static directory on a remote Linux host");
+      expect(html).toContain("OpenSSH public key");
+      expect(html).toContain("Contact IDS at ICJIA");
+    });
+
+    it("omits the panel entirely when accessKind is null/undefined", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).not.toMatch(/class="access-panel/);
+      expect(html).not.toContain("How to access this site's files");
+    });
+
+    it("omits the panel when accessKind is an unrecognized value", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+        accessKind: "ftp",
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).not.toMatch(/class="access-panel/);
+    });
+
+    it("places the access panel between the dp-hero and the meta-grid", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+        accessKind: "strapi",
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      const heroEnd = html.indexOf("</header>");
+      const panelStart = html.indexOf('<section class="access-panel');
+      const metaGrid = html.indexOf('<div class="meta-grid">');
+      expect(heroEnd).toBeGreaterThan(-1);
+      expect(panelStart).toBeGreaterThan(heroEnd);
+      expect(metaGrid).toBeGreaterThan(panelStart);
+    });
+  });
 });

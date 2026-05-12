@@ -135,7 +135,31 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
  *                                        Standalone single-site audits omit
  *                                        this (nothing to navigate back to).
  */
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null }) {
+// Detail-page access-panel copy. Keep in lock-step with ACCESS_CHIP_LABEL in
+// src/web/index-page.js so a manager going from index → detail sees consistent
+// language.
+const ACCESS_PANEL_COPY = {
+  strapi: {
+    label: "Strapi CMS / SSH required",
+    method: "Files are served by a Strapi CMS instance on a remote Linux host. To audit or remediate them you need to rsync the uploads directory over SSH.",
+    credential: "An OpenSSH public key on the file server is required.",
+    action: "Contact IDS at ICJIA to request access.",
+  },
+  github: {
+    label: "GitHub repo / access required",
+    method: "Files live in an ICJIA-owned GitHub repository. To audit or remediate them you clone the repo and inspect the static asset directory.",
+    credential: "A GitHub.com account with ICJIA organization access is required.",
+    action: "Contact IDS at ICJIA to request access.",
+  },
+  server: {
+    label: "Server / SSH required",
+    method: "Files are stored in a static directory on a remote Linux host (no CMS). To audit or remediate them you need to rsync the directory over SSH.",
+    credential: "An OpenSSH public key on the file server is required.",
+    action: "Contact IDS at ICJIA to request access.",
+  },
+};
+
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -350,6 +374,21 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const heroTitle = htmlEscape(siteFullName || siteName || "filecap inventory report");
   const heroNick = htmlEscape(siteName ?? "");
 
+  // Access-method panel: shown when web-rollup passes an accessKind. Tells a
+  // manager/remediator at a glance how the site's files are served + what
+  // credentials are needed to reach them. The index card carries the chip
+  // version; this is the verbose treatment with the SSH-key + Contact IDS
+  // call-to-action that the chip can't fit.
+  const accessCopy = accessKind && ACCESS_PANEL_COPY[accessKind] ? ACCESS_PANEL_COPY[accessKind] : null;
+  const accessPanelHtml = accessCopy
+    ? `<section class="access-panel access-${accessKind}" aria-labelledby="access-panel-heading">
+  <div class="access-panel-eyebrow">How to access this site's files</div>
+  <h2 class="access-panel-heading" id="access-panel-heading">${htmlEscape(accessCopy.label)}</h2>
+  <p class="access-panel-method">${htmlEscape(accessCopy.method)}</p>
+  <p class="access-panel-credential"><strong>${htmlEscape(accessCopy.credential)}</strong> ${htmlEscape(accessCopy.action)}</p>
+</section>`
+    : "";
+
   // ── assemble HTML ─────────────────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -540,6 +579,63 @@ a:hover { color: #93c5fd; text-decoration: underline; }
   .dp-hero .dp-tile .dp-num { font-size: 3em; }
   .dp-hero .dp-donut-row { flex-direction: column; }
   .dp-hero .dp-title { font-size: 2em; }
+}
+
+/* ── access-method panel (v1.7.6) ────────────────────────────
+   Verbose treatment of the index card's access chip. Tells a
+   manager or remediator how the site's files are served + what
+   credentials are required to reach them (OpenSSH key for the
+   server/Strapi cases, GitHub org access for the repo case).
+   Three variants share the same layout; the left border + heading
+   color make the access category visually obvious.
+*/
+.access-panel {
+  margin: 1.2rem 0 1.6rem;
+  padding: 1.1rem 1.3rem 1.15rem 1.55rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #151c26 0%, #121821 100%);
+  border: 1px solid #232a35;
+  border-left: 6px solid currentColor;
+  color: #c0cdda;
+}
+.access-panel .access-panel-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #9aa5b1;
+  margin: 0 0 0.35rem;
+}
+.access-panel .access-panel-heading {
+  margin: 0 0 0.55rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: currentColor;
+}
+.access-panel .access-panel-method {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #d4dae0;
+}
+.access-panel .access-panel-credential {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #d4dae0;
+}
+.access-panel .access-panel-credential strong { color: #ffffff; }
+/* Per-variant accent. The text inside the panel stays neutral light grey
+   for AA contrast; only the heading + left border use the brand color. */
+.access-panel.access-strapi { color: #7dd3fc; }
+.access-panel.access-github { color: #c4b5fd; }
+.access-panel.access-server { color: #fcd34d; }
+
+@media (max-width: 720px) {
+  .access-panel { padding: 1rem 1.1rem 1.05rem 1.2rem; }
+  .access-panel .access-panel-heading { font-size: 1.2rem; }
 }
 
 /* ── metadata grid ─────────────────────────────────────────── */
@@ -941,6 +1037,8 @@ ${(backHref || csvHref) ? `<nav class="report-back-bar" aria-label="Report navig
     <p class="dp-donut-caption"><strong>${heroPhrase}</strong> &middot; ${heroAudit.toLocaleString()} of ${heroTotal.toLocaleString()} files</p>
   </div>
 </header>
+
+${accessPanelHtml}
 
 <div class="meta-grid">${metaGridHtml}
 </div>

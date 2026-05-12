@@ -83,4 +83,39 @@ describe("renderCard", () => {
       /<a href="dvfr-2026\.csv" class="btn btn-secondary" download>Download spreadsheet<\/a>/,
     );
   });
+
+  describe("access chip (v1.7.6)", () => {
+    it("renders a Strapi-CMS chip when accessKind is 'strapi'", () => {
+      const sr = { ...baseSr, site: { ...baseSr.site, accessKind: "strapi" } };
+      const html = renderCard(sr);
+      expect(html).toMatch(/class="access-chip access-strapi"/);
+      expect(html).toContain("Strapi CMS / SSH required");
+    });
+
+    it("renders a GitHub chip when accessKind is 'github'", () => {
+      const sr = { ...baseSr, site: { ...baseSr.site, accessKind: "github" } };
+      const html = renderCard(sr);
+      expect(html).toMatch(/class="access-chip access-github"/);
+      expect(html).toContain("GitHub repo / access required");
+    });
+
+    it("renders a Server chip when accessKind is 'server'", () => {
+      const sr = { ...baseSr, site: { ...baseSr.site, accessKind: "server" } };
+      const html = renderCard(sr);
+      expect(html).toMatch(/class="access-chip access-server"/);
+      expect(html).toContain("Server / SSH required");
+    });
+
+    it("omits the chip entirely when accessKind is missing", () => {
+      const sr = { ...baseSr, site: { ...baseSr.site, accessKind: undefined } };
+      const html = renderCard(sr);
+      expect(html).not.toMatch(/class="access-chip/);
+    });
+
+    it("omits the chip when accessKind is an unrecognized value", () => {
+      const sr = { ...baseSr, site: { ...baseSr.site, accessKind: "ftp" } };
+      const html = renderCard(sr);
+      expect(html).not.toMatch(/class="access-chip/);
+    });
+  });
 });

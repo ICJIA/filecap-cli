@@ -268,6 +268,30 @@ function slug(s) {
 }
 
 /**
+ * Classify how a site's files are accessed, so the rollup UI can render a
+ * scannable chip telling managers/remediators what they're looking at and
+ * what credentials are needed to get to the files.
+ *
+ * Categories — derived from sites.json fields, no schema change required:
+ *   "github"  type === "git": files live in a GitHub repo (clone via HTTPS,
+ *             needs GitHub org access)
+ *   "strapi"  publicUrlBase ends in /uploads: Strapi CMS on a remote host
+ *             (rsync over SSH, needs an OpenSSH key on the host)
+ *   "server"  fallback for SSH-reachable file trees that aren't Strapi
+ *             (e.g. the Archive's /root/files static directory)
+ *
+ * @param {object} site - entry from sites.json (post-validation)
+ * @returns {"strapi"|"github"|"server"}
+ */
+export function deriveAccessKind(site) {
+  if (!site) return "server";
+  if (site.type === "git") return "github";
+  const base = String(site.publicUrlBase ?? "");
+  if (/\/uploads\/?$/.test(base)) return "strapi";
+  return "server";
+}
+
+/**
  * Stream the inventory and tally summary statistics.
  *
  * @param {string} inventoryPath
@@ -439,6 +463,7 @@ export async function runWebRollup({
     // audit-file-list.csv to <slug>-<timestamp>.csv in step 5 below).
     // siteUrl is the site's front-end homepage URL from sites.json (e.g.
     // dvfr.illinois.gov), distinct from publicUrlBase (the file server).
+    const accessKind = deriveAccessKind(site);
     const reportResult = await runReport({
       input: latestInv,
       outputDir: tempDir,
@@ -447,6 +472,7 @@ export async function runWebRollup({
       csvHref: `${baseName}.csv`,
       siteUrl: site.siteUrl ?? null,
       siteFullName: site.siteFullName ?? null,
+      accessKind,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
@@ -516,7 +542,7 @@ export async function runWebRollup({
     });
 
     siteResults.push({
-      site: { ...site, siteFullName: site.siteFullName ?? null },
+      site: { ...site, siteFullName: site.siteFullName ?? null, accessKind },
       header,
       summary,
       htmlFile: `${baseName}.html`,

@@ -7,6 +7,7 @@ import {
   normalizeStrapiFilename,
   findCrossServerDuplicates,
   writeDuplicatesCsv,
+  deriveAccessKind,
 } from "../src/commands/web-rollup.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -1043,5 +1044,135 @@ describe("runWebRollup — siteFullName plumbing", () => {
     expect(dvfrHtml).toBeDefined();
     const html = await fs.readFile(path.join(outputDir, dvfrHtml), "utf8");
     expect(html).toContain("Domestic Violence Fatality Review");
+  });
+});
+
+describe("deriveAccessKind (v1.7.6)", () => {
+  it("returns 'github' when site.type is 'git'", () => {
+    expect(deriveAccessKind({ type: "git", gitRepo: "https://github.com/ICJIA/foo.git" })).toBe("github");
+  });
+
+  it("returns 'strapi' when publicUrlBase ends in /uploads", () => {
+    expect(deriveAccessKind({ publicUrlBase: "https://dvfr.icjia-api.cloud/uploads" })).toBe("strapi");
+  });
+
+  it("returns 'strapi' when publicUrlBase ends in /uploads/ with trailing slash", () => {
+    expect(deriveAccessKind({ publicUrlBase: "https://dvfr.icjia-api.cloud/uploads/" })).toBe("strapi");
+  });
+
+  it("returns 'server' when host is set but publicUrlBase is /files (Archive case)", () => {
+    expect(deriveAccessKind({ host: "143.244.146.43", publicUrlBase: "https://archive.icjia.cloud/files" })).toBe("server");
+  });
+
+  it("returns 'server' as the fallback when nothing matches", () => {
+    expect(deriveAccessKind({})).toBe("server");
+  });
+
+  it("returns 'server' when given null/undefined site", () => {
+    expect(deriveAccessKind(null)).toBe("server");
+    expect(deriveAccessKind(undefined)).toBe("server");
+  });
+
+  it("prefers 'github' over publicUrlBase pattern when type is 'git'", () => {
+    // A git-mode site with a misleading /uploads URL should still classify
+    // as github since type is the authoritative signal.
+    expect(deriveAccessKind({
+      type: "git",
+      gitRepo: "https://github.com/ICJIA/foo.git",
+      publicUrlBase: "https://foo.example.com/uploads",
+    })).toBe("github");
+  });
+});
+
+describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
+  it("threads accessKind='strapi' through to both index card chip and detail-page panel", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    const latestDir = path.join(auditsBase, "dvfr-strapi-prod", "latest");
+    await fs.mkdir(latestDir, { recursive: true });
+    await writeInventory(path.join(latestDir, "inventory.ndjson"), {
+      serverName: "dvfr-strapi-prod",
+      serverIp: "1.2.3.4",
+      hostname: "dvfr.example.com",
+      publicUrlBase: "https://dvfr.icjia-api.cloud/uploads",
+    });
+
+    const sitesFile = path.join(tmpDir, "sites-strapi.json");
+    await writeSitesJson(sitesFile, [
+      {
+        name: "dvfr-strapi-prod",
+        siteName: "DVFR",
+        siteFullName: "Domestic Violence Fatality Review",
+        user: "forge",
+        host: "1.2.3.4",
+        remotePath: "/uploads",
+        publicUrlBase: "https://dvfr.icjia-api.cloud/uploads",
+      },
+    ]);
+
+    const outputDir = path.join(tmpDir, "output-strapi-access");
+    const result = await runWebRollup({
+      sitesFile,
+      output: outputDir,
+      _auditsBase: auditsBase,
+      password: null,
+    });
+    expect(result.exitCode).toBe(0);
+
+    const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(indexHtml).toMatch(/class="access-chip access-strapi"/);
+    expect(indexHtml).toContain("Strapi CMS / SSH required");
+
+    const files = await fs.readdir(outputDir);
+    const dvfrHtml = files.find((f) => f.startsWith("dvfr-") && f.endsWith(".html"));
+    expect(dvfrHtml).toBeDefined();
+    const detailHtml = await fs.readFile(path.join(outputDir, dvfrHtml), "utf8");
+    expect(detailHtml).toMatch(/<section class="access-panel access-strapi"/);
+    expect(detailHtml).toContain("OpenSSH public key");
+    expect(detailHtml).toContain("Contact IDS at ICJIA");
+  });
+
+  it("threads accessKind='github' for a git-mode site", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    const latestDir = path.join(auditsBase, "vpp-static", "latest");
+    await fs.mkdir(latestDir, { recursive: true });
+    await writeInventory(path.join(latestDir, "inventory.ndjson"), {
+      serverName: "vpp-static",
+      serverIp: "github.com",
+      hostname: "vpp-static",
+      publicUrlBase: "https://vpp.icjia.illinois.gov",
+    });
+
+    const sitesFile = path.join(tmpDir, "sites-github.json");
+    await writeSitesJson(sitesFile, [
+      {
+        name: "vpp-static",
+        siteName: "VPP",
+        siteFullName: "Violence Prevention Project",
+        type: "git",
+        gitRepo: "https://github.com/ICJIA/icjia-vpp-2025.git",
+        publicPath: "public",
+        publicUrlBase: "https://vpp.icjia.illinois.gov",
+      },
+    ]);
+
+    const outputDir = path.join(tmpDir, "output-github-access");
+    const result = await runWebRollup({
+      sitesFile,
+      output: outputDir,
+      _auditsBase: auditsBase,
+      password: null,
+    });
+    expect(result.exitCode).toBe(0);
+
+    const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(indexHtml).toMatch(/class="access-chip access-github"/);
+    expect(indexHtml).toContain("GitHub repo / access required");
+
+    const files = await fs.readdir(outputDir);
+    const vppHtml = files.find((f) => f.startsWith("vpp-") && f.endsWith(".html"));
+    expect(vppHtml).toBeDefined();
+    const detailHtml = await fs.readFile(path.join(outputDir, vppHtml), "utf8");
+    expect(detailHtml).toMatch(/<section class="access-panel access-github"/);
+    expect(detailHtml).toContain("ICJIA organization access");
   });
 });

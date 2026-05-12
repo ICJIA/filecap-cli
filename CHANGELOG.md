@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6] — 2026-05-12
+
+### Added
+
+- **Access-method chip on every index card + matching "How to access this site's files" panel on every per-site detail page.** Designed for non-technical managers and outside remediators who land on the rollup and don't yet know what kind of system each ICJIA site is, or what credentials they'd need to actually open a flagged file. Each site is auto-classified into one of three buckets from its existing `sites.json` config (no schema change required) — `strapi` (`publicUrlBase` ends in `/uploads`, ~10 ICJIA sites), `github` (`type: "git"`, 6 sites), or `server` (fallback for SSH-reachable static directories, e.g. the Archive's `/root/files`). The index card shows the chip in the card-head eyebrow position above the nickname, color-coded by category (cyan = Strapi, violet = GitHub, amber = bare server) with WCAG AA 4.5 : 1+ contrast on the card's dark background. The per-site detail page repeats the classification as a more prominent callout immediately below the dp-hero: eyebrow ("How to access this site's files"), heading ("Strapi CMS / SSH required" / "GitHub repo / access required" / "Server / SSH required"), a method paragraph ("Files are served by a Strapi CMS instance on a remote Linux host…" / "Files live in an ICJIA-owned GitHub repository…" / "Files are stored in a static directory on a remote Linux host…"), and a credential line ending with the SSH-key / GitHub-org-access requirement plus **"Contact IDS at ICJIA to request access."** Implementation lives in a new exported helper `deriveAccessKind(site)` in `src/commands/web-rollup.js` plus two parallel copy maps (`ACCESS_CHIP_LABEL` in `src/web/index-page.js` and `ACCESS_PANEL_COPY` in `src/report/html.js`) so a manager going index → detail sees consistent wording. 20 new tests (8 for `deriveAccessKind`, 5 chip variants in `renderCard`, 5 panel variants in `writeHtml`, 2 end-to-end plumbing tests through `runWebRollup`) — total now 30 test files / 395 tests.
+
+[1.7.6]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.6
+
 ## [1.7.5] — 2026-05-11
 
 ### Documentation

@@ -78,7 +78,7 @@ For more details: https://github.com/ICJIA/filecap-cli
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null }) {
+export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null }) {
   let header;
   const entries = [];
 
@@ -147,6 +147,10 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
       // Manager-friendly title from sites.json (e.g. "Domestic Violence
       // Fatality Review"). Falls back to siteName in the h1 when null.
       siteFullName,
+      // "strapi" | "github" | "server" — drives the "How to access this
+      // site's files" panel near the top of the per-site report. Null when
+      // the report is generated outside of web-rollup (panel is skipped).
+      accessKind,
     });
   }
 

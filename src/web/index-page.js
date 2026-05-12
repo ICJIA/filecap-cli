@@ -209,6 +209,14 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
   </section>`;
 }
 
+// Access-method chip copy. Keep these strings in lock-step with the detail-page
+// access panel in src/report/html.js so managers see consistent language.
+const ACCESS_CHIP_LABEL = {
+  strapi: "Strapi CMS / SSH required",
+  github: "GitHub repo / access required",
+  server: "Server / SSH required",
+};
+
 export function renderCard(sr) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const nickname = he(site.siteName ?? site.name ?? "");
@@ -217,6 +225,8 @@ export function renderCard(sr) {
   const fullName = he(site.siteFullName || site.siteName || site.name || "");
   const hostname = he(site.host ?? "");
   const ip = he(sr.header?.metadata?.serverIp ?? site.host ?? "");
+  const accessKind = site.accessKind && ACCESS_CHIP_LABEL[site.accessKind] ? site.accessKind : null;
+  const accessLabel = accessKind ? ACCESS_CHIP_LABEL[accessKind] : "";
 
   const siteUrlRaw = site.siteUrl ?? site.publicUrlBase ?? sr.header?.metadata?.publicUrlBase ?? "";
   const publicUrlBaseRaw = siteUrlRaw;
@@ -275,6 +285,7 @@ export function renderCard(sr) {
   return `<article class="site-card">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
   <header class="card-head">
+    ${accessKind ? `<p class="access-chip access-${accessKind}" title="${he(accessLabel)} — see detail page for access steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</p>` : ""}
     <p class="nickname">${nickname}</p>
     <h3 class="full-name">${fullName}</h3>
     ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
@@ -765,6 +776,38 @@ main {
   color: var(--fc-text-muted, #788391);
 }
 .site-card .site-url a { color: var(--fc-accent, #4dabf7); text-decoration: none; }
+
+/* v1.7.6 — access-method chip in the card-head eyebrow position. Three
+   variants (Strapi/GitHub/Server) with distinct hue so a manager can scan
+   the index and immediately tell what credentials each site needs. The
+   detail page repeats this in a larger "How to access" panel with the
+   "Contact IDS at ICJIA" line + SSH-key copy. */
+.site-card .access-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto 10px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.74em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  border: 1px solid currentColor;
+}
+.site-card .access-chip .access-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+/* Cyan — Strapi CMS (most common). #7dd3fc on dark gives ≥ 8:1 contrast. */
+.site-card .access-strapi { color: #7dd3fc; background: rgba(125, 211, 252, 0.08); }
+/* Violet — GitHub repo. #c4b5fd gives ≥ 7:1 contrast on the card bg. */
+.site-card .access-github { color: #c4b5fd; background: rgba(196, 181, 253, 0.08); }
+/* Amber — bare server (uncommon, signals "different"). #fcd34d ≥ 9:1. */
+.site-card .access-server { color: #fcd34d; background: rgba(252, 211, 77, 0.08); }
 
 .site-card .nums {
   display: grid;
