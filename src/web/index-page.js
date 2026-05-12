@@ -744,6 +744,28 @@ main {
   position: relative;
   z-index: 1;
 }
+/* v1.7.7: make the whole card clickable. Pre-v1.7.7 the stretched-link
+   pattern only worked on the small padding gaps between children — every
+   visible text/tile/donut sat above the link (z-index 1 vs 0) and
+   captured the click but had no click handler. Bumping the link's
+   z-index introduces its own landmines: it would cover the action
+   buttons (which would then need higher z-index escape hatches), and
+   the donut's internal .pct (position relative, z-index 1) would still
+   end up on top of the link. Cleaner solution: make every
+   non-interactive descendant pointer-events:none so the click falls
+   through to the link, then explicitly re-enable pointer-events on the
+   real interactive elements (action buttons + tech-details disclosure
+   summary). The site-url anchor in the card-head intentionally stays
+   click-through so the whole card maps to one action — go to the detail
+   page. */
+.site-card > *:not(.card-stretched-link),
+.site-card > *:not(.card-stretched-link) * {
+  pointer-events: none;
+}
+.site-card .actions .btn,
+.site-card .tech-details summary {
+  pointer-events: auto;
+}
 @media (prefers-reduced-motion: reduce) {
   .site-card { transition: none; }
   .site-card:hover { transform: none; }

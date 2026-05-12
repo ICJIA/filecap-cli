@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7] — 2026-05-12
+
+### Fixed
+
+- **Whole-card click now works on every index-page card.** The v1.7.1 stretched-link pattern set the link at `z-index: 0` and the other card children at `z-index: 1`, which meant clicks on the visible content (full-name heading, total/audit tiles, donut percentage text, file-type chips, access chip) hit the children — none of which had a click handler — and the user saw nothing happen. Only the small padding gaps between children actually navigated to the detail page. Bumping the link's z-index introduces fresh landmines (it would cover the action buttons, which would need ever-higher escape hatches, and the donut's internal `.pct { position: relative; z-index: 1 }` would still escape on top of the link). Cleaner solution: pin `pointer-events: none` on every non-`.card-stretched-link` descendant of `.site-card` (parent + universal-descendant in one rule) so the click falls through to the stretched-link, then explicitly re-enable `pointer-events: auto` on the two action buttons (`.actions .btn`) and the disclosure summary (`.tech-details summary`) so those stay separately clickable. Two new tests pin the CSS rules so the regression can't slip in again.
+
+### Added
+
+- **Copy-to-clipboard buttons on the per-site detail-page meta-grid.** Designed for remediators who need to paste these values into a terminal or browser without text-selecting monospace strings by hand. Each of the five copy-worthy meta-grid rows — **IP**, **Hostname**, **Scanned path**, **Scanned at**, **Public URL** — gets a 24 × 22 px button on the right edge with a clipboard-outline SVG icon. The two short-identifier rows (**Website**, **Server**) intentionally don't get buttons per user spec. Click feedback: the button widens, swaps the icon for the word "Copied" in green for 1.4 s, then snaps back. Uses `navigator.clipboard.writeText` first, with a hidden-textarea + `document.execCommand("copy")` fallback for `file://` loads and very old browsers. Single delegated `document.addEventListener("click", …)` covers every button so the report can have as many copy targets as we add later without per-button wiring. New `copyableMetaCell(value, displayHtml, label)` helper in `src/report/html.js` keeps the markup terse; the wrapped Public URL row still renders its `<a target="_blank">` for one-click visit *and* shows the copy button on the same line. 5 new tests assert presence/absence of buttons on the right rows, the `data-copy` attribute carries the raw value, and the clipboard handler IIFE is embedded in the inline `<script>`.
+
+[1.7.7]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.7
+
 ## [1.7.6] — 2026-05-12
 
 ### Added

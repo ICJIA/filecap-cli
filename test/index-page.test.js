@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderCard } from "../src/web/index-page.js";
+import { renderCard, generateIndexHtml } from "../src/web/index-page.js";
 
 const baseSr = {
   site: {
@@ -117,5 +117,27 @@ describe("renderCard", () => {
       const html = renderCard(sr);
       expect(html).not.toMatch(/class="access-chip/);
     });
+  });
+});
+
+describe("index page CSS (v1.7.7 whole-card click fix)", () => {
+  // The fix lives in the <style> block emitted by generateIndexHtml: it
+  // pins pointer-events: none on every non-interactive descendant of
+  // .site-card so the stretched-link catches every click on visible
+  // content, then re-enables pointer-events on the action buttons + the
+  // tech-details disclosure summary so those stay separately interactive.
+  // Pre-v1.7.7 the same problem was attempted via z-index, which only
+  // covered the small gaps between children — every text/tile/donut
+  // captured the click and routed it to an element with no handler.
+  const html = generateIndexHtml({ siteResults: [], password: null });
+
+  it("emits pointer-events: none on every non-stretched-link descendant of .site-card", () => {
+    // Single CSS rule that applies pointer-events: none to direct children
+    // and (separately, via universal descendant) all of their descendants.
+    expect(html).toMatch(/\.site-card > \*:not\(\.card-stretched-link\),\s*\.site-card > \*:not\(\.card-stretched-link\) \*\s*\{[^}]*pointer-events:\s*none/);
+  });
+
+  it("re-enables pointer-events on the action buttons + tech-details summary", () => {
+    expect(html).toMatch(/\.site-card \.actions \.btn,\s*\.site-card \.tech-details summary\s*\{[^}]*pointer-events:\s*auto/);
   });
 });

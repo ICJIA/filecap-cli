@@ -628,4 +628,92 @@ describe("writeHtml", () => {
       expect(metaGrid).toBeGreaterThan(panelStart);
     });
   });
+
+  describe("meta-grid copy-to-clipboard (v1.7.7)", () => {
+    it("renders a .meta-copy button next to IP, Hostname, Scanned path, Scanned at, and Public URL", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      const headerWithUrl = {
+        ...sampleHeader,
+        metadata: { ...sampleHeader.metadata, siteName: "ILFVCC", publicUrlBase: "https://icjia.illinois.gov/ifvcc/" },
+      };
+      await writeHtml({
+        sourceHeader: headerWithUrl,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      // Exactly 5 copy buttons — one per copyable meta-grid row.
+      const buttons = html.match(/<button[^>]*class="meta-copy"/g) || [];
+      expect(buttons.length).toBe(5);
+    });
+
+    it("the copy button carries the raw value in data-copy (not HTML-escaped display text)", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      // data-copy="10.0.0.1" should be the literal serverIp value.
+      expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="10\.0\.0\.1"/);
+      // Scanned path /uploads
+      expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="\/uploads"/);
+    });
+
+    it("does NOT render copy buttons next to Website or Server (per user spec)", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      const headerWithSite = {
+        ...sampleHeader,
+        metadata: { ...sampleHeader.metadata, siteName: "ILFVCC" },
+      };
+      await writeHtml({
+        sourceHeader: headerWithSite,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      // The Website + Server rows are still rendered as plain <span>, not
+      // wrapped in .meta-value with a copy button.
+      expect(html).toMatch(/<span class="meta-label">Website:<\/span>\s+<span>ILFVCC<\/span>/);
+      expect(html).toMatch(/<span class="meta-label">Server:<\/span>\s+<span>test-server<\/span>/);
+    });
+
+    it("uses copyableMetaCell wrapping so the Public URL stays a clickable <a> AND gets a copy button", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      const headerWithUrl = {
+        ...sampleHeader,
+        metadata: { ...sampleHeader.metadata, publicUrlBase: "https://example.com/uploads" },
+      };
+      await writeHtml({
+        sourceHeader: headerWithUrl,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      // The link is wrapped in a .meta-value flex container alongside the
+      // copy button so both stay on the same row.
+      expect(html).toMatch(/<span class="meta-value"><a href="https:\/\/example\.com\/uploads"[^>]*>https:\/\/example\.com\/uploads<\/a><button[^>]*class="meta-copy"[^>]*data-copy="https:\/\/example\.com\/uploads"/);
+    });
+
+    it("the clipboard handler IIFE is embedded in the inline <script>", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).toContain("navigator.clipboard.writeText");
+      expect(html).toContain(".meta-copy");
+      // The fallback (execCommand copy) is also wired so the buttons still
+      // work on file:// loads and very old browsers.
+      expect(html).toContain("execCommand");
+    });
+  });
 });

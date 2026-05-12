@@ -41,6 +41,30 @@ function htmlEscape(s) {
     .replace(/'/g, "&#39;");
 }
 
+// Small clipboard-outline icon used by the meta-grid copy buttons. Inline SVG
+// (no external request, no font dependency) and stroke: currentColor so the
+// hover/copied states can recolor it via CSS.
+const COPY_ICON_SVG = '<svg class="meta-copy-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4.25" y="3.25" width="8.5" height="10.5" rx="1.25"/><path d="M10.75 3.25V2.75a1 1 0 0 0-1-1h-2.5a1 1 0 0 0-1 1v0.5"/></svg>';
+
+/**
+ * Wrap a meta-grid value in a flex container with the value text and a small
+ * copy-to-clipboard button. Designed for the per-site detail page so a
+ * remediator can copy IP / hostname / scanned path / public URL with one
+ * click instead of selecting the monospace text by hand. The button copies
+ * the *raw* value (no surrounding HTML escapes); display HTML can be richer
+ * (e.g. an <a> wrapping the URL) without affecting what gets copied.
+ *
+ * @param {string} value - raw text that goes on the clipboard
+ * @param {string|null} displayHtml - HTML to render (defaults to escaped value)
+ * @param {string} label - aria-label suffix, e.g. "IP address"
+ * @returns {string}
+ */
+function copyableMetaCell(value, displayHtml, label) {
+  if (value === undefined || value === null || value === "") return "<span></span>";
+  const display = displayHtml ?? htmlEscape(value);
+  return `<span class="meta-value">${display}<button type="button" class="meta-copy" data-copy="${htmlEscape(value)}" aria-label="Copy ${htmlEscape(label || "value")} to clipboard" title="Copy to clipboard">${COPY_ICON_SVG}<span class="meta-copy-feedback" aria-hidden="true">Copied</span></button></span>`;
+}
+
 /**
  * Build a display-ready row value array for one entry, parallel to CSV_COLUMNS.
  * Booleans are converted to "Yes"/"No" for human readability.
@@ -334,11 +358,11 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     metaGridHtml = `
   ${siteName !== "" ? `<span class="meta-label">Website:</span>      <span>${htmlEscape(siteName)}</span>` : ""}
   <span class="meta-label">Server:</span>      <span>${htmlEscape(serverName)}</span>
-  <span class="meta-label">IP:</span>           <span>${htmlEscape(serverIp)}</span>
-  <span class="meta-label">Hostname:</span>     <span>${htmlEscape(hostname)}</span>
-  <span class="meta-label">Scanned path:</span> <span>${htmlEscape(scannedPath)}</span>
-  <span class="meta-label">Scanned at:</span>   <span>${htmlEscape(scannedAt)}</span>
-  ${publicUrlBase !== "" ? `<span class="meta-label">Public URL:</span>   <span><a href="${htmlEscape(publicUrlBase)}" target="_blank" rel="noopener noreferrer">${htmlEscape(publicUrlBase)}</a></span>` : ""}`;
+  <span class="meta-label">IP:</span>           ${copyableMetaCell(serverIp, null, "IP address")}
+  <span class="meta-label">Hostname:</span>     ${copyableMetaCell(hostname, null, "hostname")}
+  <span class="meta-label">Scanned path:</span> ${copyableMetaCell(scannedPath, null, "scanned path")}
+  <span class="meta-label">Scanned at:</span>   ${copyableMetaCell(scannedAt, null, "scan timestamp")}
+  ${publicUrlBase !== "" ? `<span class="meta-label">Public URL:</span>   ${copyableMetaCell(publicUrlBase, `<a href="${htmlEscape(publicUrlBase)}" target="_blank" rel="noopener noreferrer">${htmlEscape(publicUrlBase)}</a>`, "public URL")}` : ""}`;
   }
 
   // ── embed data as JSON for client-side search/sort ────────────────────────────
@@ -648,6 +672,63 @@ a:hover { color: #93c5fd; text-decoration: underline; }
   font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 .meta-label { font-weight: 600; color: #999999; }
+
+/* v1.7.7 — copy-to-clipboard buttons on the right edge of select meta-grid
+   values (IP, hostname, scanned path, scanned at, public URL). Designed
+   for remediators who need to paste these into a terminal or browser
+   without text-selecting monospace text by hand. */
+.meta-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.meta-value > a { word-break: break-all; }
+.meta-copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid #2a323d;
+  border-radius: 4px;
+  color: #9aa5b1;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease, width 140ms ease;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.meta-copy:hover {
+  background: rgba(88, 166, 255, 0.10);
+  color: #58a6ff;
+  border-color: #58a6ff;
+}
+.meta-copy:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.meta-copy.copied {
+  width: 64px;
+  color: #66d9a3;
+  border-color: #66d9a3;
+  background: rgba(102, 217, 163, 0.10);
+}
+.meta-copy-icon { width: 13px; height: 13px; flex: none; }
+.meta-copy-feedback {
+  display: none;
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+}
+.meta-copy.copied .meta-copy-icon { display: none; }
+.meta-copy.copied .meta-copy-feedback { display: inline; }
 
 /* ── summary cards ─────────────────────────────────────────── */
 .summary-bar {
@@ -1386,6 +1467,56 @@ ${rowsHtml}
     // releases without dragging (a stationary click on the 8px handle is
     // still a "resize intent," not a sort intent).
     handle.addEventListener("click", function (e) { e.stopPropagation(); });
+  });
+})();
+
+// v1.7.7 — meta-grid copy-to-clipboard handler. One delegated listener on
+// document.body covers every copy button (no per-button wiring, works
+// regardless of how many cells the report has). Visual confirmation: the
+// button widens and swaps the icon for the word "Copied" for 1.4 s.
+(function () {
+  "use strict";
+  function flashCopied(btn) {
+    btn.classList.add("copied");
+    if (btn._copiedTimer) clearTimeout(btn._copiedTimer);
+    btn._copiedTimer = setTimeout(function () {
+      btn.classList.remove("copied");
+      btn._copiedTimer = null;
+    }, 1400);
+  }
+  function fallbackCopy(text) {
+    // Older browsers and some file:// loads don't expose navigator.clipboard.
+    // Use a hidden textarea + execCommand("copy") which has worked since 2015
+    // and degrades silently if the browser disallows it. (No worse than the
+    // old behavior of select-by-hand.)
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest ? e.target.closest(".meta-copy") : null;
+    if (!btn) return;
+    e.preventDefault();
+    var text = btn.getAttribute("data-copy");
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        flashCopied(btn);
+      }).catch(function () {
+        if (fallbackCopy(text)) flashCopied(btn);
+      });
+    } else {
+      if (fallbackCopy(text)) flashCopied(btn);
+    }
   });
 })();
 </script>
