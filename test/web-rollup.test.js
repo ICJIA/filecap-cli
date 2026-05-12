@@ -452,6 +452,35 @@ describe("runWebRollup", () => {
     expect(html).toContain("Why aren&#39;t all");
   });
 
+  describe("alphabetical card order (v1.7.15)", () => {
+    it("renders cards in alphabetical order by siteFullName, not sites.json declaration order", async () => {
+      // sites.json declares B-first to prove the renderer is doing the sort.
+      const auditsBase = path.join(tmpDir, "filecap-audits");
+      for (const slug of ["zebra-prod", "alpha-prod", "mango-prod"]) {
+        const dir = path.join(auditsBase, slug, "latest");
+        await fs.mkdir(dir, { recursive: true });
+        await writeInventory(path.join(dir, "inventory.ndjson"), { serverName: slug, hostname: `${slug}.example.com`, serverIp: "1.2.3.4" });
+      }
+      const sitesFile = path.join(tmpDir, "sites-sort.json");
+      await writeSitesJson(sitesFile, [
+        { name: "zebra-prod",  siteName: "Z",  siteFullName: "Zebra Site",  user: "x", host: "1.2.3.4", remotePath: "/u" },
+        { name: "alpha-prod",  siteName: "A",  siteFullName: "Alpha Site",  user: "x", host: "1.2.3.4", remotePath: "/u" },
+        { name: "mango-prod",  siteName: "M",  siteFullName: "Mango Site",  user: "x", host: "1.2.3.4", remotePath: "/u" },
+      ]);
+      const outputDir = path.join(tmpDir, "output-sort");
+      await runWebRollup({ sitesFile, output: outputDir, _auditsBase: auditsBase, password: null });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      // Find the positions of each card in the rendered HTML — they should
+      // appear in alphabetical order regardless of sites.json declaration.
+      const posAlpha = html.indexOf("Alpha Site");
+      const posMango = html.indexOf("Mango Site");
+      const posZebra = html.indexOf("Zebra Site");
+      expect(posAlpha).toBeGreaterThan(-1);
+      expect(posMango).toBeGreaterThan(posAlpha);
+      expect(posZebra).toBeGreaterThan(posMango);
+    });
+  });
+
   describe("by-file-type detail pages + CSVs (v1.7.14)", () => {
     it("emits one CSV per non-empty bucket (audit-pdfs.csv, audit-docx.csv, …)", async () => {
       const { sitesFile, outputDir, auditsBase } = await buildFixture();

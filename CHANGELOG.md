@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.15] — 2026-05-12
+
+### Added
+
+- **ICJIA wordmark logo in the index-page navbar.** Inline SVG (~13 kB) from the agency's standard asset set (https://github.com/ICJIA/archived-website-page/blob/main/assets/icjia-logo.svg), sed-themed so every `rgb(100%, 100%, 100%)` fill becomes `currentColor` — the logo recolors via `.site-header .icjia-logo { color: … }`, so dark navbar → `#ffffff`, print mode → `#000000` without forking the markup. New `.site-header-left` flex container groups the 38 px-tall logo + the "filecap fleet audit snapshot" brand text with a thin vertical divider between them. Stacks the logo down to 32 px under 600 px viewport. Accessible name "Illinois Criminal Justice Information Authority" is set via `role="img"` + `aria-label` on the SVG; the wrapping `<span>` is `aria-hidden` so screen readers only see the label once.
+
+### Changed
+
+- **Index-page cards now sorted alphabetically by site title (siteFullName).** Pre-v1.7.15 cards rendered in sites.json declaration order — which matched how the audit team thought about the fleet but not how an outside viewer scans the page. Sort happens at render time in `generateIndexHtml` (`siteResults.sort((a, b) => aKey.localeCompare(bKey, undefined, { sensitivity: "base" }))`), falling back to `siteName` then `name` if `siteFullName` is missing. `sensitivity: "base"` handles mixed case + diacritics naturally on a real keyboard. New test pins the order against a fixture that declares sites in B-first / C-first order to prove the renderer is doing the work.
+- **ARI Summit 2023 full name updated** in `~/.filecap/sites.json` from `Adult Redeploy All Sites Summit 2023` → `ARI All Sites Summit 2023` per user request. (The 2017/2018/2019 summits still spell out "Adult Redeploy" — flagged for follow-up if the renaming should propagate.)
+
+[1.7.15]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.15
+
 ## [1.7.14] — 2026-05-12
 
 ### Added
