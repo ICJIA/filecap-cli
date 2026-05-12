@@ -452,6 +452,63 @@ describe("runWebRollup", () => {
     expect(html).toContain("Why aren&#39;t all");
   });
 
+  describe("fleet-hero infographic (v1.7.13)", () => {
+    it("leads with the AUDIT count, not the total, in the .fleet-hero-num block", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      // The big number is the audit count (remediable across the fleet).
+      // The fixture entries are remediable: true, so audit count > 0.
+      expect(html).toMatch(/<p class="fleet-hero-num">\d+(,\d{3})*<\/p>/);
+      // Eyebrow above the number names what it is.
+      expect(html).toMatch(/<p class="fleet-hero-eyebrow">Files that may need accessibility audit<\/p>/);
+    });
+
+    it("renders a fleet-hero donut with the audit-share % inline-styled", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      // Donut element with --pct CSS custom property, matching the per-card pattern.
+      expect(html).toMatch(/<div class="fleet-hero-donut" style="--pct:\d+(\.\d+)?%"/);
+      // Centred percentage + "may need audit" caption inside.
+      expect(html).toMatch(/<div class="fleet-hero-donut-pct">\d+%<small>may need audit<\/small>/);
+    });
+
+    it("emits a plain-English phrase caption beneath the donut", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      // Same phrase buckets as per-card: "Two-thirds may need audit",
+      // "About half may need audit", etc. The fixture uses 100% remediable
+      // (every entry has remediable: true), so the phrase is the high-pct one.
+      expect(html).toMatch(/<p class="fleet-hero-phrase"><strong>(No files inventoried|.+ may need audit)<\/strong><\/p>/);
+    });
+
+    it("includes the total in the secondary context line, not as the headline", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      expect(html).toMatch(/<p class="fleet-hero-context">out of <strong>\d+(,\d{3})*<\/strong> files scanned across \d+ ICJIA websites?/);
+    });
+
+    it("no longer emits the pre-v1.7.13 fleet-total-headline / fleet-split-bar / fleet-equation markup", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      expect(html).not.toMatch(/class="fleet-total-headline/);
+      expect(html).not.toMatch(/class="fleet-split-bar/);
+      expect(html).not.toMatch(/class="fleet-split-segment/);
+      expect(html).not.toMatch(/class="fleet-equation"/);
+    });
+
+    it("sets an aria-label on the .fleet-hero so screen readers get the audit/total phrasing", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      expect(html).toMatch(/<div class="fleet-hero" role="img" aria-label="\d[^"]* of \d[^"]* files may need accessibility audit, \d+ percent\./);
+    });
+  });
+
   it("index.html contains both by-type column headings", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
@@ -489,14 +546,18 @@ describe("runWebRollup", () => {
     expect(html).toContain("<summary>");
   });
 
-  it("index.html hero section uses plain-English lead paragraph wording", async () => {
+  it("index.html hero uses plain-English wording (v1.7.13: audit-first phrasing)", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
 
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).toContain("We scanned");
-    expect(html).toContain("files in total");
-    expect(html).toContain("need accessibility audit");
+    // The new fleet-hero leads with the audit count + a "Files that may
+    // need accessibility audit" eyebrow, with the total in the secondary
+    // context line. Pre-v1.7.13 wording ("We scanned X websites and found
+    // Y files in total") was dropped because it foregrounded the total.
+    expect(html).toContain("Files that may need accessibility audit");
+    expect(html).toContain("files scanned across");
+    expect(html).toContain("may need audit"); // covers donut caption + phrase bucket
   });
 
   // ── Security: FC-2026-006 sitesFile path validation ─────────────────────────

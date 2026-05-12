@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.13] — 2026-05-12
+
+### Changed
+
+- **Index-page hero redesigned around the audit count, not the total.** Pre-v1.7.13 the hero led with `<span class="fleet-total-headline">14,914</span>` in 96 px blue type, with `total files scanned across N websites` underneath. Managers were misreading that headline as *"the audit team has 14,914 files to remediate"* — but 14,914 is the *inventory* number; only ~74 % of those flagged for accessibility review, and the actual scope of work is the 11,097 remediable subset. The new hero is a two-column infographic — left column has the audit count in 105 px amber (`#ffa84d`, matching the per-card audit tile) with a small "Files that may need accessibility audit" eyebrow above it and `out of 9,096 files scanned across 17 ICJIA websites` as a secondary context line. Right column is a 200 × 200 px donut (same conic-gradient pattern as the per-site cards, just larger) with `54 %` + `may need audit` in the center and a phrase-bucket caption beneath (`About half may need audit` / `Two-thirds may need audit` / etc.) reusing the same caption logic as the cards so fleet view and per-site view share visual language. Stacks to a single column under 720 px. The split bar and equation row (`14,914 = 11,097 need audit + 3,817 don't`) are dropped — the new headline + donut convey the same information without the math-class framing that read as cold. 6 new tests pin the new markup (audit count as the headline, donut with `--pct` style, phrase caption, total in secondary line, no surviving pre-v1.7.13 classes, aria-label on the role=img hero). Print-mode CSS overrides updated to match the new class names.
+
+[1.7.13]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.13
+
 ## [1.7.12] — 2026-05-12
 
 ### Fixed
