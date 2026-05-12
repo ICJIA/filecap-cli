@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.9] — 2026-05-12
+
+### Fixed
+
+- **Donut percentage now stays centred inside the donut hole on every index-page card.** Side-effect of v1.7.8's softening of "need audit" → "may need audit": the longer caption widened the inner `.pct` box, but `.site-card .donut .pct` was a left-aligned column (no `text-align: center` rule). With "need audit" the percentage glyphs and the caption text happened to be near-equal width, so centering looked correct by coincidence; "may need audit" is two letters longer and broke the illusion (the percentage stuck to the left edge of a wider `.pct` box). Added `text-align: center` so both the percentage and the small caption properly centre inside the donut hole regardless of caption length. The sibling `.dp-hero .dp-donut .dp-pct` on the per-site detail page already had this rule from the start, which is why the detail-page donut was unaffected.
+
+[1.7.9]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.9
+
 ## [1.7.8] — 2026-05-12
 
 ### Added

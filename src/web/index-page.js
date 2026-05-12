@@ -939,6 +939,13 @@ main {
   font-size: 1.5em;
   color: #ffa84d;
   line-height: 1;
+  /* v1.7.9: center both the percentage and the <small> caption inside the
+     donut. Pre-v1.7.9 this was accidentally OK because "need audit" and
+     "67%" happened to be near-equal widths; the v1.7.8 softening to
+     "may need audit" made the caption wider, exposing that the .pct box
+     was a left-aligned column. The detail-page sibling .dp-pct had this
+     rule from the start. */
+  text-align: center;
 }
 .site-card .donut .pct small {
   display: block;
