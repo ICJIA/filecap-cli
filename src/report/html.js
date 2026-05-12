@@ -992,25 +992,75 @@ tr.flagged td { /* let row bg show through; border is the indicator */ }
   font-weight: 600;
   color: #e5e5e5;
 }
-.row-marker-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  margin: 0.35rem 0;
+/* v1.7.11 — proper 3-column table layout. Pre-v1.7.11 the legend was a
+   two-line flex block where the description text wrapped under itself
+   under the swatch, leading to ragged paragraphs with awkward line breaks
+   like "it ... or matches a default scanner output pattern like" wrapping
+   in three places. The table separates "marker / what it means / what to
+   do" into clean columns. */
+.row-marker-table {
+  /* The global "table { table-layout: fixed; width: max-content }" rule
+     above is for the file-inventory table (drag-to-resize columns). The
+     legend table needs auto layout + 100% width so the marker column
+     shrinks to its content and the meaning/action columns absorb the rest. */
+  table-layout: auto;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4rem 0 0;
   color: #c9d1d9;
+  font-size: 13px;
+  line-height: 1.5;
 }
-.row-marker-row code {
+.row-marker-table colgroup .rmt-col-marker  { width: 26%; }
+.row-marker-table colgroup .rmt-col-meaning { width: 37%; }
+.row-marker-table colgroup .rmt-col-action  { width: 37%; }
+.row-marker-table thead th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa5b1;
+  padding: 0.45rem 0.85rem;
+  border-bottom: 1px solid #21262d;
+}
+.row-marker-table tbody th,
+.row-marker-table tbody td {
+  vertical-align: top;
+  padding: 0.7rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid #21262d;
+  font-weight: normal;
+}
+.row-marker-table tbody tr:last-child th,
+.row-marker-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.row-marker-table tbody th {
+  white-space: normal;
+  color: #e5e5e5;
+  font-weight: 600;
+  width: 1%; /* shrink-to-content; the meaning + action cols absorb the rest */
+}
+.row-marker-table .rmt-marker-name {
+  display: inline-block;
+  margin-left: 0.45rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.row-marker-table code {
   background: #0d1117;
   padding: 0.05em 0.4em;
   border-radius: 3px;
   font-size: 0.92em;
 }
+.row-marker-table em { font-style: italic; color: #e5e5e5; }
 .row-marker-swatch {
   display: inline-block;
   flex-shrink: 0;
   width: 1.5em;
   height: 1.5em;
-  margin-top: 0.1em;
+  vertical-align: middle;
   border-radius: 2px;
 }
 .row-marker-flagged {
@@ -1022,6 +1072,29 @@ tr.flagged td { /* let row bg show through; border is the indicator */ }
   /* Mirror the actual image-only row tint. */
   background: #111000;
   border: 1px solid #1a1400;
+}
+/* On narrow viewports, collapse the table to a stacked layout so cells
+   don't squeeze each other into single-character columns. */
+@media (max-width: 700px) {
+  .row-marker-table,
+  .row-marker-table thead,
+  .row-marker-table tbody,
+  .row-marker-table tr,
+  .row-marker-table th,
+  .row-marker-table td { display: block; }
+  .row-marker-table thead { display: none; }
+  .row-marker-table tbody tr {
+    border-bottom: 1px solid #21262d;
+    padding: 0.5rem 0;
+  }
+  .row-marker-table tbody tr:last-child { border-bottom: 0; }
+  .row-marker-table tbody th,
+  .row-marker-table tbody td {
+    border-bottom: 0;
+    padding: 0.35rem 0;
+    width: auto;
+  }
+  .row-marker-table .rmt-marker-name { white-space: normal; }
 }
 
 /* ── badge ─────────────────────────────────────────────────── */
@@ -1187,14 +1260,38 @@ ${filterBarHtml}
 
 <aside class="row-marker-legend" role="note" aria-label="Row marker key">
   <h3>What are the colored row markers in the table?</h3>
-  <p class="row-marker-row">
-    <span class="row-marker-swatch row-marker-flagged" aria-hidden="true"></span>
-    <strong>Yellow vertical bar on the left edge of a row</strong> — the filename has been flagged for human review: it contains spaces, non-ASCII characters, exceeds 200 chars, or matches a default scanner output pattern like <code>Scan_20240115_001.pdf</code>. Often correlates with files that were OCR'd from paper. Worth a quick rename or close look before remediation.
-  </p>
-  <p class="row-marker-row">
-    <span class="row-marker-swatch row-marker-imageonly" aria-hidden="true"></span>
-    <strong>Faint yellow row tint</strong> — the file is an <em>image-only PDF</em> (scanned, no text layer). May need OCR before it can be tagged for screen readers. Typically the most expensive remediation work — a vendor will price these higher than text-based PDFs.
-  </p>
+  <table class="row-marker-table">
+    <colgroup>
+      <col class="rmt-col-marker">
+      <col class="rmt-col-meaning">
+      <col class="rmt-col-action">
+    </colgroup>
+    <thead>
+      <tr>
+        <th scope="col">Marker</th>
+        <th scope="col">What it means</th>
+        <th scope="col">What to do about it</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">
+          <span class="row-marker-swatch row-marker-flagged" aria-hidden="true"></span>
+          <span class="rmt-marker-name">Yellow vertical bar on the left edge of a row</span>
+        </th>
+        <td>The filename has been flagged for human review: it contains spaces, non-ASCII characters, more than 200 characters, or matches a default scanner output pattern like <code>Scan_20240115_001.pdf</code>.</td>
+        <td>Often correlates with files that were OCR'd from paper. Worth a quick rename or close look before remediation.</td>
+      </tr>
+      <tr>
+        <th scope="row">
+          <span class="row-marker-swatch row-marker-imageonly" aria-hidden="true"></span>
+          <span class="rmt-marker-name">Faint yellow row tint</span>
+        </th>
+        <td>The file is an <em>image-only PDF</em> — a scanned page with no text layer.</td>
+        <td>May need OCR before it can be tagged for screen readers. Typically the most expensive remediation work — a vendor will price these higher than text-based PDFs.</td>
+      </tr>
+    </tbody>
+  </table>
 </aside>
 
 <div class="table-wrap table-scroll">

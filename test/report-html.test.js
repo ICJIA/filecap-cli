@@ -629,6 +629,49 @@ describe("writeHtml", () => {
     });
   });
 
+  describe("row-marker legend table (v1.7.11)", () => {
+    it("renders the legend as a 3-column <table> (Marker / What it means / What to do)", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).toMatch(/<table class="row-marker-table">/);
+      expect(html).toMatch(/<th[^>]*>Marker<\/th>/);
+      expect(html).toMatch(/<th[^>]*>What it means<\/th>/);
+      expect(html).toMatch(/<th[^>]*>What to do about it<\/th>/);
+    });
+
+    it("has exactly two body rows — one per marker (flagged + image-only)", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      // Each row carries a row-marker-swatch in its <th>.
+      const swatchHits = html.match(/<span class="row-marker-swatch row-marker-(flagged|imageonly)"/g) || [];
+      expect(swatchHits.length).toBe(2);
+    });
+
+    it("no longer emits the pre-v1.7.11 .row-marker-row flex paragraphs", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).not.toMatch(/<p class="row-marker-row"/);
+    });
+  });
+
   describe("meta-grid copy-to-clipboard (v1.7.7)", () => {
     it("renders a .meta-copy button next to IP, Hostname, Scanned path, Scanned at, and Public URL", async () => {
       const outputPath = path.join(tmpDir, "out.html");

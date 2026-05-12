@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.11] — 2026-05-12
+
+### Changed
+
+- **Per-site detail page's row-marker legend redesigned as a proper 3-column table.** Pre-v1.7.11 the legend was two flex-row paragraphs (swatch + run-on text), and on a wide viewport the long descriptions broke awkwardly mid-clause — "...it" + "contains spaces, non-ASCII characters, exceeds 200 chars," + "or matches a default scanner output pattern like" + "Scan_20240115_001.pdf" + ". Often correlates..." on five visually-distinct lines that the eye had to reassemble. The new layout is a `<table class="row-marker-table">` with three columns — **Marker** (~26% width, holds the swatch + name), **What it means** (~37%, the definition), **What to do about it** (~37%, the remediator guidance) — with `<thead>` column labels and `border-bottom` row dividers so each marker reads as one self-contained row. The marker name (`Yellow vertical bar on the left edge of a row` / `Faint yellow row tint`) gets `white-space: nowrap` to stay on one line in the Marker column. A `@media (max-width: 700px)` rule collapses the table to a stacked layout so the cells don't squeeze each other on narrow viewports. Required overriding the global `table { table-layout: fixed; width: max-content }` (used by the file-inventory table for click-and-drag column resize) with `table-layout: auto; width: 100%` plus an explicit `<colgroup>` for the % widths. 3 new tests pin the table structure (3 header cells, 2 body rows with swatches, no surviving `.row-marker-row` paragraphs).
+
+[1.7.11]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.11
+
 ## [1.7.10] — 2026-05-12
 
 ### Changed
