@@ -368,6 +368,7 @@ export function generateIndexHtml({
   duplicateGroups = [],
   masterCsv = null, // { filename: string, fileCount: number, byteCount: number } | null
   duplicatesCsv = null, // { filename: string, groupCount: number, occurrenceCount: number, byteCount: number } | null
+  byTypeCsvs = [], // v1.7.14: [{ slug, side, label, keys, csvFilename, htmlFilename, fileCount, byteCount }, …]
 }) {
   // Fleet totals
   let fleetTotalFiles = 0;
@@ -414,6 +415,17 @@ export function generateIndexHtml({
     delete normByCategory["legacy-office"];
   }
 
+  // v1.7.14: build a lookup of bucket → its HTML/CSV pair so a row can
+  // become a clickable link to the by-type detail page. The bucket
+  // identity is on the `keys` array — the first key in `categories` order
+  // determines whether the row matches.
+  const bucketByKey = new Map();
+  for (const b of byTypeCsvs) {
+    for (const k of (b.keys || [])) {
+      bucketByKey.set(k, b);
+    }
+  }
+
   function buildTypeRows(categories) {
     const seenLabels = new Set();
     return categories
@@ -424,7 +436,17 @@ export function generateIndexHtml({
       })
       .map(({ key, label }) => {
         const n = normByCategory[key] ?? 0;
-        return `<tr><td>${he(label)}</td><td class="num">${he(n.toLocaleString())}</td></tr>`;
+        const bucket = bucketByKey.get(key);
+        // When a per-type detail page exists, the whole row label is a link
+        // to it; otherwise (older bundles without by-type CSVs) the row
+        // renders as plain text.
+        const labelHtml = bucket?.htmlFilename
+          ? `<a class="by-type-link" href="${he(bucket.htmlFilename)}" aria-label="Open ${he(label)} detail page (${he(n.toLocaleString())} files)">${he(label)}<svg class="by-type-link-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>`
+          : he(label);
+        const numHtml = bucket?.csvFilename
+          ? `<a class="by-type-csv-link" href="${he(bucket.csvFilename)}" download aria-label="Download ${he(label)} CSV (${he(n.toLocaleString())} files)" title="Download CSV — ${he(label)}">${he(n.toLocaleString())}</a>`
+          : he(n.toLocaleString());
+        return `<tr><td>${labelHtml}</td><td class="num">${numHtml}</td></tr>`;
       })
       .join("");
   }
@@ -712,6 +734,58 @@ main {
 .by-type-column td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* v1.7.14 — clickable by-type row. Label opens the per-type detail page
+   (table of every file of that type across the fleet, with a CSV
+   download). Count opens just the CSV. Both styled subtly so the rows
+   still scan as a table; hover lights them up. */
+.by-type-column .by-type-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  color: #d4dae0;
+  text-decoration: none;
+  transition: color 100ms ease;
+}
+.by-type-column .by-type-link:hover,
+.by-type-column .by-type-link:focus-visible {
+  color: #58a6ff;
+  text-decoration: underline;
+}
+.by-type-column .by-type-link:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.by-type-column .by-type-link-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.55;
+  flex: none;
+  transition: opacity 100ms ease, transform 140ms ease;
+}
+.by-type-column .by-type-link:hover .by-type-link-icon,
+.by-type-column .by-type-link:focus-visible .by-type-link-icon {
+  opacity: 1;
+  transform: translateX(2px);
+}
+.by-type-column .by-type-csv-link {
+  color: #d4dae0;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dotted #2a323d;
+  transition: color 100ms ease, border-color 100ms ease;
+}
+.by-type-column .by-type-csv-link:hover,
+.by-type-column .by-type-csv-link:focus-visible {
+  color: #58a6ff;
+  border-bottom-color: #58a6ff;
+}
+.by-type-column .by-type-csv-link:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* ─── Site-card anatomy v1.7.0 + v1.7.1 clickable card ─── */

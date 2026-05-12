@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.14] — 2026-05-12
+
+### Added
+
+- **Per-file-type detail pages with CSV downloads — click "PDFs" on the index and get every PDF across the fleet in one infographic-style page.** Every non-empty bucket in the index's "By file type" table now has two artefacts emitted next to the master CSV: `audit-<slug>.csv` (filtered master, same 14 columns, every row tagged with its source server) and `audit-<slug>.html` (per-site-style detail page — same dp-hero pattern with two-up tiles + donut + plain-English caption + sortable file table + row-marker legend + click-and-drag resizable columns + sticky back-link / CSV-download bar). The slug for each bucket is stable and readable: `audit-pdfs.csv`, `audit-docx.csv`, `audit-xlsx.csv`, `audit-pptx.csv`, `audit-office-legacy.csv`, `audit-images.csv`, `audit-text-files.csv`, `audit-archives.csv`, `audit-audio-video.csv`, `audit-web-files.csv`, `audit-other.csv` (and matching `.html` for each). Empty buckets are skipped — no zero-row CSV/HTML pairs on disk. On the index page, the by-type row's **label** now opens the detail page and the **count column** downloads just the CSV; both styled subtly (hover-only blue, dotted underline on the count) so the table still scans as a table. Implementation: new exported `TYPE_BUCKETS` constant in `src/commands/web-rollup.js` is the single source of truth (used by both the CSV writer and the index renderer). Each bucket has `keys` (so the legacy-office and legacy-office synonyms merge into one bucket), `side` ("remediable" / "reference"), `label`, and `slug`. The per-bucket HTML reuses `writeHtml` with a consolidated header — the `dp-hero` shows "Across the fleet" as the eyebrow and the bucket label as the H1, with the donut showing 100 % audit for remediable buckets and 0 % for reference. 5 new tests cover CSV emission, master/per-type schema parity, dp-hero structure, index linking, and the empty-bucket skip path. Total now 30 test files / 422 tests.
+
+[1.7.14]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.14
+
 ## [1.7.13] — 2026-05-12
 
 ### Changed

@@ -452,6 +452,70 @@ describe("runWebRollup", () => {
     expect(html).toContain("Why aren&#39;t all");
   });
 
+  describe("by-file-type detail pages + CSVs (v1.7.14)", () => {
+    it("emits one CSV per non-empty bucket (audit-pdfs.csv, audit-docx.csv, …)", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const files = await fs.readdir(outputDir);
+      // The default fixture inserts PDFs, so at least audit-pdfs.csv should exist.
+      expect(files).toContain("audit-pdfs.csv");
+      expect(files).toContain("audit-pdfs.html");
+    });
+
+    it("the by-type CSV mirrors the master CSV's columns for entries of that category", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const masterCsv = await fs.readFile(path.join(outputDir, "audit-file-list-master.csv"), "utf8");
+      const pdfsCsv = await fs.readFile(path.join(outputDir, "audit-pdfs.csv"), "utf8");
+      // Same header row.
+      expect(pdfsCsv.split("\n")[0]).toBe(masterCsv.split("\n")[0]);
+      // Every data row in audit-pdfs.csv should also appear in the master CSV.
+      const pdfDataRows = pdfsCsv.split("\n").slice(1).filter(Boolean);
+      const masterDataRows = new Set(masterCsv.split("\n").slice(1).filter(Boolean));
+      for (const r of pdfDataRows) {
+        expect(masterDataRows.has(r)).toBe(true);
+      }
+    });
+
+    it("the by-type HTML detail page has the same dp-hero block as a per-site report", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "audit-pdfs.html"), "utf8");
+      // Hero block exists
+      expect(html).toMatch(/<header class="dp-hero">/);
+      // Title is the bucket label ("PDFs")
+      expect(html).toMatch(/<h1 class="dp-title">PDFs<\/h1>/);
+      // CSV download link in the sticky bar points to the bucket's CSV
+      expect(html).toMatch(/<a class="report-csv-link" href="audit-pdfs\.csv" download>/);
+      // Back link returns to the fleet index
+      expect(html).toMatch(/<a class="report-back-link" href="index\.html">/);
+      // Eyebrow says it's the across-the-fleet view, not a single site
+      expect(html).toContain("Across the fleet");
+    });
+
+    it("the index by-type table wraps each row label in a link to the detail page", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+      // Label → HTML detail page
+      expect(html).toMatch(/<a class="by-type-link" href="audit-pdfs\.html"[^>]*>PDFs/);
+      // Count → CSV
+      expect(html).toMatch(/<a class="by-type-csv-link" href="audit-pdfs\.csv" download/);
+    });
+
+    it("skips buckets that have zero matching files (no empty CSV/HTML pairs)", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const files = await fs.readdir(outputDir);
+      // The default fixture has only PDFs — buckets like office-legacy or
+      // audio-video should produce no artifacts.
+      expect(files).not.toContain("audit-office-legacy.csv");
+      expect(files).not.toContain("audit-office-legacy.html");
+      expect(files).not.toContain("audit-audio-video.csv");
+      expect(files).not.toContain("audit-audio-video.html");
+    });
+  });
+
   describe("fleet-hero infographic (v1.7.13)", () => {
     it("leads with the AUDIT count, not the total, in the .fleet-hero-num block", async () => {
       const { sitesFile, outputDir, auditsBase } = await buildFixture();

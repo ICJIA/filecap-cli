@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { z } from "zod";
 import { runReport } from "./report.js";
 import { writeCsv } from "../report/csv.js";
+import { writeHtml } from "../report/html.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
@@ -266,6 +267,28 @@ function slug(s) {
     .replace(/^-+|-+$/g, "")
     || "site";
 }
+
+// v1.7.14: by-file-type CSV buckets. One row in the "By file type" table on
+// the fleet index page corresponds to one bucket here. Each non-empty bucket
+// gets its own CSV emitted next to the master CSV so a manager can click
+// "PDFs" and get every PDF across every site in one file — no per-site
+// filtering by hand. `keys` is plural so the legacy-office synonyms can be
+// merged into one bucket (and likewise for any future category fan-out).
+export const TYPE_BUCKETS = [
+  // Files that may need accessibility remediation
+  { side: "remediable", keys: ["pdf"],              label: "PDFs",                                       slug: "pdfs" },
+  { side: "remediable", keys: ["office-document"],  label: "Word documents (.docx)",                     slug: "docx" },
+  { side: "remediable", keys: ["spreadsheet"],      label: "Excel spreadsheets (.xlsx)",                 slug: "xlsx" },
+  { side: "remediable", keys: ["presentation"],     label: "PowerPoint (.pptx)",                         slug: "pptx" },
+  { side: "remediable", keys: ["office-legacy", "legacy-office"], label: "Legacy Office (.doc, .xls, .ppt)", slug: "office-legacy" },
+  // Files that may not need remediation (reference / handled-elsewhere)
+  { side: "reference",  keys: ["image"],            label: "Images (.jpg, .png, .gif, .webp, .svg)",     slug: "images" },
+  { side: "reference",  keys: ["text"],             label: "Text files (.txt, .md)",                     slug: "text-files" },
+  { side: "reference",  keys: ["archive"],          label: "Archives (.zip, .tar, etc.)",                slug: "archives" },
+  { side: "reference",  keys: ["audio-video"],      label: "Audio / video",                              slug: "audio-video" },
+  { side: "reference",  keys: ["web"],              label: "Web pages (.html, .css, .js)",               slug: "web-files" },
+  { side: "reference",  keys: ["other"],            label: "Other (placeholders, unrecognized)",         slug: "other" },
+];
 
 /**
  * Classify how a site's files are accessed, so the rollup UI can render a
@@ -586,6 +609,86 @@ export async function runWebRollup({
     };
   }
 
+  // 6a-bis. v1.7.14 — per-file-type CSV + HTML detail pages.
+  //   For every non-empty bucket in TYPE_BUCKETS, write:
+  //     audit-<slug>.csv  — filtered master CSV containing only files of this
+  //                         type, with the same Server/Website/IP/Public URL
+  //                         columns (consolidated header path).
+  //     audit-<slug>.html — same dp-hero + sortable file table as a per-site
+  //                         detail page, but pre-filtered to this category
+  //                         across every server. Lets a manager click "PDFs"
+  //                         on the index page's "By file type" table and get
+  //                         a full table of every PDF across the fleet
+  //                         without filtering by hand.
+  const byTypeCsvs = [];
+  if (allEntries.length > 0) {
+    for (const bucket of TYPE_BUCKETS) {
+      const filtered = allEntries.filter((it) => bucket.keys.includes(it.entry?.category));
+      if (filtered.length === 0) continue;
+
+      // Reuse the same consolidated-header shape that the master CSV/HTML
+      // path uses. Setting `siteName` to bucket.label gives the dp-hero a
+      // nickname/eyebrow that reads as a file-type page rather than a site.
+      const byTypeHeader = {
+        schemaVersion: 1,
+        kind: "filecap-consolidated-header",
+        metadata: {
+          consolidatedAt: new Date().toISOString(),
+          filecapVersion: "web-rollup",
+          sources: consolidatedSources,
+          siteName: "Across the fleet",
+        },
+      };
+      const filteredEntries = filtered.map((it) => it.entry);
+
+      const csvFilename = `audit-${bucket.slug}.csv`;
+      const csvText = writeCsv({
+        sourceHeader: byTypeHeader,
+        entries: filteredEntries,
+        sources: consolidatedSources,
+      });
+      await fs.writeFile(path.join(output, csvFilename), csvText);
+      const csvStat = await fs.stat(path.join(output, csvFilename));
+
+      const htmlFilename = `audit-${bucket.slug}.html`;
+      let htmlOk = false;
+      try {
+        await writeHtml({
+          sourceHeader: byTypeHeader,
+          entries: filteredEntries,
+          sources: consolidatedSources,
+          outputPath: path.join(output, htmlFilename),
+          backHref: "index.html",
+          csvHref: csvFilename,
+          siteUrl: null,
+          siteFullName: bucket.label,
+          accessKind: null,
+        });
+        htmlOk = true;
+        // v1.7.14: inject the client-side password gate into per-type pages
+        // the same way the per-site detail pages get gated above.
+        if (!noClientGate && password !== null) {
+          const hexHash = computeHash(password);
+          const html = await fs.readFile(path.join(output, htmlFilename), "utf8");
+          await fs.writeFile(path.join(output, htmlFilename), injectPasswordGate(html, hexHash));
+        }
+      } catch (err) {
+        process.stderr.write(`WARN: failed to write ${htmlFilename}: ${err.message}\n`);
+      }
+
+      byTypeCsvs.push({
+        slug: bucket.slug,
+        side: bucket.side,
+        label: bucket.label,
+        keys: bucket.keys,
+        csvFilename,
+        htmlFilename: htmlOk ? htmlFilename : null,
+        fileCount: filtered.length,
+        byteCount: csvStat.size,
+      });
+    }
+  }
+
   // 6b. Detect cross-server duplicates by normalised filename, then write the
   //     per-occurrence duplicates CSV alongside the master CSV.
   const duplicateGroups = findCrossServerDuplicates(allEntries);
@@ -615,6 +718,7 @@ export async function runWebRollup({
     masterCsv: masterCsvMeta,
     duplicateGroups,
     duplicatesCsv: duplicatesCsvMeta,
+    byTypeCsvs,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 
