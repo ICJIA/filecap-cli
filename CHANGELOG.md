@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.38] — 2026-05-13
+
+### Changed
+
+- **Timestamp format upgraded to 12-hour clock + DST-aware abbreviation + plain-English clarifier.** Pre-v1.7.38 every visible timestamp read like `2026-05-13 12:59 Chicago time` — accurate for Chicago readers but ambiguous for remediation vendors and auditors in Eastern or Mountain time who needed to compute the offset to their local time. The new format reads `2026-05-13 12:59 PM CDT (Chicago time)` and carries three signals on every stamp:
+  - **12-hour clock with AM/PM** — most familiar to US readers.
+  - **CDT or CST abbreviation** — automatic via `Intl.DateTimeFormat` `timeZoneName: "short"`, so daylight-saving transitions are handled without code changes.
+  - **`(Chicago time)` plain-English clarifier** — non-technical readers don't need to decode CDT/CST.
+
+  Applied everywhere the bundle prints a time: index-page footer `Generated …` stamp, per-site detail-page footer + meta-grid `Scanned at:`, cross-server duplicates `Newest → oldest` column. Date-only displays (`Last audit: May 13, 2026`) are unchanged — the calendar day is unambiguous and was already being evaluated in Chicago tz.
+- Helper functions in `src/util/time.js` updated; the `Intl`-derived tz abbreviation lookup is centralised in a single private `chicagoTzAbbr(d)` helper so both display helpers stay in lock-step.
+
+[1.7.38]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.38
+
 ## [1.7.37] — 2026-05-13
 
 ### Changed

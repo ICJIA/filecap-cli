@@ -5,15 +5,39 @@
 // 8601 UTC (that's the on-disk wire format); these helpers convert at
 // the rendering layer only.
 //
-// All three helpers explicitly emit "Chicago time" as the trailing
-// label so the timezone is unambiguous to non-technical readers — no
-// CDT/CST abbreviations to decode.
+// 1.7.38 — Display format updated for clarity across mixed-timezone
+// audiences. Remediation vendors are often in Eastern or Mountain time
+// and need to know the exact offset to compute their local equivalent.
+// Three signals on every timestamp:
+//   - 12-hour clock with AM/PM (most familiar to US readers)
+//   - CDT or CST abbreviation (Intl-derived; DST-aware automatically)
+//   - "(Chicago time)" plain-English clarifier
+// Example: "May 13, 1:21 PM CDT (Chicago time)".
 
 const CHICAGO = "America/Chicago";
 
 /**
- * "May 13, 16:05 Chicago time" — compact date + 24-hour time used in
- * the cross-server duplicates "Newest → oldest" column.
+ * Pull the time-zone short-name part ("CDT" / "CST") for a given
+ * Date instance, evaluated in America/Chicago. DST handling is
+ * automatic.
+ */
+function chicagoTzAbbr(d) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: CHICAGO,
+      timeZoneName: "short",
+    }).formatToParts(d);
+    const tz = parts.find((p) => p.type === "timeZoneName");
+    return tz?.value ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * "May 13, 1:21 PM CDT (Chicago time)" — compact date + 12-hour time
+ * used in the cross-server duplicates "Newest → oldest" column and
+ * any other compact context.
  */
 export function fmtChicagoDateTime(iso) {
   if (!iso) return "";
@@ -27,11 +51,12 @@ export function fmtChicagoDateTime(iso) {
     }).format(d);
     const timePart = new Intl.DateTimeFormat("en-US", {
       timeZone: CHICAGO,
-      hour: "2-digit",
+      hour: "numeric",
       minute: "2-digit",
-      hour12: false,
+      hour12: true,
     }).format(d);
-    return `${datePart}, ${timePart} Chicago time`;
+    const tz = chicagoTzAbbr(d);
+    return `${datePart}, ${timePart} ${tz} (Chicago time)`;
   } catch {
     return "";
   }
@@ -39,7 +64,9 @@ export function fmtChicagoDateTime(iso) {
 
 /**
  * "May 13, 2026" — date-only display used in "Last audit:" captions
- * and the sticky-nav last-audit chip on per-site detail pages.
+ * and the sticky-nav last-audit chip on per-site detail pages. No
+ * time component; calendar day is evaluated in Chicago tz so the
+ * date matches what an ICJIA reader would call "today."
  */
 export function fmtChicagoDate(iso) {
   if (!iso) return "";
@@ -58,15 +85,15 @@ export function fmtChicagoDate(iso) {
 }
 
 /**
- * "2026-05-13 12:03 Chicago time" — wire format for the page footer
- * "Generated …" stamp and the meta-grid "Scanned at:" row. Uses
- * ISO-like YYYY-MM-DD ordering so timestamps sort lexically.
+ * "2026-05-13 1:21 PM CDT (Chicago time)" — wire format for the page
+ * footer "Generated …" stamp and the meta-grid "Scanned at:" row.
+ * Uses ISO-like YYYY-MM-DD ordering on the date so timestamps sort
+ * lexically.
  */
 export function fmtChicagoGeneratedAt(input) {
   const d = input instanceof Date ? input : new Date(input);
   if (Number.isNaN(d.getTime())) return "";
   try {
-    // en-CA emits YYYY-MM-DD ordering by default.
     const datePart = new Intl.DateTimeFormat("en-CA", {
       timeZone: CHICAGO,
       year: "numeric",
@@ -75,11 +102,12 @@ export function fmtChicagoGeneratedAt(input) {
     }).format(d);
     const timePart = new Intl.DateTimeFormat("en-US", {
       timeZone: CHICAGO,
-      hour: "2-digit",
+      hour: "numeric",
       minute: "2-digit",
-      hour12: false,
+      hour12: true,
     }).format(d);
-    return `${datePart} ${timePart} Chicago time`;
+    const tz = chicagoTzAbbr(d);
+    return `${datePart} ${timePart} ${tz} (Chicago time)`;
   } catch {
     return "";
   }
