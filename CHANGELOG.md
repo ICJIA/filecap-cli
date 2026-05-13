@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.19] — 2026-05-13
+
+### Added
+
+- **Duplicates table is now filterable by Remediable / Reference / All, defaulting to "Remediable only."** Three pill chips above the table; click toggles visibility of rows tagged with `data-dup-side`. Default state matches where the manager/auditor attention belongs — remediable (PDF, DOCX, XLSX, PPTX, legacy Office) — and shows live row counts in each chip ("Remediable only 131", "Reference only 299", "All 430") so the user sees the proportions at a glance. Filter is pure CSS toggle via `[data-dup-active-filter]` on the wrapper element + a small IIFE for click handling.
+- **"Some duplicates are intentional and required" callout in the duplicates explainer.** New green-tinted paragraph (parallel to the existing blue `dup-not-error` callout) covering the specific case where the same document is published on both a specialty site and the main ICJIA site for findability and Open Meetings Act compliance — e.g. a DVFR board agenda lives on dvfr.illinois.gov *and* on icjia.illinois.gov, because someone going to the DVFR site to look up "when is the next DVFR meeting?" shouldn't have to know to also visit the main agency site. Same logic applies to other site-owner requests where a document needs to live on multiple sites for findability. The callout sits between "a duplicate is not an error" and the exact/variant kind cards so a manager reading top-to-bottom sees the three framings (not an error → sometimes intentional → here's the table) in order before they hit the data.
+
+[1.7.19]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.19
+
 ## [1.7.18] — 2026-05-13
 
 ### Changed

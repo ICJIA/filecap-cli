@@ -112,6 +112,27 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
   const exactCount = groups.filter((g) => g.isExactDuplicate).length;
   const variantCount = groups.length - exactCount;
 
+  // v1.7.19: classify each duplicate group's filename so the on-page table
+  // can be filtered "Remediable only / Reference only / All" — the same
+  // remediable/reference split filecap uses on the per-site detail page.
+  // Remediable = formats a vendor would actually quote against (PDF, DOCX,
+  // XLSX, PPTX, legacy Office). Reference = everything else (images, text,
+  // web, archives, other). Managers/auditors mostly care about the
+  // remediable subset; the other rows are still visible if they switch
+  // filters or pick "All".
+  const REMEDIABLE_EXT = new Set(["pdf", "docx", "xlsx", "pptx", "doc", "xls", "ppt"]);
+  function sideForFilename(name) {
+    const m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+    const ext = m ? m[1] : "";
+    return REMEDIABLE_EXT.has(ext) ? "remediable" : "reference";
+  }
+  let dupRemediableCount = 0;
+  let dupReferenceCount = 0;
+  for (const g of groups) {
+    if (sideForFilename(g.normalizedFilename) === "remediable") dupRemediableCount++;
+    else dupReferenceCount++;
+  }
+
   // One row per group — easier to scan than the per-item-row version. The
   // per-occurrence detail lives in audit-file-duplicates.csv for pivot work.
   const groupRows = groups.map((g) => {
@@ -137,7 +158,8 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
       ? `${he(fmtDate(newest))} <span class="dup-dim">↓</span> ${he(fmtDate(oldest))}`
       : he(newest ? fmtDate(newest) : "—");
     const sitesText = items.map((i) => i.siteName || i.serverName || "").join(", ");
-    return `<tr>
+    const side = sideForFilename(g.normalizedFilename);
+    return `<tr data-dup-side="${he(side)}">
       <td title="${he(g.normalizedFilename)}">${he(g.normalizedFilename)}</td>
       <td>${matchBadge}</td>
       <td title="${he(sitesText)}">${sites}</td>
@@ -205,6 +227,8 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
 
       <p class="dup-not-error"><strong>A duplicate is not an error.</strong> It is not the webmaster's fault. It just means the same filename appears in more than one place — typically because the same document was meant to be visible on multiple sites. Use this list as a <strong>cross-check</strong>, not a deletion queue.</p>
 
+      <p class="dup-intentional"><strong>Some duplicates are intentional and required.</strong> Because ICJIA runs a main site plus several specialty sites (DVFR, R3, i2i, ILFVCC, Infonet, Intranet, etc.), the same meeting agenda is often posted on <em>both</em> the main agency site and the specialty site that owns the meeting — for example, a DVFR board agenda is posted on the DVFR site (where DVFR stakeholders look) <em>and</em> on the ICJIA main site (for Open Meetings Act compliance). Someone going to the DVFR site to look up "when is the next DVFR meeting?" shouldn't have to know to also visit icjia.illinois.gov, and vice versa. So when you see the same agenda PDF flagged as a duplicate across DVFR and ICJIA, that's almost certainly a feature, not a bug. The same logic applies to other site-owner requests where a document needs to live on multiple sites for findability.</p>
+
       <div class="dup-kind-cards">
         <div class="dup-kind-card dup-kind-card-exact">
           <h4 class="dup-kind-card-h4"><span class="dup-kind dup-exact">exact</span> — same content on every site</h4>
@@ -221,7 +245,15 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
 
     <details class="dup-table-details" open>
       <summary>Summary table — ${he(groups.length.toLocaleString())} filename groups (one row each)</summary>
-      <div class="dup-pan-wrap" data-dup-pan>
+      <div class="dup-filter-bar" role="group" aria-label="Filter duplicates by file kind">
+        <p class="dup-filter-help">For managers and auditors, the remediable files (PDFs, Word, Excel, PowerPoint, legacy Office) are the ones that matter for accessibility scope. Reference files (images, text, archives, web pages) are listed here for completeness — vendors don't usually quote against them.</p>
+        <div class="dup-filter-chips" data-dup-filter-bar>
+          <button type="button" class="dup-filter-chip is-active" data-dup-filter="remediable" aria-pressed="true">Remediable only <span class="dup-filter-count">${he(dupRemediableCount.toLocaleString())}</span></button>
+          <button type="button" class="dup-filter-chip" data-dup-filter="reference" aria-pressed="false">Reference only <span class="dup-filter-count">${he(dupReferenceCount.toLocaleString())}</span></button>
+          <button type="button" class="dup-filter-chip" data-dup-filter="all" aria-pressed="false">All <span class="dup-filter-count">${he(groups.length.toLocaleString())}</span></button>
+        </div>
+      </div>
+      <div class="dup-pan-wrap" data-dup-pan data-dup-active-filter="remediable">
         <table class="dup-table">
           <thead>
             <tr>
@@ -1490,6 +1522,20 @@ main {
   border-radius: 6px;
   color: #e8ecf1;
 }
+.duplicates .dup-intentional {
+  /* v1.7.19: separate callout for the "this duplicate is on purpose" case —
+     e.g. meeting agendas posted on both the main ICJIA site and the
+     specialty site for Open Meetings Act compliance. Visually parallel
+     to .dup-not-error but tinted green so a manager glancing at the
+     section reads it as a positive reassurance, not a warning. */
+  margin: 0 0 1.3rem !important;
+  padding: 14px 18px;
+  background: rgba(102, 217, 163, 0.08);
+  border-left: 3px solid #66d9a3;
+  border-radius: 6px;
+  color: #e8ecf1;
+}
+.duplicates .dup-intentional strong { color: #d4f7e1; }
 .duplicates .dup-kind-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1738,6 +1784,70 @@ main {
   border-radius: 3px;
   color: #e5e5e5;
 }
+/* v1.7.19: duplicates table filter — remediable/reference/all chips above
+   the table. Default state is "Remediable only" because that's where the
+   manager/auditor attention belongs; the on-page table hides the
+   non-remediable rows by JS toggle of [data-dup-side] visibility against
+   the wrapper's [data-dup-active-filter] attribute. */
+.dup-filter-bar {
+  margin: 1rem 0 0.75rem;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #21262d;
+  border-radius: 8px;
+}
+.dup-filter-help {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  color: #9aa5b1;
+  line-height: 1.55;
+}
+.dup-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.dup-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  color: #c9d1d9;
+  border: 1px solid #2a323d;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.dup-filter-chip:hover {
+  background: rgba(88, 166, 255, 0.08);
+  color: #58a6ff;
+  border-color: #58a6ff;
+}
+.dup-filter-chip:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.dup-filter-chip.is-active {
+  background: #1f6feb;
+  color: #ffffff;
+  border-color: #1f6feb;
+}
+.dup-filter-chip.is-active:hover { background: #388bfd; color: #ffffff; }
+.dup-filter-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.8em;
+  opacity: 0.85;
+}
+.dup-filter-chip.is-active .dup-filter-count { opacity: 1; }
+/* Show/hide rows by matching tr[data-dup-side] against
+   [data-dup-active-filter] on the wrapper. */
+.dup-pan-wrap[data-dup-active-filter="remediable"] tr[data-dup-side="reference"] { display: none; }
+.dup-pan-wrap[data-dup-active-filter="reference"] tr[data-dup-side="remediable"] { display: none; }
 .dup-kind {
   display: inline-block;
   margin-left: 0.6rem;
@@ -2050,6 +2160,32 @@ ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
     } else {
       if (fallbackCopy(text)) flashCopied(btn);
     }
+  });
+})();
+
+/* v1.7.19 — duplicates table filter. Three chips above the table
+   (Remediable only / Reference only / All) toggle visibility of rows
+   tagged with data-dup-side. Default is "remediable" so managers and
+   auditors land on the subset that matters for accessibility scope.
+   Each chip carries its own count so the user sees how many rows are
+   in each bucket before clicking. */
+(function () {
+  "use strict";
+  var bar = document.querySelector("[data-dup-filter-bar]");
+  if (!bar) return;
+  var wrap = document.querySelector("[data-dup-pan]");
+  if (!wrap) return;
+  var chips = bar.querySelectorAll("[data-dup-filter]");
+  bar.addEventListener("click", function (e) {
+    var chip = e.target.closest ? e.target.closest("[data-dup-filter]") : null;
+    if (!chip) return;
+    var next = chip.getAttribute("data-dup-filter");
+    wrap.setAttribute("data-dup-active-filter", next);
+    chips.forEach(function (c) {
+      var active = c === chip;
+      c.classList.toggle("is-active", active);
+      c.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   });
 })();
 </script>
