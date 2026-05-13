@@ -546,7 +546,11 @@ describe("writeHtml", () => {
       });
       const html = await fs.readFile(outputPath, "utf8");
       expect(html).toMatch(/<section class="access-panel access-strapi"/);
-      expect(html).toContain("Strapi CMS / SSH required");
+      // v1.7.33: panel headline collapsed to "For bulk file access" — the
+      // per-type detail (Strapi CMS / GitHub / Server) stays in the body
+      // copy because a remediator visiting the panel still needs to know
+      // what credential to ask for.
+      expect(html).toContain("For bulk file access");
       expect(html).toContain("Strapi CMS instance on a remote Linux host");
       expect(html).toContain("OpenSSH public key");
       expect(html).toContain("Contact IDS at ICJIA");
@@ -563,7 +567,7 @@ describe("writeHtml", () => {
       });
       const html = await fs.readFile(outputPath, "utf8");
       expect(html).toMatch(/<section class="access-panel access-github"/);
-      expect(html).toContain("GitHub repo / access required");
+      expect(html).toContain("For bulk file access");
       expect(html).toContain("GitHub.com account");
       expect(html).toContain("ICJIA organization access");
       expect(html).toContain("Contact IDS at ICJIA");
@@ -580,7 +584,7 @@ describe("writeHtml", () => {
       });
       const html = await fs.readFile(outputPath, "utf8");
       expect(html).toMatch(/<section class="access-panel access-server"/);
-      expect(html).toContain("Server / SSH required");
+      expect(html).toContain("For bulk file access");
       expect(html).toContain("static directory on a remote Linux host");
       expect(html).toContain("OpenSSH public key");
       expect(html).toContain("Contact IDS at ICJIA");

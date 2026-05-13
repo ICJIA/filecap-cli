@@ -1285,7 +1285,8 @@ describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
 
     const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
     expect(indexHtml).toMatch(/class="access-chip access-strapi"/);
-    expect(indexHtml).toContain("Strapi CMS / SSH required");
+    // v1.7.33: chip label collapsed to plain English across all site types.
+    expect(indexHtml).toContain("For bulk file access");
 
     const files = await fs.readdir(outputDir);
     const dvfrHtml = files.find((f) => f.startsWith("dvfr-") && f.endsWith(".html"));
@@ -1331,7 +1332,7 @@ describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
 
     const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
     expect(indexHtml).toMatch(/class="access-chip access-github"/);
-    expect(indexHtml).toContain("GitHub repo / access required");
+    expect(indexHtml).toContain("For bulk file access");
 
     const files = await fs.readdir(outputDir);
     const vppHtml = files.find((f) => f.startsWith("vpp-") && f.endsWith(".html"));

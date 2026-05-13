@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.33] — 2026-05-13
+
+### Changed
+
+- **Access-method chip labels collapsed to plain English across every site type.** Pre-v1.7.33, each per-site card carried a chip reading one of `Strapi CMS / SSH required`, `GitHub repo / access required`, or `Server / SSH required` — implementation jargon that leaked irrelevant detail to the non-technical audience the fleet index is written for. v1.7.33 replaces all three with the same plain-English phrase: **`For bulk file access`**. The per-site visual differentiation (cyan / violet / amber dot + border) is preserved via the CSS class on the chip (`access-strapi` / `access-github` / `access-server`), so the at-a-glance type-color signal still works for anyone who needs it. The per-site detail page's access panel uses the same new headline but **keeps the underlying specifics in the body copy** (Strapi rsync vs GitHub clone vs server rsync, SSH-key vs ICJIA-GitHub-org credential, "Contact IDS at ICJIA to request access") because a remediator who actually visits the panel does need that detail to ask for the right credential.
+- **Chip tooltip updated** from `"<label> — see detail page for access steps"` to `"For bulk file access — open this site's report for the specific credentials and steps"`. Removes the double-use of `access` and reads cleanly as a single instruction.
+
+[1.7.33]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.33
+
 ## [1.7.32] — 2026-05-13
 
 ### Security / privacy

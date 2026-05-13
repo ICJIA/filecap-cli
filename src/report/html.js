@@ -167,24 +167,28 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
  *                                        Standalone single-site audits omit
  *                                        this (nothing to navigate back to).
  */
-// Detail-page access-panel copy. Keep in lock-step with ACCESS_CHIP_LABEL in
-// src/web/index-page.js so a manager going from index → detail sees consistent
-// language.
+// Detail-page access-panel copy. v1.7.33: the `label` (panel headline)
+// now matches the index-card chip's plain-English "For bulk file access"
+// across all three site types. The per-type `method` / `credential` /
+// `action` body still spells out the underlying specifics (Strapi rsync
+// vs GitHub clone vs server rsync) because a remediator visiting this
+// panel does need to know what credential to ask for. Keep in lock-step
+// with ACCESS_CHIP_LABEL in src/web/index-page.js.
 const ACCESS_PANEL_COPY = {
   strapi: {
-    label: "Strapi CMS / SSH required",
+    label: "For bulk file access",
     method: "Files are served by a Strapi CMS instance on a remote Linux host. To audit or remediate them you need to rsync the uploads directory over SSH.",
     credential: "An OpenSSH public key on the file server is required.",
     action: "Contact IDS at ICJIA to request access.",
   },
   github: {
-    label: "GitHub repo / access required",
+    label: "For bulk file access",
     method: "Files live in an ICJIA-owned GitHub repository. To audit or remediate them you clone the repo and inspect the static asset directory.",
     credential: "A GitHub.com account with ICJIA organization access is required.",
     action: "Contact IDS at ICJIA to request access.",
   },
   server: {
-    label: "Server / SSH required",
+    label: "For bulk file access",
     method: "Files are stored in a static directory on a remote Linux host (no CMS). To audit or remediate them you need to rsync the directory over SSH.",
     credential: "An OpenSSH public key on the file server is required.",
     action: "Contact IDS at ICJIA to request access.",

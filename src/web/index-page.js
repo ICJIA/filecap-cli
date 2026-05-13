@@ -426,10 +426,19 @@ const ICJIA_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="htt
 
 // Access-method chip copy. Keep these strings in lock-step with the detail-page
 // access panel in src/report/html.js so managers see consistent language.
+// v1.7.33 — chip label collapsed to a single plain-English phrase across
+// all three site types. The pre-v1.7.33 labels ("Strapi CMS / SSH required",
+// "GitHub repo / access required", "Server / SSH required") leaked
+// implementation details to a non-technical reader who only cares about
+// the practical question: "how do I get the files?" The per-site
+// detail page's access panel still spells out the underlying
+// requirements (SSH key vs GitHub org access vs rsync) — that's where a
+// remediator goes when they need the specifics. The chip on the index
+// card just says what the panel is FOR.
 const ACCESS_CHIP_LABEL = {
-  strapi: "Strapi CMS / SSH required",
-  github: "GitHub repo / access required",
-  server: "Server / SSH required",
+  strapi: "For bulk file access",
+  github: "For bulk file access",
+  server: "For bulk file access",
 };
 
 // Same clipboard-outline icon as src/report/html.js's COPY_ICON_SVG — kept
@@ -544,7 +553,7 @@ export function renderCard(sr) {
   return `<article class="site-card">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
   <header class="card-head">
-    ${accessKind ? `<p class="access-chip access-${accessKind}" title="${he(accessLabel)} — see detail page for access steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</p>` : ""}
+    ${accessKind ? `<p class="access-chip access-${accessKind}" title="${he(accessLabel)} — open this site's report for the specific credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</p>` : ""}
     <p class="nickname">${nickname}</p>
     <h3 class="full-name">${fullName}</h3>
     ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}

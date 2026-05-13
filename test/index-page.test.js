@@ -85,25 +85,29 @@ describe("renderCard", () => {
   });
 
   describe("access chip (v1.7.6)", () => {
+    // v1.7.33: chip labels collapsed to a single plain-English phrase
+    // ("For bulk file access") across all three site types — the CSS
+    // class (access-strapi / access-github / access-server) still
+    // carries the per-type visual distinction.
     it("renders a Strapi-CMS chip when accessKind is 'strapi'", () => {
       const sr = { ...baseSr, site: { ...baseSr.site, accessKind: "strapi" } };
       const html = renderCard(sr);
       expect(html).toMatch(/class="access-chip access-strapi"/);
-      expect(html).toContain("Strapi CMS / SSH required");
+      expect(html).toContain("For bulk file access");
     });
 
     it("renders a GitHub chip when accessKind is 'github'", () => {
       const sr = { ...baseSr, site: { ...baseSr.site, accessKind: "github" } };
       const html = renderCard(sr);
       expect(html).toMatch(/class="access-chip access-github"/);
-      expect(html).toContain("GitHub repo / access required");
+      expect(html).toContain("For bulk file access");
     });
 
     it("renders a Server chip when accessKind is 'server'", () => {
       const sr = { ...baseSr, site: { ...baseSr.site, accessKind: "server" } };
       const html = renderCard(sr);
       expect(html).toMatch(/class="access-chip access-server"/);
-      expect(html).toContain("Server / SSH required");
+      expect(html).toContain("For bulk file access");
     });
 
     it("omits the chip entirely when accessKind is missing", () => {
