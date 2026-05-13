@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.34] — 2026-05-13
+
+### Changed
+
+- **"For bulk file access" chip is now a clickable button that opens a full instructions modal**, replacing the unreachable `title=` tooltip. Pre-v1.7.34 the chip used a native HTML tooltip, but the whole-card stretched-link's `pointer-events: none` cascade on every card descendant suppressed the chip's hover events, so the tooltip never fired in practice. v1.7.34 makes the chip a real `<button>` with `pointer-events: auto`, click-opens a native `<dialog>` carrying:
+  - **Two plain-English paragraphs** explaining where the files live (Strapi-managed remote Linux host / ICJIA-owned GitHub repo / regular Linux server) and how someone copies them off in bulk (rsync over SSH, GitHub clone, or rsync over SSH respectively);
+  - **A 3-step numbered list** of the actual workflow: who to contact, what tool to run, how the corrected files get back to the host;
+  - **A direct contact line** — `Email cja.ids@illinois.gov for help with credentials, walkthroughs, or any question about getting these files in bulk.`
+
+  Three dialogs total (one per access type) rendered once at the page footer; each chip targets the matching dialog by `data-access-modal` attr. Per-type accent color (cyan for Strapi, violet for GitHub, amber for Server) on the dialog's left border + the CTA block, so the modal visually echoes the chip the user clicked. Native `<dialog>` + `showModal()` handles focus trap + Escape-to-close; click on the backdrop closes the dialog too. Why this matters: "How do I access these files?" is the single most common question a manager has when looking at this audit, and it deserves a first-class answer that isn't gated behind a hover tooltip nobody can trigger.
+
+- **Chip styled as a real button** (cursor: pointer, hover-brightness + subtle 1 px lift on hover, focus-visible outline) so it's discoverable as interactive instead of looking like a decorative label.
+
+[1.7.34]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.34
+
 ## [1.7.33] — 2026-05-13
 
 ### Changed

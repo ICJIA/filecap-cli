@@ -394,6 +394,41 @@ function renderTodoSection() {
   </section>`;
 }
 
+/**
+ * v1.7.34 — Render the per-access-type modals once at the page footer.
+ * Each per-site card's "For bulk file access" chip is a <button> with
+ * `data-access-modal="strapi|github|server"`; the page-level click
+ * handler reads that attr and opens the matching dialog. Three dialogs
+ * total regardless of site count — they're shared.
+ *
+ * Uses the native <dialog> element + showModal(): handles focus trap,
+ * Escape-key close, and click-outside-to-close via the ::backdrop
+ * pseudo-element with a click handler. No external modal library.
+ */
+function renderAccessModals() {
+  const dialogs = Object.entries(ACCESS_MODAL_COPY).map(([kind, copy]) => {
+    const paragraphsHtml = (copy.paragraphs ?? [])
+      .map((p) => `<p>${p}</p>`)
+      .join("");
+    const stepsHtml = (copy.steps ?? [])
+      .map((s) => `<li>${s}</li>`)
+      .join("");
+    return `<dialog class="access-modal access-modal-${he(kind)}" id="access-modal-${he(kind)}" aria-labelledby="access-modal-${he(kind)}-title">
+  <form method="dialog" class="access-modal-close-form">
+    <button type="submit" class="access-modal-close" aria-label="Close access-instructions dialog" title="Close">&times;</button>
+  </form>
+  <h2 id="access-modal-${he(kind)}-title" class="access-modal-title">${he(copy.title)}</h2>
+  <div class="access-modal-body">
+    ${paragraphsHtml}
+    <h3 class="access-modal-steps-h3">Step-by-step</h3>
+    <ol class="access-modal-steps">${stepsHtml}</ol>
+    <p class="access-modal-cta"><strong>${he(copy.cta)}</strong> Email <a href="mailto:cja.ids@illinois.gov">cja.ids@illinois.gov</a> for help with credentials, walkthroughs, or any question about getting these files in bulk.</p>
+  </div>
+</dialog>`;
+  }).join("\n");
+  return dialogs;
+}
+
 // v1.7.15: ICJIA wordmark for the navbar. Sourced from the agency's standard
 // asset set (https://github.com/ICJIA/archived-website-page/blob/main/assets/
 // icjia-logo.svg). White fills were swapped to currentColor so a CSS color
@@ -439,6 +474,57 @@ const ACCESS_CHIP_LABEL = {
   strapi: "For bulk file access",
   github: "For bulk file access",
   server: "For bulk file access",
+};
+
+// v1.7.34 — clickable chip opens a modal with the per-type instructions.
+// Pre-v1.7.34 the chip used a `title=` tooltip, but `pointer-events: none`
+// on every card descendant (set so whole-card clicks fall through to the
+// stretched-link) suppressed the tooltip's hover event entirely.
+// Switching to a click-opens-<dialog> pattern: chip gets pointer-events
+// re-enabled, click opens a native <dialog> with the full instructions
+// for that site's access type. Each access type is a separate dialog
+// rendered once at the bottom of the page; any chip of that type
+// targets the same dialog by id.
+const ACCESS_MODAL_COPY = {
+  strapi: {
+    title: "How to access this site's files (Strapi-managed)",
+    paragraphs: [
+      "This site's files live on a remote Linux host running a Strapi CMS. The files inventoried in this audit are everything inside that host's <code>/uploads/</code> directory — the same documents the public sees when browsing the live site.",
+      "To download the files in bulk (so a remediation vendor can fix accessibility issues across the whole site), you'll need to copy them off the Strapi host directly. The standard tool for that is <code>rsync</code> over SSH — it copies entire directories efficiently and skips files that haven't changed since last time.",
+    ],
+    steps: [
+      "Ask ICJIA's IDS team to add your SSH public key to this Strapi host's authorized-keys list. (If you don't have an SSH key yet, IDS can walk you through generating one.)",
+      "Once your key is on the host, run a one-line <code>rsync</code> command from your laptop to pull a copy of the uploads directory locally. The audit team can provide the exact command.",
+      "Hand the local copy to your remediation vendor — they apply fixes to the files in-place, and you <code>rsync</code> the corrected files back up to the host when the work is done.",
+    ],
+    cta: "Contact IDS at ICJIA to request SSH access.",
+  },
+  github: {
+    title: "How to access this site's files (GitHub-managed)",
+    paragraphs: [
+      "This site's files live in an ICJIA-owned GitHub repository — every PDF, image, and document the public sees is stored alongside the site's source code on github.com.",
+      "To download the files in bulk, you don't need server access — you clone the GitHub repository. Cloning makes a complete local copy of the repo, including every file inventoried in this audit. The remediation vendor works on the local clone, and the corrected files are committed back into the repository.",
+    ],
+    steps: [
+      "Ask ICJIA's IDS team to add your GitHub username to the ICJIA organization on github.com.",
+      "Once you're added, sign in to github.com and clone the repository (the URL is on this site's per-site detail page). A laptop-side GitHub app or the command-line <code>git</code> tool both work.",
+      "Hand the local clone to your remediation vendor — they fix the files in-place, commit the changes, and push back to GitHub when done.",
+    ],
+    cta: "Contact IDS at ICJIA to request GitHub organization access.",
+  },
+  server: {
+    title: "How to access this site's files (server-managed)",
+    paragraphs: [
+      "This site's files live in a regular directory on a remote Linux host — no content-management system in the middle, just files-on-disk that a web server publishes. The files inventoried in this audit are everything inside that directory.",
+      "To download the files in bulk, you'll need to copy them off the host directly. The standard tool for that is <code>rsync</code> over SSH — it copies entire directories efficiently and skips files that haven't changed since last time.",
+    ],
+    steps: [
+      "Ask ICJIA's IDS team to add your SSH public key to this host's authorized-keys list. (If you don't have an SSH key yet, IDS can walk you through generating one.)",
+      "Once your key is on the host, run a one-line <code>rsync</code> command from your laptop to pull a copy of the directory locally. The audit team can provide the exact command.",
+      "Hand the local copy to your remediation vendor — they apply fixes to the files in-place, and you <code>rsync</code> the corrected files back up when the work is done.",
+    ],
+    cta: "Contact IDS at ICJIA to request SSH access.",
+  },
 };
 
 // Same clipboard-outline icon as src/report/html.js's COPY_ICON_SVG — kept
@@ -553,7 +639,7 @@ export function renderCard(sr) {
   return `<article class="site-card">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
   <header class="card-head">
-    ${accessKind ? `<p class="access-chip access-${accessKind}" title="${he(accessLabel)} — open this site's report for the specific credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</p>` : ""}
+    ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
     <p class="nickname">${nickname}</p>
     <h3 class="full-name">${fullName}</h3>
     ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
@@ -1306,7 +1392,8 @@ main {
 .site-card .actions .btn,
 .site-card .tech-details summary,
 .site-card .tech-details .meta-copy,
-.site-card .tech-details .meta-value a {
+.site-card .tech-details .meta-value a,
+.site-card .access-chip {
   pointer-events: auto;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1360,6 +1447,22 @@ main {
   text-transform: uppercase;
   line-height: 1.2;
   border: 1px solid currentColor;
+  /* v1.7.34: chip is now a <button> that opens an access-instructions
+     modal. Reset browser-default button styling so it still reads as a
+     chip; cursor-pointer + subtle hover lift signal interactivity. */
+  font-family: inherit;
+  background-image: none;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.site-card .access-chip:hover,
+.site-card .access-chip:focus-visible {
+  filter: brightness(1.18);
+  transform: translateY(-1px);
+}
+.site-card .access-chip:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 .site-card .access-chip .access-dot {
   width: 8px; height: 8px;
@@ -1895,6 +1998,126 @@ main {
   .duplicates .dup-section-banner { margin: 3rem 0 1.5rem; padding-top: 1.1rem; }
   .duplicates .dup-section-banner::before { width: 56px; height: 4px; margin-bottom: 1rem; }
   .duplicates .dup-section-lede { font-size: 1rem; }
+}
+
+/* v1.7.34 — access-instructions modal. Native <dialog> styled to fit the
+   site's dark-mode register. Per-type accent (cyan for Strapi, violet
+   for GitHub, amber for Server) on the title underline + the left
+   border, so the modal visually echoes the chip the user clicked. */
+dialog.access-modal {
+  width: min(640px, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  padding: 0;
+  background: #161b22;
+  color: #c0cdda;
+  border: 1px solid #2a3340;
+  border-left: 4px solid #7dd3fc;
+  border-radius: 10px;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+dialog.access-modal::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+dialog.access-modal-github { border-left-color: #c4b5fd; }
+dialog.access-modal-server { border-left-color: #fcd34d; }
+dialog.access-modal .access-modal-close-form {
+  margin: 0;
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+}
+dialog.access-modal .access-modal-close {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #8b949e;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+dialog.access-modal .access-modal-close:hover,
+dialog.access-modal .access-modal-close:focus-visible {
+  color: #ffffff;
+  border-color: #2a3340;
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+dialog.access-modal .access-modal-title {
+  margin: 0;
+  padding: 1.4rem 3.4rem 1rem 1.6rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #f0f6fc;
+  border-bottom: 1px solid #21262d;
+}
+dialog.access-modal .access-modal-body {
+  padding: 1.2rem 1.6rem 1.4rem;
+  max-height: calc(100vh - 12rem);
+  overflow-y: auto;
+}
+dialog.access-modal .access-modal-body p {
+  margin: 0 0 0.95rem;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+dialog.access-modal .access-modal-body p:last-child { margin-bottom: 0; }
+dialog.access-modal .access-modal-body code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.88em;
+  color: #d2a8ff;
+}
+dialog.access-modal .access-modal-steps-h3 {
+  margin: 1.3rem 0 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #f0f6fc;
+}
+dialog.access-modal .access-modal-steps {
+  margin: 0 0 1.1rem;
+  padding-left: 1.2rem;
+}
+dialog.access-modal .access-modal-steps li {
+  margin: 0 0 0.7rem;
+  line-height: 1.55;
+}
+dialog.access-modal .access-modal-steps li:last-child { margin-bottom: 0; }
+dialog.access-modal .access-modal-cta {
+  margin: 1.3rem 0 0;
+  padding: 0.95rem 1.1rem;
+  background: rgba(125, 211, 252, 0.08);
+  border-left: 3px solid #7dd3fc;
+  border-radius: 4px;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+dialog.access-modal-github .access-modal-cta {
+  background: rgba(196, 181, 253, 0.08);
+  border-left-color: #c4b5fd;
+}
+dialog.access-modal-server .access-modal-cta {
+  background: rgba(252, 211, 77, 0.08);
+  border-left-color: #fcd34d;
+}
+dialog.access-modal .access-modal-cta a {
+  color: #58a6ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+@media (max-width: 540px) {
+  dialog.access-modal { width: calc(100vw - 1rem); }
+  dialog.access-modal .access-modal-title { font-size: 1.2rem; padding: 1.1rem 3.2rem 0.8rem 1.2rem; }
+  dialog.access-modal .access-modal-body { padding: 1rem 1.2rem 1.2rem; }
 }
 
 /* v1.7.30 — "Coming soon" section. Same banner anatomy as the fleet +
@@ -2706,6 +2929,8 @@ ${renderLlmContextSection(llmContext)}
 ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
 ${renderTodoSection()}
 
+${renderAccessModals()}
+
 </main>
 
 <footer class="site-footer">
@@ -2882,6 +3107,35 @@ ${renderTodoSection()}
       c.setAttribute("aria-pressed", active ? "true" : "false");
     });
     applyStats(next);
+  });
+})();
+
+/* v1.7.34 — access-instructions modal: click any per-site "For bulk
+   file access" chip to open the matching <dialog> for that site's
+   access type. Native showModal() handles focus trap + Escape close.
+   Click on the ::backdrop (everything outside the dialog content)
+   closes the dialog too — implemented by checking whether the click
+   landed on the dialog element itself rather than a descendant. */
+(function () {
+  document.addEventListener("click", function (e) {
+    if (!e.target || !e.target.closest) return;
+    var chip = e.target.closest("[data-access-modal]");
+    if (chip) {
+      var kind = chip.getAttribute("data-access-modal");
+      var dlg = document.getElementById("access-modal-" + kind);
+      if (dlg && typeof dlg.showModal === "function") {
+        e.preventDefault();
+        e.stopPropagation();
+        dlg.showModal();
+      }
+      return;
+    }
+    // Click on a <dialog>'s ::backdrop: target === the dialog itself
+    // (the content is inside an inner wrapper, so a click on a child
+    // wouldn't have target === the dialog).
+    if (e.target.matches && e.target.matches("dialog.access-modal")) {
+      e.target.close();
+    }
   });
 })();
 </script>
