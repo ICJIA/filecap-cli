@@ -121,9 +121,23 @@ export function findCrossServerDuplicates(all) {
     });
 
     const flatItems = items.map((i) => {
-      const base = (i.publicUrlBase ?? "").replace(/\/+$/, "");
-      const p = (i.entry?.path ?? "").replace(/^\/+/, "");
-      const publicUrl = base && p ? `${base}/${p}` : "";
+      // v1.7.20: mirror the per-row publicUrl logic from csv.js / html.js —
+      // git-type entries carry a GitHub /tree/<branch>/<path> URL in
+      // absolutePath, which we rewrite to /blob/ for the canonical file
+      // view. The Netlify-deployed URL for some static-site sites (ARI
+      // Summit 2017 + 2018) returns the homepage HTML at HTTP 200 for any
+      // unmatched path, so links pointing at publicUrlBase + path look
+      // valid but actually take the user to the site homepage. GitHub is
+      // the reliable destination for git-type entries.
+      const ap = String(i.entry?.absolutePath ?? "");
+      let publicUrl;
+      if (/^https?:\/\//i.test(ap)) {
+        publicUrl = ap.replace("/tree/", "/blob/");
+      } else {
+        const base = (i.publicUrlBase ?? "").replace(/\/+$/, "");
+        const p = (i.entry?.path ?? "").replace(/^\/+/, "");
+        publicUrl = base && p ? `${base}/${p}` : "";
+      }
       return {
         serverName: i.serverName,
         siteName: i.siteName ?? "",

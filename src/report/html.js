@@ -76,6 +76,14 @@ function copyableMetaCell(value, displayHtml, label) {
  * @returns {Array<string|number>}
  */
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
+  // v1.7.20: see csv.js buildPublicUrl for full rationale. Git-type sites
+  // get a GitHub /blob/ URL (the reliable file-content destination) because
+  // some static-site deploys return the homepage HTML for any
+  // non-matching path via Netlify _redirects SPA fallback.
+  const ap = String(entry.absolutePath ?? "");
+  if (/^https?:\/\//i.test(ap)) {
+    return ap.replace("/tree/", "/blob/");
+  }
   let base;
   if (isConsolidated) {
     const src = sourceMap.get(entry.serverName);

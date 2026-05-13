@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.20] — 2026-05-13
+
+### Fixed
+
+- **Git-type (static-site) entries now link to their GitHub source URL instead of the deployed Netlify URL.** The Netlify deploys of ARI Summit 2017 and 2018 (and possibly other static-site sites) have a `_redirects` SPA catch-all rule (`/*  /index.html  200`) that intercepts every file path that doesn't match a deployed asset and returns the homepage HTML at HTTP 200 — so the publicUrlBase + path URLs filecap was generating looked like working links but actually pointed at the site homepage instead of the file. The 2019 and 2023 sites happened to work because their build output exposed `/static/` at the URL root, but the 2017 and 2018 builds don't. Fix: `buildPublicUrl()` (in `src/report/csv.js`, `src/report/html.js`, and the duplicates path in `src/commands/web-rollup.js`) now checks whether `entry.absolutePath` starts with `https?://` — if so, it returns that (with `/tree/` rewritten to `/blob/` so GitHub serves the canonical file-view page). The audit-static.sh scan already stamps every git-type entry with a `https://github.com/<repo>/tree/<branch>/<path>` absolutePath, so this is a one-line distinction at URL-build time with no other plumbing changes. Strapi-type entries have absolutePath = a filesystem path (`/uploads/foo.pdf`), so the `https://` heuristic naturally distinguishes them. The private-repo case: GitHub returns the file page for authenticated ICJIA users (who view the audit via the password-gated Netlify site, so they're already authenticated); anonymous users get 404 from GitHub, but anonymous users don't have access to the audit either, so the access pattern lines up.
+
+### Changed
+
+- **Duplicates hero numbers now correspond to the active filter and default to remediable-only.** Pre-v1.7.20 the hero showed the full duplicate count (e.g. 430 files) including images / text / markdown / archives — which managers reading the page interpreted as "the audit team has 430 files to deal with." That number is correct but misleading: only the remediable-side subset (PDFs, Word, Excel, PowerPoint, legacy Office) actually affects accessibility audit scope. New default: hero shows the remediable count (131 in the current ICJIA fleet, with the 123 exact / 8 variant breakdown). A small amber-tinted "Counting only files that may need accessibility remediation" note sits directly under the headline explaining what the number includes and what it excludes. When the user clicks a different filter chip below the explainer, the hero numbers + tile labels + counting-note swap to match — three states (Remediable only / Reference only / All) with distinct counting-notes that explain what's being counted and why. Implementation: per-bucket stats embedded as a JSON dataset on the `.dup-hero` element + small extension to the v1.7.19 chip-click IIFE that swaps the `[data-dup-stat]` text content and the `.dup-counting-note` innerHTML on filter change.
+
+[1.7.20]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.20
+
 ## [1.7.19] — 2026-05-13
 
 ### Added

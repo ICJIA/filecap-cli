@@ -109,29 +109,37 @@ function renderMasterCsvSection(masterCsv) {
 function renderDuplicatesSection(groups, duplicatesCsv) {
   if (!groups || groups.length === 0) return "";
 
-  const exactCount = groups.filter((g) => g.isExactDuplicate).length;
-  const variantCount = groups.length - exactCount;
-
   // v1.7.19: classify each duplicate group's filename so the on-page table
   // can be filtered "Remediable only / Reference only / All" — the same
   // remediable/reference split filecap uses on the per-site detail page.
-  // Remediable = formats a vendor would actually quote against (PDF, DOCX,
-  // XLSX, PPTX, legacy Office). Reference = everything else (images, text,
-  // web, archives, other). Managers/auditors mostly care about the
-  // remediable subset; the other rows are still visible if they switch
-  // filters or pick "All".
+  // v1.7.20: also compute per-bucket exact/variant breakdowns so the hero
+  // tiles can reflect whichever filter the user has active. Default state
+  // is "remediable" — managers see the actionable number first, with a
+  // tiny note explaining which kinds count.
   const REMEDIABLE_EXT = new Set(["pdf", "docx", "xlsx", "pptx", "doc", "xls", "ppt"]);
   function sideForFilename(name) {
     const m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
     const ext = m ? m[1] : "";
     return REMEDIABLE_EXT.has(ext) ? "remediable" : "reference";
   }
-  let dupRemediableCount = 0;
-  let dupReferenceCount = 0;
+  const stats = {
+    all:        { total: 0, exact: 0, variant: 0 },
+    remediable: { total: 0, exact: 0, variant: 0 },
+    reference:  { total: 0, exact: 0, variant: 0 },
+  };
   for (const g of groups) {
-    if (sideForFilename(g.normalizedFilename) === "remediable") dupRemediableCount++;
-    else dupReferenceCount++;
+    const side = sideForFilename(g.normalizedFilename);
+    const kind = g.isExactDuplicate ? "exact" : "variant";
+    stats.all.total++;          stats.all[kind]++;
+    stats[side].total++;        stats[side][kind]++;
   }
+  // Initial render values use the remediable bucket — matches the default
+  // filter on the table below.
+  const dupTotalCount     = stats.remediable.total;
+  const exactCount        = stats.remediable.exact;
+  const variantCount      = stats.remediable.variant;
+  const dupRemediableCount = stats.remediable.total;
+  const dupReferenceCount  = stats.reference.total;
 
   // One row per group — easier to scan than the per-item-row version. The
   // per-occurrence detail lives in audit-file-duplicates.csv for pivot work.
@@ -201,19 +209,20 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
 
   return `
   <section class="section duplicates">
-    <header class="dup-hero">
+    <header class="dup-hero" data-dup-stats='${JSON.stringify(stats).replace(/</g, "\\u003c").replace(/'/g, "&#39;")}' data-dup-active="remediable">
       <p class="dup-eyebrow">Cross-server file map</p>
-      <h2 class="dup-title">${he(groups.length.toLocaleString())} files appear on more than one site</h2>
-      <p class="dup-subtitle"><strong>This is normal — not a webmaster error.</strong> The same PDF might be linked from DVFR, ICJIA, and the Archive simultaneously, and a copy lives on each site. We're listing them here so you can <strong>remediate the file once and push the fix to every site that hosts it</strong>, instead of paying a vendor to remediate the same document three times.</p>
+      <h2 class="dup-title"><span data-dup-stat="total">${he(dupTotalCount.toLocaleString())}</span> files appear on more than one site</h2>
+      <p class="dup-counting-note"><strong>Counting only files that may need accessibility remediation</strong> — PDFs, Word, Excel, PowerPoint, legacy Office. Images, text, markdown, and other reference files are duplicated too but they don&#39;t affect audit scope, so they&#39;re excluded from the headline number. Change the filter below the explainer to see all duplicates or only reference files.</p>
+      <p class="dup-subtitle"><strong>This is normal — not a webmaster error.</strong> The same PDF might be linked from DVFR, ICJIA, and the Archive simultaneously, and a copy lives on each site. We&#39;re listing them here so you can <strong>remediate the file once and push the fix to every site that hosts it</strong>, instead of paying a vendor to remediate the same document three times.</p>
       <div class="dup-stat-tiles">
         <div class="dup-tile dup-tile-exact">
-          <span class="dup-tile-num">${he(exactCount.toLocaleString())}</span>
-          <span class="dup-tile-lbl">exact ${exactCount === 1 ? "copy" : "copies"}</span>
+          <span class="dup-tile-num" data-dup-stat="exact">${he(exactCount.toLocaleString())}</span>
+          <span class="dup-tile-lbl" data-dup-stat-label="exact">${exactCount === 1 ? "exact copy" : "exact copies"}</span>
           <span class="dup-tile-sub">same filename, same content on every site</span>
         </div>
         <div class="dup-tile dup-tile-variant">
-          <span class="dup-tile-num">${he(variantCount.toLocaleString())}</span>
-          <span class="dup-tile-lbl">${variantCount === 1 ? "variant" : "variants"}</span>
+          <span class="dup-tile-num" data-dup-stat="variant">${he(variantCount.toLocaleString())}</span>
+          <span class="dup-tile-lbl" data-dup-stat-label="variant">${variantCount === 1 ? "variant" : "variants"}</span>
           <span class="dup-tile-sub">same filename, content differs between sites</span>
         </div>
       </div>
@@ -1447,6 +1456,25 @@ main {
   letter-spacing: -0.02em;
   line-height: 1.12;
 }
+.duplicates .dup-counting-note {
+  /* v1.7.20 — tiny sub-headline that explains what the big number is
+     counting. Lives directly under the headline so a manager glancing
+     at the section knows whether the number includes images/text/etc.
+     or just the audit-actionable subset. Amber-tinted to read as an
+     advisory note, not a normal body paragraph. */
+  margin: -4px 0 16px;
+  padding: 10px 14px;
+  font-size: 0.93em;
+  line-height: 1.5;
+  color: #f4dfa0;
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-left: 3px solid #fbbf24;
+  border-radius: 6px;
+  max-width: 78ch;
+}
+.duplicates .dup-counting-note strong { color: #ffffff; font-weight: 700; }
+.duplicates .dup-counting-note em { color: #fde6a1; font-style: italic; }
 .duplicates .dup-subtitle {
   margin: 0 0 22px;
   font-size: 1.05em;
@@ -2163,19 +2191,55 @@ ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
   });
 })();
 
-/* v1.7.19 — duplicates table filter. Three chips above the table
-   (Remediable only / Reference only / All) toggle visibility of rows
-   tagged with data-dup-side. Default is "remediable" so managers and
-   auditors land on the subset that matters for accessibility scope.
-   Each chip carries its own count so the user sees how many rows are
-   in each bucket before clicking. */
+/* v1.7.19 / v1.7.20 — duplicates table filter. Three chips above the
+   table (Remediable only / Reference only / All) toggle row visibility
+   AND swap the hero stat numbers so the big numbers always correspond
+   to the filter the user has active. Default is "remediable" so a
+   manager landing on the page sees the actionable subset first. Each
+   chip carries its own count so the user sees the proportions before
+   clicking. v1.7.20 also rewrites the small "Counting only files
+   that may need remediation" note when the filter changes to "All"
+   or "Reference only" so a non-technical reader is never confused
+   about which kind of duplicate the headline counts. */
 (function () {
   "use strict";
   var bar = document.querySelector("[data-dup-filter-bar]");
   if (!bar) return;
   var wrap = document.querySelector("[data-dup-pan]");
   if (!wrap) return;
+  var hero = document.querySelector(".dup-hero");
+  if (!hero) return;
   var chips = bar.querySelectorAll("[data-dup-filter]");
+  var stats;
+  try { stats = JSON.parse(hero.getAttribute("data-dup-stats") || "null"); }
+  catch (e) { stats = null; }
+  if (!stats) return;
+
+  var NOTES = {
+    remediable: "<strong>Counting only files that may need accessibility remediation</strong> — PDFs, Word, Excel, PowerPoint, legacy Office. Images, text, markdown, and other reference files are duplicated too but they don’t affect audit scope, so they’re excluded from the headline number. Change the filter below the explainer to see all duplicates or only reference files.",
+    reference:  "<strong>Counting reference-file duplicates only</strong> — images, text, markdown, archives, and similar. These don’t affect audit scope; the audit-actionable subset (PDFs, Word, Excel, PowerPoint, legacy Office) is hidden right now. Switch the filter back to <em>Remediable only</em> to see the headline number that matters.",
+    all:        "<strong>Counting every duplicate</strong>, including non-actionable kinds (images, text, archives, etc.). The default <em>Remediable only</em> view shows just the duplicates that affect audit scope; switch back to that view for the headline number that matters most for accessibility planning."
+  };
+
+  function fmtNum(n) { return Number(n).toLocaleString(); }
+
+  function applyStats(side) {
+    var s = stats[side] || stats.remediable;
+    var total = hero.querySelector('[data-dup-stat="total"]');
+    var exact = hero.querySelector('[data-dup-stat="exact"]');
+    var variant = hero.querySelector('[data-dup-stat="variant"]');
+    var exactLbl = hero.querySelector('[data-dup-stat-label="exact"]');
+    var variantLbl = hero.querySelector('[data-dup-stat-label="variant"]');
+    var note = hero.querySelector('.dup-counting-note');
+    if (total) total.textContent = fmtNum(s.total);
+    if (exact) exact.textContent = fmtNum(s.exact);
+    if (variant) variant.textContent = fmtNum(s.variant);
+    if (exactLbl) exactLbl.textContent = s.exact === 1 ? "exact copy" : "exact copies";
+    if (variantLbl) variantLbl.textContent = s.variant === 1 ? "variant" : "variants";
+    if (note && NOTES[side]) note.innerHTML = NOTES[side];
+    hero.setAttribute("data-dup-active", side);
+  }
+
   bar.addEventListener("click", function (e) {
     var chip = e.target.closest ? e.target.closest("[data-dup-filter]") : null;
     if (!chip) return;
@@ -2186,6 +2250,7 @@ ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
       c.classList.toggle("is-active", active);
       c.setAttribute("aria-pressed", active ? "true" : "false");
     });
+    applyStats(next);
   });
 })();
 </script>

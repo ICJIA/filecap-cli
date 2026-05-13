@@ -70,6 +70,23 @@ function formatValue(v) {
 }
 
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
+  // v1.7.20: for git-type sites the audit-static.sh scan stamps each entry's
+  // absolutePath with a full https://github.com/<repo>/tree/<branch>/<path>
+  // URL. The Netlify deploys of some static-site sites (ARI Summit 2017 +
+  // 2018) have a Netlify `_redirects` SPA catch-all that returns the
+  // homepage HTML at HTTP 200 for any file path that doesn't match a
+  // deployed asset — so the publicUrlBase + path URL looks like a working
+  // link but actually points at the homepage. The GitHub source URL is the
+  // reliable destination: GitHub directly serves the file content for every
+  // committed file in the repo. We auto-convert /tree/ → /blob/ since
+  // GitHub uses /blob/ for the file-view canonical URL (though /tree/ also
+  // redirects there for non-directory paths). Strapi-type entries have
+  // absolutePath = a server filesystem path (/uploads/foo.pdf), so the
+  // https:// heuristic naturally distinguishes them.
+  const ap = String(entry.absolutePath ?? "");
+  if (/^https?:\/\//i.test(ap)) {
+    return ap.replace("/tree/", "/blob/");
+  }
   let base;
   if (isConsolidated) {
     const src = sourceMap.get(entry.serverName);
