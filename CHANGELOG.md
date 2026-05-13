@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.29] — 2026-05-13
+
+### Changed
+
+- **Audit-tool button label** `ICJIA's PDF Audit Tool` → **`ICJIA PDF Audit Tool`**. Dropped the possessive `'s` to match the syntax of the adjacent **`ICJIA Accessibility FAQs`** button — both buttons now read as `ICJIA <thing>` for visual consistency.
+
+- **Detail-page CSV download button is now green** instead of the same blue as the audit-tool buttons sitting next to it. Pre-v1.7.29 the sticky bar had three blue rectangles in a row (FAQ + PDF Audit + CSV download), and the CSV button — the one that's the *actionable* artefact for staff — blended in. New green gradient `#2ea043 → #238636` with a darker green border and a subtle hover lift. Color register: download / get / "take this artefact away" — distinct from the blue navbar register that says "navigate to an external tool." Focus outline updated to green `#3fb950` to match.
+
+[1.7.29]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.29
+
 ## [1.7.28] — 2026-05-13
 
 ### Changed

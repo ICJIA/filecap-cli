@@ -2361,13 +2361,13 @@ main {
       </svg>
       <span>ICJIA Accessibility FAQs</span>
     </a>
-    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA's PDF Audit Tool (audit.icjia.app, opens in a new tab)">
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA PDF Audit Tool (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>ICJIA&#39;s PDF Audit Tool</span>
+      <span>ICJIA PDF Audit Tool</span>
     </a>
   </div>
 </header>

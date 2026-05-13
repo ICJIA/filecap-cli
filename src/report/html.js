@@ -482,25 +482,29 @@ body {
 }
 .report-csv-link {
   /* CSV is the real deliverable — render the link as a prominent button
-     so it reads as a primary action, not an afterthought. v1.7.28:
-     font + padding match the .audit-tool-link button (0.8rem / 0.35rem
-     0.75rem) so the two right-cluster buttons render at identical
-     heights and the bar stays compact. */
+     so it reads as a primary action, not an afterthought. v1.7.29: green
+     CTA so the download button is visibly distinct from the two blue
+     navbar buttons (FAQ + PDF Audit Tool) sitting next to it. Color
+     register: download / get / "take this artefact away." */
   display: inline-block;
-  background: #1f6feb;
+  background: linear-gradient(180deg, #2ea043 0%, #238636 100%);
   color: #ffffff !important;
   text-decoration: none;
   font-weight: 700;
   font-size: 0.8rem;
   padding: 0.35rem 0.75rem;
   border-radius: 7px;
-  border: 1px solid #1f6feb;
-  transition: background 120ms ease;
+  border: 1px solid #1f7a30;
+  transition: background 120ms ease, filter 120ms ease, transform 120ms ease;
   white-space: nowrap;
 }
-.report-csv-link:hover { background: #388bfd; text-decoration: none; }
+.report-csv-link:hover {
+  filter: brightness(1.06);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
 .report-csv-link:focus-visible {
-  outline: 2px solid #58a6ff;
+  outline: 2px solid #3fb950;
   outline-offset: 2px;
 }
 /* v1.7.16: cluster of right-side actions in the sticky bar. v1.7.27:
@@ -1287,13 +1291,13 @@ ${(() => {
       </svg>
       <span>ICJIA Accessibility FAQs</span>
     </a>
-    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA's PDF Audit Tool (audit.icjia.app, opens in a new tab)">
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA PDF Audit Tool (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>ICJIA&#39;s PDF Audit Tool</span>
+      <span>ICJIA PDF Audit Tool</span>
     </a>
     ${csvHref ? `<div class="report-csv-block">
       <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>

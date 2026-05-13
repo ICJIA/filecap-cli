@@ -239,8 +239,8 @@ describe("index page audit-tool button (v1.7.16)", () => {
     expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*>/);
   });
 
-  it("the audit-tool link includes an external-link SVG icon and the 'ICJIA's PDF Audit Tool' label", () => {
-    expect(html).toMatch(/<a class="audit-tool-link"[^>]*href="https:\/\/audit\.icjia\.app"[\s\S]{0,800}<span>ICJIA&#39;s PDF Audit Tool<\/span>/);
+  it("the audit-tool link includes an external-link SVG icon and the 'ICJIA PDF Audit Tool' label", () => {
+    expect(html).toMatch(/<a class="audit-tool-link"[^>]*href="https:\/\/audit\.icjia\.app"[\s\S]{0,800}<span>ICJIA PDF Audit Tool<\/span>/);
   });
 
   it("the navbar also has an 'ICJIA Accessibility FAQs' button linked to accessibility.icjia.app (v1.7.28)", () => {
