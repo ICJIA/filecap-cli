@@ -307,13 +307,16 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     sha256:       220,
     duplicateOf:  220,
   };
+  // v1.7.16: csvOnly columns (Delete?, Notes) are filtered out of the HTML
+  // table — the web view is informational, the CSV is the actionable artefact.
+  const HTML_COLUMNS = CSV_COLUMNS.filter((c) => !c.csvOnly);
   const colgroupHtml = `<colgroup>${
-    CSV_COLUMNS.map((col) => {
+    HTML_COLUMNS.map((col) => {
       const w = COL_INITIAL_PX[col.name] ?? 140;
       return `<col data-col="${htmlEscape(col.name)}" style="width:${w}px">`;
     }).join("")
   }</colgroup>`;
-  const headerCells = CSV_COLUMNS.map((col) =>
+  const headerCells = HTML_COLUMNS.map((col) =>
     `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}<span class="col-resize-handle" data-resize-handle aria-hidden="true"></span></th>`
   ).join("");
 
@@ -487,6 +490,60 @@ body {
 .report-csv-link:focus-visible {
   outline: 2px solid #58a6ff;
   outline-offset: 2px;
+}
+/* v1.7.16: cluster of right-side actions in the sticky bar. */
+.report-back-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+.report-csv-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+.report-csv-date {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #8b949e;
+  letter-spacing: 0.02em;
+}
+.report-csv-date strong { color: #c9d1d9; font-weight: 700; }
+/* Mirror of .audit-tool-link styling on the index page so the affordance
+   reads the same across surfaces. */
+.audit-tool-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
+  color: #0c1219 !important;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  border-radius: 8px;
+  border: 1px solid #2f8de0;
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+  white-space: nowrap;
+}
+.audit-tool-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(77, 171, 247, 0.35);
+  filter: brightness(1.05);
+  text-decoration: none;
+}
+.audit-tool-link:focus-visible {
+  outline: 3px solid #58a6ff;
+  outline-offset: 2px;
+}
+.audit-tool-icon { width: 14px; height: 14px; flex: none; }
+@media (max-width: 600px) {
+  .audit-tool-link { padding: 0.35rem 0.65rem; font-size: 0.82rem; }
+  .audit-tool-link span { display: none; }
+  .audit-tool-icon { width: 16px; height: 16px; }
 }
 h1 { font-size: 1.4rem; margin: 0 0 0.25rem; color: #e5e5e5; letter-spacing: -0.02em; }
 h2 { font-size: 1.1rem; margin: 1.25rem 0 0.5rem; color: #e5e5e5; font-weight: 600; }
@@ -1180,14 +1237,43 @@ footer {
 </head>
 <body>
 
-${(backHref || csvHref) ? `<nav class="report-back-bar" aria-label="Report navigation">
+${(() => {
+  // v1.7.16: sticky nav now also surfaces the audit-tool button (visible on
+  // every per-site + by-type detail page) and shows the last-audit date under
+  // the CSV download so staff can tell whether their downloaded CSV is
+  // current. The audit-tool button uses the same visual style as the index
+  // navbar variant — managers see identical affordances across pages.
+  const lastAuditIso = (isConsolidated ? meta?.consolidatedAt : meta?.scannedAt) ?? "";
+  const lastAuditFmt = (() => {
+    if (!lastAuditIso) return "";
+    try {
+      const d = new Date(lastAuditIso);
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+    } catch { return ""; }
+  })();
+  return `<nav class="report-back-bar" aria-label="Report navigation">
   ${backHref ? `<a class="report-back-link" href="${htmlEscape(backHref)}">
     <span aria-hidden="true">&larr;</span> Back to fleet index
   </a>` : '<span></span>'}
-  ${csvHref ? `<a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
-    <span aria-hidden="true">&#x2913;</span> Download spreadsheet (CSV)
-  </a>` : ''}
-</nav>` : ""}
+  <div class="report-back-bar-right">
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="Check a PDF for accessibility at ICJIA's audit tool (audit.icjia.app, opens in a new tab)">
+      <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
+        <path d="M9 2h5v5"/>
+        <path d="M8 8l6-6"/>
+      </svg>
+      <span>Use ICJIA&#39;s PDF audit tool</span>
+    </a>
+    ${csvHref ? `<div class="report-csv-block">
+      <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
+        <span aria-hidden="true">&#x2913;</span> Download spreadsheet (CSV)
+      </a>
+      ${lastAuditFmt ? `<p class="report-csv-date">Last audit: <strong>${htmlEscape(lastAuditFmt)}</strong></p>` : ""}
+    </div>` : ""}
+  </div>
+</nav>`;
+})()}
 <header class="dp-hero">
   ${heroNick ? `<p class="dp-nickname">${heroNick}</p>` : ""}
   <h1 class="dp-title">${heroTitle}</h1>

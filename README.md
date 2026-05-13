@@ -17,7 +17,7 @@
 
 You run a website. Like most websites, it hosts hundreds or thousands of uploaded documents — PDFs of meeting minutes, Word documents of policies, image attachments, spreadsheets. Federal accessibility law (ADA Title II / WCAG 2.1 AA) requires those files to be accessible to people with disabilities.
 
-To budget the remediation work, you need to know what's actually there: file counts by type, which PDFs are scanned images (need OCR — often substantially more expensive than tagging born-digital PDFs), which Word docs lack heading structure, which tables are missing header rows, and so on.
+To budget the remediation work, you need to know what's actually there: file counts by type, which PDFs are scanned images (may need OCR — often substantially more expensive than tagging born-digital PDFs), which Word docs lack heading structure, which tables are missing header rows, and so on.
 
 `filecap` produces this inventory automatically. It walks your website's `/uploads` folder, parses every file, and writes a spreadsheet (CSV) plus an interactive HTML report with one row per file and detailed accessibility-relevant metadata. You hand the spreadsheet to a remediation vendor; they give you a fixed-price quote with confidence.
 
@@ -25,13 +25,13 @@ The included `audit-remote.sh` script automates the entire workflow against any 
 
 **Three things you, as a manager, get out of this:**
 
-1. A precise count of files needing remediation, with composition (not just `wc -l`).
+1. A precise count of files that may need remediation, with composition (not just `wc -l`).
 2. A spreadsheet you can email to bid-out vendors without explanation.
 3. Repeatability — re-run quarterly, see what changed.
 
 As of 1.2.0, you can also publish the latest snapshot to a URL that your whole team can bookmark — one command bundles everything and deploys to Netlify. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot).
 
-**New in 1.7.x — manager-friendly visual redesign.** The fleet rollup now reads like an infographic instead of a spreadsheet. Each site is a large card with the site's full name in bold, two big colour-coded numbers (total files in blue, files-needing-audit in amber), a donut chart showing the audit-share percentage, plain-English captions ("Two-thirds need audit"), and file-type chips. The whole card is one big click target — anywhere on it takes you to that site's detailed report; the per-card "Download spreadsheet" button still works independently. The detail page for each site opens with the same hero pattern at larger size; below it, the file table now scrolls both horizontally and vertically with touch-friendly two-finger pan, and you can click-and-drag the right edge of any column header to resize that column. The "Public URL" column was promoted to position 4 (was column 8) so a vendor can see and click the link to each file without horizontal scrolling. **As of 1.7.6**, each card and detail page also shows an access-method chip / panel — "Strapi CMS / SSH required", "GitHub repo / access required", or "Server / SSH required" — so a manager or remediator can see at a glance what kind of system each site is and that they need an OpenSSH key (or GitHub org access) plus a quick "Contact IDS at ICJIA" to actually open a flagged file. **As of 1.7.7**, the whole index card is now reliably clickable end-to-end (the v1.7.1 stretched-link pattern only worked on the small padding gaps — most of the visible content captured the click but had no handler), and the per-site detail page's meta-grid sprouted copy-to-clipboard buttons on every row a remediator might paste (IP, hostname, scanned path, scanned at, public URL). **As of 1.7.8**, the index card's "Technical details" disclosure also got the same copy-button treatment on its now-expanded five-row mini-grid (Website, IP, Hostname, Path, URL) — a remediator can grab any of these straight from the fleet index without opening the detail page first. v1.7.8 also softens every manager-facing "needs/need audit" / "needs/need remediation" string to "may need …" so filecap describes what the data *suggests* rather than instructs the audit team what to do. See the [v1.7.x CHANGELOG entries](CHANGELOG.md) for the full list of visual changes.
+**Current shape of the fleet rollup (v1.7.x):** the page reads like an infographic, not a spreadsheet. The header carries the ICJIA wordmark + a prominent "Use ICJIA's PDF audit tool" button that links to https://audit.icjia.app. The hero leads with the **audit count** (the actionable number — e.g. "4,871 files may need accessibility audit") in big amber type, with a donut chart on the right showing the audit-share percentage and a plain-English caption like "About half may need audit." Below the hero, each ICJIA site is a card sorted alphabetically by title, with a coloured access-method chip ("Strapi CMS / SSH required" / "GitHub repo / access required" / "Server / SSH required") so a remediator can see at a glance what credentials each site needs, and a "Last audit: <date>" caption under the download button so staff can tell whether their downloaded CSV is current. The whole card is one click target; the per-card "Download spreadsheet" button still works independently. A "Technical details" disclosure on each card expands to a labeled mini-grid (Website / IP / Hostname / Path / URL) with copy-to-clipboard buttons on every row. The "By file type" section now drills down — click "PDFs" and you get a full detail page listing every PDF across the fleet, plus a CSV download with just those rows; same for Word documents, Excel, PowerPoint, images, text, archives, web files, and other. The per-site detail page mirrors the index hero, surfaces an "How to access this site's files" panel (with the SSH-key / GitHub-access requirement plus "Contact IDS at ICJIA to request access"), has copy-to-clipboard buttons on every meta-grid row, and a sticky bar at the top with Back / Audit-a-PDF / Download-CSV / Last-audit-date. All manager-facing strings use "may need" rather than prescriptive "needs," and every CSV the bundle emits — per-site, master, and by-file-type — carries two new staff-fill columns (`Delete?` defaulting to "No" + free-text `Notes`) so the audit team can mark which files should be removed before the next scan. See the [v1.7.x CHANGELOG entries](CHANGELOG.md) for the version-by-version breakdown.
 
 → Skip to [Quick start for managers](#quick-start-for-managers) for handoff instructions.
 
@@ -39,7 +39,7 @@ As of 1.2.0, you can also publish the latest snapshot to a URL that your whole t
 
 ## TL;DR for developers
 
-Node.js CLI written in ESM, distributed via npm as `@icjia/filecap`. Walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX). 30-column CSV writer + self-contained dark-mode HTML report with sortable/filterable client-side JS. Cross-server rollup with content-duplicate detection via SHA-256.
+Node.js CLI written in ESM, distributed via npm as `@icjia/filecap`. Walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX). 16-column CSV writer (14 file-descriptor columns + `Delete?` / `Notes` staff-fill columns added in v1.7.16, csvOnly so the HTML view stays at 14) + self-contained dark-mode HTML report with sortable/filterable client-side JS. Cross-server rollup with content-duplicate detection via SHA-256.
 
 Includes an MCP server (`filecap mcp`) exposing five tools for AI agents (Claude Desktop, Claude Code, Cursor, Windsurf, Continue): `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory`, `filecap_web_rollup`.
 
@@ -47,11 +47,9 @@ As of 1.2.0: `filecap web-rollup` bundles the most recent scan of every saved si
 
 Two distribution shapes: `filecap` CLI invoked directly via npx, plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where filecap actually ran.
 
-ESM-only. Node 20+ required. 30 test files; 408 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
+ESM-only. Node 20+ required. 30 test files; 434 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
 
-**v1.7.x infographic rollup.** `renderCard` (now exported from `src/web/index-page.js`) emits a `<article class="site-card">` containing nickname → big full name (`siteFullName` from sites.json, falls back to `siteName`) → two-up tiles (total + audit, color-coded #4dabf7 / #ffa84d) → CSS-only conic-gradient donut on its own row with audit-share percentage → file-type chips → meta strip → CTA. Whole card is clickable via the standard stretched-link pattern; the bottom CTAs sit explicitly at `z-index: 2` so the overlay can't intercept their clicks. Per-site detail pages use the same hero pattern via `dp-hero` classes in `src/report/html.js`. Detail-page tables now use `table-layout: fixed` with a `<colgroup>` emitting initial column widths; each `<th>` carries a pointer-event resize handle on its right edge that updates the matching `<col>` width on drag. Pure CSS / vanilla JS — no chart library, no preprocessor.
-
-**v1.7.6 access-method chip + panel.** A new exported helper `deriveAccessKind(site)` in `src/commands/web-rollup.js` classifies each site into `strapi` / `github` / `server` purely from existing `sites.json` fields (`type === "git"` → `github`; `publicUrlBase` ends in `/uploads` → `strapi`; else `server`) — no schema change required. The kind is threaded into `siteResults[].site.accessKind` and `runReport({ accessKind })` → `writeHtml({ accessKind })`. `renderCard` reads `site.accessKind` and emits a chip in the card-head eyebrow position above the nickname; copy in `ACCESS_CHIP_LABEL` (index-page.js) is kept in lock-step with `ACCESS_PANEL_COPY` (html.js), which drives the larger "How to access this site's files" callout on the per-site detail page. Both surfaces close on **"Contact IDS at ICJIA to request access."** Three color tokens — cyan `#7dd3fc` (Strapi), violet `#c4b5fd` (GitHub), amber `#fcd34d` (server) — all meet WCAG AA 4.5:1 contrast on the card's dark background.
+**v1.7.x architecture summary.** `renderCard` and `generateIndexHtml` (exported from `src/web/index-page.js`) build the fleet index — alphabetically-sorted `<article class="site-card">` elements, each with the dp-hero pattern (nickname → big full name → two-up tiles → CSS-only conic-gradient donut → expanded tech-details with copy buttons → "Last audit: …" caption). `writeHtml` (in `src/report/html.js`) renders the per-site detail page using the same `dp-hero` block — accepting `accessKind` for the access-method panel and emitting both the `<table class="row-marker-table">` legend and the file table with `table-layout: fixed` + `<colgroup>` + per-`<th>` resize handles. `CSV_COLUMNS` (in `src/report/csv.js`) is the single source of truth for column layout — entries flagged `csvOnly: true` (the `deleteFlag` and `notes` rows) are filtered out of the HTML view via `CSV_COLUMNS.filter(c => !c.csvOnly)` so the web table stays at 14 columns while CSVs ship at 16. `deriveAccessKind(site)` and `TYPE_BUCKETS` (both exported from `src/commands/web-rollup.js`) classify sites into `strapi` / `github` / `server` and into per-file-type buckets, respectively; the latter drives one CSV+HTML pair per non-empty bucket (`audit-pdfs.csv` + `audit-pdfs.html`, etc.) — each bucket page reuses `writeHtml` with a consolidated header so the file table reads "across the fleet, filtered to PDFs" out of the box. Click handling on the index card uses `pointer-events: none` on non-interactive descendants with `pointer-events: auto` re-enabled on the action buttons, tech-details summary, and copy-to-clipboard buttons — much cleaner than the v1.7.1 z-index attempt that only let clicks land on padding gaps. Pure CSS / vanilla JS throughout — no chart library, no preprocessor; the only inline JS is the column-resize, tab-pan, and clipboard-copy handlers embedded in the report HTML.
 
 → Skip to [Quick start](#quick-start) for installation and basic usage.
 
@@ -59,16 +57,15 @@ ESM-only. Node 20+ required. 30 test files; 408 tests via vitest. Source under `
 
 ## TL;DR for vendors and auditors
 
-You receive an `audit-file-list.csv` (14 columns, one row per file) with everything needed to scope and quote a remediation engagement:
+You receive an `audit-file-list.csv` (16 columns, one row per file) with everything needed to scope and quote a remediation engagement:
 
-- **Identification**: server name, website nickname, server IP, source folder on server, file location, full path, public URL, filename, extension, category.
-- **Filesystem metadata**: size in bytes, last-modified timestamp, SHA-256 content hash (for cross-server dedup detection), duplicate-of reference.
-- **PDF introspection**: page count, has-text-layer, image-only flag (signals OCR needed), tag presence, form fields, encryption, document language.
-- **DOCX introspection**: has-headings, image count, alt-text coverage, table count, tables-have-headers, vague-link count ("click here", "read more").
-- **XLSX introspection**: sheet count.
-- **Office-legacy flag**: whether the file is in a legacy Office format (`.doc`, `.xls`, `.ppt`).
+- **Identification**: server name, website nickname, server IP, **public URL** (position 4 since v1.7.2 — front and centre so you don't have to scroll), date published, source folder on server, file location, full path, filename, extension, category.
+- **Filesystem metadata**: size in bytes, SHA-256 content hash (Excel-text-formula-wrapped so it doesn't auto-convert to scientific notation), duplicate-of reference.
+- **Staff-fill columns (CSV-only, since v1.7.16)**: `Delete?` (defaults to "No" — staff marks "Yes" to flag a file for removal before the next audit) and `Notes` (free-text). These columns don't appear in the HTML view; the web is informational, the CSV is the actionable artefact.
 
-The "Server IP" and "Full file path on server" columns identify exactly where each file lives — you ssh into the server and download the file directly. Optionally accompanied by an `audit-file-list.html` rendering of the same data with sortable/searchable browser-based interface.
+Format-specific introspection columns (PDF page count, image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped from the CSV in v1.4.0/1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly. The full introspection is still carried in the underlying NDJSON inventory if your tooling wants it (the MCP server exposes a `filecap_query_inventory` tool for that).
+
+The "Server IP" and "Full file path on server" columns identify exactly where each file lives — you ssh into the server and download the file directly. Optionally accompanied by an `audit-file-list.html` rendering of the same data with sortable/searchable browser-based interface (without the staff-fill columns, by design).
 
 As of 1.2.0, the auditor can also publish the fleet snapshot to a Netlify URL for a shared web-based view — useful for review meetings where you navigate by clicking rather than filtering a spreadsheet.
 
@@ -260,7 +257,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.7.x shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional, with the v1.7.x manager-friendly visual redesign deployed: infographic-style site cards on the fleet index, matching hero pattern on per-site detail pages, big colour-coded "total files + need audit" numbers with a CSS-only donut chart, plain-English audit-share captions, clickable cards with hover elevation, two-axis touch-friendly table scrolling, resizable detail-page columns (drag the right edge of any column header), a redesigned "Files that appear on more than one server" duplicates section that explains in plain English that duplicates are normal and not a webmaster error, and (as of 1.7.6) access-method chips on every index card plus matching "How to access this site's files" panels on every detail page — color-coded by category (Strapi CMS / GitHub repo / bare server) with the credential requirement (OpenSSH key or GitHub org access) and "Contact IDS at ICJIA" call-to-action. Bundle still includes cross-server duplicates detection (1.5.0), a master CSV combining every file from every server (1.5.0), and a per-occurrence duplicates CSV for pivot in Excel (1.5.1). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
+**v1.7.x shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional, with the v1.7.x manager-friendly visual redesign live: infographic-style site cards on the fleet index (alphabetically sorted by title), matching hero pattern on per-site detail pages, big amber audit-count headlines with a CSS-only donut chart and plain-English captions ("Two-thirds may need audit"), whole-card click → detail page, two-axis touch-friendly table scrolling, click-and-drag resizable detail-page columns, copy-to-clipboard buttons throughout (per-card tech-details + per-site meta-grid), per-file-type detail pages and CSV downloads (`audit-pdfs.html`/`audit-pdfs.csv`, `audit-docx.*`, etc.), staff-fill `Delete?` + `Notes` columns on every CSV (v1.7.16), a prominent "Use ICJIA's PDF audit tool" button linking to audit.icjia.app in the navbar of every page, ICJIA wordmark in the index navbar, "Last audit: …" caption under every CSV download, and a redesigned "Files that appear on more than one server" duplicates section that explains in plain English that duplicates are normal and not a webmaster error. Bundle still includes cross-server duplicates detection (1.5.0), a master CSV combining every file from every server (1.5.0), and a per-occurrence duplicates CSV for pivot in Excel (1.5.1). All artefacts deployable to Netlify with one command via the `webRollup.autoDeploy` config flag (1.3.2). Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
 
 | Phase | Version | Status | Deliverable |
 |---|---|---|---|
@@ -285,7 +282,15 @@ npx vitest run test/web-rollup.test.js
 | 19 | v1.7.6 | shipped | Access-method chip on every index card + matching "How to access this site's files" panel on every per-site detail page; auto-classifies each site into `strapi` / `github` / `server` from existing `sites.json` fields via new exported `deriveAccessKind(site)` helper; color-coded (cyan/violet/amber) with WCAG AA contrast; both surfaces close on "Contact IDS at ICJIA to request access." with OpenSSH-key or GitHub-org-access copy as appropriate |
 | 20 | v1.7.7 | shipped | Whole-card click fix on index page — switched from broken z-index stretched-link to a `pointer-events: none` cascade with re-enables on action buttons + tech-details summary; copy-to-clipboard buttons on five rows of the detail-page meta-grid (IP, hostname, scanned path, scanned at, public URL) with green "Copied" affordance, navigator.clipboard.writeText + execCommand fallback |
 | 21 | v1.7.8 | shipped | Index-card "Technical details" disclosure now shows a five-row mini-grid (Website, IP, Hostname, Path, URL) with a copy-to-clipboard button on every row; URL row keeps a clickable `<a target="_blank">` alongside the copy button. Plus a sweep through all manager-facing strings to soften prescriptive "needs/need …" to "may need …" (the bucket phrases on cards + detail dp-hero, the audit-share tile/donut labels, the by-file-type column headings, the duplicates explainer, the row-color legend, the `audit-summary.txt` text deliverable, the `README.txt` template) — filecap describes what the data suggests, the audit team decides what to do. |
-| — | vNext | deferred | Strapi-aware mode (separate package); content-type sanity check on URL preflight |
+| 22 | v1.7.9 | shipped | Donut percentage centring fix — `text-align: center` on `.site-card .donut .pct` so the percentage + caption sit visually centred inside the donut hole regardless of caption length. (Pre-v1.7.9 it was accidentally OK because "need audit" and "67%" were near-equal widths; v1.7.8's longer "may need audit" exposed that the `.pct` box was a left-aligned column.) |
+| 23 | v1.7.10 | shipped | Donut grown from 130 × 130 px to 180 × 180 px (and ::after inset 14 → 22) so "MAY NEED AUDIT" comfortably fits inside the inner hole with ~10 px of clearance on each side from the colored ring; percentage glyph upsized from 1.5 em → 1.7 em for proportional balance. |
+| 24 | v1.7.11 | shipped | Per-site detail page's row-marker legend redesigned as a proper 3-column `<table>` (Marker / What it means / What to do about it) with `<thead>` labels, row dividers, and a `@media (max-width: 700px)` stacked fallback — replaces the pre-v1.7.11 flex-paragraph layout that wrapped mid-clause across five lines. |
+| 25 | v1.7.12 | shipped | Image-only PDF row tint now actually visible — hidden CSS specificity bug present since v1.0.2 where `tbody tr:nth-child(even/odd)` (0,1,2) outranked `tr.image-only` (0,1,1), so only the first cell rendered the tint. Fixed via `tbody tr.image-only td` (0,1,3) and a colour bump from luminance-twin `#111000` to clearly amber `#3a2c08` (≥ 8:1 contrast on `#e5e5e5` text). |
+| 26 | v1.7.13 | shipped | Index hero redesigned around the **audit count** rather than the total — pre-v1.7.13 the hero led with the 14k+ total-files number which managers misread as "the audit scope," and the new hero leads with the actionable count in 105 px amber with the total in a secondary context line. Two-column infographic: big number on the left, 200 px donut + plain-English phrase on the right. Stacks under 720 px. |
+| 27 | v1.7.14 | shipped | Per-file-type detail pages with CSV downloads — every non-empty bucket in the index's "By file type" table emits both `audit-<slug>.csv` (filtered master, every row tagged with its source server) and `audit-<slug>.html` (per-site-style detail page reusing the dp-hero pattern). New exported `TYPE_BUCKETS` constant is the single source of truth (used by both the writer in web-rollup.js and the index renderer); each bucket has `keys` (so legacy-office/office-legacy synonyms merge), `side`, `label`, `slug`. |
+| 28 | v1.7.15 | shipped | Three small index-page changes: cards alphabetized by siteFullName via `localeCompare(..., { sensitivity: "base" })`; ARI Summit cards renamed across all four years to "ARI All Sites Summit YYYY" (was "Adult Redeploy …"); ICJIA wordmark added to the index navbar (~13 kB inline SVG with `currentColor` fills so dark navbar gets white and print mode gets black without forking markup). |
+| 29 | v1.7.16 | shipped | Three CSV/workflow changes: every CSV (per-site, master, by-type) gains two staff-fill columns — `Delete?` (default "No") and `Notes` (default "") — flagged `csvOnly` so the HTML view stays at 14 columns; visible "Use ICJIA's PDF audit tool" button (linked to audit.icjia.app, opens new tab) in the index navbar and per-site sticky bar; "Last audit: <date>" caption beneath every CSV download button so staff can tell whether their downloaded copy is current vs the deployed version. |
+| — | vNext | deferred | Strapi-aware mode (separate package); content-type sanity check on URL preflight; `filecap process-deletions <csv>` to read staff-edited CSV Delete?-Yes rows and remove the matching files on each source server. |
 
 ### Production deployment
 
@@ -692,7 +697,7 @@ Output directory contents:
 
 | File | Purpose |
 |---|---|
-| `audit-file-list.csv` | One row per file, 14 columns (the work-order vendors actually consume). Human-readable column headers. Filterable in Excel, Smartsheet, etc. |
+| `audit-file-list.csv` | One row per file, 16 columns (14 file-descriptor + 2 staff-fill — the work-order vendors actually consume + the staff-edit columns added in v1.7.16). Human-readable column headers. Filterable in Excel, Smartsheet, etc. |
 | `audit-file-list.html` | (Only when `--html` is passed.) Self-contained interactive dark-mode page — same data, sortable columns, full-text search, category filter chips, no external dependencies. `audit-remote.sh` always passes `--html` unless `AUDIT_HTML=0` is set. |
 | `audit-summary.txt` | Manager-friendly top-line numbers: file counts by category, total bytes, image-only PDF count, remediable count, heading coverage, alt-text coverage, and "What this means" observation bullets. |
 | `README.txt` | Plain-text guide to all files in this folder. Start here if you're not sure which file to open. |
@@ -703,15 +708,17 @@ Output directory contents:
 
 The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `filecap diff` command to detect changes.
 
-**CSV column order** (14 columns, stable since 1.4.1):
+**CSV column order** (16 columns; positions 1–14 stable since v1.4.1 with v1.7.2 moving Public URL to position 4; positions 15–16 added in v1.7.16):
 
-`Server, Website, Server IP, Date published, Source folder on server, File location (relative to source folder), Full file path on server, Public URL, File name, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of`
+`Server, Website, Server IP, Public URL, Date published, Source folder on server, File location (relative to source folder), Full file path on server, File name, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of, Delete?, Notes`
 
-The deliverable focuses on the fields a remediator needs to **find** and **price** each file (filename, path, server, type, size, duplicate marker, public URL). Format-specific introspection columns (PDF page count, image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped in 1.4.0 / 1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly from the file. The full introspection remains in the underlying NDJSON inventory for MCP queries and custom reports.
+The deliverable focuses on the fields a remediator needs to **find** and **price** each file (filename, path, server, type, size, duplicate marker, public URL). Format-specific introspection columns (PDF page count, image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped in v1.4.0 / v1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly from the file. The full introspection remains in the underlying NDJSON inventory for MCP queries and custom reports.
+
+**The last two columns are CSV-only and meant for staff input.** `Delete?` defaults to `No` for every row; staff types `Yes` to flag a file for removal before the next audit. `Notes` is empty by default; free-text for whatever context the staff member wants to leave on a row (why it should stay, why it should go, who owns it, etc.). When the edited CSV comes back, the audit lead removes the `Yes`-marked files on each source server, reads through the notes, and re-runs the audit. These two columns don't appear in the HTML table view — the web view is informational, the CSV is the actionable artefact. CSV is plain text so the "dropdown" feel for `Delete?` needs Excel/Google-Sheets data-validation set by the staff member (right-click → Data validation → List of items → `No, Yes`); without it, staff types `Yes` or `No` directly into the cell.
 
 Column headers are human-facing labels (not raw field names). Empty cells indicate the field doesn't apply to this file's type.
 
-**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). Both input shapes produce the same 30-column CSV.
+**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). Both input shapes produce the same 16-column CSV.
 
 ## MCP server (Phase 7)
 
@@ -1070,7 +1077,7 @@ In interactive mode, the script asks a few questions. Here's what each one means
 
 After the script finishes, navigate to `~/filecap-audits/<server-name>/latest/report/`. You'll find:
 
-- **`audit-file-list.csv`** — The main deliverable. One row per file, 14 columns covering server, website, file location, full path, public URL, filename, type, size, content hash, and duplicate-of marker. Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor.
+- **`audit-file-list.csv`** — The main deliverable. One row per file, 16 columns covering server, website, file location, full path, public URL, filename, type, size, content hash, duplicate-of marker, plus two staff-fill columns (`Delete?` defaulting to "No", and `Notes`). Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor (the staff-fill columns are for an internal pre-pass — vendors can ignore them).
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
 - **`audit-file-list.html`** — A self-contained dark-mode web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, category filter chips, and print-to-PDF. (Set `AUDIT_HTML=0` in the environment to suppress this file on rare occasions when you don't want it.)
 - **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.
@@ -1085,8 +1092,8 @@ The run directory also contains `inventory.ndjson` (the raw scan data used to ge
 
 The deliverable shows **two** numbers, deliberately:
 
-- **Audit work** (e.g., 69) — files that need actual accessibility remediation: PDFs, Word docs, Excel sheets, PowerPoint, legacy Office files. These are what your remediation vendor will quote against.
-- **Reference files** (e.g., 33) — files that are inventoried but don't need direct work: images (their alt text lives in your CMS schema, not in the JPEG), text files (`.txt`, `.md`), `.gitkeep` placeholders, etc. They're listed for completeness so the inventory is comprehensive, but no remediator will touch them.
+- **Audit work** (e.g., 69) — files that may need accessibility remediation: PDFs, Word docs, Excel sheets, PowerPoint, legacy Office files. These are what your remediation vendor will quote against.
+- **Reference files** (e.g., 33) — files that are inventoried but typically don't need direct work: images (their alt text lives in your CMS schema, not in the JPEG), text files (`.txt`, `.md`), `.gitkeep` placeholders, etc. They're listed for completeness so the inventory is comprehensive, but no remediator usually touches them.
 
 The HTML report opens filtered to "Remediable only" by default. Click the "All" chip to see everything; click a category chip to drill into a specific type.
 
@@ -1441,15 +1448,31 @@ After scanning your fleet, the `filecap web-rollup` subcommand bundles every sit
 
 ```
 ~/filecap-audits/_web-rollup/<UTC-timestamp>/
-├── index.html           ← landing page with fleet totals + per-site cards
-├── netlify.toml         ← cache headers + security headers, ready to deploy
-├── robots.txt           ← User-agent: * Disallow: /
+├── index.html                      ← landing page: hero + alphabetical site cards + "By file type" table
+├── netlify.toml                    ← cache headers + security headers, ready to deploy
+├── robots.txt                      ← User-agent: * Disallow: /
 ├── assets/
-│   └── style.css        ← shared dark-mode design tokens
-├── dvfr-20260509-160504Z.html    ← per-site report (dark mode, sortable, searchable)
-├── dvfr-20260509-160504Z.csv     ← per-site CSV
+│   └── style.css                   ← shared dark-mode design tokens
+│
+├── audit-file-list-master.csv      ← one row per file across every server (16 cols incl. Delete? + Notes)
+├── audit-file-duplicates.csv       ← per-occurrence cross-server duplicates (since 1.5.1)
+│
+├── audit-pdfs.html                 ← per-file-type detail page: every PDF across the fleet (since 1.7.14)
+├── audit-pdfs.csv                  ← matching filtered CSV
+├── audit-docx.html / .csv
+├── audit-xlsx.html / .csv
+├── audit-pptx.html / .csv
+├── audit-images.html / .csv
+├── audit-text-files.html / .csv
+├── audit-archives.html / .csv
+├── audit-web-files.html / .csv
+├── audit-other.html / .csv         ← non-empty buckets only; empty buckets skipped
+│
+├── dvfr-20260509-160504Z.html      ← per-site report (dark mode, sortable, searchable, copy-buttons)
+├── dvfr-20260509-160504Z.csv       ← per-site CSV (16 cols)
 ├── i2i-20260510-093000Z.html
-└── i2i-20260510-093000Z.csv
+├── i2i-20260510-093000Z.csv
+└── … one .html + .csv pair per site, named <slug>-<UTC-timestamp>.<ext>
 ```
 
 ### Building the bundle
@@ -1590,6 +1613,7 @@ After choosing the mode, the script also asks "Auto-deploy to Netlify? [y/N]". A
 
 ## Related @icjia tools
 
+- [audit.icjia.app](https://audit.icjia.app) — single-PDF accessibility check (web tool). The fleet rollup links to this from the index navbar and from every per-site sticky bar (since v1.7.16) so a remediator looking at the inventory can pop a candidate PDF into the checker in one click.
 - `@icjia/viewcap` — screenshot capture (MCP)
 - `@icjia/lightcap` — Lighthouse audits (MCP)
 - `@icjia/axecap` — axe-core accessibility audits (MCP)

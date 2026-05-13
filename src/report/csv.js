@@ -25,6 +25,16 @@ export const CSV_COLUMNS = [
   { name: "sizeBytes",    label: "Size (bytes)" },
   { name: "sha256",       label: "Content hash (SHA-256)" },
   { name: "duplicateOf",  label: "Duplicate of" },
+  // v1.7.16: CSV-only "action" columns that staff fills in. The HTML
+  // table view skips these (filtered by `csvOnly`) because the web view is
+  // informational — the actionable artefact is the CSV. Workflow: download
+  // CSV → mark "Yes" in "Delete?" for any file that should be removed → add
+  // free-text notes → send the CSV back. CSV is plain text so the
+  // "dropdown" feel needs Excel/Google-Sheets data validation set by the
+  // staff member; the column defaults to "No" so an unedited CSV behaves
+  // sensibly. `defaultValue` is consumed by buildRow.
+  { name: "deleteFlag",   label: "Delete?", csvOnly: true, defaultValue: "No" },
+  { name: "notes",        label: "Notes",   csvOnly: true, defaultValue: "" },
 ];
 
 /**
@@ -117,6 +127,11 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
       return `="${hash}"`;
     })(),
     duplicateOf,
+    // v1.7.16 csvOnly columns. The labels stay aligned with CSV_COLUMNS
+    // entries; defaults come from the column descriptor so a future column
+    // addition just needs the descriptor update.
+    CSV_COLUMNS.find((c) => c.name === "deleteFlag")?.defaultValue ?? "No",
+    CSV_COLUMNS.find((c) => c.name === "notes")?.defaultValue ?? "",
   ];
 }
 

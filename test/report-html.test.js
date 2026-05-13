@@ -527,7 +527,9 @@ describe("writeHtml", () => {
       outputPath,
     });
     const html = await fs.readFile(outputPath, "utf8");
-    // every th has the handle; there are 14 CSV_COLUMNS so there must be 14 handles
+    // Every <th> has the resize handle. As of v1.7.16 the HTML view filters out
+    // CSV-only columns (Delete?, Notes), so the count is the 14 non-csvOnly
+    // entries in CSV_COLUMNS — not 16.
     const handles = html.match(/<span class="col-resize-handle"/g) || [];
     expect(handles.length).toBe(14);
   });
@@ -669,6 +671,54 @@ describe("writeHtml", () => {
       });
       const html = await fs.readFile(outputPath, "utf8");
       expect(html).not.toMatch(/<p class="row-marker-row"/);
+    });
+  });
+
+  describe("detail-page sticky bar (v1.7.16: audit-tool link + last-audit date)", () => {
+    it("includes a visible 'Audit a PDF' button linking to audit.icjia.app", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+        backHref: "index.html",
+        csvHref: "site.csv",
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>/);
+      expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Use ICJIA&#39;s PDF audit tool<\/span>/);
+    });
+
+    it("shows the per-site scannedAt date under the CSV download for single-site reports", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+        csvHref: "site.csv",
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      // sampleHeader.metadata.scannedAt is "2026-05-09T12:00:00.000Z" → "May 9, 2026"
+      expect(html).toMatch(/<p class="report-csv-date">Last audit: <strong>May 9, 2026<\/strong><\/p>/);
+    });
+  });
+
+  describe("HTML view excludes csvOnly columns (v1.7.16)", () => {
+    it("does NOT render Delete? or Notes columns in the table — those are CSV-only", async () => {
+      const outputPath = path.join(tmpDir, "out.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath,
+      });
+      const html = await fs.readFile(outputPath, "utf8");
+      expect(html).not.toMatch(/<th[^>]*data-col="deleteFlag"/);
+      expect(html).not.toMatch(/<th[^>]*data-col="notes"/);
+      expect(html).not.toMatch(/<col data-col="deleteFlag"/);
+      expect(html).not.toMatch(/<col data-col="notes"/);
     });
   });
 

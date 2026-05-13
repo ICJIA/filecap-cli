@@ -204,6 +204,51 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
   });
 });
 
+describe("renderCard last-audit caption (v1.7.16)", () => {
+  it("renders 'Last audit: <date>' beneath the card actions when scannedAt is set", () => {
+    const sr = {
+      site: { name: "x", siteName: "DVFR", host: "1.2.3.4" },
+      summary: { totalFiles: 10, remediable: 5, totalBytes: 1000, byCategory: { pdf: 5 } },
+      htmlFile: "x.html",
+      csvFile: "x.csv",
+      scannedAt: "2026-05-11T14:00:00.000Z",
+      header: { metadata: {} },
+    };
+    const html = renderCard(sr);
+    expect(html).toMatch(/<p class="csv-last-audit">Last audit: <strong>May 11, 2026<\/strong><\/p>/);
+  });
+
+  it("omits the caption when scannedAt is missing", () => {
+    const sr = {
+      site: { name: "x", siteName: "DVFR" },
+      summary: { totalFiles: 10, remediable: 5, totalBytes: 1000, byCategory: { pdf: 5 } },
+      htmlFile: "x.html",
+      csvFile: "x.csv",
+      scannedAt: null,
+      header: { metadata: {} },
+    };
+    const html = renderCard(sr);
+    expect(html).not.toMatch(/class="csv-last-audit"/);
+  });
+});
+
+describe("index page audit-tool button (v1.7.16)", () => {
+  const html = generateIndexHtml({ siteResults: [], password: null });
+
+  it("renders an audit.icjia.app link in the site-header right zone", () => {
+    expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*>/);
+  });
+
+  it("the audit link includes an external-link SVG icon and the 'Use ICJIA's PDF audit tool' label", () => {
+    expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,400}<svg class="audit-tool-icon"/);
+    expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Use ICJIA&#39;s PDF audit tool<\/span>/);
+  });
+
+  it("uses rel=\"noopener noreferrer\" to prevent the target page from accessing window.opener", () => {
+    expect(html).toMatch(/<a class="audit-tool-link"[^>]*rel="noopener noreferrer"/);
+  });
+});
+
 describe("index page CSS (v1.7.7 whole-card click fix)", () => {
   // The fix lives in the <style> block emitted by generateIndexHtml: it
   // pins pointer-events: none on every non-interactive descendant of

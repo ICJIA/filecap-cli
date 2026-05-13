@@ -606,6 +606,10 @@ export async function runWebRollup({
       filename: masterCsvFilename,
       fileCount: allEntries.length,
       byteCount: masterStat.size,
+      // v1.7.16: the master CSV is "as of right now" — its lastAuditAt is the
+      // moment we built this rollup. Surface it under the download button so
+      // staff can tell if their downloaded copy is current.
+      lastAuditAt: new Date().toISOString(),
     };
   }
 

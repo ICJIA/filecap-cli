@@ -341,3 +341,45 @@ describe("writeCsv SHA-256 Excel text-formula wrapping", () => {
   });
 });
 
+describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
+  it("declares deleteFlag and notes as csvOnly columns at the end of CSV_COLUMNS", () => {
+    const last = CSV_COLUMNS.slice(-2);
+    expect(last[0].name).toBe("deleteFlag");
+    expect(last[0].label).toBe("Delete?");
+    expect(last[0].csvOnly).toBe(true);
+    expect(last[0].defaultValue).toBe("No");
+    expect(last[1].name).toBe("notes");
+    expect(last[1].label).toBe("Notes");
+    expect(last[1].csvOnly).toBe(true);
+    expect(last[1].defaultValue).toBe("");
+  });
+
+  it("CSV header row includes the new Delete? and Notes labels", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
+    const headerRow = csv.trim().split("\n")[0];
+    expect(headerRow).toContain("Delete?");
+    expect(headerRow).toContain("Notes");
+    // 16 columns total (14 file-descriptor + 2 action)
+    expect(headerRow.split(",").length).toBe(16);
+  });
+
+  it("CSV data rows default Delete? to \"No\" and Notes to empty string", () => {
+    const entry = {
+      path: "doc.pdf",
+      absolutePath: "/uploads/doc.pdf",
+      filename: "doc.pdf",
+      extension: "pdf",
+      category: "pdf",
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sizeBytes: 1024,
+      sha256: "abc",
+      flags: [],
+    };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataRow = csv.trim().split("\n")[1];
+    const cells = dataRow.split(",");
+    expect(cells[colIndex("deleteFlag")]).toBe("No");
+    expect(cells[colIndex("notes")]).toBe("");
+  });
+});
+

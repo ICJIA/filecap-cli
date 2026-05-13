@@ -49,6 +49,25 @@ function fmtDate(iso) {
 }
 
 /**
+ * Format an ISO timestamp as a short calendar date — e.g. "May 12, 2026".
+ * Used for the "Last audit: …" caption beneath every CSV download button so
+ * staff can tell whether the CSV they're looking at is current. Drops the
+ * time-of-day; auditors care about which day the scan ran, not the minute.
+ * @param {string|null} iso
+ * @returns {string}
+ */
+function fmtAuditDate(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Format a Date as "YYYY-MM-DD HH:MM UTC" for the generated-at stamp.
  * @param {Date} d
  * @returns {string}
@@ -72,16 +91,18 @@ function renderMasterCsvSection(masterCsv) {
   if (!masterCsv || !masterCsv.filename) return "";
   const fileCount = masterCsv.fileCount ?? 0;
   const byteCount = masterCsv.byteCount ?? 0;
+  const lastAudit = masterCsv.lastAuditAt ? fmtAuditDate(masterCsv.lastAuditAt) : "";
   return `
   <section class="section master-csv">
     <h2>Master spreadsheet — every file across every server</h2>
-    <p>If you'd rather skim a single spreadsheet instead of per-site files, this combined CSV has every file from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from.</p>
+    <p>If you'd rather skim a single spreadsheet instead of per-site files, this combined CSV has every file from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from. The CSV also has two columns — <strong>Delete?</strong> (defaults to "No") and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit.</p>
     <p class="master-csv-download">
       <a class="cta-button" href="${he(masterCsv.filename)}" download>
         Download <strong>${he(masterCsv.filename)}</strong>
       </a>
       <span class="master-csv-meta">${he(fileCount.toLocaleString())} files · ${he(humanBytes(byteCount))}</span>
     </p>
+    ${lastAudit ? `<p class="master-csv-last-audit">Last audit: <strong>${he(lastAudit)}</strong></p>` : ""}
   </section>`;
 }
 
@@ -378,6 +399,7 @@ export function renderCard(sr) {
   <div class="actions">
     <a href="${he(htmlFile)}" class="btn btn-primary">View detailed report &rarr;</a>
     <a href="${he(csvFile)}" class="btn btn-secondary" download>Download spreadsheet</a>
+    ${scannedAt ? `<p class="csv-last-audit">Last audit: <strong>${he(fmtAuditDate(scannedAt))}</strong></p>` : ""}
   </div>
 </article>`;
 }
@@ -587,6 +609,48 @@ h2 {
 @media (max-width: 600px) {
   .site-header .icjia-logo { height: 32px; }
   .site-header .brand { font-size: 0.9rem; padding-left: 0.65rem; }
+}
+
+/* v1.7.16: ICJIA PDF accessibility audit tool button. Visually prominent
+   (filled blue) so managers/remediators see it without scanning. Same
+   pattern repeats in the per-site detail page sticky bar. */
+.site-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: none;
+}
+.audit-tool-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.95rem;
+  background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
+  color: #0c1219;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  border-radius: 8px;
+  border: 1px solid #2f8de0;
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+  white-space: nowrap;
+}
+.audit-tool-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(77, 171, 247, 0.35);
+  filter: brightness(1.05);
+}
+.audit-tool-link:focus-visible {
+  outline: 3px solid #58a6ff;
+  outline-offset: 2px;
+}
+.audit-tool-link:active { transform: translateY(0); filter: brightness(0.96); }
+.audit-tool-icon { width: 14px; height: 14px; flex: none; }
+@media (max-width: 600px) {
+  .audit-tool-link { padding: 0.4rem 0.7rem; font-size: 0.82rem; }
+  .audit-tool-link span { display: none; }
+  .audit-tool-icon { width: 16px; height: 16px; }
 }
 
 /* ── main content ────────────────────────────────────────────── */
@@ -1201,6 +1265,14 @@ main {
 }
 .site-card .actions .btn-primary { background: #4dabf7; color: #0c1219; }
 .site-card .actions .btn-secondary { background: transparent; color: #4dabf7; border: 1px solid #2a323d; }
+.site-card .actions .csv-last-audit {
+  margin: 0;
+  font-size: 0.78em;
+  text-align: center;
+  color: var(--fc-text-muted, #788391);
+  letter-spacing: 0.02em;
+}
+.site-card .actions .csv-last-audit strong { color: #c0cdda; font-weight: 700; }
 
 /* 2-col grid: desktop 2-up, mobile 1-up */
 .site-grid {
@@ -1298,6 +1370,13 @@ main {
   outline-offset: 2px;
 }
 .master-csv-meta { color: #8b949e; font-size: 0.95rem; }
+.master-csv-last-audit {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  color: #788391;
+  letter-spacing: 0.02em;
+}
+.master-csv-last-audit strong { color: #c0cdda; font-weight: 700; }
 
 /* ── duplicates section — v1.7.2 big visual treatment ─────────────────── */
 .duplicates .dup-hero {
@@ -1644,6 +1723,16 @@ main {
   <div class="site-header-left">
     <span class="icjia-logo" aria-hidden="true">${ICJIA_LOGO_SVG}</span>
     <span class="brand"><span>filecap</span> fleet audit snapshot</span>
+  </div>
+  <div class="site-header-right">
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="Check a PDF for accessibility at ICJIA's audit tool (audit.icjia.app, opens in a new tab)">
+      <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
+        <path d="M9 2h5v5"/>
+        <path d="M8 8l6-6"/>
+      </svg>
+      <span>Use ICJIA&#39;s PDF audit tool</span>
+    </a>
   </div>
 </header>
 
