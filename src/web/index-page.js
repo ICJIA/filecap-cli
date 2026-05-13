@@ -257,9 +257,17 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
 
   return `
   <section class="section duplicates">
+    <!-- v1.7.22: big section banner so the eye sees a clear "new section starts here"
+         break after the For-AI-models block. The amber accent bar echoes the
+         duplicates section's existing color register (warning/notice yellow). -->
+    <div class="dup-section-banner" role="presentation">
+      <p class="dup-section-eyebrow">Section · Duplicates</p>
+      <h2 class="dup-section-headline">Cross-Server Duplicates</h2>
+      <p class="dup-section-lede">Files that appear on more than one ICJIA site — why that&#39;s almost always normal, when it&#39;s intentional, and why removing any single copy needs careful per-site reference checks before anything is deleted.</p>
+    </div>
+
     <header class="dup-hero" data-dup-stats='${JSON.stringify(stats).replace(/</g, "\\u003c").replace(/'/g, "&#39;")}' data-dup-active="remediable">
-      <p class="dup-eyebrow">Cross-server file map</p>
-      <h2 class="dup-title"><span data-dup-stat="total">${he(dupTotalCount.toLocaleString())}</span> files appear on more than one site</h2>
+      <h3 class="dup-title"><span data-dup-stat="total">${he(dupTotalCount.toLocaleString())}</span> files appear on more than one site</h3>
       <p class="dup-counting-note"><strong>Counting only files that may need accessibility remediation</strong> — PDFs, Word, Excel, PowerPoint, legacy Office. Images, text, markdown, and other reference files are duplicated too but they don&#39;t affect audit scope, so they&#39;re excluded from the headline number. Change the filter below the explainer to see all duplicates or only reference files.</p>
       <p class="dup-subtitle"><strong>This is normal — not a webmaster error.</strong> The same PDF might be linked from DVFR, ICJIA, and the Archive simultaneously, and a copy lives on each site. We&#39;re listing them here so you can <strong>remediate the file once and push the fix to every site that hosts it</strong>, instead of paying a vendor to remediate the same document three times.</p>
       <div class="dup-stat-tiles">
@@ -1622,6 +1630,55 @@ main {
   background: rgba(255, 255, 255, 0.10);
   border-radius: 3px;
   color: #ffffff;
+}
+
+/* v1.7.22 — strong "new section" divider banner above the duplicates hero.
+   Page has accumulated a lot of stacked content (master CSV, by-type, For AI
+   models), and managers were missing where the duplicates block began. The
+   banner uses an amber accent bar (echoes the section's existing notice-
+   yellow color register), large clamped headline, and generous vertical
+   margins so the eye registers a clear section break. */
+.duplicates .dup-section-banner {
+  margin: 4.5rem 0 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #2a3340;
+}
+.duplicates .dup-section-banner::before {
+  content: "";
+  display: block;
+  width: 72px;
+  height: 5px;
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+  border-radius: 3px;
+  margin-bottom: 1.4rem;
+}
+.duplicates .dup-section-eyebrow {
+  margin: 0 0 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
+.duplicates .dup-section-headline {
+  margin: 0 0 0.9rem;
+  font-size: clamp(2.2rem, 4.5vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+}
+.duplicates .dup-section-lede {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  color: #c0cdda;
+}
+@media (max-width: 720px) {
+  .duplicates .dup-section-banner { margin: 3rem 0 1.5rem; padding-top: 1.1rem; }
+  .duplicates .dup-section-banner::before { width: 56px; height: 4px; margin-bottom: 1rem; }
+  .duplicates .dup-section-lede { font-size: 1rem; }
 }
 
 /* ── duplicates section — v1.7.2 big visual treatment ─────────────────── */

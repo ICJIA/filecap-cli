@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.22] — 2026-05-13
+
+### Changed
+
+- **Big "Cross-Server Duplicates" section banner** above the existing duplicates hero. The page has accumulated a lot of stacked content over v1.7.x (master CSV, by-file-type, For AI models, etc.), and managers were missing where the duplicates block started. New banner: 4.5 rem top margin with a thin divider line, a 72 × 5 px amber-gradient accent bar (echoes the section's existing notice-yellow color register), a `Section · Duplicates` eyebrow in amber, a 50 px-clamped "Cross-Server Duplicates" h2 in white, and a lede paragraph explaining what the section covers ("Files that appear on more than one ICJIA site — why that's almost always normal, when it's intentional, and why removing any single copy needs careful per-site reference checks before anything is deleted."). The pre-v1.7.22 small "CROSS-SERVER FILE MAP" eyebrow is removed since the new banner makes it redundant; the existing "131 files appear on more than one site" headline demoted from h2 to h3 (since the banner now carries the section's h2). Stacks gracefully under 720 px with reduced spacing.
+
+[1.7.22]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.22
+
 ## [1.7.21] — 2026-05-13
 
 ### Added

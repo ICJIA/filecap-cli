@@ -1027,10 +1027,10 @@ describe("runWebRollup — master CSV + duplicates", () => {
     const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
     expect(result.exitCode).toBe(0);
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    // v1.7.2: section heading rewritten as "<count> files appear on more
-    // than one site". Section class stays `.duplicates`; assert on a stable
-    // marker that survives copywriting.
-    expect(html).toContain("Cross-server file map");
+    // v1.7.22: section banner replaced the small "Cross-server file map"
+    // eyebrow with a big "Cross-Server Duplicates" h2. Assert on the new
+    // banner copy + the section class which is stable.
+    expect(html).toContain("Cross-Server Duplicates");
     expect(html).toMatch(/section class="section duplicates"/);
     // Both inventories' seed entry is "doc.pdf"
     expect(html).toContain("doc.pdf");
