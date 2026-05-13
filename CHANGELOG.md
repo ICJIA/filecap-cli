@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.37] — 2026-05-13
+
+### Changed
+
+- **All user-visible timestamps now display in Chicago time** (America/Chicago, DST-aware) with an explicit `Chicago time` trailing label. Pre-v1.7.37 the bundle stamped every visible time as UTC — accurate but a mental-arithmetic tax for ICJIA managers and remediation vendors in Central Time, all of whom think in Chicago hours. Three display sites updated across the bundle:
+  - **Index page footer**: `Generated 2026-05-13 17:03 UTC` → `Generated 2026-05-13 12:03 Chicago time`.
+  - **Per-site detail page footer + meta-grid `Scanned at:`**: same format treatment.
+  - **Per-site sticky-bar `Last audit: <date>` chip** (and the matching caption beneath every CSV download button on the index): converts the underlying ISO timestamp through Chicago tz before extracting the calendar date, so the day matches what a Chicago reader would call "today" rather than a UTC day boundary.
+  - **Cross-server duplicates "Newest → oldest" date column**: 24-hour display in Chicago time.
+- Raw NDJSON wire format is unchanged — every header, footer, and entry timestamp remains ISO 8601 UTC on disk. The conversion happens at the rendering layer only.
+- Implementation: new `src/util/time.js` module exports three helpers (`fmtChicagoDateTime`, `fmtChicagoDate`, `fmtChicagoGeneratedAt`) using `Intl.DateTimeFormat` with `timeZone: "America/Chicago"`. Both `src/web/index-page.js` and `src/report/html.js` consume the shared module so the timezone label is consistent across every page in the bundle.
+- The bundle's per-site **filename slugs** (e.g. `r3-20260511-172410Z.html`) remain UTC-based so the same scan timestamp produces the same canonical filename regardless of who runs `web-rollup` or where; filenames aren't user-visible time displays.
+
+[1.7.37]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.37
+
 ## [1.7.36] — 2026-05-13
 
 ### Security

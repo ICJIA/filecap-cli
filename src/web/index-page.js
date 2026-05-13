@@ -1,4 +1,5 @@
 import { injectPasswordGate } from "./password-gate.js";
+import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 
 /**
  * Escape a value for safe insertion into HTML.
@@ -28,58 +29,15 @@ function humanBytes(bytes) {
   return `${i === 0 ? val : val.toFixed(1)} ${units[i]}`;
 }
 
-/**
- * Format an ISO timestamp as "May 9, 16:05 UTC".
- * @param {string|null} iso
- * @returns {string}
- */
-function fmtDate(iso) {
-  if (!iso) return "unknown";
-  try {
-    const d = new Date(iso);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const mon = months[d.getUTCMonth()];
-    const day = d.getUTCDate();
-    const HH = String(d.getUTCHours()).padStart(2, "0");
-    const MM = String(d.getUTCMinutes()).padStart(2, "0");
-    return `${mon} ${day}, ${HH}:${MM} UTC`;
-  } catch {
-    return iso;
-  }
-}
-
-/**
- * Format an ISO timestamp as a short calendar date — e.g. "May 12, 2026".
- * Used for the "Last audit: …" caption beneath every CSV download button so
- * staff can tell whether the CSV they're looking at is current. Drops the
- * time-of-day; auditors care about which day the scan ran, not the minute.
- * @param {string|null} iso
- * @returns {string}
- */
-function fmtAuditDate(iso) {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-  } catch {
-    return "";
-  }
-}
-
-/**
- * Format a Date as "YYYY-MM-DD HH:MM UTC" for the generated-at stamp.
- * @param {Date} d
- * @returns {string}
- */
-function fmtGeneratedAt(d) {
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const HH = String(d.getUTCHours()).padStart(2, "0");
-  const MM = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd} ${HH}:${MM} UTC`;
-}
+// 1.7.37 — Time formatting delegated to src/util/time.js. All
+// user-visible timestamps now display in Chicago time (America/Chicago,
+// DST-aware) with an explicit "Chicago time" label. Raw NDJSON
+// timestamps remain ISO 8601 UTC; conversion happens at the rendering
+// layer. These wrappers keep the original local-function names so the
+// rest of this module's call sites don't need touching.
+const fmtDate = fmtChicagoDateTime;
+const fmtAuditDate = fmtChicagoDate;
+const fmtGeneratedAt = fmtChicagoGeneratedAt;
 
 /**
  * Render a single site card for managers.
