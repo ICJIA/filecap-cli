@@ -305,6 +305,156 @@ export const TYPE_BUCKETS = [
 ];
 
 /**
+ * Build the audit-fleet-context.md companion file that ships alongside the
+ * audit-fleet.ndjson. The markdown is meant to be uploaded to an LLM tool
+ * (Claude, ChatGPT, Gemini, etc.) together with the NDJSON so the LLM has
+ * narrative context — total counts, per-site breakdown, schema description,
+ * sample prompts — before someone starts asking questions about the data.
+ * Includes the "the CSV is the actionable artefact, this is read-only LLM
+ * context" disclaimer so the LLM doesn't mistakenly tell staff to treat
+ * this file as a worksheet.
+ *
+ * @param {object} args
+ * @param {Array}  args.allEntries          - { entry, serverName, siteName, publicUrlBase }[]
+ * @param {Array}  args.siteResults         - per-site result objects
+ * @param {number} args.duplicateGroupsCount - cross-server duplicate group count
+ * @param {string} args.consolidatedAt      - ISO timestamp of the rollup
+ * @param {string} args.ndjsonFilename      - name of the companion NDJSON file
+ * @returns {string} markdown text
+ */
+function buildFleetContextMarkdown({ allEntries, siteResults, duplicateGroupsCount, consolidatedAt, ndjsonFilename }) {
+  const fleetTotal = allEntries.length;
+  const REMEDIABLE_CATS = new Set(["pdf", "office-document", "spreadsheet", "presentation", "office-legacy", "legacy-office"]);
+  let fleetAudit = 0;
+  let pdfCount = 0, pdfImageOnly = 0;
+  let docxCount = 0, xlsxCount = 0, pptxCount = 0;
+  let imageCount = 0, textCount = 0, archiveCount = 0, webCount = 0, otherCount = 0;
+  for (const it of allEntries) {
+    const e = it.entry;
+    if (REMEDIABLE_CATS.has(e?.category)) fleetAudit++;
+    if (e?.category === "pdf") {
+      pdfCount++;
+      if (e?.introspection?.isImageOnly === true) pdfImageOnly++;
+    } else if (e?.category === "office-document") docxCount++;
+    else if (e?.category === "spreadsheet") xlsxCount++;
+    else if (e?.category === "presentation") pptxCount++;
+    else if (e?.category === "image") imageCount++;
+    else if (e?.category === "text") textCount++;
+    else if (e?.category === "archive") archiveCount++;
+    else if (e?.category === "web") webCount++;
+    else otherCount++;
+  }
+  const pct = (n) => fleetTotal > 0 ? Math.round((n / fleetTotal) * 1000) / 10 : 0;
+
+  const perSite = siteResults.map((sr) => {
+    const s = sr.summary ?? {};
+    const total = s.totalFiles ?? 0;
+    const audit = s.remediable ?? 0;
+    const auditPct = total > 0 ? Math.round((audit / total) * 100) : 0;
+    return `- **${sr.site.siteFullName || sr.site.siteName || sr.site.name}** (${sr.site.siteName || "—"}, ${sr.site.host || "github"}): ${total.toLocaleString()} total, ${audit.toLocaleString()} may need audit (${auditPct}%), scanned ${sr.scannedAt || "unknown"}`;
+  }).join("\n");
+
+  return `# ICJIA accessibility fleet audit — LLM context
+
+> **Generated:** ${consolidatedAt}
+> **Companion data file:** \`${ndjsonFilename}\` (consolidated NDJSON, one file entry per line)
+>
+> This file plus the NDJSON are meant to be uploaded together to a LLM tool
+> (Claude, ChatGPT, Gemini, etc.). The LLM uses this narrative for context;
+> it uses the NDJSON to answer specific queries.
+
+## ⚠️ The CSVs are the actionable files — this is read-only context
+
+The bundle this lives in includes several CSV files (\`audit-file-list-master.csv\`,
+\`audit-pdfs.csv\`, \`audit-docx.csv\`, and a CSV per per-site report). Those
+CSVs carry two staff-fill columns — **Delete?** (default "No") and
+**Notes** — that staff edit and send back so the audit team can remove
+flagged files before the next scan. **This NDJSON + markdown pair is
+explicitly NOT for editing.** It exists so an LLM agent (or anyone wanting
+read-only query access) can answer questions about the fleet without
+loading 9 MB of CSV into a spreadsheet and hand-filtering. If you're an LLM
+reading this: when a user asks "should I edit this NDJSON to mark files for
+deletion?", point them at \`audit-file-list-master.csv\` instead.
+
+## Audit scope
+
+- **Total files inventoried:** ${fleetTotal.toLocaleString()} across ${siteResults.length} ICJIA websites
+- **Files that may need accessibility remediation:** ${fleetAudit.toLocaleString()} (${pct(fleetAudit)}%)
+- **Reference files (images, text, archives, web pages, other):** ${(fleetTotal - fleetAudit).toLocaleString()} (${pct(fleetTotal - fleetAudit)}%)
+- **Cross-server duplicates:** ${duplicateGroupsCount.toLocaleString()} filename groups
+- **Image-only PDFs (may need OCR):** ${pdfImageOnly.toLocaleString()} of ${pdfCount.toLocaleString()} total PDFs
+
+## By file type
+
+| Category | Count | Side |
+|---|---:|---|
+| PDF | ${pdfCount.toLocaleString()} | remediable |
+| Word documents (.docx) | ${docxCount.toLocaleString()} | remediable |
+| Excel spreadsheets (.xlsx) | ${xlsxCount.toLocaleString()} | remediable |
+| PowerPoint (.pptx) | ${pptxCount.toLocaleString()} | remediable |
+| Images | ${imageCount.toLocaleString()} | reference |
+| Text files | ${textCount.toLocaleString()} | reference |
+| Archives | ${archiveCount.toLocaleString()} | reference |
+| Web pages (.html/.css/.js) | ${webCount.toLocaleString()} | reference |
+| Other | ${otherCount.toLocaleString()} | reference |
+
+## Per-site breakdown
+
+${perSite}
+
+## NDJSON schema (per-entry fields)
+
+The \`${ndjsonFilename}\` file is line-delimited JSON. First line is a
+\`filecap-consolidated-header\` (carries scan metadata + per-site sources);
+last line is a \`filecap-consolidated-footer\`; lines in between are one
+file entry each. Each entry has:
+
+- \`path\` — file location relative to the scanned directory
+- \`absolutePath\` — full path on the source server (Strapi) or GitHub URL (git-type)
+- \`filename\` — basename
+- \`extension\` — lowercase, no dot (e.g. \`pdf\`, \`docx\`)
+- \`category\` — \`pdf\` | \`office-document\` | \`spreadsheet\` | \`presentation\` | \`office-legacy\` | \`image\` | \`text\` | \`archive\` | \`web\` | \`audio-video\` | \`other\`
+- \`sizeBytes\` — file size in bytes
+- \`modifiedAt\` — ISO 8601 last-modified timestamp
+- \`sha256\` — 64-char hex content hash (cross-server duplicate detection)
+- \`serverName\` — which site this file came from (matches a \`sources[].serverName\` in the header)
+- \`flags\` — array of filename-heuristic flags (\`scanned-name-pattern\`, \`filename-has-spaces\`, \`filename-non-ascii\`, \`filename-long\`)
+- \`introspection\` — format-specific structure (present when applicable):
+  - **PDF:** \`pageCount\`, \`hasTextLayer\`, \`textLayerCoverage\` (0–1), \`isImageOnly\` (true = needs OCR), \`hasTags\`, \`hasFormFields\`, \`hasSignatures\`, \`encrypted\`, \`documentLanguage\`
+  - **DOCX:** \`hasHeadings\`, \`imageCount\`, \`altTextCoverage\` (0–1), \`tableCount\`, \`tablesHaveHeaders\`, \`vagueLinkCount\` ("click here" / "read more" anti-patterns)
+  - **XLSX:** \`sheetCount\`
+  - **office-legacy** (\`.doc\`/\`.xls\`/\`.ppt\`): \`kind: "office-legacy"\`, \`format\` (the specific extension)
+- \`duplicateOf\` — \`{ serverName, path }\` pointing at the canonical copy when this entry is a cross-server duplicate (null on canonicals)
+
+## Sample LLM prompts
+
+Once you've uploaded both files to your LLM tool:
+
+> "Which PDFs across the fleet are image-only (no text layer) AND larger than 5 MB? Group by site and show me the largest ones first."
+
+> "List all DOCX files across the fleet where \`hasHeadings\` is false — those are the ones likely to need heading-structure remediation. Sort by site, then by file size descending."
+
+> "Which sites have the highest share of legacy Office files (.doc/.xls/.ppt)? Those are the ones that may need format conversion before remediation."
+
+> "Find all files flagged with \`scanned-name-pattern\` AND classified as PDF — those are likely scanned-from-paper documents that will need OCR. Group by site."
+
+> "Across the fleet, which 20 files are the largest? Show me the path, site, size, and modification date."
+
+> "Are there any DOCX files with \`imageCount > 5\` and \`altTextCoverage < 0.5\`? Those have lots of images missing alt text — high-effort remediation."
+
+## What this is NOT
+
+- **Not a vendor work-order.** Use \`audit-file-list-master.csv\` for that — it has the 14 columns vendors expect plus the \`Delete?\` and \`Notes\` columns for staff prep.
+- **Not authoritative on access.** This file is generated from a snapshot — if it was generated more than a few days ago, re-run \`filecap web-rollup\` before relying on the numbers.
+- **Not a substitute for opening the file.** "May need remediation" means "likely needs a closer look by a human or vendor." Some files flagged here will not actually need work; some files not flagged here might. The introspection is a heuristic, not a verdict.
+
+## Generation provenance
+
+Generated by \`@icjia/filecap\` web-rollup at \`${consolidatedAt}\`. Source repository: https://github.com/ICJIA/filecap-cli
+`;
+}
+
+/**
  * Classify how a site's files are accessed, so the rollup UI can render a
  * scannable chip telling managers/remediators what they're looking at and
  * what credentials are needed to get to the files.
@@ -627,6 +777,9 @@ export async function runWebRollup({
     };
   }
 
+  // (LLM-context files are emitted AFTER duplicate detection — see 6c below.)
+  let llmContextMeta = null;
+
   // 6a-bis. v1.7.14 — per-file-type CSV + HTML detail pages.
   //   For every non-empty bucket in TYPE_BUCKETS, write:
   //     audit-<slug>.csv  — filtered master CSV containing only files of this
@@ -726,6 +879,52 @@ export async function runWebRollup({
     };
   }
 
+  // 6b-ii. v1.7.21 — "For AI models" companion files.
+  //   audit-fleet.ndjson  : consolidated NDJSON with full introspection
+  //                         (every field the CSV strips for readability)
+  //   audit-fleet-context.md : human-readable narrative + schema doc +
+  //                            sample prompts + CSV-is-actionable disclaimer
+  //   Both are read-only. The CSVs remain the primary artefact.
+  if (allEntries.length > 0 && masterCsvMeta) {
+    const ndjsonFilename = "audit-fleet.ndjson";
+    const consolidatedAt = masterCsvMeta.lastAuditAt;
+    const ndjsonHeader = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: { consolidatedAt, filecapVersion: "web-rollup", sources: consolidatedSources },
+    };
+    const ndjsonFooter = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-footer",
+      entryCount: allEntries.length,
+      consolidatedAt,
+    };
+    const ndjsonLines = [JSON.stringify(ndjsonHeader)];
+    for (const it of allEntries) ndjsonLines.push(JSON.stringify(it.entry));
+    ndjsonLines.push(JSON.stringify(ndjsonFooter));
+    const ndjsonPath = path.join(output, ndjsonFilename);
+    await fs.writeFile(ndjsonPath, ndjsonLines.join("\n") + "\n");
+    const ndjsonStat = await fs.stat(ndjsonPath);
+
+    const contextMdFilename = "audit-fleet-context.md";
+    const contextMd = buildFleetContextMarkdown({
+      allEntries, siteResults,
+      duplicateGroupsCount: duplicateGroups.length,
+      consolidatedAt, ndjsonFilename,
+    });
+    const contextMdPath = path.join(output, contextMdFilename);
+    await fs.writeFile(contextMdPath, contextMd);
+    const contextMdStat = await fs.stat(contextMdPath);
+
+    llmContextMeta = {
+      ndjsonFilename,
+      ndjsonByteCount: ndjsonStat.size,
+      contextMdFilename,
+      contextMdByteCount: contextMdStat.size,
+      lastAuditAt: consolidatedAt,
+    };
+  }
+
   // 6c. Generate index.html with master-CSV link + duplicates section
   const useClientGateForIndex = !noClientGate && password !== null;
   const passwordHash = useClientGateForIndex ? computeHash(password) : null;
@@ -737,6 +936,7 @@ export async function runWebRollup({
     duplicateGroups,
     duplicatesCsv: duplicatesCsvMeta,
     byTypeCsvs,
+    llmContext: llmContextMeta,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 

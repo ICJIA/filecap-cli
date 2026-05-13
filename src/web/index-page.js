@@ -87,6 +87,54 @@ function fmtGeneratedAt(d) {
  * @param {object} sr - siteResult entry
  * @returns {string}
  */
+/* v1.7.21 — "For AI models" section. Two read-only files sit next to the
+   master CSV: a consolidated NDJSON and a context.md. Together they let
+   someone using an AI tool (Claude, ChatGPT, Gemini, Copilot, etc.) ask
+   questions about the fleet inventory without having to load 9 MB of CSV
+   into a spreadsheet and hand-filter. The tone is deliberately matter-of-
+   fact + forward-looking: the user's office may or may not permit AI tool
+   use yet, but if/when that changes, these files are ready to be uploaded.
+   The CSV remains the actionable artefact. */
+function renderLlmContextSection(llmContext) {
+  if (!llmContext || !llmContext.ndjsonFilename) return "";
+  const ndjsonSize = humanBytes(llmContext.ndjsonByteCount ?? 0);
+  const mdSize = humanBytes(llmContext.contextMdByteCount ?? 0);
+  return `
+  <section class="section llm-context" aria-labelledby="llm-context-heading">
+    <header class="llm-context-head">
+      <p class="llm-context-eyebrow">Optional · for AI models</p>
+      <h2 id="llm-context-heading">For AI models</h2>
+    </header>
+    <p class="llm-context-lead">If your office permits using AI tools like Claude, ChatGPT, Gemini, or Copilot, you can upload these two files to a chat session and ask questions about the audit. <strong>This is optional.</strong> The CSV spreadsheets above are the actionable files — that's the workflow staff use to mark which files should be removed. The two files in this section are <strong>read-only</strong> and exist for AI-assisted analysis.</p>
+
+    <p class="llm-context-future"><strong>Why this is here.</strong> State-agency policy on AI tool use is still evolving. Today, your office may or may not allow uploading files to AI chat tools — that's your call, governed by your office's data-handling rules. We're including these files because in 6–12 months, AI-assisted analysis of audits like this one is likely to be much more routine, and we'd rather have them in the bundle now than try to add them later. If you don't use AI tools, you can ignore this section entirely; nothing about the rest of the audit changes.</p>
+
+    <div class="llm-context-files">
+      <a class="llm-context-file" href="${he(llmContext.ndjsonFilename)}" download>
+        <span class="llm-context-file-name">${he(llmContext.ndjsonFilename)}</span>
+        <span class="llm-context-file-meta">${he(ndjsonSize)} · the full data</span>
+        <span class="llm-context-file-desc">One JSON object per file across every site. Includes everything the spreadsheets do, plus the PDF / Word / Excel details the spreadsheets leave out (page counts, image-only flag, heading coverage, alt-text coverage, etc.).</span>
+      </a>
+      <a class="llm-context-file" href="${he(llmContext.contextMdFilename)}" download>
+        <span class="llm-context-file-name">${he(llmContext.contextMdFilename)}</span>
+        <span class="llm-context-file-meta">${he(mdSize)} · the narrative</span>
+        <span class="llm-context-file-desc">A short readable summary of the audit (total counts, per-site breakdown), a schema description for the NDJSON, and a few sample prompts you can paste into the AI tool to get started.</span>
+      </a>
+    </div>
+
+    <details class="llm-context-howto">
+      <summary>How to use these (if you want to)</summary>
+      <ol class="llm-context-steps">
+        <li><strong>Confirm with your office</strong> that uploading file inventories to an AI chat tool is allowed. This audit contains site / file structure data; check your office's data-handling policy before uploading anywhere.</li>
+        <li><strong>Open the AI tool you use</strong> (Claude.ai, ChatGPT, Gemini, etc.). Start a new chat.</li>
+        <li><strong>Attach both files</strong> using the tool's file-upload button. Upload the <code>${he(llmContext.contextMdFilename)}</code> first so the AI reads the narrative + schema; then upload <code>${he(llmContext.ndjsonFilename)}</code> as the actual data.</li>
+        <li><strong>Ask questions</strong> in plain English. Example starter prompts are inside <code>${he(llmContext.contextMdFilename)}</code>. The AI will read the data file and answer based on what's actually in your audit.</li>
+      </ol>
+      <p class="llm-context-actionable-reminder"><strong>The CSVs are still the actionable files.</strong> If the AI suggests "let me mark these files for deletion," redirect it to the <code>audit-file-list-master.csv</code> file — that's where the <code>Delete?</code> and <code>Notes</code> columns live, and that's the file staff hands back to the audit team to actually remove flagged files. The AI files exist for asking and learning, not for changing.</p>
+    </details>
+  </section>`;
+}
+
 function renderMasterCsvSection(masterCsv) {
   if (!masterCsv || !masterCsv.filename) return "";
   const fileCount = masterCsv.fileCount ?? 0;
@@ -474,6 +522,7 @@ export function generateIndexHtml({
   masterCsv = null, // { filename: string, fileCount: number, byteCount: number } | null
   duplicatesCsv = null, // { filename: string, groupCount: number, occurrenceCount: number, byteCount: number } | null
   byTypeCsvs = [], // v1.7.14: [{ slug, side, label, keys, csvFilename, htmlFilename, fileCount, byteCount }, …]
+  llmContext = null, // v1.7.21: { ndjsonFilename, ndjsonByteCount, contextMdFilename, contextMdByteCount, lastAuditAt } | null
 }) {
   // Fleet totals
   let fleetTotalFiles = 0;
@@ -1431,6 +1480,150 @@ main {
 }
 .master-csv-last-audit strong { color: #c0cdda; font-weight: 700; }
 
+/* v1.7.21 — "For AI models" section. Sits between the master CSV section
+   and the duplicates section. Visual register is "optional / read-only"
+   so a manager doesn't mistake it for a workflow step. Muted background +
+   small "Optional · for AI models" eyebrow + a softer color palette than
+   the actionable CTA buttons. */
+.llm-context {
+  margin: 2.2rem 0;
+  padding: 1.5rem 1.6rem;
+  background: linear-gradient(180deg, #131b27 0%, #11161e 100%);
+  border: 1px solid #2a3340;
+  border-radius: 10px;
+}
+.llm-context-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+.llm-context h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #e5e5e5;
+  letter-spacing: -0.01em;
+}
+.llm-context-lead {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: #c9d1d9;
+  max-width: 78ch;
+}
+.llm-context-lead strong { color: #ffffff; }
+.llm-context-future {
+  margin: 0 0 1.1rem;
+  padding: 0.7rem 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid #6e7681;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.95em;
+  line-height: 1.55;
+  color: #b8c0c8;
+  max-width: 78ch;
+}
+.llm-context-future strong { color: #d4dae0; }
+.llm-context-files {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  margin: 1rem 0 1.1rem;
+}
+@media (max-width: 720px) {
+  .llm-context-files { grid-template-columns: 1fr; }
+}
+.llm-context-file {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.85rem 1rem;
+  background: rgba(77, 171, 247, 0.05);
+  border: 1px solid #2a3340;
+  border-left: 3px solid #4dabf7;
+  border-radius: 6px;
+  color: #d4dae0;
+  text-decoration: none;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.llm-context-file:hover {
+  background: rgba(77, 171, 247, 0.10);
+  border-left-color: #58a6ff;
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.llm-context-file:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+.llm-context-file-name {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  word-break: break-all;
+}
+.llm-context-file-meta {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8b949e;
+  letter-spacing: 0.02em;
+}
+.llm-context-file-desc {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #b8c0c8;
+}
+.llm-context-howto {
+  margin-top: 0.5rem;
+}
+.llm-context-howto > summary {
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #58a6ff;
+  padding: 0.35rem 0;
+}
+.llm-context-howto > summary:hover { color: #93c5fd; }
+.llm-context-steps {
+  margin: 0.6rem 0 0.5rem 1.3rem;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #c9d1d9;
+}
+.llm-context-steps li { margin: 0.4rem 0; }
+.llm-context-steps strong { color: #ffffff; }
+.llm-context-steps code {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.88em;
+  padding: 0.04em 0.35em;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+}
+.llm-context-actionable-reminder {
+  margin: 0.6rem 0 0;
+  padding: 0.65rem 0.9rem;
+  background: rgba(251, 191, 36, 0.06);
+  border-left: 3px solid #fbbf24;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #f4dfa0;
+}
+.llm-context-actionable-reminder strong { color: #ffffff; }
+.llm-context-actionable-reminder code {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.88em;
+  padding: 0.04em 0.35em;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 3px;
+  color: #ffffff;
+}
+
 /* ── duplicates section — v1.7.2 big visual treatment ─────────────────── */
 .duplicates .dup-hero {
   background: linear-gradient(180deg, #18202b 0%, #141a23 100%);
@@ -2073,6 +2266,7 @@ ${cardsHtml}
   </section>
 
 ${renderMasterCsvSection(masterCsv)}
+${renderLlmContextSection(llmContext)}
 ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
 
 </main>

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.21] — 2026-05-13
+
+### Added
+
+- **"For AI models" section on the index page** with two new read-only companion files: `audit-fleet.ndjson` (consolidated, line-delimited JSON inventory with full per-file introspection — PDF page count, image-only flag, text-layer coverage, DOCX heading coverage, alt-text coverage, XLSX sheet count, etc.; everything the CSV strips for human readability) and `audit-fleet-context.md` (~7.5 kB narrative with summary stats, per-site breakdown, NDJSON schema doc, and sample LLM prompts). Both files sit next to the master CSV in the bundle, gated by the same Netlify Site Password. Intended use: someone running an AI tool (Claude, ChatGPT, Gemini, Copilot) uploads both files and asks questions about the fleet in plain English ("which PDFs across the fleet are image-only AND larger than 5 MB?"). Audience is non-technical and state-agency-policy on AI tool use is still evolving — the section is framed as **explicitly optional + forward-looking**: a manager who doesn't use AI tools can ignore it entirely. The page copy makes it explicit that the CSVs remain the actionable artefact (Delete? + Notes columns are still where deletion decisions get marked); these two files are read-only context for query-and-learn, not for editing. The companion `audit-fleet-context.md` carries the same disclaimer in its first section so an LLM ingesting it tells the user to use the CSV if they ask "should I edit this file?". Section markup includes a "How to use these (if you want to)" `<details>` block with the four steps a non-technical user needs (confirm with office, open AI tool, upload context.md first then NDJSON, ask in plain English) and an amber-tinted reminder that the CSV is still the actionable file. Implementation: new `buildFleetContextMarkdown()` helper in `src/commands/web-rollup.js` generates the markdown from the in-memory `allEntries` + `siteResults` + `duplicateGroups` data the rollup already collects (no new scan, no new fetch); `renderLlmContextSection()` in `src/web/index-page.js` slots the section between the master CSV section and the duplicates section. Whole feature adds ~6 MB to the bundle and is feature-flagged-off-by-omission — when `allEntries` is empty (no scans), neither file is generated and the section silently disappears from the index.
+
+[1.7.21]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.21
+
 ## [1.7.20] — 2026-05-13
 
 ### Fixed
