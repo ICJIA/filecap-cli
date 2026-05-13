@@ -784,6 +784,153 @@ main {
   color: #999999;
   margin: 0 0 1.5rem;
 }
+/* v1.7.23 — top section banner. Mirrors the v1.7.22 dup-section-banner so
+   the page reads as TWO symmetric major sections (Fleet snapshot, Cross-
+   Server Duplicates). Blue accent bar here vs amber on duplicates — the
+   color encodes section identity at a glance. */
+.fleet-section-banner {
+  margin: 1.5rem 0 1.5rem;
+  padding-top: 0;
+}
+.fleet-section-banner::before {
+  content: "";
+  display: block;
+  width: 72px;
+  height: 5px;
+  background: linear-gradient(90deg, #4dabf7 0%, #1f6feb 100%);
+  border-radius: 3px;
+  margin-bottom: 1.4rem;
+}
+.fleet-section-eyebrow {
+  margin: 0 0 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #4dabf7;
+}
+.fleet-section-headline {
+  margin: 0 0 0.9rem;
+  font-size: clamp(2.2rem, 4.5vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+}
+.fleet-section-lede {
+  margin: 0 0 0.7rem;
+  max-width: 72ch;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  color: #c0cdda;
+}
+.fleet-section-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #8b949e;
+  letter-spacing: 0.02em;
+}
+@media (max-width: 720px) {
+  .fleet-section-banner { margin: 1rem 0 1.2rem; }
+  .fleet-section-banner::before { width: 56px; height: 4px; margin-bottom: 1rem; }
+  .fleet-section-lede { font-size: 1rem; }
+}
+
+/* v1.7.23 — "Zero PII" reassurance banner. Sits right under the top section
+   banner so anyone on the page sees it immediately. Green color register
+   = "safe / verified." Two-column IN / NOT-IN list so a manager can
+   scan the data scope without reading prose. */
+.no-pii-banner {
+  margin: 0 0 2.5rem;
+  padding: 1.5rem 1.7rem;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 1.2rem;
+  background: linear-gradient(180deg, #11221a 0%, #0f1d17 100%);
+  border: 1px solid #1f4a37;
+  border-left: 6px solid #66d9a3;
+  border-radius: 12px;
+}
+.no-pii-banner-icon {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.4rem;
+  color: #66d9a3;
+}
+.no-pii-banner-icon svg { width: 48px; height: 48px; }
+.no-pii-banner-body { min-width: 0; }
+.no-pii-banner-eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #66d9a3;
+}
+.no-pii-banner-title {
+  margin: 0 0 0.7rem;
+  font-size: 1.65rem;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  color: #ffffff;
+}
+.no-pii-banner-lede {
+  margin: 0 0 1.1rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: #d4dae0;
+}
+.no-pii-banner-lede strong { color: #ffffff; }
+.no-pii-banner-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin: 0 0 1rem;
+}
+@media (max-width: 720px) {
+  .no-pii-banner { grid-template-columns: 1fr; padding: 1.2rem 1.3rem; }
+  .no-pii-banner-icon { padding-top: 0; }
+  .no-pii-banner-icon svg { width: 36px; height: 36px; }
+  .no-pii-banner-columns { grid-template-columns: 1fr; gap: 0.85rem; }
+}
+.no-pii-banner-col {
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid #1f3a30;
+  border-radius: 8px;
+}
+.no-pii-banner-col-in   { border-left: 3px solid #66d9a3; }
+.no-pii-banner-col-out  { border-left: 3px solid #f57878; }
+.no-pii-banner-col h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+}
+.no-pii-banner-col-in h3 em  { color: #66d9a3; font-style: italic; font-weight: 700; }
+.no-pii-banner-col-out h3 em { color: #f57878; font-style: italic; font-weight: 700; }
+.no-pii-banner-col ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #c0cdda;
+}
+.no-pii-banner-col ul li { margin: 0.25rem 0; }
+.no-pii-banner-footer {
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  background: rgba(102, 217, 163, 0.08);
+  border-left: 3px solid #66d9a3;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #c8e6d2;
+}
+.no-pii-banner-footer strong { color: #ffffff; }
+
 /* ── fleet-hero (v1.7.13) ────────────────────────────────────────
    Manager-friendly infographic hero. Pre-v1.7.13 the hero led with the
    TOTAL files number (e.g. "14,914") which managers misread as "every
@@ -2192,8 +2339,59 @@ main {
 
 <main>
 
+  <!-- v1.7.23: top section banner — mirrors the v1.7.22 "Cross-Server Duplicates"
+       banner so the page reads as TWO clearly-marked sections (Fleet snapshot
+       at top, Cross-Server Duplicates below) with the same visual grammar. -->
+  <div class="fleet-section-banner" role="presentation">
+    <p class="fleet-section-eyebrow">Section · Fleet snapshot</p>
+    <h1 class="fleet-section-headline">ICJIA Accessibility Fleet Audit</h1>
+    <p class="fleet-section-lede">A complete scan of every file on every ICJIA-managed website, with audit-actionable counts, per-site detail, and a 30-second answer to &ldquo;what may need accessibility remediation across our fleet right now?&rdquo;</p>
+    <p class="fleet-section-meta">Generated <time>${he(generatedAt)}</time> &middot; ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
+  </div>
+
+  <!-- v1.7.23: prominent "Zero PII" banner. Audience may be concerned about
+       what's in an audit deliverable; this lays out the IN / NOT-IN data
+       categories explicitly so nobody has to guess. Green color register
+       = "safe / verified" rather than amber (warning) or red (alarm). -->
+  <aside class="no-pii-banner" role="note" aria-labelledby="no-pii-heading">
+    <div class="no-pii-banner-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="m9 12 2 2 4-4"/>
+      </svg>
+    </div>
+    <div class="no-pii-banner-body">
+      <p class="no-pii-banner-eyebrow">Privacy</p>
+      <h2 id="no-pii-heading" class="no-pii-banner-title">Zero PII in this audit</h2>
+      <p class="no-pii-banner-lede">This is a file inventory of <strong>publicly-hosted documents</strong> on ICJIA&#39;s websites. <strong>No personally identifiable information is included or referenced</strong> — not in this page, not in any CSV, not in any of the downloadable files.</p>
+
+      <div class="no-pii-banner-columns">
+        <div class="no-pii-banner-col no-pii-banner-col-in">
+          <h3>What this audit <em>does</em> contain</h3>
+          <ul>
+            <li>Filenames and folder paths from each site&#39;s public file directory</li>
+            <li>File metadata: size, modification date, file type</li>
+            <li>Format-specific structure (PDF page counts, image-only flag, heading coverage, etc.)</li>
+            <li>The same documents the public already sees on the live sites</li>
+          </ul>
+        </div>
+        <div class="no-pii-banner-col no-pii-banner-col-out">
+          <h3>What this audit <em>does not</em> contain</h3>
+          <ul>
+            <li>No Social Security numbers, dates of birth, or driver&#39;s-license numbers</li>
+            <li>No names, addresses, phone numbers, or email addresses of individuals</li>
+            <li>No case-file content, investigation details, or law-enforcement records</li>
+            <li>No staff personnel records, payroll, or HR data</li>
+            <li>No login credentials, session tokens, or internal system data</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="no-pii-banner-footer">The Intranet site contains <strong>ICJIA-internal materials</strong> (staff worksheets, bus schedules, internal references) — useful to ICJIA staff, but <strong>still contains zero PII</strong>. Same applies to every other site in this audit.</p>
+    </div>
+  </aside>
+
   <section class="hero">
-    <h1>ICJIA accessibility fleet audit</h1>
     <p class="subtitle">Generated <time>${he(generatedAt)}</time> from ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
 
     ${(() => {

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.23] — 2026-05-13
+
+### Added
+
+- **Top "Section · Fleet snapshot" banner** that mirrors the v1.7.22 "Cross-Server Duplicates" banner at the bottom of the page — same visual grammar (small uppercase eyebrow, large clamped headline, lede paragraph, accent bar) but with a **blue** gradient `#4dabf7 → #1f6feb` instead of amber so the two sections read as distinct major chapters at a glance. The page now opens with "ICJIA Accessibility Fleet Audit" as a 50 px h1, with a one-sentence framing lede and a small "Generated DATE · N websites" meta line. The pre-v1.7.23 `<h1>ICJIA accessibility fleet audit</h1>` inside the hero is removed (the new banner takes the h1 role); the existing fleet hero, site cards, by-file-type tables, master CSV section, and "For AI models" section all stay underneath as the section's content.
+
+- **Prominent "Zero PII in this audit" reassurance banner** below the top section banner. ICJIA staff or partners landing on the deployed audit may worry "what's actually in this thing?" — particularly given the agency's law-enforcement and criminal-justice mandate. The new banner addresses that head-on: a 6 px green left border + 48 px shield-with-checkmark icon + bold "Zero PII in this audit" headline + a one-sentence lede stating "publicly-hosted documents, no personally identifiable information." Below the lede, two side-by-side scannable lists in tinted boxes — **What this audit does contain** (green left border): filenames, folder paths, file metadata, format-specific structure, the same public documents on the live sites — and **What this audit does not contain** (red left border): no SSNs / DOB / driver's licenses, no names / addresses / phone numbers, no case-file content, no personnel records, no credentials. Closes with a green-tinted footnote that the Intranet site contains ICJIA-internal materials (worksheets, bus schedules) but still **contains zero PII**. Stacks to a single column under 720 px viewport so the IN/NOT-IN lists stay readable on phones.
+
+[1.7.23]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.23
+
 ## [1.7.22] — 2026-05-13
 
 ### Changed
