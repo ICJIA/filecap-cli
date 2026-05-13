@@ -852,71 +852,76 @@ main {
    banner so anyone on the page sees it immediately. Green color register
    = "safe / verified." Two-column IN / NOT-IN list so a manager can
    scan the data scope without reading prose. */
+/* v1.7.25: vertically tightened. Same content (eyebrow + title + lede +
+   two-column in/out lists + footnote about the Intranet) but ~30% less
+   vertical real estate — every padding and margin pulled in, smaller
+   icon column, tighter list line-height + item gaps. */
 .no-pii-banner {
-  margin: 0 0 2.5rem;
-  padding: 1.5rem 1.7rem;
+  margin: 0 0 1.6rem;
+  padding: 1rem 1.2rem;
   display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 1.2rem;
+  grid-template-columns: 42px 1fr;
+  gap: 0.9rem;
   background: linear-gradient(180deg, #11221a 0%, #0f1d17 100%);
   border: 1px solid #1f4a37;
-  border-left: 6px solid #66d9a3;
-  border-radius: 12px;
+  border-left: 5px solid #66d9a3;
+  border-radius: 10px;
 }
 .no-pii-banner-icon {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 0.4rem;
+  padding-top: 0.15rem;
   color: #66d9a3;
 }
-.no-pii-banner-icon svg { width: 48px; height: 48px; }
+.no-pii-banner-icon svg { width: 36px; height: 36px; }
 .no-pii-banner-body { min-width: 0; }
 .no-pii-banner-eyebrow {
-  margin: 0 0 0.3rem;
-  font-size: 0.72rem;
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #66d9a3;
 }
 .no-pii-banner-title {
-  margin: 0 0 0.7rem;
-  font-size: 1.65rem;
+  margin: 0 0 0.4rem;
+  font-size: 1.35rem;
   font-weight: 900;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.012em;
+  line-height: 1.2;
   color: #ffffff;
 }
 .no-pii-banner-lede {
-  margin: 0 0 1.1rem;
-  font-size: 1rem;
-  line-height: 1.55;
+  margin: 0 0 0.7rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
   color: #d4dae0;
 }
 .no-pii-banner-lede strong { color: #ffffff; }
 .no-pii-banner-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.2rem;
-  margin: 0 0 1rem;
+  gap: 0.7rem;
+  margin: 0 0 0.65rem;
 }
 @media (max-width: 720px) {
-  .no-pii-banner { grid-template-columns: 1fr; padding: 1.2rem 1.3rem; }
+  .no-pii-banner { grid-template-columns: 1fr; padding: 0.9rem 1rem; }
   .no-pii-banner-icon { padding-top: 0; }
-  .no-pii-banner-icon svg { width: 36px; height: 36px; }
-  .no-pii-banner-columns { grid-template-columns: 1fr; gap: 0.85rem; }
+  .no-pii-banner-icon svg { width: 30px; height: 30px; }
+  .no-pii-banner-columns { grid-template-columns: 1fr; gap: 0.55rem; }
 }
 .no-pii-banner-col {
-  padding: 0.85rem 1rem;
+  padding: 0.55rem 0.75rem;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid #1f3a30;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 .no-pii-banner-col-in   { border-left: 3px solid #66d9a3; }
 .no-pii-banner-col-out  { border-left: 3px solid #f57878; }
 .no-pii-banner-col h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.92rem;
+  margin: 0 0 0.3rem;
+  font-size: 0.86rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   color: #ffffff;
@@ -925,20 +930,20 @@ main {
 .no-pii-banner-col-out h3 em { color: #f57878; font-style: italic; font-weight: 700; }
 .no-pii-banner-col ul {
   margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.9rem;
-  line-height: 1.55;
+  padding-left: 1rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
   color: #c0cdda;
 }
-.no-pii-banner-col ul li { margin: 0.25rem 0; }
+.no-pii-banner-col ul li { margin: 0.12rem 0; }
 .no-pii-banner-footer {
   margin: 0;
-  padding: 0.65rem 0.9rem;
+  padding: 0.5rem 0.8rem;
   background: rgba(102, 217, 163, 0.08);
   border-left: 3px solid #66d9a3;
-  border-radius: 0 6px 6px 0;
-  font-size: 0.92rem;
-  line-height: 1.55;
+  border-radius: 0 5px 5px 0;
+  font-size: 0.87rem;
+  line-height: 1.45;
   color: #c8e6d2;
 }
 .no-pii-banner-footer strong { color: #ffffff; }
@@ -2371,48 +2376,6 @@ main {
     <p class="fleet-section-meta">Generated <time>${he(generatedAt)}</time> &middot; ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
   </div>
 
-  <!-- v1.7.23: prominent "Zero PII" banner. Audience may be concerned about
-       what's in an audit deliverable; this lays out the IN / NOT-IN data
-       categories explicitly so nobody has to guess. Green color register
-       = "safe / verified" rather than amber (warning) or red (alarm). -->
-  <aside class="no-pii-banner" role="note" aria-labelledby="no-pii-heading">
-    <div class="no-pii-banner-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        <path d="m9 12 2 2 4-4"/>
-      </svg>
-    </div>
-    <div class="no-pii-banner-body">
-      <p class="no-pii-banner-eyebrow">Privacy</p>
-      <h2 id="no-pii-heading" class="no-pii-banner-title">Zero PII in this audit</h2>
-      <p class="no-pii-banner-lede">This is a file inventory of <strong>publicly-hosted documents</strong> on ICJIA&#39;s websites. <strong>No personally identifiable information is included or referenced</strong> — not in this page, not in any CSV, not in any of the downloadable files.</p>
-
-      <div class="no-pii-banner-columns">
-        <div class="no-pii-banner-col no-pii-banner-col-in">
-          <h3>What this audit <em>does</em> contain</h3>
-          <ul>
-            <li>Filenames and folder paths from each site&#39;s public file directory</li>
-            <li>File metadata: size, modification date, file type</li>
-            <li>Format-specific structure (PDF page counts, image-only flag, heading coverage, etc.)</li>
-            <li>The same documents the public already sees on the live sites</li>
-          </ul>
-        </div>
-        <div class="no-pii-banner-col no-pii-banner-col-out">
-          <h3>What this audit <em>does not</em> contain</h3>
-          <ul>
-            <li>No Social Security numbers, dates of birth, or driver&#39;s-license numbers</li>
-            <li>No names, addresses, phone numbers, or email addresses of individuals</li>
-            <li>No case-file content, investigation details, or law-enforcement records</li>
-            <li>No staff personnel records, payroll, or HR data</li>
-            <li>No login credentials, session tokens, or internal system data</li>
-          </ul>
-        </div>
-      </div>
-
-      <p class="no-pii-banner-footer">The Intranet site contains <strong>ICJIA-internal materials</strong> (staff worksheets, bus schedules, internal references) — useful to ICJIA staff, but <strong>still contains zero PII</strong>. Same applies to every other site in this audit.</p>
-    </div>
-  </aside>
-
   <section class="hero">
     <p class="subtitle">Generated <time>${he(generatedAt)}</time> from ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
 
@@ -2534,6 +2497,51 @@ main {
       </div>
     </div>
   </section>
+
+  <!-- v1.7.25: PII banner moved here from the top of the page. The audit
+       numbers + donut hero are the most important above-the-fold content, so
+       they get the top position; the PII reassurance sits right before the
+       Websites-in-this-audit grid where a viewer would naturally start
+       asking "wait, what's actually IN these audits?" Headline spells out
+       PII so a non-technical reader who hasn't seen the acronym doesn't
+       have to guess what it means (and doesn't misread it as "PILL"). -->
+  <aside class="no-pii-banner" role="note" aria-labelledby="no-pii-heading">
+    <div class="no-pii-banner-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="m9 12 2 2 4-4"/>
+      </svg>
+    </div>
+    <div class="no-pii-banner-body">
+      <p class="no-pii-banner-eyebrow">Privacy</p>
+      <h2 id="no-pii-heading" class="no-pii-banner-title">Zero Personally Identifying Information (PII) in this audit</h2>
+      <p class="no-pii-banner-lede">This is a file inventory of <strong>publicly-hosted documents</strong> on ICJIA&#39;s websites. <strong>No personally identifying information is included or referenced</strong> &mdash; not in this page, not in any CSV, not in any of the downloadable files.</p>
+
+      <div class="no-pii-banner-columns">
+        <div class="no-pii-banner-col no-pii-banner-col-in">
+          <h3>What this audit <em>does</em> contain</h3>
+          <ul>
+            <li>Filenames and folder paths from each site&#39;s public file directory</li>
+            <li>File metadata: size, modification date, file type</li>
+            <li>Format-specific structure (PDF page counts, image-only flag, heading coverage, etc.)</li>
+            <li>The same documents the public already sees on the live sites</li>
+          </ul>
+        </div>
+        <div class="no-pii-banner-col no-pii-banner-col-out">
+          <h3>What this audit <em>does not</em> contain</h3>
+          <ul>
+            <li>No Social Security numbers, dates of birth, or driver&#39;s-license numbers</li>
+            <li>No names, addresses, phone numbers, or email addresses of individuals</li>
+            <li>No case-file content, investigation details, or law-enforcement records</li>
+            <li>No staff personnel records, payroll, or HR data</li>
+            <li>No login credentials, session tokens, or internal system data</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="no-pii-banner-footer">The Intranet site contains <strong>ICJIA-internal materials</strong> (staff worksheets, bus schedules, internal references) &mdash; useful to ICJIA staff, but <strong>still contains zero personally identifying information</strong>. Same applies to every other site in this audit.</p>
+    </div>
+  </aside>
 
   <section class="section">
     <h2>Websites in this audit</h2>

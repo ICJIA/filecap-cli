@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.25] — 2026-05-13
+
+### Changed
+
+- **PII banner relocated** from the top of the page (right under the section banner, between it and the audit-numbers hero) to immediately above the "Websites in this audit" site grid. The audit numbers + donut are the most important above-the-fold content, so they get the top position; the privacy reassurance sits right where a viewer naturally starts asking "wait, what's actually IN these audits?" — at the threshold of seeing the per-site cards.
+- **PII headline spelled out** from `Zero PII in this audit` to **`Zero Personally Identifying Information (PII) in this audit`**. The acronym was misreading as "PILL" at a glance, and non-technical staff who haven't seen the term wouldn't have known what it meant. The lede + footer now also spell out "personally identifying information" alongside their continued use of the shorter form.
+- **Banner vertically tightened** by ~30%. Same content (eyebrow + title + lede + IN / NOT-IN columns + Intranet footnote) but every padding and margin pulled in, smaller icon column (42 px down from 56 px, 36 px icon down from 48 px), tighter list line-height + item gaps, slightly smaller h3s and lede font. Banner now measures ~360 px tall vs ~500 px before, with no information lost.
+
+[1.7.25]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.25
+
 ## [1.7.24] — 2026-05-13
 
 ### Changed
