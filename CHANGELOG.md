@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.26] — 2026-05-13
+
+### Documentation
+
+- **README Status table caught up to v1.7.25.** Added rows for v1.7.17 (duplicates info-only), v1.7.18 (N-times / Big O explainer), v1.7.19 (table filter + OMA-intentional callout), v1.7.20 (GitHub URLs for git-type sites + dynamic remediable hero counts), v1.7.21 ("For AI models" section), v1.7.22 (Cross-Server Duplicates section banner), v1.7.23 (top section banner + Zero PII banner), v1.7.24 (condensed explainer + "Try" button label), v1.7.25 (PII banner relocated, spelled out, and tightened). No code changes — this is a documentation-only release so the next npm registry view of the package shows the current Status table, and any reader landing on the GitHub repo's README sees an accurate version history.
+
+[1.7.26]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.26
+
 ## [1.7.25] — 2026-05-13
 
 ### Changed
