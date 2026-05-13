@@ -1131,7 +1131,7 @@ describe("writeDuplicatesCsv", () => {
 });
 
 describe("runWebRollup — duplicates CSV", () => {
-  it("writes audit-file-duplicates.csv when cross-server duplicates exist", async () => {
+  it("writes audit-file-duplicates.csv when cross-server duplicates exist (v1.7.17: file still emitted, link removed from index)", async () => {
     const auditsBase = path.join(tmpDir, "filecap-audits");
     for (const sn of ["dvfr", "archive"]) {
       const latestDir = path.join(auditsBase, sn, "latest");
@@ -1148,12 +1148,20 @@ describe("runWebRollup — duplicates CSV", () => {
     const outputDir = path.join(tmpDir, "output");
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
 
+    // The CSV is STILL written to disk (the audit lead can still retrieve it
+    // by direct URL or by inspecting the bundle directory) — v1.7.17 only
+    // removed the download button from the index page.
     const dupCsvPath = path.join(outputDir, "audit-file-duplicates.csv");
     const stat = await fs.stat(dupCsvPath);
     expect(stat.size).toBeGreaterThan(0);
 
+    // The index page should NOT link to the CSV (no download button + no
+    // direct mention of the filename in a clickable context).
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).toContain("audit-file-duplicates.csv");
+    expect(html).not.toMatch(/href="audit-file-duplicates\.csv"/);
+    // And the new info-only callout should be present instead.
+    expect(html).toContain("For information only");
+    expect(html).toContain("Don&#39;t treat this list as a delete-worksheet");
   });
 
   it("does not write the duplicates CSV when no cross-server duplicates exist", async () => {

@@ -155,15 +155,25 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
     return `Newest ${fmtDate(dates[dates.length - 1])}, oldest ${fmtDate(dates[0])}`;
   }
 
-  const csvDownloadHtml = duplicatesCsv && duplicatesCsv.filename
-    ? `<p class="dup-csv-download">
-        <a class="cta-button" href="${he(duplicatesCsv.filename)}" download>
-          Download <strong>${he(duplicatesCsv.filename)}</strong>
-        </a>
-        <span class="master-csv-meta">${he((duplicatesCsv.groupCount ?? 0).toLocaleString())} filenames · ${he((duplicatesCsv.occurrenceCount ?? 0).toLocaleString())} occurrences · ${he(humanBytes(duplicatesCsv.byteCount ?? 0))}</span>
-      </p>
-      <p class="dup-csv-blurb">The CSV has one row per occurrence — useful in Excel for sorting by site, by date, or by match type. The on-page table below shows one row per filename group.</p>`
-    : "";
+  // v1.7.17: the duplicates CSV download was pulled (the file is still
+  // generated server-side and accessible via direct URL for the audit lead,
+  // but it's no longer surfaced as a button on the index page). Reasoning:
+  // duplicate removal is meaningfully trickier than removing a unique file,
+  // and surfacing a downloadable worksheet implies "go act on this list,"
+  // which is not what we want staff to do without per-site reference checks.
+  // The on-page table stays — managers should still SEE that duplicates
+  // exist; they just shouldn't be invited to action them via spreadsheet.
+  const infoOnlyCalloutHtml = `<aside class="dup-info-only" role="note" aria-label="Duplicate handling — for information only">
+    <p class="dup-info-only-eyebrow">For information only</p>
+    <h3 class="dup-info-only-title">Don&#39;t treat this list as a delete-worksheet</h3>
+    <p>Removing a duplicate looks like a free win — same file on three sites, surely two of them can go. It isn&#39;t. Removing <strong>any</strong> file can break the page that links to it (a 404), and duplicates carry extra risk on top of that:</p>
+    <ol class="dup-info-only-reasons">
+      <li><strong>N-times the search surface.</strong> A unique file might be linked from one site&#39;s HTML. A file present on three servers might be linked from three sites&#39; HTML — you have to check all three before touching any copy.</li>
+      <li><strong>"Wrong copy" risk.</strong> SHA-256 equality only tells you the bytes match. It doesn&#39;t tell you which copy is the canonical one. If Site A links to it and Site B doesn&#39;t, the obvious move is "delete from B" — but if B was the original and A&#39;s link is the stale one, you just removed the wrong copy.</li>
+      <li><strong>Asymmetric references.</strong> Two copies can be linked from completely different contexts (one from a meeting-agendas page, the other from an annual-reports archive). Deleting either causes a 404 somewhere; neither is obviously safer than the other without looking.</li>
+    </ol>
+    <p>Site editors in their own CMS only see references on their own site — they can&#39;t independently judge "safe to delete on my site" because they don&#39;t see the cross-site references. <strong>Treat this section as awareness, not action.</strong> Cross-server consolidation requires per-site reference-checking before any file is removed.</p>
+  </aside>`;
 
   return `
   <section class="section duplicates">
@@ -185,7 +195,7 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
       </div>
     </header>
 
-    ${csvDownloadHtml}
+    ${infoOnlyCalloutHtml}
 
     <section class="dup-explainer-open">
       <h3 class="dup-explainer-open-h3">Why are we showing you this?</h3>
@@ -1648,30 +1658,61 @@ main {
 .dup-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dup-dates { font-size: 0.85rem; color: #c9d1d9; white-space: nowrap; }
 .dup-dim { color: #6e7681; padding: 0 0.2rem; }
-.dup-csv-download {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin: 0.75rem 0 0.3rem 0;
+/* v1.7.17 — duplicates "for information only" callout. Replaces the
+   pre-v1.7.17 download-the-duplicates-CSV button. Duplicate removal needs
+   per-site reference checking, not a downloadable worksheet. The amber
+   left border + eyebrow style says "warning, not action item." Three
+   numbered reasons (N-times search surface / wrong-copy risk / asymmetric
+   references) sit in their own slightly-tinted block so the eye lands on
+   them rather than skimming past as prose. */
+.dup-info-only {
+  margin: 1.2rem 0 0.6rem;
+  padding: 1.1rem 1.3rem 1.05rem 1.5rem;
+  background: linear-gradient(180deg, #1c1a10 0%, #181610 100%);
+  border: 1px solid #2a2618;
+  border-left: 6px solid #fbbf24;
+  border-radius: 10px;
+  color: #d4dae0;
+  line-height: 1.55;
 }
-.dup-csv-download .cta-button {
-  display: inline-block;
-  padding: 0.55rem 0.95rem;
-  background: #1f6feb;
+.dup-info-only-eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
+.dup-info-only-title {
+  margin: 0 0 0.7rem;
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: #ffffff;
-  text-decoration: none;
-  border-radius: 4px;
-  font-weight: 600;
-  border: 1px solid #1f6feb;
-  transition: background 120ms ease;
 }
-.dup-csv-download .cta-button:hover { background: #388bfd; }
-.dup-csv-download .cta-button:focus-visible {
-  outline: 2px solid #58a6ff;
-  outline-offset: 2px;
+.dup-info-only p {
+  margin: 0 0 0.65rem;
+  font-size: 0.96rem;
 }
-.dup-csv-blurb { color: #8b949e; font-size: 0.92rem; margin-top: 0.2rem; }
+.dup-info-only p strong { color: #ffffff; }
+.dup-info-only-reasons {
+  margin: 0.65rem 0 0.9rem;
+  padding: 0.85rem 1rem 0.85rem 2.4rem;
+  background: rgba(251, 191, 36, 0.06);
+  border-radius: 6px;
+  border: 1px solid rgba(251, 191, 36, 0.18);
+  font-size: 0.95rem;
+  list-style: decimal;
+}
+.dup-info-only-reasons li {
+  margin: 0.35rem 0;
+  padding-left: 0.3rem;
+}
+.dup-info-only-reasons li::marker {
+  font-weight: 800;
+  color: #fbbf24;
+}
+.dup-info-only-reasons strong { color: #ffffff; font-weight: 700; }
 .dup-kind {
   display: inline-block;
   margin-left: 0.6rem;

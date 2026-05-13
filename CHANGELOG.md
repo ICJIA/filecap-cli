@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.17] — 2026-05-13
+
+### Changed
+
+- **Cross-server duplicates section on the index is now information-only — the CSV download button was removed.** Pre-v1.7.17 the section ended with a "Download `audit-file-duplicates.csv`" call-to-action. That implied "here's a worksheet, go act on this list," which isn't the right framing: duplicate removal is meaningfully trickier than removing a unique file, and surfacing the CSV as a primary affordance encouraged staff to start deleting without per-site reference checks. The on-page table stays — managers should still SEE that duplicates exist; they just shouldn't be invited to action them via spreadsheet. The CSV file itself is **still generated** server-side and accessible via direct URL if the audit lead needs it for offline analysis; v1.7.17 only pulled the in-page button.
+- **New "For information only" callout above the duplicates table** explaining why duplicate removal is uniquely tricky, with the three concrete reasons in a numbered, visually distinct block:
+  1. **N-times the search surface.** A unique file might be linked from one site's HTML. A file present on three servers might be linked from three sites' HTML — staff has to check all three before touching any copy.
+  2. **"Wrong copy" risk.** SHA-256 equality only tells you the bytes match. It doesn't tell you which copy is the canonical one. If Site A links to it and Site B doesn't, the obvious move is "delete from B" — but if B was the original and A's link is the stale one, you just removed the wrong copy.
+  3. **Asymmetric references.** Two copies can be linked from completely different contexts (one from a meeting-agendas page, the other from an annual-reports archive). Deleting either causes a 404 somewhere; neither is obviously safer than the other without looking.
+  The callout closes with the reminder that site editors in their own CMS only see references on their own site, so they can't independently judge "safe to delete on my site." Treat the section as awareness, not action. Amber left-border + amber-tinted inner block keeps the visual register at "warning" without screaming.
+
+[1.7.17]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.17
+
 ## [1.7.16] — 2026-05-13
 
 ### Added
