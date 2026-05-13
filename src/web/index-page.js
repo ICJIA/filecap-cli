@@ -380,16 +380,17 @@ function renderTodoSection() {
         <p>Files inventoried on one ICJIA site that are linked from another (for example, an archive PDF embedded in a page on icjia.illinois.gov) will appear in the Referenced column with a "<em>from icjia</em>" tag. The current per-site view doesn't see across sites, so a PDF can look orphaned on the archive even when it's actively cited from another property.</p>
       </li>
       <li class="todo-item">
-        <h3 class="todo-item-h3">SPA-page rendering</h3>
-        <p>Several ICJIA sites (i2i, spac, and the main icjia.illinois.gov frontend) render their content client-side via JavaScript — the curl-style crawler sees only an empty page shell. A future release will use a headless browser engine to capture the rendered content, recovering references that are currently invisible (e.g. agendas and minutes attached to the ARI meetings page).</p>
+        <h3 class="todo-item-h3">Reading pages our tool can&#39;t fully read today</h3>
+        <p>A few of the ICJIA sites &mdash; i2i, spac, and the main icjia.illinois.gov site &mdash; are built in a way that our auditing tool can&#39;t fully read today. The list of pages on those sites shows up, but when the tool opens each page it sees a blank document, with none of the document links inside it visible. That means files actually attached to those pages &mdash; for example, the agendas and minutes on the ARI meetings page &mdash; currently look <em>orphaned</em> in the audit even though they&#39;re actively in use. A future release will open each page the way a person&#39;s web browser does (clicking through and waiting for the content to load), so every file reference is captured.</p>
+        <p class="todo-item-payoff"><strong>Why it matters:</strong> fewer files mistakenly flagged as orphans, more confidence about which files are truly safe to delete, and a sharper list to hand the remediators &mdash; so they can quote the work faster and we don&#39;t accidentally break live page links by deleting a file the site is still using.</p>
       </li>
       <li class="todo-item">
-        <h3 class="todo-item-h3">Sitemap-validated reference URLs</h3>
-        <p>Every reference URL the report emits will be cross-checked against the site's published <code>sitemap.xml</code> before it appears in the spreadsheet. The aim: any URL a manager clicks always lands on a real published page — no 404s from auto-constructed routes that the live frontend doesn't actually recognise.</p>
+        <h3 class="todo-item-h3">Every clickable reference goes to a real page</h3>
+        <p>Before any reference URL appears in the spreadsheet or on a detail page, our tool will check that the page actually exists on the live website. The result: every link a manager clicks lands on a real, published page &mdash; no "page not found" errors from URLs the audit had to guess at.</p>
       </li>
     </ul>
 
-    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/filecap-cli/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">filecap CHANGELOG</a> — the next minor release (1.8.0) will roll these out.</p>
+    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/filecap-cli/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">filecap CHANGELOG</a> — the next major release will roll these out.</p>
   </section>`;
 }
 
