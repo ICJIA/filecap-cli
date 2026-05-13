@@ -31,4 +31,43 @@ describe("csvCell", () => {
     expect(csvCell('he said "hi"')).toBe('"he said ""hi"""');
     expect(csvCell("line1\nline2")).toBe('"line1\nline2"');
   });
+
+  // 1.7.36 — fixes 2026-05-13 audit finding #1.
+  describe("CSV formula-injection defense", () => {
+    it("prefixes leading `=` with a single quote so Excel doesn't evaluate the cell", () => {
+      // No `,\n\r"` in the input so no CSV-quote wrapping; just the
+      // OWASP apostrophe-prefix.
+      expect(csvCell("=cmd|'/c calc'!A1.pdf")).toBe("'=cmd|'/c calc'!A1.pdf");
+    });
+
+    it("prefixes leading `+` `-` `@` `\\t` with a single quote (no CSV-quote wrap needed)", () => {
+      expect(csvCell("+SUM(1+1)")).toBe("'+SUM(1+1)");
+      expect(csvCell("-2+3+cmd")).toBe("'-2+3+cmd");
+      expect(csvCell("@DDE")).toBe("'@DDE");
+      expect(csvCell("\tmalicious")).toBe("'\tmalicious");
+    });
+
+    it("prefixes leading `\\r` and ALSO CSV-quote-wraps (because `\\r` triggers wrapping)", () => {
+      expect(csvCell("\rmalicious")).toBe('"\'\rmalicious"');
+    });
+
+    it("does NOT prefix benign cells that merely contain `=` mid-string", () => {
+      expect(csvCell("a=b")).toBe("a=b");
+      expect(csvCell("path/to/file=v2.pdf")).toBe("path/to/file=v2.pdf");
+    });
+
+    it("leaves deliberate Excel text-formula cells (SHA-256 hash) intact so Excel still renders the hash without scientific-notation munging", () => {
+      // The hash cell wraps the hex string as `="<hash>"`. This pattern
+      // is allow-listed because the bytes inside the quotes come from
+      // filecap's own scanner, not from filenames.
+      expect(csvCell('="abc123def456"')).toBe('"=""abc123def456"""');
+    });
+
+    it("a hostile filename crafted as an Excel-text-formula-with-trailing-garbage is still defanged", () => {
+      // The trusted pattern requires the WHOLE cell to be `="..."` with
+      // nothing else. A filename like `="hostile".pdf` doesn't match
+      // and gets the apostrophe prefix.
+      expect(csvCell('="hostile".pdf')).toBe(`"'=""hostile"".pdf"`);
+    });
+  });
 });

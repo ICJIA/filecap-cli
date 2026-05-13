@@ -41,6 +41,28 @@ function htmlEscape(s) {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * 1.7.36 — Return the URL string only when it parses cleanly and its
+ * scheme is http: or https:; otherwise return null. Used to gate every
+ * `<a href="…">` emit site so a malicious value in sites.json or in
+ * scanned entry data (e.g. `javascript:alert(1)`) can't produce a
+ * clickable XSS-vector anchor. Fixes 2026-05-13 audit finding #2.
+ *
+ * Callers should emit a plain <span> instead of <a> when this returns
+ * null, so the offending value still appears as text but isn't
+ * clickable.
+ */
+function safeUrl(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(String(url));
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return String(url);
+  } catch {
+    return null;
+  }
+}
+
 // Small clipboard-outline icon used by the meta-grid copy buttons. Inline SVG
 // (no external request, no font dependency) and stroke: currentColor so the
 // hover/copied states can recolor it via CSS.
@@ -284,8 +306,14 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     const categoryAttr = ` data-category="${htmlEscape(entry.category ?? "other")}"`;
     const cells = values.map((v, i) => {
       if (i === publicUrlColIdx && v !== "" && v !== null && v !== undefined) {
+        const safe = safeUrl(v);
         const escaped = htmlEscape(v);
-        return `<td><a href="${escaped}" target="_blank" rel="noopener noreferrer">${escaped}</a></td>`;
+        if (safe) {
+          return `<td><a href="${htmlEscape(safe)}" target="_blank" rel="noopener noreferrer">${escaped}</a></td>`;
+        }
+        // Unsafe scheme (e.g. javascript:, data:) — show as plain text
+        // so the value still appears in the table but is not clickable.
+        return `<td>${escaped}</td>`;
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -377,7 +405,17 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   <span class="meta-label">Hostname:</span>     ${copyableMetaCell(hostname, null, "hostname")}
   <span class="meta-label">Scanned path:</span> ${copyableMetaCell(scannedPath, null, "scanned path")}
   <span class="meta-label">Scanned at:</span>   ${copyableMetaCell(scannedAt, null, "scan timestamp")}
-  ${publicUrlBase !== "" ? `<span class="meta-label">Public URL:</span>   ${copyableMetaCell(publicUrlBase, `<a href="${htmlEscape(publicUrlBase)}" target="_blank" rel="noopener noreferrer">${htmlEscape(publicUrlBase)}</a>`, "public URL")}` : ""}`;
+  ${publicUrlBase !== "" ? (() => {
+    // Gate the meta-grid Public URL row through safeUrl so a malicious
+    // sites.json `siteUrl` (e.g. `javascript:…`) can't render as a
+    // clickable anchor. Plain text is shown when the scheme is bad.
+    const safe = safeUrl(publicUrlBase);
+    const escaped = htmlEscape(publicUrlBase);
+    const display = safe
+      ? `<a href="${htmlEscape(safe)}" target="_blank" rel="noopener noreferrer">${escaped}</a>`
+      : escaped;
+    return `<span class="meta-label">Public URL:</span>   ${copyableMetaCell(publicUrlBase, display, "public URL")}`;
+  })() : ""}`;
   }
 
   // ── embed data as JSON for client-side search/sort ────────────────────────────

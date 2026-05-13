@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.36] — 2026-05-13
+
+### Security
+
+Fixes five of the seven findings from the 2026-05-13 red/blue team re-audit ([full audit log in README](README.md#2026-05-13-redblue-team-re-audit-v1735)). Two findings remained "Open" after the audit because they're either deferred or already mitigated; this release closes the rest.
+
+- **Finding #1 (Moderate) — CSV formula-injection through filenames.** `csvCell` in `src/report/format.js` now prefixes cells whose first character is in `{= + - @ \t \r}` with a single quote (`'`), the OWASP-recommended marker that spreadsheet apps treat as a text-mode prefix and strip on display. A filename like `=cmd|'/c calc'!A1.pdf` no longer evaluates as a formula when the audit CSV is opened in Excel / Sheets / Numbers. The deliberate `="<sha256-hash>"` text-formula cell is allow-listed via a strict whole-cell pattern match, so the hash column still renders correctly. Five new tests cover the attack vectors and the allow-listed pattern.
+- **Finding #2 (Moderate) — `<a href>` URL-scheme validation.** New `safeUrl(url)` helper in `src/report/html.js` returns the URL only when its scheme is `http:` or `https:`. The publicUrl table cell and the meta-grid Public URL row both gate emission through `safeUrl()`; values with `javascript:`, `data:`, or other schemes now render as plain text (still visible, no longer clickable).
+- **Finding #3 (Moderate) — `sites.json` `name` slug regex.** `siteEntrySchema.name` in `src/commands/web-rollup.js` now requires `/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i` (kebab-case slug, no leading/trailing hyphen). A malicious `name: "../../etc"` no longer passes validation, so the audits-directory path traversal is closed at the schema layer.
+- **Finding #4 (Low) — `secrets.json` mode warning.** `loadSecrets()` in `src/config/secrets.js` now stats the file on load and emits a stderr warning when `(mode & 0o077) !== 0` (group- or world-readable). Doesn't refuse to load — workstations are usually single-user — but tells the operator to `chmod 600`.
+- **Finding #6 (Low) — `autoDeploy` UX guard.** `runNetlifyDeploy()` in `src/commands/web-rollup.js` now prints a loud banner before invoking `netlify deploy --prod` (so operators see when `webRollup.autoDeploy: true` is about to push to production) and honours `FILECAP_NO_DEPLOY=1` as an opt-out for local builds / tests / quick regenerations.
+
+Deferred (per audit recommendations):
+
+- Finding #5 (Low) — Internal server paths in the bundle. Already mitigated by the Netlify Pro Site Password gate; redaction would be defense-in-depth only.
+- Finding #7 (Informational) — Bundle artefact signing. TLS to Netlify covers the transit-layer threat; signing's operational cost (key management, vendor education) isn't justified for the current distribution model.
+
+[1.7.36]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.36
+
 ## [1.7.35] — 2026-05-13
 
 ### Changed

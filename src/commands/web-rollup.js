@@ -15,9 +15,17 @@ import { generateNetlifyToml, generateNetlifyRedirects } from "../web/netlify-co
 import { darkModeCss } from "../web/styles.js";
 
 // FC-2026-007: Zod schema for sites.json validation
+// 1.7.36 — `name` is interpolated into filesystem paths
+// (`~/filecap-audits/<name>/latest/inventory.ndjson`) and into the
+// generated `_redirects` rules. Restrict to a strict kebab-case slug
+// shape so a malicious or careless sites.json can't produce a
+// `name: "../../etc"` that escapes the audits directory. Fixes
+// 2026-05-13 audit finding #3.
+const SITE_NAME_SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
+
 const siteEntrySchema = z
   .object({
-    name: z.string().min(1),
+    name: z.string().regex(SITE_NAME_SLUG, "name must be a kebab-case slug ([a-z0-9-], no leading/trailing hyphen)"),
     siteName: z.string().optional(),
     // Audit mode. "strapi" (default) means SSH+rsync against a CMS host using
     // host/user/remotePath. "git" means shallow-clone a static-site repo and
@@ -1013,6 +1021,26 @@ export async function runWebRollup({
  * @returns {Promise<void>}
  */
 async function runNetlifyDeploy({ output, deploySite }) {
+  // 1.7.36 — Honor FILECAP_NO_DEPLOY=1 so local builds / tests / quick
+  // regenerations don't accidentally push to production when the user
+  // has `webRollup.autoDeploy: true` in ~/.filecap/config.json. Loud
+  // banner first so the operator sees what's about to happen and can
+  // Ctrl-C if it wasn't intended. Fixes 2026-05-13 audit finding #6.
+  if (process.env.FILECAP_NO_DEPLOY === "1") {
+    process.stderr.write(
+      "FILECAP_NO_DEPLOY=1 set — skipping `netlify deploy --prod`. " +
+        `Bundle is in ${output}.\n`,
+    );
+    return;
+  }
+  process.stderr.write(
+    "\n────────────────────────────────────────────────────────────\n" +
+      "  PUSHING TO PRODUCTION via `netlify deploy --prod`\n" +
+      "  Triggered by --deploy flag or webRollup.autoDeploy=true in config.\n" +
+      "  Ctrl-C now to abort; set FILECAP_NO_DEPLOY=1 to opt out.\n" +
+      "────────────────────────────────────────────────────────────\n\n",
+  );
+
   const args = ["deploy", "--prod", "--dir", output];
   if (deploySite) {
     args.push("--site", deploySite);

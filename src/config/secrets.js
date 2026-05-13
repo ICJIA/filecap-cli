@@ -16,9 +16,32 @@ const DEFAULT_SECRETS_PATH = path.join(
   "secrets.json",
 );
 
-export function loadSecrets({ secretsPath = DEFAULT_SECRETS_PATH } = {}) {
+export function loadSecrets({
+  secretsPath = DEFAULT_SECRETS_PATH,
+  warn = (msg) => process.stderr.write(msg),
+} = {}) {
   if (!fs.existsSync(secretsPath)) {
     return { tokens: {} };
+  }
+
+  // 1.7.36 — Warn if the file is group- or world-readable. The bearer
+  // tokens this file carries should sit at mode 0600 (owner-only);
+  // anything else means other users on the same workstation could
+  // siphon the credentials. Don't refuse to load — single-user
+  // workstations are the common case and a warning is enough.
+  // Fixes 2026-05-13 audit finding #4.
+  try {
+    const stat = fs.statSync(secretsPath);
+    if ((stat.mode & 0o077) !== 0) {
+      const modeStr = (stat.mode & 0o777).toString(8).padStart(3, "0");
+      warn(
+        `WARN: filecap secrets file at ${secretsPath} is group- or world-readable (mode 0${modeStr}); ` +
+          `recommended mode is 0600. Fix with: chmod 600 ${secretsPath}\n`,
+      );
+    }
+  } catch {
+    // Stat failure is non-fatal — the readFileSync below will surface
+    // any real I/O issue with a more specific error.
   }
 
   let raw;
