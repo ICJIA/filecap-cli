@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.24] — 2026-05-13
+
+### Changed
+
+- **Duplicates explainer compressed from five colored callouts into one cohesive block.** Pre-v1.7.24 the "Why are we showing you this?" area had five visually-distinct elements stacked vertically: the historical-context paragraph, a blue-bordered `dup-not-error` callout, a green-bordered `dup-intentional` (OMA / parallel-publishing) callout, the two-card exact/variant comparison, and an amber-bordered `dup-caveat` false-positives note. Every callout had its own background tint + colored left border, so the eye landed on the rainbow of boxes rather than the content. v1.7.24 consolidates into one unified container with the same single dark `#161b22` background as the rest of the section: three tight paragraphs (history → "not an error" + "intentional" merged → "use as cross-check"), the exact/variant kind-cards (still get their accent borders because they're the actually-useful visual comparison), and the false-positives caveat **collapsed into a `<details>` element** with a chevron-marked summary so the technical edge-case is still there but doesn't dominate the layout. Same information; less visual noise. Inline `<strong>` + `<em>` carry the emphasis where colored borders used to.
+
+- **Navbar audit-tool button label updated** from `Use ICJIA's PDF audit tool` to `Try ICJIA's PDF audit tool`. "Try" is softer (suggestion to test the tool) vs "Use" (instruction to operate it). The link target, accessibility attributes, and visual styling are unchanged.
+
+[1.7.24]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.24
+
 ## [1.7.23] — 2026-05-13
 
 ### Added

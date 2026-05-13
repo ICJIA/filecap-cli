@@ -687,7 +687,7 @@ describe("writeHtml", () => {
       });
       const html = await fs.readFile(outputPath, "utf8");
       expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>/);
-      expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Use ICJIA&#39;s PDF audit tool<\/span>/);
+      expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Try ICJIA&#39;s PDF audit tool<\/span>/);
     });
 
     it("shows the per-site scannedAt date under the CSV download for single-site reports", async () => {

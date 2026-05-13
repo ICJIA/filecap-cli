@@ -286,26 +286,38 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
 
     ${infoOnlyCalloutHtml}
 
-    <section class="dup-explainer-open">
-      <h3 class="dup-explainer-open-h3">Why are we showing you this?</h3>
-      <p>ICJIA's web presence has evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository where reports, meeting minutes, and reference documents lived. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) developed their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context. Files were sometimes updated on one server without being updated on the others — that's why a "duplicate" pair may have <strong>different content even though the filename matches</strong>. <code>.gitkeep</code> and <code>.gitignore</code> are filtered out (placeholder files that always exist as duplicates by design).</p>
+    <!-- v1.7.24: explainer compressed into one cohesive block. Same info as
+         the previous five-callout layout (historical context, not-an-error,
+         intentional duplicates, exact/variant cards, false-positives caveat),
+         but consolidated into three tight paragraphs + the kind-cards (the
+         most useful visual) + a collapsed false-positives <details>. Single
+         visual register — no per-paragraph colored borders — so the eye
+         lands on the typography contrast (h3 + inline strong), not on a
+         rainbow of callout backgrounds. -->
+    <section class="dup-explainer">
+      <h3 class="dup-explainer-h3">Why this list exists</h3>
 
-      <p class="dup-not-error"><strong>A duplicate is not an error.</strong> It is not the webmaster's fault. It just means the same filename appears in more than one place — typically because the same document was meant to be visible on multiple sites. Use this list as a <strong>cross-check</strong>, not a deletion queue.</p>
+      <p>ICJIA's web presence evolved over many years. The Archive site was historically the agency's <em>library</em> — a single repository for reports, meeting minutes, and reference documents. Over time, individual programs (DVFR, R3, ICJIA, ILFVCC, i2i, Infonet, Intranet) got their own websites, and copies of relevant Archive files were placed into each program's CMS so they'd appear in context. Files were sometimes updated on one server but not the others, which is why a "duplicate" pair may have <strong>different content even though the filename matches</strong>. <code>.gitkeep</code> and <code>.gitignore</code> placeholders are filtered out.</p>
 
-      <p class="dup-intentional"><strong>Some duplicates are intentional and required.</strong> Because ICJIA runs a main site plus several specialty sites (DVFR, R3, i2i, ILFVCC, Infonet, Intranet, etc.), the same meeting agenda is often posted on <em>both</em> the main agency site and the specialty site that owns the meeting — for example, a DVFR board agenda is posted on the DVFR site (where DVFR stakeholders look) <em>and</em> on the ICJIA main site (for Open Meetings Act compliance). Someone going to the DVFR site to look up "when is the next DVFR meeting?" shouldn't have to know to also visit icjia.illinois.gov, and vice versa. So when you see the same agenda PDF flagged as a duplicate across DVFR and ICJIA, that's almost certainly a feature, not a bug. The same logic applies to other site-owner requests where a document needs to live on multiple sites for findability.</p>
+      <p><strong>A duplicate is not an error</strong> — it's almost always the same document deliberately published on more than one site. <strong>Many duplicates are intentional and required</strong>: a DVFR board agenda is posted on the DVFR site <em>and</em> on the main ICJIA site (Open Meetings Act compliance, plus stakeholder findability). Someone looking up "when's the next DVFR meeting?" on dvfr.illinois.gov shouldn't have to know to also visit icjia.illinois.gov. Same logic applies anywhere a document needs to live on multiple sites for discoverability.</p>
+
+      <p>Use this list as a <strong>cross-check</strong>, not a deletion queue.</p>
 
       <div class="dup-kind-cards">
         <div class="dup-kind-card dup-kind-card-exact">
-          <h4 class="dup-kind-card-h4"><span class="dup-kind dup-exact">exact</span> — same content on every site</h4>
-          <p>Byte-for-byte identical file in N places. <strong>Remediate it once</strong> on the canonical copy (typically the newest or most-frequently-linked one), then push the corrected file to the other sites' CMSes using the same filename. <strong>Don't delete the duplicates</strong> — most are referenced by CMS entries on each site; removing them would break the link. The goal is "one corrected file appearing in N places," not "one file existing in one place."</p>
+          <h4 class="dup-kind-card-h4"><span class="dup-kind dup-exact">exact</span> &mdash; same content on every site</h4>
+          <p>Byte-for-byte identical file in N places. <strong>Remediate once</strong> on the canonical copy (typically the newest or most-linked one), then push the corrected file to the other sites' CMSes using the same filename. <strong>Don't delete the duplicates</strong> — most are referenced by CMS entries on each site; removing them would break the link. The goal is "one corrected file appearing in N places," not "one file existing in one place."</p>
         </div>
         <div class="dup-kind-card dup-kind-card-variant">
-          <h4 class="dup-kind-card-h4"><span class="dup-kind dup-variant">variant</span> — same filename, different content</h4>
-          <p>The file was edited on one server and the others still hold the older version. <strong>Each variant may need its own remediation pass</strong>. Open each in the table below to check whether they're truly distinct documents or whether one is the canonical version the others should be replaced with. Once you decide, either remediate all variants individually, or remediate the canonical one and overwrite the others (treating it like an <em>exact</em> case going forward).</p>
+          <h4 class="dup-kind-card-h4"><span class="dup-kind dup-variant">variant</span> &mdash; same filename, different content</h4>
+          <p>The file was edited on one server, others still hold the older version. <strong>Each variant may need its own remediation pass</strong>. Open each in the table below to check whether they're truly distinct documents or whether one is the canonical version the others should be replaced with. Then either remediate all variants individually, or remediate the canonical one and overwrite the others (treating it like an <em>exact</em> case going forward).</p>
         </div>
       </div>
 
-      <p class="dup-caveat"><strong>Heads up on false positives.</strong> Cross-server matching strips Strapi's appended 10-character hex hash before comparing filenames (so <code>report_a1b2c3d4e5.pdf</code> matches <code>report_xxxxxxxxxx.pdf</code>). Two unrelated files that happen to follow the same naming convention before the hash can be flagged as a <em>variant</em> here even though they're logically different documents. The <em>exact</em> match (same content hash) is the high-confidence signal; <em>variant</em> matches are worth opening to confirm.</p>
+      <details class="dup-caveat-details">
+        <summary>Heads up on false positives in <em>variant</em> matches</summary>
+        <p>Cross-server matching strips Strapi's appended 10-character hex hash before comparing filenames (so <code>report_a1b2c3d4e5.pdf</code> matches <code>report_xxxxxxxxxx.pdf</code>). Two unrelated files that follow the same naming convention before the hash can be flagged as a <em>variant</em> here even though they're logically different documents. The <em>exact</em> match (same content hash) is the high-confidence signal; <em>variant</em> matches are worth opening to confirm.</p>
+      </details>
     </section>
 
     <details class="dup-table-details" open>
@@ -1923,44 +1935,82 @@ main {
   color: #9aa5b1;
   line-height: 1.4;
 }
-.duplicates .dup-explainer-open {
+/* v1.7.24: single unified explainer block — replaces the pre-v1.7.24
+   .dup-explainer-open + .dup-not-error + .dup-intentional + .dup-caveat
+   layout (five visually-distinct callouts) with one cohesive container.
+   Same information; less visual noise. Inline <strong> + <em> carry
+   emphasis where colored borders used to. The exact/variant kind-cards
+   still get their accent borders because they're the actually-useful
+   visual comparison; everything else demoted to body prose. */
+.duplicates .dup-explainer {
   background: #161b22;
   border: 1px solid #21262d;
   border-radius: 12px;
-  padding: 22px 26px;
+  padding: 22px 28px 18px;
   margin: 0 0 24px;
   color: #d4dae0;
-  line-height: 1.55;
+  line-height: 1.6;
 }
-.duplicates .dup-explainer-open p { margin: 0.6rem 0; }
-.duplicates .dup-explainer-open-h3 {
-  margin: 0 0 0.8rem;
-  font-size: 1.2em;
-  font-weight: 700;
+.duplicates .dup-explainer > p {
+  margin: 0 0 0.85rem;
+  font-size: 0.98rem;
+  max-width: 78ch;
+}
+.duplicates .dup-explainer > p:last-of-type { margin-bottom: 0.4rem; }
+.duplicates .dup-explainer > p strong { color: #ffffff; }
+.duplicates .dup-explainer > p em { color: #e8ecf1; font-style: italic; }
+.duplicates .dup-explainer code {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.88em;
+  padding: 0.04em 0.4em;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+}
+.duplicates .dup-explainer-h3 {
+  margin: 0 0 0.9rem;
+  font-size: 1.22rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: #ffffff;
 }
-.duplicates .dup-not-error {
-  margin: 1rem 0 1.3rem !important;
-  padding: 14px 18px;
-  background: rgba(77, 171, 247, 0.08);
-  border-left: 3px solid #4dabf7;
-  border-radius: 6px;
-  color: #e8ecf1;
+.duplicates .dup-caveat-details {
+  margin: 1rem 0 0;
+  padding: 0.55rem 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid #6e7681;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.92rem;
+  color: #c0cdda;
 }
-.duplicates .dup-intentional {
-  /* v1.7.19: separate callout for the "this duplicate is on purpose" case —
-     e.g. meeting agendas posted on both the main ICJIA site and the
-     specialty site for Open Meetings Act compliance. Visually parallel
-     to .dup-not-error but tinted green so a manager glancing at the
-     section reads it as a positive reassurance, not a warning. */
-  margin: 0 0 1.3rem !important;
-  padding: 14px 18px;
-  background: rgba(102, 217, 163, 0.08);
-  border-left: 3px solid #66d9a3;
-  border-radius: 6px;
-  color: #e8ecf1;
+.duplicates .dup-caveat-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #d4dae0;
+  list-style: none;
+  padding: 0.2rem 0;
 }
-.duplicates .dup-intentional strong { color: #d4f7e1; }
+.duplicates .dup-caveat-details > summary::-webkit-details-marker { display: none; }
+.duplicates .dup-caveat-details > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  margin-right: 0.25rem;
+  transition: transform 120ms ease;
+  color: #8b949e;
+}
+.duplicates .dup-caveat-details[open] > summary::before { content: "▾ "; }
+.duplicates .dup-caveat-details > summary em { color: #d4dae0; font-style: italic; }
+.duplicates .dup-caveat-details > p {
+  margin: 0.5rem 0 0.2rem;
+  line-height: 1.55;
+}
+.duplicates .dup-caveat-details code {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.86em;
+  padding: 0.04em 0.35em;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+}
+
 .duplicates .dup-kind-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1986,39 +2036,11 @@ main {
 }
 .duplicates .dup-kind-card p { margin: 0; font-size: 0.95em; }
 
-/* Legacy collapsible explainer kept for back-compat if reactivated later */
-.duplicates .dup-explainer {
-  margin: 1rem 0;
-  padding: 0.8rem 1rem;
-  background: #161b22;
-  border: 1px solid #21262d;
-  border-radius: 4px;
-}
-.duplicates .dup-explainer summary {
-  font-weight: 600;
-  cursor: pointer;
-  color: #79c0ff;
-}
-.duplicates .dup-explainer summary:focus-visible {
-  outline: 2px solid #58a6ff;
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-.duplicates .dup-explainer p { margin: 0.5rem 0; line-height: 1.55; }
-.duplicates .dup-explainer-h3 {
-  margin: 1.2rem 0 0.3rem 0;
-  font-size: 1rem;
-  color: #c9d1d9;
-  font-weight: 600;
-}
-.duplicates .dup-caveat {
-  margin-top: 1.2rem;
-  padding: 0.6rem 0.8rem;
-  background: #0d1117;
-  border-left: 3px solid #d29922;
-  border-radius: 2px;
-  font-size: 0.93rem;
-}
+/* v1.7.24: legacy .dup-explainer (a collapsible details pattern that
+   predated the v1.7.0 redesign) + .dup-caveat (the inline yellow note,
+   superseded by .dup-caveat-details collapsible) removed — both classes
+   are no longer emitted, and the v1.7.24 .dup-explainer / .dup-caveat-details
+   styles defined above own the same selector names now. */
 
 .dup-table-details {
   margin-top: 1rem;
@@ -2332,7 +2354,7 @@ main {
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>Use ICJIA&#39;s PDF audit tool</span>
+      <span>Try ICJIA&#39;s PDF audit tool</span>
     </a>
   </div>
 </header>

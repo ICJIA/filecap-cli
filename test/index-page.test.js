@@ -239,9 +239,9 @@ describe("index page audit-tool button (v1.7.16)", () => {
     expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*>/);
   });
 
-  it("the audit link includes an external-link SVG icon and the 'Use ICJIA's PDF audit tool' label", () => {
+  it("the audit link includes an external-link SVG icon and the 'Try ICJIA's PDF audit tool' label", () => {
     expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,400}<svg class="audit-tool-icon"/);
-    expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Use ICJIA&#39;s PDF audit tool<\/span>/);
+    expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Try ICJIA&#39;s PDF audit tool<\/span>/);
   });
 
   it("uses rel=\"noopener noreferrer\" to prevent the target page from accessing window.opener", () => {

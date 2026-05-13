@@ -1271,7 +1271,7 @@ ${(() => {
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>Use ICJIA&#39;s PDF audit tool</span>
+      <span>Try ICJIA&#39;s PDF audit tool</span>
     </a>
     ${csvHref ? `<div class="report-csv-block">
       <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
