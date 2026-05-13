@@ -11,7 +11,7 @@ import { writeHtml } from "../report/html.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
-import { generateNetlifyToml } from "../web/netlify-config.js";
+import { generateNetlifyToml, generateNetlifyRedirects } from "../web/netlify-config.js";
 import { darkModeCss } from "../web/styles.js";
 
 // FC-2026-007: Zod schema for sites.json validation
@@ -944,8 +944,12 @@ export async function runWebRollup({
   // 7. Generate robots.txt
   await fs.writeFile(path.join(output, "robots.txt"), generateRobotsTxt());
 
-  // 8. Generate netlify.toml
+  // 8. Generate netlify.toml + _redirects. The latter aliases lowercase
+  // and extension-less variants of each per-site report URL to the
+  // canonical Z.html file so a manager typing a URL by hand or pasting
+  // one that got case-mangled lands on the right page.
   await fs.writeFile(path.join(output, "netlify.toml"), generateNetlifyToml());
+  await fs.writeFile(path.join(output, "_redirects"), generateNetlifyRedirects(siteResults));
 
   // 9. Generate shared CSS
   await fs.writeFile(path.join(output, "assets", "style.css"), darkModeCss());

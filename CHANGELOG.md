@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.31] — 2026-05-13
+
+### Added
+
+- **Case-insensitive + extension-less URL aliases for every per-site report.** Netlify is case-sensitive when serving static files, so `/r3-20260511-172410z` (lowercase `z`) didn't resolve to the canonical `/r3-20260511-172410Z.html` — a manager typing or pasting a URL with mangled casing hit a Netlify error page. `filecap web-rollup` now generates a `_redirects` file at the bundle root with three alias rules per per-site report:
+  - `/<base-lowercase-z>` → `/<base>.html` (301)
+  - `/<base-lowercase-z>.html` → `/<base>.html` (301)
+  - `/<base>` → `/<base>.html` (301; ensures extension-less variants resolve even when the Netlify Pro password gate interacts oddly with Pretty URLs)
+
+  17 sites → ~51 rules, all auto-emitted by the new exported `generateNetlifyRedirects(siteResults)` helper in `src/web/netlify-config.js`. Netlify reads `_redirects` from the publish root at deploy time, so no extra Netlify-dashboard configuration is needed.
+
+[1.7.31]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.31
+
 ## [1.7.30] — 2026-05-13
 
 ### Added
