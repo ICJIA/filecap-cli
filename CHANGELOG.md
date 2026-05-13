@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.18] — 2026-05-13
+
+### Changed
+
+- **Plain-English explainer added beneath the "N-times the search surface" reason** in the v1.7.17 duplicates-info-only callout. Pre-v1.7.18 a manager landing on the page might bounce off the jargon ("N-times the search surface… what does that even mean?"). The new explainer unpacks both `N` and `Big O notation` in language a non-technical reader can use: `N` is "however many copies of this file exist"; `O(N)` is engineering shorthand for "the work scales linearly — 3 copies = 3× the reference-checking work, 5 copies = 5× the work." Contrasted with `O(1)` (constant work, doesn't apply here) so the manager has a concrete reference point. The explainer closes with an actionable budget ("5–15 minutes per copy for reference review") so the manager can translate the abstract growth-rate into a meeting-agenda commitment. Visually distinct (slightly lighter grey block with a left rule + monospaced `O(N)` / `O(1)` chips) so it reads as an aside rather than competing with the three numbered reasons it explains.
+
+[1.7.18]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.18
+
 ## [1.7.17] — 2026-05-13
 
 ### Changed

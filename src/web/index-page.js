@@ -168,7 +168,9 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
     <h3 class="dup-info-only-title">Don&#39;t treat this list as a delete-worksheet</h3>
     <p>Removing a duplicate looks like a free win — same file on three sites, surely two of them can go. It isn&#39;t. Removing <strong>any</strong> file can break the page that links to it (a 404), and duplicates carry extra risk on top of that:</p>
     <ol class="dup-info-only-reasons">
-      <li><strong>N-times the search surface.</strong> A unique file might be linked from one site&#39;s HTML. A file present on three servers might be linked from three sites&#39; HTML — you have to check all three before touching any copy.</li>
+      <li><strong>N-times the search surface.</strong> A unique file might be linked from one site&#39;s HTML. A file present on three servers might be linked from three sites&#39; HTML — you have to check all three before touching any copy.
+        <p class="dup-info-only-plain"><em>What does "N-times" mean?</em> <strong>N</strong> is just a placeholder for "however many copies of this file exist." Software engineers use <strong>Big&nbsp;O notation</strong> like <code>O(N)</code> to describe how the work grows with the size of the problem. <code>O(N)</code> means the effort scales <em>linearly</em>: if a file is on 3 sites, you do roughly 3&times; the reference-checking work; on 5 sites, 5&times;. (Compare <code>O(1)</code>, which means the work is the same no matter how many copies there are — that&#39;s not the case here.) The practical implication for a manager: budget review time per duplicate as <strong>roughly 5&ndash;15&nbsp;minutes per copy</strong>, because each copy needs its own site walked for incoming links before you can decide whether removal is safe.</p>
+      </li>
       <li><strong>"Wrong copy" risk.</strong> SHA-256 equality only tells you the bytes match. It doesn&#39;t tell you which copy is the canonical one. If Site A links to it and Site B doesn&#39;t, the obvious move is "delete from B" — but if B was the original and A&#39;s link is the stale one, you just removed the wrong copy.</li>
       <li><strong>Asymmetric references.</strong> Two copies can be linked from completely different contexts (one from a meeting-agendas page, the other from an annual-reports archive). Deleting either causes a 404 somewhere; neither is obviously safer than the other without looking.</li>
     </ol>
@@ -1713,6 +1715,29 @@ main {
   color: #fbbf24;
 }
 .dup-info-only-reasons strong { color: #ffffff; font-weight: 700; }
+.dup-info-only-plain {
+  margin: 0.5rem 0 0.1rem;
+  padding: 0.55rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid #6e7681;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.9rem;
+  color: #b8c0c8;
+  line-height: 1.55;
+}
+.dup-info-only-plain em {
+  color: #d4dae0;
+  font-style: italic;
+  font-weight: 600;
+}
+.dup-info-only-plain code {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.88em;
+  padding: 0.04em 0.35em;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  color: #e5e5e5;
+}
 .dup-kind {
   display: inline-block;
   margin-left: 0.6rem;
