@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.35] — 2026-05-13
+
+### Changed
+
+- **Access-instructions copy now points readers at Chris Schweda directly** instead of a generic "Contact IDS at ICJIA" line. Chris is the sole authorizer for both SSH and GitHub access at ICJIA, so routing requests through him directly (rather than a team alias) is materially faster — a remediation vendor reading this audit shouldn't have to bounce through a queue when there's exactly one person who can grant the credential. Three places updated for consistency:
+  - **Index-page modal CTA**: `<strong>Need access? Email <a href="mailto:christopher.schweda@illinois.gov">christopher.schweda@illinois.gov</a></strong> — Chris Schweda is the sole authorizer for SSH and GitHub access at ICJIA, so emailing him directly is the fastest path. He'll help with credentials, walkthroughs, and any question about getting these files in bulk.`
+  - **Index-page modal step 1** (all three site types): the "ask ICJIA's IDS team" phrasing replaced with "Email Chris Schweda at ICJIA" + a note that Chris can also walk you through generating an SSH key if you don't have one.
+  - **Per-site detail-page access panel**: the trailing `action` line now reads "Email Chris Schweda at <mailto:christopher.schweda@illinois.gov> — he's the sole authorizer for SSH and GitHub access at ICJIA, so emailing him directly is the fastest path." Renderer updated to emit the mailto link as raw HTML (the constant is hardcoded, no XSS surface).
+- Tests updated to assert on `christopher.schweda@illinois.gov` rather than the old `"Contact IDS at ICJIA"` literal.
+
+[1.7.35]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.35
+
 ## [1.7.34] — 2026-05-13
 
 ### Changed

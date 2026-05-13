@@ -553,7 +553,10 @@ describe("writeHtml", () => {
       expect(html).toContain("For bulk file access");
       expect(html).toContain("Strapi CMS instance on a remote Linux host");
       expect(html).toContain("OpenSSH public key");
-      expect(html).toContain("Contact IDS at ICJIA");
+      // v1.7.35: access-panel action line now points at Chris Schweda
+      // directly with a mailto link (he's the sole access authorizer at
+      // ICJIA).
+      expect(html).toContain("christopher.schweda@illinois.gov");
     });
 
     it("renders a GitHub access panel when accessKind is 'github'", async () => {
@@ -570,7 +573,10 @@ describe("writeHtml", () => {
       expect(html).toContain("For bulk file access");
       expect(html).toContain("GitHub.com account");
       expect(html).toContain("ICJIA organization access");
-      expect(html).toContain("Contact IDS at ICJIA");
+      // v1.7.35: access-panel action line now points at Chris Schweda
+      // directly with a mailto link (he's the sole access authorizer at
+      // ICJIA).
+      expect(html).toContain("christopher.schweda@illinois.gov");
     });
 
     it("renders a Server access panel when accessKind is 'server'", async () => {
@@ -587,7 +593,10 @@ describe("writeHtml", () => {
       expect(html).toContain("For bulk file access");
       expect(html).toContain("static directory on a remote Linux host");
       expect(html).toContain("OpenSSH public key");
-      expect(html).toContain("Contact IDS at ICJIA");
+      // v1.7.35: access-panel action line now points at Chris Schweda
+      // directly with a mailto link (he's the sole access authorizer at
+      // ICJIA).
+      expect(html).toContain("christopher.schweda@illinois.gov");
     });
 
     it("omits the panel entirely when accessKind is null/undefined", async () => {

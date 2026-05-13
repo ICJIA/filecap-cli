@@ -422,7 +422,7 @@ function renderAccessModals() {
     ${paragraphsHtml}
     <h3 class="access-modal-steps-h3">Step-by-step</h3>
     <ol class="access-modal-steps">${stepsHtml}</ol>
-    <p class="access-modal-cta"><strong>${he(copy.cta)}</strong> Email <a href="mailto:cja.ids@illinois.gov">cja.ids@illinois.gov</a> for help with credentials, walkthroughs, or any question about getting these files in bulk.</p>
+    <p class="access-modal-cta"><strong>Need access? Email <a href="mailto:christopher.schweda@illinois.gov">christopher.schweda@illinois.gov</a></strong> — Chris Schweda is the sole authorizer for SSH and GitHub access at ICJIA, so emailing him directly is the fastest path. He'll help with credentials, walkthroughs, and any question about getting these files in bulk.</p>
   </div>
 </dialog>`;
   }).join("\n");
@@ -493,11 +493,10 @@ const ACCESS_MODAL_COPY = {
       "To download the files in bulk (so a remediation vendor can fix accessibility issues across the whole site), you'll need to copy them off the Strapi host directly. The standard tool for that is <code>rsync</code> over SSH — it copies entire directories efficiently and skips files that haven't changed since last time.",
     ],
     steps: [
-      "Ask ICJIA's IDS team to add your SSH public key to this Strapi host's authorized-keys list. (If you don't have an SSH key yet, IDS can walk you through generating one.)",
-      "Once your key is on the host, run a one-line <code>rsync</code> command from your laptop to pull a copy of the uploads directory locally. The audit team can provide the exact command.",
+      "Email Chris Schweda at ICJIA to add your SSH public key to this Strapi host's authorized-keys list. (If you don't have an SSH key yet, he can walk you through generating one.)",
+      "Once your key is on the host, run a one-line <code>rsync</code> command from your laptop to pull a copy of the uploads directory locally. Chris can provide the exact command.",
       "Hand the local copy to your remediation vendor — they apply fixes to the files in-place, and you <code>rsync</code> the corrected files back up to the host when the work is done.",
     ],
-    cta: "Contact IDS at ICJIA to request SSH access.",
   },
   github: {
     title: "How to access this site's files (GitHub-managed)",
@@ -506,11 +505,10 @@ const ACCESS_MODAL_COPY = {
       "To download the files in bulk, you don't need server access — you clone the GitHub repository. Cloning makes a complete local copy of the repo, including every file inventoried in this audit. The remediation vendor works on the local clone, and the corrected files are committed back into the repository.",
     ],
     steps: [
-      "Ask ICJIA's IDS team to add your GitHub username to the ICJIA organization on github.com.",
+      "Email Chris Schweda at ICJIA to add your GitHub username to the ICJIA organization on github.com.",
       "Once you're added, sign in to github.com and clone the repository (the URL is on this site's per-site detail page). A laptop-side GitHub app or the command-line <code>git</code> tool both work.",
       "Hand the local clone to your remediation vendor — they fix the files in-place, commit the changes, and push back to GitHub when done.",
     ],
-    cta: "Contact IDS at ICJIA to request GitHub organization access.",
   },
   server: {
     title: "How to access this site's files (server-managed)",
@@ -519,11 +517,10 @@ const ACCESS_MODAL_COPY = {
       "To download the files in bulk, you'll need to copy them off the host directly. The standard tool for that is <code>rsync</code> over SSH — it copies entire directories efficiently and skips files that haven't changed since last time.",
     ],
     steps: [
-      "Ask ICJIA's IDS team to add your SSH public key to this host's authorized-keys list. (If you don't have an SSH key yet, IDS can walk you through generating one.)",
-      "Once your key is on the host, run a one-line <code>rsync</code> command from your laptop to pull a copy of the directory locally. The audit team can provide the exact command.",
+      "Email Chris Schweda at ICJIA to add your SSH public key to this host's authorized-keys list. (If you don't have an SSH key yet, he can walk you through generating one.)",
+      "Once your key is on the host, run a one-line <code>rsync</code> command from your laptop to pull a copy of the directory locally. Chris can provide the exact command.",
       "Hand the local copy to your remediation vendor — they apply fixes to the files in-place, and you <code>rsync</code> the corrected files back up when the work is done.",
     ],
-    cta: "Contact IDS at ICJIA to request SSH access.",
   },
 };
 

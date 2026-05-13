@@ -179,19 +179,19 @@ const ACCESS_PANEL_COPY = {
     label: "For bulk file access",
     method: "Files are served by a Strapi CMS instance on a remote Linux host. To audit or remediate them you need to rsync the uploads directory over SSH.",
     credential: "An OpenSSH public key on the file server is required.",
-    action: "Contact IDS at ICJIA to request access.",
+    action: `Email Chris Schweda at <a href="mailto:christopher.schweda@illinois.gov">christopher.schweda@illinois.gov</a> — he's the sole authorizer for SSH and GitHub access at ICJIA, so emailing him directly is the fastest path.`,
   },
   github: {
     label: "For bulk file access",
     method: "Files live in an ICJIA-owned GitHub repository. To audit or remediate them you clone the repo and inspect the static asset directory.",
     credential: "A GitHub.com account with ICJIA organization access is required.",
-    action: "Contact IDS at ICJIA to request access.",
+    action: `Email Chris Schweda at <a href="mailto:christopher.schweda@illinois.gov">christopher.schweda@illinois.gov</a> — he's the sole authorizer for SSH and GitHub access at ICJIA, so emailing him directly is the fastest path.`,
   },
   server: {
     label: "For bulk file access",
     method: "Files are stored in a static directory on a remote Linux host (no CMS). To audit or remediate them you need to rsync the directory over SSH.",
     credential: "An OpenSSH public key on the file server is required.",
-    action: "Contact IDS at ICJIA to request access.",
+    action: `Email Chris Schweda at <a href="mailto:christopher.schweda@illinois.gov">christopher.schweda@illinois.gov</a> — he's the sole authorizer for SSH and GitHub access at ICJIA, so emailing him directly is the fastest path.`,
   },
 };
 
@@ -424,7 +424,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   <div class="access-panel-eyebrow">How to access this site's files</div>
   <h2 class="access-panel-heading" id="access-panel-heading">${htmlEscape(accessCopy.label)}</h2>
   <p class="access-panel-method">${htmlEscape(accessCopy.method)}</p>
-  <p class="access-panel-credential"><strong>${htmlEscape(accessCopy.credential)}</strong> ${htmlEscape(accessCopy.action)}</p>
+  <p class="access-panel-credential"><strong>${htmlEscape(accessCopy.credential)}</strong> ${accessCopy.action}</p>
 </section>`
     : "";
 

@@ -1294,7 +1294,9 @@ describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
     const detailHtml = await fs.readFile(path.join(outputDir, dvfrHtml), "utf8");
     expect(detailHtml).toMatch(/<section class="access-panel access-strapi"/);
     expect(detailHtml).toContain("OpenSSH public key");
-    expect(detailHtml).toContain("Contact IDS at ICJIA");
+    // v1.7.35: access-panel action line now points at Chris Schweda's
+    // email directly.
+    expect(detailHtml).toContain("christopher.schweda@illinois.gov");
   });
 
   it("threads accessKind='github' for a git-mode site", async () => {
