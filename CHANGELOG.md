@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.32] — 2026-05-13
+
+### Security / privacy
+
+- **`audit-fleet.ndjson` no longer carries `introspection.author` or `introspection.lastModifiedBy`.** The bundle's "Zero Personally Identifying Information (PII) in this audit" banner promises *"No names, addresses, phone numbers, or email addresses of individuals"* and *"not in any of the downloadable files."* That last clause wasn't strictly true: PDF and DOCX files commonly stamp the original author (and DOCX additionally stamps the last person who modified the document) into their metadata, filecap's introspection step extracted those into the inventory NDJSON, and `audit-fleet.ndjson` — published in the bundle for AI-context use — carried 983 such names across the fleet (e.g. "Stacey Smith" on an annual report, "Johnson, Crystal D." on meeting minutes). The names were already on the source documents, but aggregating them into a single queryable file across 9,000+ documents materially changed the exposure surface. New `stripPiiFromEntry(entry)` helper in `src/commands/web-rollup.js` drops both fields from every entry before the NDJSON is written; all other introspection (page count, image-only flag, heading coverage, OCR signals, file size, hash) is preserved because that's what makes the AI-context file useful. Verified: 9,096 entries in this bundle, **0 with author, 0 with lastModifiedBy**.
+
+[1.7.32]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.32
+
 ## [1.7.31] — 2026-05-13
 
 ### Added

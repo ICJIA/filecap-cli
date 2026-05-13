@@ -81,6 +81,35 @@ export function normalizeStrapiFilename(filename) {
   return filename.replace(/_[a-f0-9]{10}(\.[^.]+)$/, "$1");
 }
 
+/**
+ * v1.7.32 — Strip personal-identifier fields from an inventory entry's
+ * format-specific introspection before it's written into the public
+ * `audit-fleet.ndjson`. PDF/DOCX metadata exposes `author` (and DOCX
+ * also exposes `lastModifiedBy`) — both commonly contain a real human
+ * name (e.g. "Stacey Smith", "Johnson, Crystal D."). Those names are
+ * already inside the source document and visible to anyone who opens
+ * the file, but aggregating them across 9,000+ documents into a
+ * single queryable NDJSON is a new exposure surface — and the public
+ * "Zero PII in this audit" banner promises this won't happen.
+ *
+ * Conservative scope: drop only the two fields known to carry names.
+ * Other introspection (page count, image-only, heading coverage, OCR
+ * flags, file sizes, hashes) is what makes the audit useful, so it
+ * stays. `creator` + `producer` are kept because they're software
+ * identifiers in every sample we've seen ("Microsoft Word",
+ * "Adobe PDF Library", etc.) rather than people.
+ */
+function stripPiiFromEntry(entry) {
+  if (!entry?.introspection) return entry;
+  const intro = entry.introspection;
+  // Shallow-clone so the original (held in allEntries for cross-server
+  // duplicate detection elsewhere) is untouched. Build a new
+  // introspection object without the redacted keys.
+  // eslint-disable-next-line no-unused-vars
+  const { author, lastModifiedBy, ...keep } = intro;
+  return { ...entry, introspection: keep };
+}
+
 // Filenames that are always-duplicates by design and would clutter the
 // cross-server duplicates view without giving the audit lead any useful
 // signal. `.gitkeep` and `.gitignore` exist purely to preserve empty
@@ -901,7 +930,7 @@ export async function runWebRollup({
       consolidatedAt,
     };
     const ndjsonLines = [JSON.stringify(ndjsonHeader)];
-    for (const it of allEntries) ndjsonLines.push(JSON.stringify(it.entry));
+    for (const it of allEntries) ndjsonLines.push(JSON.stringify(stripPiiFromEntry(it.entry)));
     ndjsonLines.push(JSON.stringify(ndjsonFooter));
     const ndjsonPath = path.join(output, ndjsonFilename);
     await fs.writeFile(ndjsonPath, ndjsonLines.join("\n") + "\n");
