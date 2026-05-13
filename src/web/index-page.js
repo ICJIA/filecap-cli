@@ -351,6 +351,48 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
   </section>`;
 }
 
+/**
+ * v1.7.30 — "Coming soon" / in-development section at the bottom of the
+ * fleet index. Mirrors the layout register of the fleet + duplicates
+ * section banners (eyebrow + clamped headline + lede + accent bar), but
+ * with a violet accent so the eye reads it as a third visual category:
+ * not "current state" (blue), not "warning / awareness" (amber), but
+ * "upcoming." The bullets summarise the major reference-discovery work
+ * that's been built in-branch but is not yet shipped in this bundle —
+ * surfaced here so managers see the roadmap without scrolling the repo.
+ */
+function renderTodoSection() {
+  return `
+  <section class="section todo">
+    <div class="todo-section-banner" role="presentation">
+      <p class="todo-section-eyebrow">Section · Coming soon</p>
+      <h2 class="todo-section-headline">What's next for this audit</h2>
+      <p class="todo-section-lede">These features are in active development and will appear in upcoming releases. They aim to answer the question every manager asks when reading an audit: <em>"where is this file used, and is it safe to delete?"</em></p>
+    </div>
+
+    <ul class="todo-list">
+      <li class="todo-item">
+        <h3 class="todo-item-h3">A "Referenced" column and a "Status" verdict</h3>
+        <p>Each PDF row will gain two new columns directly to the right of <strong>Public URL</strong>: <strong>Referenced</strong> (the live pages that link to the file) and <strong>Status</strong> (a single verdict chip: <em>Active</em>, <em>Orphan candidate</em>, or <em>Discovery N/A</em>). Sorting the spreadsheet on Status lets a manager scan for files that no published page links to — without reading every URL by hand.</p>
+      </li>
+      <li class="todo-item">
+        <h3 class="todo-item-h3">Cross-site reference detection</h3>
+        <p>Files inventoried on one ICJIA site that are linked from another (for example, an archive PDF embedded in a page on icjia.illinois.gov) will appear in the Referenced column with a "<em>from icjia</em>" tag. The current per-site view doesn't see across sites, so a PDF can look orphaned on the archive even when it's actively cited from another property.</p>
+      </li>
+      <li class="todo-item">
+        <h3 class="todo-item-h3">SPA-page rendering</h3>
+        <p>Several ICJIA sites (i2i, spac, and the main icjia.illinois.gov frontend) render their content client-side via JavaScript — the curl-style crawler sees only an empty page shell. A future release will use a headless browser engine to capture the rendered content, recovering references that are currently invisible (e.g. agendas and minutes attached to the ARI meetings page).</p>
+      </li>
+      <li class="todo-item">
+        <h3 class="todo-item-h3">Sitemap-validated reference URLs</h3>
+        <p>Every reference URL the report emits will be cross-checked against the site's published <code>sitemap.xml</code> before it appears in the spreadsheet. The aim: any URL a manager clicks always lands on a real published page — no 404s from auto-constructed routes that the live frontend doesn't actually recognise.</p>
+      </li>
+    </ul>
+
+    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/filecap-cli/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">filecap CHANGELOG</a> — the next minor release (1.8.0) will roll these out.</p>
+  </section>`;
+}
+
 // v1.7.15: ICJIA wordmark for the navbar. Sourced from the agency's standard
 // asset set (https://github.com/ICJIA/archived-website-page/blob/main/assets/
 // icjia-logo.svg). White fills were swapped to currentColor so a CSS color
@@ -1845,6 +1887,97 @@ main {
   .duplicates .dup-section-lede { font-size: 1rem; }
 }
 
+/* v1.7.30 — "Coming soon" section. Same banner anatomy as the fleet +
+   duplicates sections (eyebrow / clamped headline / lede / accent bar),
+   but with a violet accent so the eye registers it as a third register:
+   not current state (blue), not warning (amber), but upcoming work. */
+.todo .todo-section-banner {
+  margin: 4.5rem 0 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #2a3340;
+}
+.todo .todo-section-banner::before {
+  content: "";
+  display: block;
+  width: 72px;
+  height: 5px;
+  background: linear-gradient(90deg, #d2a8ff 0%, #8957e5 100%);
+  border-radius: 3px;
+  margin-bottom: 1.4rem;
+}
+.todo .todo-section-eyebrow {
+  margin: 0 0 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #d2a8ff;
+}
+.todo .todo-section-headline {
+  margin: 0 0 0.9rem;
+  font-size: clamp(2.2rem, 4.5vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+}
+.todo .todo-section-lede {
+  margin: 0 0 1.8rem;
+  max-width: 72ch;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  color: #c0cdda;
+}
+.todo .todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+.todo .todo-item {
+  background: #181d27;
+  border: 1px solid #2a2540;
+  border-left: 4px solid #8957e5;
+  border-radius: 6px;
+  padding: 1rem 1.2rem 1.1rem;
+}
+.todo .todo-item-h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f0e7ff;
+}
+.todo .todo-item p {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.55;
+  color: #c0cdda;
+}
+.todo .todo-item code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+.todo .todo-footer-note {
+  margin: 1.4rem 0 0;
+  font-size: 0.92rem;
+  color: #8b949e;
+}
+.todo .todo-footer-note a {
+  color: #d2a8ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+@media (max-width: 720px) {
+  .todo .todo-section-banner { margin: 3rem 0 1.5rem; padding-top: 1.1rem; }
+  .todo .todo-section-banner::before { width: 56px; height: 4px; margin-bottom: 1rem; }
+  .todo .todo-section-lede { font-size: 1rem; }
+  .todo .todo-item { padding: 0.9rem 1rem; }
+  .todo .todo-item-h3 { font-size: 1rem; }
+}
+
 /* ── duplicates section — v1.7.2 big visual treatment ─────────────────── */
 .duplicates .dup-hero {
   background: linear-gradient(180deg, #18202b 0%, #141a23 100%);
@@ -2561,6 +2694,7 @@ ${cardsHtml}
 ${renderMasterCsvSection(masterCsv)}
 ${renderLlmContextSection(llmContext)}
 ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
+${renderTodoSection()}
 
 </main>
 

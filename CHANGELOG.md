@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.30] — 2026-05-13
+
+### Added
+
+- **New "Coming soon" section at the bottom of the fleet index** — a violet-accented section banner (mirroring the existing fleet/duplicates banner anatomy: eyebrow + clamped headline + lede + accent bar) surfacing in-development reference-discovery work to managers without making them dig through the repo. Lists four items currently being built on a side branch:
+  - The **Referenced** + **Status** columns answering "where is this file linked from on the live site?" and "Active or Orphan?";
+  - **Cross-site reference detection** that surfaces files inventoried on one ICJIA site but linked from another (e.g. archive PDFs cited on icjia.illinois.gov);
+  - **SPA-page rendering** via a headless browser engine for sites where the curl-style crawler sees only an empty `<div id="app">` shell (i2i / spac / agency);
+  - **Sitemap-validated reference URLs** so clicking a reference always lands on a real published page (no 404s from auto-constructed routes that the live frontend doesn't actually recognise).
+
+  Each item is a `<li class="todo-item">` with a violet left-border, a short `<h3>` headline, and a one-paragraph explanation in plain manager-friendly English. Links out to the CHANGELOG so curious managers can track progress between releases. Visual register: violet (`#d2a8ff` → `#8957e5`) — a third color identity beyond the existing blue (fleet snapshot) and amber (duplicates) so the eye instantly registers the section as "upcoming, not current."
+
+[1.7.30]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.30
+
 ## [1.7.29] — 2026-05-13
 
 ### Changed
