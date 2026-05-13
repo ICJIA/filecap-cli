@@ -468,7 +468,7 @@ body {
   color: #58a6ff;
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   padding: 0.25rem 0.5rem;
   margin-left: -0.5rem;
   border-radius: 3px;
@@ -482,27 +482,38 @@ body {
 }
 .report-csv-link {
   /* CSV is the real deliverable — render the link as a prominent button
-     so it reads as a primary action, not an afterthought. */
+     so it reads as a primary action, not an afterthought. v1.7.27:
+     font-size + padding tuned to match the .audit-tool-link button so
+     they render at identical heights when sitting side-by-side. */
   display: inline-block;
   background: #1f6feb;
   color: #ffffff !important;
   text-decoration: none;
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: 700;
+  font-size: 0.88rem;
   padding: 0.4rem 0.9rem;
-  border-radius: 4px;
+  border-radius: 8px;
   border: 1px solid #1f6feb;
   transition: background 120ms ease;
+  white-space: nowrap;
 }
 .report-csv-link:hover { background: #388bfd; text-decoration: none; }
 .report-csv-link:focus-visible {
   outline: 2px solid #58a6ff;
   outline-offset: 2px;
 }
-/* v1.7.16: cluster of right-side actions in the sticky bar. */
+/* v1.7.16: cluster of right-side actions in the sticky bar. v1.7.27:
+   switched to align-items: flex-start so the two buttons (audit-tool +
+   csv-link) line up on their TOP edges. Pre-v1.7.27 they were
+   align-items: center, which centered the .audit-tool-link button on
+   the .report-csv-block's vertical midpoint — but the csv-block is
+   taller because it has the "Last audit: …" caption stacked below the
+   button, so the csv-link button sat above the audit-tool button.
+   Top-aligning both buttons puts them on the same baseline; the date
+   caption hangs below the csv-link without pushing it around. */
 .report-back-bar-right {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.85rem;
   flex-wrap: wrap;
 }
@@ -520,7 +531,8 @@ body {
 }
 .report-csv-date strong { color: #c9d1d9; font-weight: 700; }
 /* Mirror of .audit-tool-link styling on the index page so the affordance
-   reads the same across surfaces. */
+   reads the same across surfaces. v1.7.27: font-size + padding tuned to
+   match .report-csv-link button so they render at identical heights. */
 .audit-tool-link {
   display: inline-flex;
   align-items: center;
@@ -529,7 +541,7 @@ body {
   background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
   color: #0c1219 !important;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   letter-spacing: 0.01em;
   text-decoration: none;
   border-radius: 8px;

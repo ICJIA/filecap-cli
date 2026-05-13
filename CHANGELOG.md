@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.27] — 2026-05-13
+
+### Fixed
+
+- **Detail-page sticky bar buttons now top-align cleanly + render at identical heights.** Pre-v1.7.27 the right-side cluster (`.report-back-bar-right`) used `align-items: center` to center its children — but its two children were the `.audit-tool-link` button (single line, ~37 px tall) and the `.report-csv-block` column-wrapper (the CSV-link button + "Last audit: …" caption stacked, ~55 px tall total). Centering both meant the CSV-link button sat ~9 px higher than the audit-tool button, with the date caption hanging below. Switched the right-cluster to `align-items: flex-start` so both buttons line up on their top edges; the date caption still hangs below the CSV button without pushing it around. Also unified the two buttons' styling (`font-size: 0.88 rem`, `padding: 0.4 rem 0.9 rem`, `border-radius: 8 px`, `font-weight: 700`, `white-space: nowrap`) so they render at identical heights regardless of which one wraps text first.
+
+### Changed
+
+- **Sticky-bar fonts nudged down a hair.** Back link `0.95 rem → 0.88 rem`, CSV-link button `0.95 rem → 0.88 rem`, audit-tool button `0.9 rem → 0.88 rem`. All three now match at `0.88 rem`. Subtle change — keeps the bar from feeling shouty against the dense detail-page content below.
+
+[1.7.27]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.27
+
 ## [1.7.26] — 2026-05-13
 
 ### Documentation
