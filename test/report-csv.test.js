@@ -347,7 +347,7 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     expect(last[0].name).toBe("deleteFlag");
     expect(last[0].label).toBe("Delete?");
     expect(last[0].csvOnly).toBe(true);
-    expect(last[0].defaultValue).toBe("No");
+    expect(last[0].defaultValue).toBe("");
     expect(last[1].name).toBe("notes");
     expect(last[1].label).toBe("Notes");
     expect(last[1].csvOnly).toBe(true);
@@ -363,7 +363,7 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     expect(headerRow.split(",").length).toBe(16);
   });
 
-  it("CSV data rows default Delete? to \"No\" and Notes to empty string", () => {
+  it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {
     const entry = {
       path: "doc.pdf",
       absolutePath: "/uploads/doc.pdf",
@@ -378,7 +378,7 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
     const dataRow = csv.trim().split("\n")[1];
     const cells = dataRow.split(",");
-    expect(cells[colIndex("deleteFlag")]).toBe("No");
+    expect(cells[colIndex("deleteFlag")]).toBe("");
     expect(cells[colIndex("notes")]).toBe("");
   });
 });

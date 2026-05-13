@@ -686,8 +686,9 @@ describe("writeHtml", () => {
         csvHref: "site.csv",
       });
       const html = await fs.readFile(outputPath, "utf8");
-      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>/);
-      expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Try ICJIA&#39;s PDF audit tool<\/span>/);
+      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>[\s\S]{0,800}<span>ICJIA&#39;s PDF Audit Tool<\/span>/);
+      // v1.7.28: detail-page sticky bar also carries the FAQ button.
+      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/accessibility\.icjia\.app"[\s\S]{0,800}<span>ICJIA Accessibility FAQs<\/span>/);
     });
 
     it("shows the per-site scannedAt date under the CSV download for single-site reports", async () => {

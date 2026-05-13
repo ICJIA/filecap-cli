@@ -239,9 +239,12 @@ describe("index page audit-tool button (v1.7.16)", () => {
     expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*>/);
   });
 
-  it("the audit link includes an external-link SVG icon and the 'Try ICJIA's PDF audit tool' label", () => {
-    expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,400}<svg class="audit-tool-icon"/);
-    expect(html).toMatch(/<a class="audit-tool-link"[\s\S]{0,700}<span>Try ICJIA&#39;s PDF audit tool<\/span>/);
+  it("the audit-tool link includes an external-link SVG icon and the 'ICJIA's PDF Audit Tool' label", () => {
+    expect(html).toMatch(/<a class="audit-tool-link"[^>]*href="https:\/\/audit\.icjia\.app"[\s\S]{0,800}<span>ICJIA&#39;s PDF Audit Tool<\/span>/);
+  });
+
+  it("the navbar also has an 'ICJIA Accessibility FAQs' button linked to accessibility.icjia.app (v1.7.28)", () => {
+    expect(html).toMatch(/<a class="audit-tool-link"[^>]*href="https:\/\/accessibility\.icjia\.app"[\s\S]{0,800}<span>ICJIA Accessibility FAQs<\/span>/);
   });
 
   it("uses rel=\"noopener noreferrer\" to prevent the target page from accessing window.opener", () => {

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.28] — 2026-05-13
+
+### Changed
+
+- **CSV `Delete?` column defaults to empty instead of `"No"`.** CSV is plain text — it can't carry a Yes/No dropdown (data validation is an Excel/Sheets feature, not a CSV feature). Asking staff to set up validation manually adds friction. Empty default lets staff type whatever feels natural — `X`, `YES`, `Y`, `delete`, ✔ — and the (future) delete-processor will treat any non-empty, non-"no" value as "flag this file for removal." More permissive, less prescriptive. Master-CSV section blurb on the index updated: "Put `X`, `YES`, or anything non-blank in the Delete? cell for any file you want removed." Tests + LLM context.md updated.
+
+- **Navbar button label** `Try ICJIA's PDF audit tool` → **`ICJIA's PDF Audit Tool`**. Dropped the verb (button labels generally read as the noun they point at) and Title-Cased "Audit Tool" so the brand reads cleanly.
+
+- **New navbar button: `ICJIA Accessibility FAQs`** linking to `https://accessibility.icjia.app`. Sits to the left of the PDF Audit Tool button on every page (index navbar + per-site detail page sticky bar + per-file-type detail pages) so a manager or auditor reading the audit can pop over to the agency's accessibility FAQ in one click. Same visual treatment as the audit-tool button (filled-blue button with external-link / question-mark icon, `rel="noopener noreferrer"`, opens in a new tab).
+
+- **Navbar fonts reduced for less crowding.** Index navbar brand: `1 rem → 0.88 rem`. Both navbar action buttons (FAQ + PDF Audit): `0.9 rem → 0.8 rem`, padding `0.5 rem 0.95 rem → 0.4 rem 0.8 rem`, border-radius `8 px → 7 px`, gap `0.5 rem → 0.45 rem`. Detail-page sticky bar back-link + CSV-link + audit-tool button all dropped to `0.8 rem` too so the whole bar reads as one consistent register. Net effect: visibly more horizontal whitespace in the navbar, two buttons + brand sit comfortably without crowding the page edge.
+
+- **Top-section banner lede uses a dynamic site count.** Was `A complete scan of every file on every ICJIA-managed website`; now `A complete scan of every file on ICJIA's <N> sites` where `<N>` is the actual count of sites in the audit (currently 17). Managers can see at a glance exactly how big the fleet is without scrolling to the per-site cards.
+
+[1.7.28]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.28
+
 ## [1.7.27] — 2026-05-13
 
 ### Fixed

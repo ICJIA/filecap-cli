@@ -367,7 +367,8 @@ function buildFleetContextMarkdown({ allEntries, siteResults, duplicateGroupsCou
 
 The bundle this lives in includes several CSV files (\`audit-file-list-master.csv\`,
 \`audit-pdfs.csv\`, \`audit-docx.csv\`, and a CSV per per-site report). Those
-CSVs carry two staff-fill columns — **Delete?** (default "No") and
+CSVs carry two staff-fill columns — **Delete?** (default empty; staff
+writes \`X\`, \`YES\`, or anything non-blank to flag a file for removal) and
 **Notes** — that staff edit and send back so the audit team can remove
 flagged files before the next scan. **This NDJSON + markdown pair is
 explicitly NOT for editing.** It exists so an LLM agent (or anyone wanting

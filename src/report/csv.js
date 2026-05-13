@@ -27,13 +27,15 @@ export const CSV_COLUMNS = [
   { name: "duplicateOf",  label: "Duplicate of" },
   // v1.7.16: CSV-only "action" columns that staff fills in. The HTML
   // table view skips these (filtered by `csvOnly`) because the web view is
-  // informational — the actionable artefact is the CSV. Workflow: download
-  // CSV → mark "Yes" in "Delete?" for any file that should be removed → add
-  // free-text notes → send the CSV back. CSV is plain text so the
-  // "dropdown" feel needs Excel/Google-Sheets data validation set by the
-  // staff member; the column defaults to "No" so an unedited CSV behaves
-  // sensibly. `defaultValue` is consumed by buildRow.
-  { name: "deleteFlag",   label: "Delete?", csvOnly: true, defaultValue: "No" },
+  // informational — the actionable artefact is the CSV.
+  //
+  // v1.7.28: Delete? defaults to EMPTY instead of "No". CSV cannot carry
+  // data validation (no real Yes/No dropdown), and asking staff to set up
+  // validation manually in Excel/Sheets adds friction. Empty default lets
+  // staff type whatever feels natural — `X`, `YES`, `Y`, `delete`, ✔ — and
+  // the (future) delete-processor will treat any non-empty, non-"no" value
+  // as "flag for removal." More permissive, less prescriptive.
+  { name: "deleteFlag",   label: "Delete?", csvOnly: true, defaultValue: "" },
   { name: "notes",        label: "Notes",   csvOnly: true, defaultValue: "" },
 ];
 
@@ -146,8 +148,9 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     duplicateOf,
     // v1.7.16 csvOnly columns. The labels stay aligned with CSV_COLUMNS
     // entries; defaults come from the column descriptor so a future column
-    // addition just needs the descriptor update.
-    CSV_COLUMNS.find((c) => c.name === "deleteFlag")?.defaultValue ?? "No",
+    // addition just needs the descriptor update. v1.7.28: deleteFlag
+    // default flipped from "No" → "" (see CSV_COLUMNS comment above).
+    CSV_COLUMNS.find((c) => c.name === "deleteFlag")?.defaultValue ?? "",
     CSV_COLUMNS.find((c) => c.name === "notes")?.defaultValue ?? "",
   ];
 }

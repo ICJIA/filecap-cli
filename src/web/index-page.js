@@ -143,7 +143,7 @@ function renderMasterCsvSection(masterCsv) {
   return `
   <section class="section master-csv">
     <h2>Master spreadsheet — every file across every server</h2>
-    <p>If you'd rather skim a single spreadsheet instead of per-site files, this combined CSV has every file from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from. The CSV also has two columns — <strong>Delete?</strong> (defaults to "No") and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit.</p>
+    <p>If you'd rather skim a single spreadsheet instead of per-site files, this combined CSV has every file from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from. The CSV also has two empty columns — <strong>Delete?</strong> and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit. Put <code>X</code>, <code>YES</code>, or anything non-blank in the Delete? cell for any file you want removed.</p>
     <p class="master-csv-download">
       <a class="cta-button" href="${he(masterCsv.filename)}" download>
         Download <strong>${he(masterCsv.filename)}</strong>
@@ -721,7 +721,7 @@ h2 {
 }
 .site-header .brand {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.88rem;
   color: #e5e5e5;
   letter-spacing: -0.01em;
   padding-left: 0.85rem;
@@ -745,15 +745,15 @@ h2 {
 .audit-tool-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.95rem;
+  gap: 0.45rem;
+  padding: 0.4rem 0.8rem;
   background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
   color: #0c1219;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   letter-spacing: 0.01em;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: 7px;
   border: 1px solid #2f8de0;
   transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
   white-space: nowrap;
@@ -2353,13 +2353,21 @@ main {
     <span class="brand"><span>filecap</span> fleet audit snapshot</span>
   </div>
   <div class="site-header-right">
-    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="Check a PDF for accessibility at ICJIA's audit tool (audit.icjia.app, opens in a new tab)">
+    <a class="audit-tool-link" href="https://accessibility.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA accessibility FAQs (accessibility.icjia.app, opens in a new tab)">
+      <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="8" r="6.5"/>
+        <path d="M6 6.2a2 2 0 1 1 2.6 1.9c-0.5 0.2-0.6 0.5-0.6 0.9"/>
+        <circle cx="8" cy="11.2" r="0.55" fill="currentColor"/>
+      </svg>
+      <span>ICJIA Accessibility FAQs</span>
+    </a>
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA's PDF Audit Tool (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>Try ICJIA&#39;s PDF audit tool</span>
+      <span>ICJIA&#39;s PDF Audit Tool</span>
     </a>
   </div>
 </header>
@@ -2372,7 +2380,7 @@ main {
   <div class="fleet-section-banner" role="presentation">
     <p class="fleet-section-eyebrow">Section · Fleet snapshot</p>
     <h1 class="fleet-section-headline">ICJIA Accessibility Fleet Audit</h1>
-    <p class="fleet-section-lede">A complete scan of every file on every ICJIA-managed website, with audit-actionable counts, per-site detail, and a 30-second answer to &ldquo;what may need accessibility remediation across our fleet right now?&rdquo;</p>
+    <p class="fleet-section-lede">A complete scan of every file on ICJIA&#39;s ${he(String(siteCount))} sites, with audit-actionable counts, per-site detail, and a 30-second answer to &ldquo;what may need accessibility remediation across our fleet right now?&rdquo;</p>
     <p class="fleet-section-meta">Generated <time>${he(generatedAt)}</time> &middot; ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
   </div>
 

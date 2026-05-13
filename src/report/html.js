@@ -468,7 +468,7 @@ body {
   color: #58a6ff;
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   padding: 0.25rem 0.5rem;
   margin-left: -0.5rem;
   border-radius: 3px;
@@ -482,17 +482,18 @@ body {
 }
 .report-csv-link {
   /* CSV is the real deliverable — render the link as a prominent button
-     so it reads as a primary action, not an afterthought. v1.7.27:
-     font-size + padding tuned to match the .audit-tool-link button so
-     they render at identical heights when sitting side-by-side. */
+     so it reads as a primary action, not an afterthought. v1.7.28:
+     font + padding match the .audit-tool-link button (0.8rem / 0.35rem
+     0.75rem) so the two right-cluster buttons render at identical
+     heights and the bar stays compact. */
   display: inline-block;
   background: #1f6feb;
   color: #ffffff !important;
   text-decoration: none;
   font-weight: 700;
-  font-size: 0.88rem;
-  padding: 0.4rem 0.9rem;
-  border-radius: 8px;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 7px;
   border: 1px solid #1f6feb;
   transition: background 120ms ease;
   white-space: nowrap;
@@ -531,20 +532,21 @@ body {
 }
 .report-csv-date strong { color: #c9d1d9; font-weight: 700; }
 /* Mirror of .audit-tool-link styling on the index page so the affordance
-   reads the same across surfaces. v1.7.27: font-size + padding tuned to
-   match .report-csv-link button so they render at identical heights. */
+   reads the same across surfaces. v1.7.28: font dropped to 0.8rem
+   (matched against the index navbar variant) to leave more horizontal
+   room for the two-button cluster (FAQ + audit tool) on narrow viewports. */
 .audit-tool-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.9rem;
+  gap: 0.45rem;
+  padding: 0.35rem 0.75rem;
   background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
   color: #0c1219 !important;
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   letter-spacing: 0.01em;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: 7px;
   border: 1px solid #2f8de0;
   transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
   white-space: nowrap;
@@ -1277,13 +1279,21 @@ ${(() => {
     <span aria-hidden="true">&larr;</span> Back to fleet index
   </a>` : '<span></span>'}
   <div class="report-back-bar-right">
-    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="Check a PDF for accessibility at ICJIA's audit tool (audit.icjia.app, opens in a new tab)">
+    <a class="audit-tool-link" href="https://accessibility.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA accessibility FAQs (accessibility.icjia.app, opens in a new tab)">
+      <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="8" r="6.5"/>
+        <path d="M6 6.2a2 2 0 1 1 2.6 1.9c-0.5 0.2-0.6 0.5-0.6 0.9"/>
+        <circle cx="8" cy="11.2" r="0.55" fill="currentColor"/>
+      </svg>
+      <span>ICJIA Accessibility FAQs</span>
+    </a>
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA's PDF Audit Tool (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>Try ICJIA&#39;s PDF audit tool</span>
+      <span>ICJIA&#39;s PDF Audit Tool</span>
     </a>
     ${csvHref ? `<div class="report-csv-block">
       <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
