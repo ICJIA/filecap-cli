@@ -99,14 +99,10 @@ function copyableMetaCell(value, displayHtml, label) {
  * @returns {Array<string|number>}
  */
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
-  // v1.7.20: see csv.js buildPublicUrl for full rationale. Git-type sites
-  // get a GitHub /blob/ URL (the reliable file-content destination) because
-  // some static-site deploys return the homepage HTML for any
-  // non-matching path via Netlify _redirects SPA fallback.
-  const ap = String(entry.absolutePath ?? "");
-  if (/^https?:\/\//i.test(ap)) {
-    return ap.replace("/tree/", "/blob/");
-  }
+  // v1.7.40 — see csv.js buildPublicUrl for full rationale. All sites now
+  // build the Public URL as publicUrlBase + entry.path so links land on
+  // the deployed public site instead of github.com (which broke for
+  // anyone without repo access).
   let base;
   if (isConsolidated) {
     const src = sourceMap.get(entry.serverName);
@@ -114,10 +110,18 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   } else {
     base = sourceHeader.metadata?.publicUrlBase ?? "";
   }
-  if (!base) return "";
-  const cleanBase = base.replace(/\/+$/, "");
-  const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
-  return `${cleanBase}/${cleanPath}`;
+  if (base) {
+    const cleanBase = base.replace(/\/+$/, "");
+    const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
+    return `${cleanBase}/${cleanPath}`;
+  }
+  // Defensive fallback for legacy inventories missing publicUrlBase but
+  // carrying an https:// absolutePath from an older audit-static.sh run.
+  const ap = String(entry.absolutePath ?? "");
+  if (/^https?:\/\//i.test(ap)) {
+    return ap.replace("/tree/", "/blob/");
+  }
+  return "";
 }
 
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {

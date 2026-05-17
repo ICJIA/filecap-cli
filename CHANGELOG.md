@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.40] — 2026-05-17
+
+### Changed
+
+- **Public URL column for git-type sites now points at the deployed public site instead of github.com.** Pre-v1.7.40 (since v1.7.20) every per-file Public URL on a Nuxt/git-hosted site (VPP, ILHEALS, ARI Summit 2017/2018/2019/2023, Safe From the Start) rendered as `https://github.com/<owner>/<repo>/blob/<branch>/<rel>`. That worked for ICJIA staff with repo access but was a dead link for anonymous public-website viewers and would break entirely if any of these repos became private. v1.7.40 changes the Public URL to `<publicUrlBase>/<rel>` — e.g. `https://sfs.icjia.illinois.gov/QuickStart_PartOne_NavIntakeBIF.pdf` instead of `https://github.com/ICJIA/icjia-sfs-2024/blob/main/public/QuickStart_PartOne_NavIntakeBIF.pdf`. The links now resolve for any viewer, regardless of repo access.
+  - **Absolute Path column unchanged.** The CSV still carries the github.com source-tree URL in its dedicated `absolutePath` column for audit-trail and debug purposes, so technical reviewers can still jump to the file's source in the repo.
+  - **Strapi and remote-server sites unaffected.** Their `absolutePath` is a `/home/forge/...` filesystem path (not `https://`), so the publicUrlBase + path shape has always been their Public URL and remains so. Verified end-to-end: DVFR Public URL still resolves through `https://dvfr.icjia-api.cloud/uploads/<file>`.
+  - **No re-audit required.** The change is in the URL-building layer only; existing inventory NDJSON files already carry the right `publicUrlBase` in their headers and the right rel `path` per entry. A fresh `web-rollup` regenerates the bundle with the new URLs immediately.
+  - **Trade-off considered.** Some Nuxt static-site deploys have an SPA `_redirects` catch-all that returns the homepage HTML at HTTP 200 for any path that doesn't match a deployed asset, so a missing file would silently land on the homepage rather than a 404. In practice the audited files always ship with the deploy (we read the same `public/` directory the build serves), so the catch-all rarely fires; when it does, a homepage landing is still a better failure mode for a non-repo viewer than a broken GitHub link.
+
+[1.7.40]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.40
+
 ## [1.7.39] — 2026-05-17
 
 ### Added

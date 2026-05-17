@@ -72,23 +72,29 @@ function formatValue(v) {
 }
 
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
-  // v1.7.20: for git-type sites the audit-static.sh scan stamps each entry's
-  // absolutePath with a full https://github.com/<repo>/tree/<branch>/<path>
-  // URL. The Netlify deploys of some static-site sites (ARI Summit 2017 +
-  // 2018) have a Netlify `_redirects` SPA catch-all that returns the
-  // homepage HTML at HTTP 200 for any file path that doesn't match a
-  // deployed asset — so the publicUrlBase + path URL looks like a working
-  // link but actually points at the homepage. The GitHub source URL is the
-  // reliable destination: GitHub directly serves the file content for every
-  // committed file in the repo. We auto-convert /tree/ → /blob/ since
-  // GitHub uses /blob/ for the file-view canonical URL (though /tree/ also
-  // redirects there for non-directory paths). Strapi-type entries have
-  // absolutePath = a server filesystem path (/uploads/foo.pdf), so the
-  // https:// heuristic naturally distinguishes them.
-  const ap = String(entry.absolutePath ?? "");
-  if (/^https?:\/\//i.test(ap)) {
-    return ap.replace("/tree/", "/blob/");
-  }
+  // v1.7.40 — Always build the Public URL from publicUrlBase + entry.path
+  // so every link lands on the deployed public site, regardless of site
+  // type. For git-type sites this supersedes the v1.7.20 behaviour, which
+  // returned a github.com/<owner>/<repo>/blob/<branch>/<rel> URL written
+  // to entry.absolutePath by the audit-static.sh path-rewrite step. The
+  // GitHub URL was reliable for finding the file content but only worked
+  // for users with repo access — broken for anonymous public-website
+  // viewers (and for any future private repo). The audited files DO live
+  // in the deploy at <publicUrlBase>/<rel>, so the deployed-site URL is
+  // the right destination for end users.
+  //
+  // Trade-off accepted 2026-05-17: some Nuxt static-site deploys have an
+  // SPA `_redirects` catch-all that returns the homepage HTML at HTTP 200
+  // for any path that doesn't match a deployed asset. If a file ever fell
+  // out of the deploy, the link would silently land on the homepage
+  // instead of a 404. In practice the audited files are always in the
+  // deploy (the audit reads the repo's public/ directory, which is what
+  // ships), so this is theoretical. A homepage landing also remains a
+  // better failure mode for non-repo viewers than a broken GitHub link.
+  //
+  // Strapi and remote-server entries are unaffected — their absolutePath
+  // is a /home/forge/... filesystem path, never https://, so the
+  // publicUrlBase + path shape has always been their URL and stays so.
   let base;
   if (isConsolidated) {
     const src = sourceMap.get(entry.serverName);
@@ -96,10 +102,18 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   } else {
     base = sourceHeader.metadata?.publicUrlBase ?? "";
   }
-  if (!base) return "";
-  const cleanBase = base.replace(/\/+$/, "");
-  const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
-  return `${cleanBase}/${cleanPath}`;
+  if (base) {
+    const cleanBase = base.replace(/\/+$/, "");
+    const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
+    return `${cleanBase}/${cleanPath}`;
+  }
+  // Defensive fallback for legacy inventories missing publicUrlBase but
+  // carrying an https:// absolutePath from an older audit-static.sh run.
+  const ap = String(entry.absolutePath ?? "");
+  if (/^https?:\/\//i.test(ap)) {
+    return ap.replace("/tree/", "/blob/");
+  }
+  return "";
 }
 
 function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
