@@ -507,7 +507,7 @@ function copyableValue(value, displayHtml, label) {
   return `<span class="meta-value">${display}<button type="button" class="meta-copy" data-copy="${he(value)}" aria-label="Copy ${he(label || "value")} to clipboard" title="Copy to clipboard">${COPY_ICON_SVG}<span class="meta-copy-feedback" aria-hidden="true">Copied</span></button></span>`;
 }
 
-export function renderCard(sr) {
+export function renderCard(sr, { sortIndex = 0 } = {}) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const nickname = he(site.siteName ?? site.name ?? "");
   // `||` (not `??`) so an empty-string siteFullName falls through to siteName.
@@ -591,7 +591,14 @@ export function renderCard(sr) {
   </details>`
     : "";
 
-  return `<article class="site-card">
+  // v1.7.39 — data-sort-* attributes feed the client-side sort control
+  // above the grid. `sort-az` is the lower-cased visible heading (matches
+  // the default alphabetical order). `sort-added` is the entry's index
+  // in sites.json (highest = most recently added → sorts first when the
+  // user picks "Most recently added"). `sort-files` is total file count
+  // (highest first when the user picks "Most files").
+  const sortAzKey = (site.siteFullName || site.siteName || site.name || "").toLowerCase();
+  return `<article class="site-card" data-sort-az="${he(sortAzKey)}" data-sort-added="${sortIndex}" data-sort-files="${totalFiles}">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
   <header class="card-head">
     ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
@@ -738,12 +745,20 @@ export function generateIndexHtml({
   // matched how the audit team thought about the fleet but not how an
   // outside viewer scans the page. localeCompare so case + diacritics
   // behave naturally on a real keyboard.
+  //
+  // v1.7.39 — capture the original input order before sorting so each
+  // rendered card carries its sites.json declaration index as
+  // `data-sort-added`. That's the data the "Most recently added" sort
+  // option in the toolbar above the grid reads.
+  const originalOrder = new Map(siteResults.map((sr, i) => [sr, i]));
   const sortedSiteResults = [...siteResults].sort((a, b) => {
     const aKey = a.site?.siteFullName || a.site?.siteName || a.site?.name || "";
     const bKey = b.site?.siteFullName || b.site?.siteName || b.site?.name || "";
     return aKey.localeCompare(bKey, undefined, { sensitivity: "base" });
   });
-  const cardsHtml = sortedSiteResults.map(renderCard).join("\n");
+  const cardsHtml = sortedSiteResults
+    .map((sr) => renderCard(sr, { sortIndex: originalOrder.get(sr) ?? 0 }))
+    .join("\n");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1666,6 +1681,104 @@ main {
 }
 @media (max-width: 820px) {
   .site-grid { grid-template-columns: 1fr; }
+}
+
+/* v1.7.39 — big, visible sort toolbar above the site grid. Three
+   segmented buttons (Alphabetical / Most recently added / Most files
+   first) drive a small inline-JS reorder of .site-card elements
+   already in the DOM. No animation on first paint so the user sees
+   the default A-Z immediately. Buttons wrap to a second row on
+   narrow screens; on phones the whole bar stacks. */
+.site-grid-sort {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 1.4rem;
+  padding: 0.85rem 1rem;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+}
+.site-grid-sort-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e5e5e5;
+  letter-spacing: -0.005em;
+  flex: none;
+}
+.site-grid-sort-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+}
+.sort-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: #0d1117;
+  color: #e5e5e5;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 0.65rem 1.05rem;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s, transform 0.08s;
+}
+.sort-btn:hover {
+  background: #1f2530;
+  border-color: #4b81e0;
+  color: #f0f6fc;
+}
+.sort-btn:active { transform: translateY(1px); }
+.sort-btn:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+.sort-btn.is-active,
+.sort-btn[aria-pressed="true"] {
+  background: #1f6feb;
+  color: #ffffff;
+  border-color: #58a6ff;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(88,166,255,0.45) inset;
+}
+.sort-btn.is-active:hover,
+.sort-btn[aria-pressed="true"]:hover {
+  background: #2c7eff;
+  color: #ffffff;
+  border-color: #79b8ff;
+}
+.sort-btn-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  padding: 0 0.3em;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: inherit;
+}
+.sort-btn.is-active .sort-btn-glyph,
+.sort-btn[aria-pressed="true"] .sort-btn-glyph {
+  background: rgba(255,255,255,0.18);
+}
+.sort-btn-label { white-space: nowrap; }
+@media (max-width: 600px) {
+  .site-grid-sort { align-items: flex-start; flex-direction: column; gap: 0.6rem; }
+  .sort-btn { padding: 0.55rem 0.9rem; font-size: 0.95rem; }
+  .sort-btn-label { white-space: normal; }
 }
 
 /* ── footer ─────────────────────────────────────────────────── */
@@ -2874,6 +2987,23 @@ dialog.access-modal .access-modal-cta a {
 
   <section class="section">
     <h2>Websites in this audit</h2>
+    <div class="site-grid-sort" role="group" aria-label="Sort the websites list">
+      <span class="site-grid-sort-label">Sort by:</span>
+      <div class="site-grid-sort-buttons">
+        <button type="button" class="sort-btn is-active" data-sort="az" aria-pressed="true">
+          <span class="sort-btn-glyph" aria-hidden="true">A&thinsp;&rarr;&thinsp;Z</span>
+          <span class="sort-btn-label">Alphabetical</span>
+        </button>
+        <button type="button" class="sort-btn" data-sort="added" aria-pressed="false">
+          <span class="sort-btn-glyph" aria-hidden="true">&#9733;</span>
+          <span class="sort-btn-label">Most recently added</span>
+        </button>
+        <button type="button" class="sort-btn" data-sort="files" aria-pressed="false">
+          <span class="sort-btn-glyph" aria-hidden="true">&#9660;</span>
+          <span class="sort-btn-label">Most files first</span>
+        </button>
+      </div>
+    </div>
     <div class="site-grid">
 ${cardsHtml}
     </div>
@@ -3092,6 +3222,66 @@ ${renderAccessModals()}
       e.target.close();
     }
   });
+})();
+
+/* v1.7.39 — site-grid sort toolbar. Reorders the .site-card
+   articles already in the DOM by appending them back to .site-grid
+   in the chosen order. Persists the user's choice to sessionStorage
+   so it survives soft navigations (e.g. password-gate reload). */
+(function () {
+  var grid = document.querySelector(".site-grid");
+  if (!grid) return;
+  var buttons = document.querySelectorAll(".site-grid-sort .sort-btn");
+  if (!buttons || buttons.length === 0) return;
+
+  function sortCards(mode) {
+    var cards = Array.prototype.slice.call(grid.querySelectorAll(".site-card"));
+    if (mode === "added") {
+      cards.sort(function (a, b) {
+        return (Number(b.getAttribute("data-sort-added")) || 0) -
+               (Number(a.getAttribute("data-sort-added")) || 0);
+      });
+    } else if (mode === "files") {
+      cards.sort(function (a, b) {
+        return (Number(b.getAttribute("data-sort-files")) || 0) -
+               (Number(a.getAttribute("data-sort-files")) || 0);
+      });
+    } else {
+      cards.sort(function (a, b) {
+        var ak = a.getAttribute("data-sort-az") || "";
+        var bk = b.getAttribute("data-sort-az") || "";
+        return ak.localeCompare(bk, undefined, { sensitivity: "base" });
+      });
+    }
+    var frag = document.createDocumentFragment();
+    cards.forEach(function (c) { frag.appendChild(c); });
+    grid.appendChild(frag);
+  }
+
+  function setActive(mode) {
+    buttons.forEach(function (b) {
+      var active = b.getAttribute("data-sort") === mode;
+      b.classList.toggle("is-active", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  buttons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var mode = btn.getAttribute("data-sort") || "az";
+      sortCards(mode);
+      setActive(mode);
+      try { sessionStorage.setItem("filecap-site-sort", mode); } catch (_) {}
+    });
+  });
+
+  // Restore prior choice on load (default is "az", already rendered server-side).
+  var saved = null;
+  try { saved = sessionStorage.getItem("filecap-site-sort"); } catch (_) {}
+  if (saved && saved !== "az") {
+    sortCards(saved);
+    setActive(saved);
+  }
 })();
 </script>
 

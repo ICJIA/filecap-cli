@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.39] — 2026-05-17
+
+### Added
+
+- **Sort toolbar above the website grid on the fleet index page.** Three big, visible segmented buttons let viewers re-order the site cards without leaving the page:
+  - **Alphabetical (default)** — A→Z by visible heading (`siteFullName`), matching the pre-1.7.39 default order.
+  - **Most recently added** — sites in reverse `sites.json` declaration order, so the most recently added site (e.g. Safe From the Start, added 2026-05-17) appears first. Useful when scanning for the newest member of the fleet without hunting alphabetically.
+  - **Most files first** — by total file count descending, so the biggest sites surface at the top. Useful when triaging remediation effort.
+  - The chosen sort persists across reloads via `sessionStorage` (`filecap-site-sort`). Toolbar wraps on narrow viewports and stacks vertically on phones.
+  - All reordering is client-side via inline JS that re-appends the existing `.site-card` DOM nodes in the new order — no network request, no full re-render. Each card carries `data-sort-az`, `data-sort-added`, and `data-sort-files` attributes so the reorder is purely attribute-driven.
+
+[1.7.39]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.39
+
 ## [1.7.38] — 2026-05-13
 
 ### Changed
