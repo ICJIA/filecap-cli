@@ -7,7 +7,7 @@
 
 ## Problem
 
-Non-technical managers who land on the fleet rollup at `icjia-fleet-audit.netlify.app` need to grok each site's accessibility-audit scope in a glance. The current cards bury the site title in a small `<h3>`, use the short nickname only (e.g. "DVFR", "i2i") with no explanation, and present one paragraph of mixed numbers ("69 need accessibility audit · 33 other · 38 MB"). For a manager who *won't* read (busy, skim-mode), this lands as undifferentiated gray text. Detail pages have the same issue: small `<h1>`, modest stat block, then the file table.
+Non-technical managers who land on the fleet rollup at `icjia-fleet-audit.netlify.app` need to grok each site's accessibility-audit scope in a glance. The current cards bury the site title in a small `<h3>`, use the short nickname only (e.g. "DVFR", "i2i") with no explanation, and present one paragraph of mixed numbers ("69 need accessibility audit · 33 other · 38 MB"). For a manager who _won't_ read (busy, skim-mode), this lands as undifferentiated gray text. Detail pages have the same issue: small `<h1>`, modest stat block, then the file table.
 
 The redesign goal is one sentence: **make each card and each detail page read like an infographic for an executive who has 3 seconds**.
 
@@ -21,16 +21,16 @@ The redesign goal is one sentence: **make each card and each detail page read li
 
 ## Decisions (locked during brainstorming)
 
-| # | Decision | Source |
-|---|---|---|
-| D1 | Each site gets an optional `siteFullName` in `sites.json`. Card title prefers `siteFullName`; falls back to `siteName`. Full-name map for all 17 sites baked into the deliverable (`sites.json` edit). | Q1 + user-supplied full names |
-| D2 | The hero numbers on each card are **total files** and **files needing audit**, both shown big, both color-coded (blue = scope, amber = workload). No size hero. | Q2 → "B" |
-| D3 | Cards include a **donut chart** with the audit percentage in the center plus a plain-English caption ("Two-thirds need audit · 69 of 102 files"). | Q3 → "donut + percentage" |
-| D4 | Index grid switches from 3-col to **2-col** at desktop; collapses to **1-col** on mobile (<820 px). | User: "More space, easier to make responsive." |
-| D5 | The donut sits on **its own row below** the two-up tiles, not beside them. Rationale: gives the two-up tiles the full card width so the numbers themselves can scale up (~3.6em, up from 3em). | User: "Feel free to put the donut graph on its own line… in order to make the numbers bigger." |
-| D6 | Nickname (DVFR, i2i, ICJIA…) renders bold (font-weight 800) on light gray (`#c0cdda`) for ≥ 7:1 contrast on the card background — comfortably above WCAG AA 2.1 (4.5:1 normal, 3:1 large). | User: "make the nickname WCAG AA 2.1 contrasty." |
-| D7 | The detail-page header uses **Variant 1**: the same two-up tiles + donut pattern as the index card, blown up wide across the top of the page. Donut on its own row here too. | Q5 → "1" |
-| D8 | "Managers who won't read" is the design audience, not "managers who can't read." Visual-first because they're busy, not because of literacy. | User clarification |
+| #   | Decision                                                                                                                                                                                               | Source                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| D1  | Each site gets an optional `siteFullName` in `sites.json`. Card title prefers `siteFullName`; falls back to `siteName`. Full-name map for all 17 sites baked into the deliverable (`sites.json` edit). | Q1 + user-supplied full names                                                                  |
+| D2  | The hero numbers on each card are **total files** and **files needing audit**, both shown big, both color-coded (blue = scope, amber = workload). No size hero.                                        | Q2 → "B"                                                                                       |
+| D3  | Cards include a **donut chart** with the audit percentage in the center plus a plain-English caption ("Two-thirds need audit · 69 of 102 files").                                                      | Q3 → "donut + percentage"                                                                      |
+| D4  | Index grid switches from 3-col to **2-col** at desktop; collapses to **1-col** on mobile (<820 px).                                                                                                    | User: "More space, easier to make responsive."                                                 |
+| D5  | The donut sits on **its own row below** the two-up tiles, not beside them. Rationale: gives the two-up tiles the full card width so the numbers themselves can scale up (~3.6em, up from 3em).         | User: "Feel free to put the donut graph on its own line… in order to make the numbers bigger." |
+| D6  | Nickname (DVFR, i2i, ICJIA…) renders bold (font-weight 800) on light gray (`#c0cdda`) for ≥ 7:1 contrast on the card background — comfortably above WCAG AA 2.1 (4.5:1 normal, 3:1 large).             | User: "make the nickname WCAG AA 2.1 contrasty."                                               |
+| D7  | The detail-page header uses **Variant 1**: the same two-up tiles + donut pattern as the index card, blown up wide across the top of the page. Donut on its own row here too.                           | Q5 → "1"                                                                                       |
+| D8  | "Managers who won't read" is the design audience, not "managers who can't read." Visual-first because they're busy, not because of literacy.                                                           | User clarification                                                                             |
 
 ## Architecture
 
@@ -40,25 +40,25 @@ Add an optional `siteFullName` string to each site entry. Existing `siteName` (n
 
 The 17 ICJIA-fleet full names landed during brainstorming:
 
-| siteName | siteFullName |
-|---|---|
-| DVFR | Domestic Violence Fatality Review |
-| r3 | Restore. Reinvest. Renew. (R3) Program |
-| i2i | Institute to Innovate |
-| ICJIA | Illinois Criminal Justice Information Authority |
-| Infonet | InfoNet |
-| ILFVCC | Illinois Family Violence Coordinating Council |
-| Archive | ICJIA Document Archive |
-| Intranet | ICJIA Staff Intranet |
-| VPP | Violence Prevention Project |
-| ARI | Adult Redeploy Illinois |
-| ILHEALS | Illinois HEALS |
-| Research Hub 1.0 | ICJIA Research Hub |
-| SPAC | Sentencing Policy Advisory Council |
-| ARI Summit 2023 | Adult Redeploy All Sites Summit 2023 |
-| ARI Summit 2019 | Adult Redeploy All Sites Summit 2019 |
-| ARI Summit 2018 | Adult Redeploy All Sites Summit 2018 |
-| ARI Summit 2017 | Adult Redeploy All Sites Summit 2017 |
+| siteName         | siteFullName                                    |
+| ---------------- | ----------------------------------------------- |
+| DVFR             | Domestic Violence Fatality Review               |
+| r3               | Restore. Reinvest. Renew. (R3) Program          |
+| i2i              | Institute to Innovate                           |
+| ICJIA            | Illinois Criminal Justice Information Authority |
+| Infonet          | InfoNet                                         |
+| ILFVCC           | Illinois Family Violence Coordinating Council   |
+| Archive          | ICJIA Document Archive                          |
+| Intranet         | ICJIA Staff Intranet                            |
+| VPP              | Violence Prevention Project                     |
+| ARI              | Adult Redeploy Illinois                         |
+| ILHEALS          | Illinois HEALS                                  |
+| Research Hub 1.0 | ICJIA Research Hub                              |
+| SPAC             | Sentencing Policy Advisory Council              |
+| ARI Summit 2023  | Adult Redeploy All Sites Summit 2023            |
+| ARI Summit 2019  | Adult Redeploy All Sites Summit 2019            |
+| ARI Summit 2018  | Adult Redeploy All Sites Summit 2018            |
+| ARI Summit 2017  | Adult Redeploy All Sites Summit 2017            |
 
 These get written to `~/.filecap/sites.json` as part of the implementation rollout.
 
@@ -79,18 +79,25 @@ CSS-only via `conic-gradient`:
 
 ```css
 .donut {
-  width: 140px; height: 140px; border-radius: 50%;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
   background: conic-gradient(
-    var(--audit-color)  0   calc(var(--pct) * 1%),
-    var(--total-color)  calc(var(--pct) * 1%) 100%
+    var(--audit-color) 0 calc(var(--pct) * 1%),
+    var(--total-color) calc(var(--pct) * 1%) 100%
   );
   position: relative;
 }
 .donut::after {
-  content: ""; position: absolute; inset: 16px;
-  background: var(--card-bg); border-radius: 50%;
+  content: "";
+  position: absolute;
+  inset: 16px;
+  background: var(--card-bg);
+  border-radius: 50%;
 }
-.donut .pct { /* the % number in the middle */ }
+.donut .pct {
+  /* the % number in the middle */
+}
 ```
 
 `--pct` is set inline per card from the inventory summary. No SVG, no JS, no chart library — works offline once Netlify serves the page.
@@ -125,6 +132,7 @@ CSS-only via `conic-gradient`:
 ```
 
 Equal-height alignment guaranteed via:
+
 - `display: flex; flex-direction: column` on the card.
 - Fixed slots for nickname (1 line), name (`min-height: 2.4em`), tiles (fixed), donut row (fixed), chips (fixed), meta (fixed), CTA pinned with `margin-top: auto`.
 
@@ -155,20 +163,20 @@ DVFR · dvfr-strapi-prod · scanned May 11, 2026
 
 ## Color tokens
 
-| Token | Hex | Used for |
-|---|---|---|
-| `--card-bg-top` | `#18202b` | Card gradient top |
-| `--card-bg-bot` | `#141a23` | Card gradient bottom (also page bg) |
-| `--card-border` | `#2a323d` | Card border |
-| `--total-color` | `#4dabf7` | Blue — scope (total files) |
-| `--audit-color` | `#ffa84d` | Amber — workload (files needing audit) |
-| `--total-tile-bg` | `rgba(77,171,247,0.10)` | Blue tile background |
-| `--audit-tile-bg` | `rgba(255,168,77,0.13)` | Amber tile background |
-| `--name-color` | `#ffffff` | Site title |
-| `--nick-color` | `#c0cdda` | Nickname (≥ 7:1 on card bg) |
-| `--meta-color` | `#788391` | Meta strip / muted text |
-| `--cta-bg` | `#4dabf7` | CTA button background |
-| `--cta-fg` | `#0c1219` | CTA button text |
+| Token             | Hex                     | Used for                               |
+| ----------------- | ----------------------- | -------------------------------------- |
+| `--card-bg-top`   | `#18202b`               | Card gradient top                      |
+| `--card-bg-bot`   | `#141a23`               | Card gradient bottom (also page bg)    |
+| `--card-border`   | `#2a323d`               | Card border                            |
+| `--total-color`   | `#4dabf7`               | Blue — scope (total files)             |
+| `--audit-color`   | `#ffa84d`               | Amber — workload (files needing audit) |
+| `--total-tile-bg` | `rgba(77,171,247,0.10)` | Blue tile background                   |
+| `--audit-tile-bg` | `rgba(255,168,77,0.13)` | Amber tile background                  |
+| `--name-color`    | `#ffffff`               | Site title                             |
+| `--nick-color`    | `#c0cdda`               | Nickname (≥ 7:1 on card bg)            |
+| `--meta-color`    | `#788391`               | Meta strip / muted text                |
+| `--cta-bg`        | `#4dabf7`               | CTA button background                  |
+| `--cta-fg`        | `#0c1219`               | CTA button text                        |
 
 All AA-2.1-validated against the relevant backgrounds.
 
@@ -180,12 +188,12 @@ All AA-2.1-validated against the relevant backgrounds.
 
 ## Error / edge cases
 
-| Case | Behavior |
-|---|---|
-| Site has no `siteFullName` | Title slot shows `siteName` (current behavior preserved). |
-| Site has no `siteUrl` | Nickname-line URL link omitted (current behavior preserved). |
-| Site inventory has 0 files | Both tiles show `0`; donut renders fully blue (0% amber slice); caption reads "No files inventoried." CTA still links to the (empty) detail page. |
-| Audit percentage 0% or 100% | `conic-gradient` handles both endpoints natively — verified visually in mockup. |
+| Case                              | Behavior                                                                                                                                                                                                                                                                                                             |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Site has no `siteFullName`        | Title slot shows `siteName` (current behavior preserved).                                                                                                                                                                                                                                                            |
+| Site has no `siteUrl`             | Nickname-line URL link omitted (current behavior preserved).                                                                                                                                                                                                                                                         |
+| Site inventory has 0 files        | Both tiles show `0`; donut renders fully blue (0% amber slice); caption reads "No files inventoried." CTA still links to the (empty) detail page.                                                                                                                                                                    |
+| Audit percentage 0% or 100%       | `conic-gradient` handles both endpoints natively — verified visually in mockup.                                                                                                                                                                                                                                      |
 | Name longer than 28 ch (~3 lines) | Name container has `max-width: 28ch` so long names wrap to up to 3 lines without overflowing the card. `min-height: 2.4em` reserves space for 2 lines (shorter names align consistently); 3-line names push the rest of the card down but the row stays aligned because all cards in the row stretch to the tallest. |
 
 ## Testing strategy
@@ -193,6 +201,7 @@ All AA-2.1-validated against the relevant backgrounds.
 Existing test suites (288 tests across 27 files) cover the data layer + introspection — none of that changes.
 
 Net-new tests:
+
 1. `test/web/index-page.test.js` — snapshot of one rendered card to catch regressions on the markup structure (assert classes, the presence of donut `--pct` style, the two `<span class="num">` elements, etc.). One green-path snapshot + one zero-files edge case.
 2. `test/report/html.test.js` — snapshot of the new detail-page header block. Same idea.
 3. Manual / Lighthouse: verify WCAG AA 2.1 contrast on the deployed Netlify page using the `axecap` / `contrastcap` MCP. Capture screenshots via `viewcap` before/after for the design retrospective.
@@ -204,6 +213,7 @@ No visual-regression test infrastructure exists; not adding one for this version
 Single git branch, single commit (or two commits — see below). The data-layer change (`siteFullName` in `sites.json`) is the only thing the user sees that affects their saved config; new field is optional so adding it to one fleet doesn't break another fleet's `sites.json`.
 
 Commit shape (single tag `v1.7.0`):
+
 - `examples/audit-fleet-auto.sh`-era version → 1.7.0
 - `package.json` bump
 - `CHANGELOG.md` entry under `[1.7.0]`
