@@ -967,5 +967,39 @@ describe("writeHtml", () => {
       // The "No references found" chip should NOT appear (only for empty array)
       expect(html).not.toContain("No references found");
     });
+
+    // 1.8.0-beta.5: references whose pageUrl couldn't be resolved (no
+    // contentTypeRoutes mapping, missing slug, unsafe scheme) previously
+    // rendered as a red "Page N" chip that looked like a broken link.
+    // Replace with explicit "no page URL" text + a tooltip explaining why,
+    // so it's obvious the reference exists but isn't clickable.
+    it("renders unresolved references as 'no page URL' (not a fake Page N label)", async () => {
+      const out = path.join(tmpDir, "ref-unresolved.html");
+      const entries = [
+        {
+          ...sampleEntries[0],
+          references: [
+            { pageUrl: "https://icjia.illinois.gov/working/page/" },
+            { pageUrl: null, siteName: "ilfvcc-api-prod", contentType: "form", entryId: 17 },
+          ],
+        },
+      ];
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries,
+        sources: null,
+        outputPath: out,
+      });
+      const html = await fs.readFile(out, "utf8");
+      // The unresolved chip says what it is, not "Page 2"
+      expect(html).toContain("no page URL");
+      // The working ref still uses the "Page 1" anchor label
+      expect(html).toMatch(/>Page 1</);
+      // The unresolved chip is NOT labelled "Page 2"
+      const pageTwo = html.match(/>Page 2</);
+      expect(pageTwo).toBeNull();
+      // The chip carries an informative title attribute
+      expect(html).toMatch(/title="[^"]*ilfvcc-api-prod[^"]*form[^"]*#17/);
+    });
   });
 });

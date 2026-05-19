@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.5] — 2026-05-19
+
+### Changed
+
+- **`Referenced` column moved to position 5 in the CSV/HTML report**, immediately after `Public URL`. Pre-beta.5 the column sat at position 15 (between `Duplicate of` and `Delete?`), forcing managers to scroll right to see "where is this file linked from?" — the question the column exists to answer. The two URLs that matter most for the delete-or-keep decision (the file's own URL and the list of pages that link to it) now sit side-by-side.
+
+- **Unresolved-reference chips no longer pretend to be a `Page N` link.** When the cross-resolver finds a reference but the deployed page URL couldn't be computed (no `contentTypeRoutes` mapping for the entry's content type, missing slug, or unsafe scheme), the chip now reads `no page URL` (italic, non-link) with a `title` tooltip identifying the source (`Reference from <siteName> <contentType> #<entryId> — deployed page URL could not be resolved`). The red-styled `Page N` label that looked like a broken link is gone.
+
+- **CSV cells for unresolved references render `(no page URL)` as a placeholder line** instead of silently dropping the reference. Previously a reference with `pageUrl: null` was filtered out of the cell, which made it impossible to distinguish "no references found" from "references exist but no page URLs." The cell's line count now matches the actual reference count.
+
+### Routes added to `~/.filecap/sites.json` for `icjia-agency-prod`
+
+Derived empirically from `icjia.illinois.gov/sitemap.xml`. Added or corrected five `contentTypeRoutes`:
+
+| Content type | Route | Why it matters |
+| --- | --- | --- |
+| `meeting` | `/news/meetings/:slug/` | Meeting agendas + minutes carry legal hosting requirements; managers must see they're referenced before deleting |
+| `program` | `/grants/programs/:slug/` | 60 of 65 programs have attachments |
+| `job` | `/about/employment/:slug/` | (No job attachments in current fleet, but route enables future) |
+| `unit` | `/about/units/:slug/` | Org-unit pages |
+| `publication` | `/about/publications/:slug/` (corrected, was `/researchhub/articles/:slug/`) | 1,107 publications — the corrected route is the canonical /about/publications/ path, also mirrored at /researchhub/articles/ on the live site |
+
+End-to-end re-run of the references step against `icjia-agency-prod` after the route additions resolved deployed page URLs for 2,127 of 2,198 sidecar records (97%). The 71 remaining unresolved records belong to admin content types (`tag`, `requiredForm`, `policy`, `rule`, `regulation`, `config`) that don't have user-facing pages.
+
+The icjia per-site detail page in the bundle went from 884 red `Page N` chips down to 30 "no page URL" chips; working anchor count: 1,349.
+
+### Verified attachments capture
+
+The user-reinforced check: every Strapi content type with an `attachments` field is captured by the v3 extractor's `upload-file-list` path. Per-content-type tally on `icjia-agency-prod`:
+
+| Content type | Entries | With attachments |
+| --- | --- | --- |
+| grant | 106 | 106 (100%) |
+| publication | 1,107 | 1,105 (99.8%) |
+| meeting | 285 | 281 (99%) |
+| post (news) | 188 | 171 (91%) |
+| program | 65 | 60 (92%) |
+| job | 219 | 0 (rarely filled, per user expectation) |
+
+[1.8.0-beta.5]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0-beta.5
+
 ## [1.8.0-beta.4] — 2026-05-19
 
 ### Added

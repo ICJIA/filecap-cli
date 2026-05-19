@@ -139,15 +139,31 @@ function buildReferencedCell(refs) {
   if (refs.length === 0) {
     return '<td><span class="no-refs">No references found</span></td>';
   }
-  const anchors = refs.map((r, i) => {
+  // 1.8.0-beta.5: working refs render as numbered "Page N" anchors; refs
+  // whose pageUrl couldn't be resolved (no contentTypeRoute mapping for
+  // their content type, missing slug, or unsafe scheme) render as an
+  // explicit "no page URL" non-link chip with an informative tooltip
+  // identifying the source (siteName / contentType / entryId). Previously
+  // these rendered as a red "Page N" label that looked like a broken link.
+  let pageNum = 0;
+  const chips = refs.map((r) => {
     const url = r?.pageUrl ?? "";
     const safe = safeUrl(url);
-    const label = `Page ${i + 1}`;
-    if (!safe) return `<span class="ref-link-bad">${label}</span>`;
-    const escapedUrl = htmlEscape(safe);
-    return `<a class="ref-link" href="${escapedUrl}" title="${escapedUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    if (safe) {
+      pageNum += 1;
+      const escapedUrl = htmlEscape(safe);
+      return `<a class="ref-link" href="${escapedUrl}" title="${escapedUrl}" target="_blank" rel="noopener noreferrer">Page ${pageNum}</a>`;
+    }
+    const sourceParts = [];
+    if (r?.siteName) sourceParts.push(r.siteName);
+    if (r?.contentType) sourceParts.push(r.contentType);
+    if (r?.entryId != null) sourceParts.push(`#${r.entryId}`);
+    const tip = sourceParts.length > 0
+      ? `Reference from ${sourceParts.join(" ")} — deployed page URL could not be resolved`
+      : "Reference exists but deployed page URL could not be resolved";
+    return `<span class="ref-link-bad" title="${htmlEscape(tip)}">no page URL</span>`;
   }).join(", ");
-  return `<td>${anchors}</td>`;
+  return `<td>${chips}</td>`;
 }
 
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
@@ -177,6 +193,12 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     siteName,
     serverIp,
     publicUrl,
+    // v1.8.0: placeholder for the Referenced column. The cell loop in
+    // writeHtml() bypasses this value and renders entry.references[] as
+    // anchor chips directly, so the placeholder is only here to keep array
+    // indices aligned with CSV_COLUMNS positions. v1.8.0-beta.5: position
+    // moved to be immediately after publicUrl.
+    "",
     entry.modifiedAt,
     scannedPath,
     entry.path,
@@ -187,11 +209,6 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.sizeBytes,
     entry.sha256 ?? "",
     duplicateOf,
-    // v1.8.0: placeholder for the Referenced column. The cell loop in
-    // writeHtml() bypasses this value and renders entry.references[] as
-    // anchor chips directly, so the placeholder is only here to keep array
-    // indices aligned with CSV_COLUMNS positions.
-    "",
   ];
 
   return raw.map(formatCellValue);

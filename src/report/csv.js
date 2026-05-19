@@ -15,6 +15,21 @@ export const CSV_COLUMNS = [
   { name: "siteName",     label: "Website" },
   { name: "serverIp",     label: "Server IP" },
   { name: "publicUrl",    label: "Public URL" },
+  // v1.8.0-beta.5: Referenced sits immediately next to Public URL so the
+  // file's own URL and the pages that link to it can be read side-by-side
+  // without horizontal scrolling. (Earlier 1.8.0 betas had it as column 15.)
+  // Cell value:
+  //   undefined references → "" (cross-ref step not run yet)
+  //   empty references     → "No" (file is orphaned, no known referrers)
+  //   one or more refs     → page URLs joined by newlines (one URL per line
+  //                          within a single multi-line CSV cell; Excel and
+  //                          Google Sheets auto-hyperlink each URL on open).
+  //                          Refs whose pageUrl couldn't be resolved render
+  //                          as the literal "(no page URL)" so the cell's
+  //                          line count matches the reference count and
+  //                          unresolved refs don't silently collide with the
+  //                          "" / "not run" state.
+  { name: "referenced",   label: "Referenced" },
   { name: "modifiedAt",   label: "Date published" },
   { name: "scannedPath",  label: "Source folder on server" },
   { name: "path",         label: "File location (relative to source folder)" },
@@ -25,15 +40,6 @@ export const CSV_COLUMNS = [
   { name: "sizeBytes",    label: "Size (bytes)" },
   { name: "sha256",       label: "Content hash (SHA-256)" },
   { name: "duplicateOf",  label: "Duplicate of" },
-  // v1.8.0: Referenced column. Lists the page URLs that link to this file —
-  // computed by the references step + cross-references resolver. The
-  // inflection point for managers' delete-or-keep decisions. Cell value:
-  //   undefined references → "" (cross-ref step not run yet)
-  //   empty references     → "No" (file is orphaned, no known referrers)
-  //   one or more refs     → page URLs joined by newlines (one URL per line
-  //                          within a single multi-line CSV cell; Excel and
-  //                          Google Sheets auto-hyperlink each URL on open).
-  { name: "referenced",   label: "Referenced" },
   // v1.7.16: CSV-only "action" columns that staff fills in. The HTML
   // table view skips these (filtered by `csvOnly`) because the web view is
   // informational — the actionable artefact is the CSV.
@@ -84,7 +90,13 @@ function formatReferenced(refs) {
   if (refs == null) return "";
   if (!Array.isArray(refs)) return "";
   if (refs.length === 0) return "No";
-  return refs.map((r) => r.pageUrl ?? "").filter(Boolean).join("\n");
+  // 1.8.0-beta.5: emit one line per reference. When a reference lacks a
+  // pageUrl (no contentTypeRoute match, missing slug, unsafe scheme), write
+  // the literal "(no page URL)" so the line count matches the reference
+  // count and unresolved refs are visible instead of silently dropped.
+  return refs
+    .map((r) => (r?.pageUrl ? r.pageUrl : "(no page URL)"))
+    .join("\n");
 }
 
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
@@ -161,6 +173,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     siteName,
     serverIp,
     publicUrl,
+    referenced,
     entry.modifiedAt,
     scannedPath,
     entry.path,
@@ -178,7 +191,6 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
       return `="${hash}"`;
     })(),
     duplicateOf,
-    referenced,
     // v1.7.16 csvOnly columns. The labels stay aligned with CSV_COLUMNS
     // entries; defaults come from the column descriptor so a future column
     // addition just needs the descriptor update. v1.7.28: deleteFlag

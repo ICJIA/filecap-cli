@@ -63,9 +63,17 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[3].label).toBe("Public URL");
   });
 
-  it("fifth column is modifiedAt with label Date published", () => {
-    expect(CSV_COLUMNS[4].name).toBe("modifiedAt");
-    expect(CSV_COLUMNS[4].label).toBe("Date published");
+  // 1.8.0-beta.5: Referenced column moved to position 5 (immediately after
+  // Public URL) so managers can see "where the file lives" and "where it's
+  // referenced from" side-by-side. modifiedAt slid to position 6.
+  it("fifth column is referenced with label Referenced", () => {
+    expect(CSV_COLUMNS[4].name).toBe("referenced");
+    expect(CSV_COLUMNS[4].label).toBe("Referenced");
+  });
+
+  it("sixth column is modifiedAt with label Date published", () => {
+    expect(CSV_COLUMNS[5].name).toBe("modifiedAt");
+    expect(CSV_COLUMNS[5].label).toBe("Date published");
   });
 
   it("modifiedAt column label is 'Date published' not 'Last modified'", () => {
@@ -384,11 +392,14 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
 });
 
 describe("writeCsv Referenced column", () => {
-  it("declares a Referenced column right after duplicateOf and before deleteFlag", () => {
-    const dupIdx = colIndex("duplicateOf");
+  // 1.8.0-beta.5: column moved next to Public URL so managers can read the
+  // file's own URL and the list of pages that link to it side-by-side
+  // without horizontal scrolling.
+  it("declares a Referenced column immediately after Public URL", () => {
+    const pubIdx = colIndex("publicUrl");
     const refIdx = colIndex("referenced");
     const delIdx = colIndex("deleteFlag");
-    expect(refIdx).toBe(dupIdx + 1);
+    expect(refIdx).toBe(pubIdx + 1);
     expect(refIdx).toBeLessThan(delIdx);
   });
 
@@ -431,6 +442,26 @@ describe("writeCsv Referenced column", () => {
     expect(cells[colIndex("referenced")]).toBe(
       "https://icjia.illinois.gov/grants/funding/2020-casa/",
     );
+  });
+
+  // 1.8.0-beta.5: previously, references with a null pageUrl were silently
+  // dropped from the CSV cell — a row whose references all lack page URLs
+  // ended up with "" in the cell, which the column semantics define as
+  // "cross-references not run yet." That collision hid real data. Now an
+  // unresolved reference renders as the literal string "(no page URL)" so
+  // the cell's line count matches the actual reference count.
+  it("renders '(no page URL)' for references with a null pageUrl", () => {
+    const entry = {
+      ...baseEntry,
+      references: [
+        { pageUrl: "https://icjia.illinois.gov/grants/funding/2020-casa/" },
+        { pageUrl: null, contentType: "form", entryId: 17 },
+      ],
+    };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n").slice(1).join("\n");
+    expect(dataLine).toContain("https://icjia.illinois.gov/grants/funding/2020-casa/");
+    expect(dataLine).toContain("(no page URL)");
   });
 
   it("emits multi-line cell (newline-joined, double-quoted) when references contains multiple items", () => {
