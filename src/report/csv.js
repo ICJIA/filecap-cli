@@ -25,6 +25,15 @@ export const CSV_COLUMNS = [
   { name: "sizeBytes",    label: "Size (bytes)" },
   { name: "sha256",       label: "Content hash (SHA-256)" },
   { name: "duplicateOf",  label: "Duplicate of" },
+  // v1.8.0: Referenced column. Lists the page URLs that link to this file —
+  // computed by the references step + cross-references resolver. The
+  // inflection point for managers' delete-or-keep decisions. Cell value:
+  //   undefined references → "" (cross-ref step not run yet)
+  //   empty references     → "No" (file is orphaned, no known referrers)
+  //   one or more refs     → page URLs joined by newlines (one URL per line
+  //                          within a single multi-line CSV cell; Excel and
+  //                          Google Sheets auto-hyperlink each URL on open).
+  { name: "referenced",   label: "Referenced" },
   // v1.7.16: CSV-only "action" columns that staff fills in. The HTML
   // table view skips these (filtered by `csvOnly`) because the web view is
   // informational — the actionable artefact is the CSV.
@@ -69,6 +78,13 @@ function formatValue(v) {
   if (v === true) return "Yes";
   if (v === false) return "No";
   return v;
+}
+
+function formatReferenced(refs) {
+  if (refs == null) return "";
+  if (!Array.isArray(refs)) return "";
+  if (refs.length === 0) return "No";
+  return refs.map((r) => r.pageUrl ?? "").filter(Boolean).join("\n");
 }
 
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
@@ -138,6 +154,8 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     ? `${entry.duplicateOf.serverName}:${entry.duplicateOf.path}`
     : "";
 
+  const referenced = formatReferenced(entry.references);
+
   return [
     serverName,
     siteName,
@@ -160,6 +178,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
       return `="${hash}"`;
     })(),
     duplicateOf,
+    referenced,
     // v1.7.16 csvOnly columns. The labels stay aligned with CSV_COLUMNS
     // entries; defaults come from the column descriptor so a future column
     // addition just needs the descriptor update. v1.7.28: deleteFlag

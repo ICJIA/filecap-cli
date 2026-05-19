@@ -359,8 +359,8 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     const headerRow = csv.trim().split("\n")[0];
     expect(headerRow).toContain("Delete?");
     expect(headerRow).toContain("Notes");
-    // 16 columns total (14 file-descriptor + 2 action)
-    expect(headerRow.split(",").length).toBe(16);
+    // 17 columns total (15 file-descriptor incl. Referenced + 2 action)
+    expect(headerRow.split(",").length).toBe(17);
   });
 
   it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {
@@ -383,3 +383,70 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
   });
 });
 
+describe("writeCsv Referenced column", () => {
+  it("declares a Referenced column right after duplicateOf and before deleteFlag", () => {
+    const dupIdx = colIndex("duplicateOf");
+    const refIdx = colIndex("referenced");
+    const delIdx = colIndex("deleteFlag");
+    expect(refIdx).toBe(dupIdx + 1);
+    expect(refIdx).toBeLessThan(delIdx);
+  });
+
+  it("uses the human label 'Referenced'", () => {
+    const col = CSV_COLUMNS.find((c) => c.name === "referenced");
+    expect(col).toBeDefined();
+    expect(col.label).toBe("Referenced");
+  });
+
+  it("Referenced column is NOT csvOnly (it appears in the HTML view too)", () => {
+    const col = CSV_COLUMNS.find((c) => c.name === "referenced");
+    expect(col.csvOnly).not.toBe(true);
+  });
+
+  it("emits an empty Referenced cell when entry.references is undefined (cross-ref not run)", () => {
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [baseEntry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("referenced")]).toBe("");
+  });
+
+  it("emits 'No' when entry.references is an empty array", () => {
+    const entry = { ...baseEntry, references: [] };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("referenced")]).toBe("No");
+  });
+
+  it("emits a single page URL when references contains one item", () => {
+    const entry = {
+      ...baseEntry,
+      references: [
+        { pageUrl: "https://icjia.illinois.gov/grants/funding/2020-casa/" },
+      ],
+    };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const dataLine = csv.trim().split("\n")[1];
+    const cells = dataLine.split(",");
+    expect(cells[colIndex("referenced")]).toBe(
+      "https://icjia.illinois.gov/grants/funding/2020-casa/",
+    );
+  });
+
+  it("emits multi-line cell (newline-joined, double-quoted) when references contains multiple items", () => {
+    const entry = {
+      ...baseEntry,
+      references: [
+        { pageUrl: "https://icjia.illinois.gov/grants/funding/2020-casa/" },
+        { pageUrl: "https://icjia.illinois.gov/news/foo/" },
+      ],
+    };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    // Embedded newlines force the csvCell helper to wrap the cell in double quotes,
+    // so the row no longer splits cleanly on plain commas. Find the Referenced cell
+    // by scanning for its expected content directly.
+    expect(csv).toContain(
+      '"https://icjia.illinois.gov/grants/funding/2020-casa/\nhttps://icjia.illinois.gov/news/foo/"',
+    );
+  });
+});

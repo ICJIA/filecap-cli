@@ -577,3 +577,58 @@ describe("isCompleteInventory", () => {
   });
 });
 
+describe("entry.references[] (v1.8.0)", () => {
+  const baseEntry = {
+    path: "case.pdf",
+    absolutePath: "/uploads/case.pdf",
+    filename: "case.pdf",
+    extension: "pdf",
+    category: "pdf",
+    remediable: true,
+    sizeBytes: 1024,
+    modifiedAt: "2024-01-01T00:00:00.000Z",
+    sha256: "abc",
+    flags: [],
+  };
+
+  it("accepts an entry without references (existing inventories are compatible)", () => {
+    expect(() => entrySchema.parse(baseEntry)).not.toThrow();
+  });
+
+  it("accepts an entry with an empty references array", () => {
+    expect(() => entrySchema.parse({ ...baseEntry, references: [] })).not.toThrow();
+  });
+
+  it("accepts an entry with a populated references array", () => {
+    const entry = {
+      ...baseEntry,
+      references: [
+        {
+          pageUrl: "https://icjia.illinois.gov/grants/funding/2020-casa/",
+          anchorText: "LINK TO NOFO",
+          contentType: "grant",
+          entryId: 217,
+          siteName: "icjia-agency-prod",
+          source: "strapi-body-regex",
+        },
+      ],
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("rejects a reference entry missing the required pageUrl", () => {
+    const entry = {
+      ...baseEntry,
+      references: [{ anchorText: "Some text" }],
+    };
+    expect(() => entrySchema.parse(entry)).toThrow();
+  });
+
+  it("accepts a reference entry with only the required pageUrl (other fields optional)", () => {
+    const entry = {
+      ...baseEntry,
+      references: [{ pageUrl: "https://icjia.illinois.gov/x/" }],
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
+  });
+});

@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-alpha.1] — 2026-05-19
+
+### Added
+
+- **`Referenced` column on the per-file CSV and HTML reports.** Answers the single most frequent manager question — "Where is this PDF referenced on the site?" — without leaving the audit. Managers use the column as the inflection point for the delete-vs-keep decision: if a file has no known referrers, it can be removed; if it's linked from one or more live pages, the URL of each linking page surfaces directly in the cell. HTML view renders "Page 1, Page 2, …" anchor chips (URLs in hover-titles, opens in new tab). CSV view renders one full URL per line within a single multi-line cell so Excel/Google Sheets auto-hyperlink each row.
+  - Cell semantics: `entry.references` undefined → empty cell (cross-references step not run); `[]` → muted "No references found" chip; populated → anchor chips. The empty-array state explicitly distinguishes "we looked and found none" from "we haven't looked yet."
+
+- **`filecap references <siteName>` subcommand.** Per-site reference extractor. For Strapi v3 sites it introspects the GraphQL schema to discover every content type, classifies each type's fields automatically (URL-suffix strings, body-style markdown strings, and `UploadFile` typed media), then paginates through every published entry via REST and extracts the union of file URLs found in those fields. Writes an NDJSON sidecar with one record per content entry. Schema-driven, so new content types added to a Strapi site are picked up by introspection without code changes.
+
+- **`filecap cross-references <inventory> --sidecar <path>` subcommand.** Fleet-wide reverse-index resolver. Reads every site's sidecar into one URL → referrers map and walks an inventory NDJSON to attach `entry.references[]` to each file via canonical-URL match. This is what makes the archive site's report useful: archive files don't know their own referrers, but pages on icjia.illinois.gov, dvfr.illinois.gov, etc. point at them, and the resolver back-links those pages onto the archive's rows.
+
+- **Domain-alias resolution for the cross-site index.** Each site in sites.json can declare `domainAliases: ["backend.example.com"]` to cover alternate hosts that serve the same content as its `publicUrlBase`. The resolver collapses alias hosts onto the primary so a URL that appears as `archive.icjia-api.cloud/files/X.pdf` in CMS content matches the archive's inventory entry at `archive.icjia.cloud/files/X.pdf`. Without this, ~99% of archive-PDF references would silently fail to match because ICJIA's content overwhelmingly cites the backend host.
+
+- **`references` block on sites.json site entries** (`strategy`, `graphqlEndpoint`, `restApiBase`, `siteFrontendUrl`, `sitemapUrl`, `contentTypeRoutes`). Configured for `icjia-agency-prod` in this release; the eight other Strapi sites in the fleet (dvfr, r3, i2i, ari, spac, infonet, intranet, ilfvcc, researchhub) are planned for v1.8.0-beta.
+
+### Design notes & verification
+
+- **Verified architecture, not speculative.** Before writing the extractor we probed `agency.icjia-api.cloud` against the live SPA at icjia.illinois.gov to confirm the approach. Two findings drove the design:
+  - On a grant page (`2020-casa`), the rendered SPA's three file hrefs equalled exactly the three URLs extracted from the Strapi entry's `body` markdown via URL regex — perfect 1:1 match. Confirms body-field markdown extraction captures everything the rendered page links to.
+  - On a publication page (`2025-ifvcc-strategic-plan-summary`), the rendered SPA had zero `<a href="…pdf">` anchors — the download is driven by a Vuetify `<button class="article-download">` whose target URL lives only in Vue component state and never reaches the DOM. The PDF URL was, however, present in the Strapi entry's `fileURL` field. Any rendered-page scraping approach would miss all 1,107 publications; the Strapi-API approach captures them. This was the deciding factor: Strapi data is strictly more complete than what the rendered SPA exposes.
+- **Cross-site references are the rule, not the edge case.** Real-world numbers from this release's end-to-end run: 2,059 sidecar records emitted from icjia-agency-prod, joined against the archive inventory → **909 of 1,849 archive files** (49%) now show one or more referring pages on icjia.illinois.gov. Similar coverage on researchhub-prod (108 / 315, 34%) and icjia-agency-prod's own uploads (1,315 / 3,110, 42%).
+- **Domain whitelist filtering.** Each extracted URL is dropped unless its host appears in the auto-derived fleet domain set (every `publicUrlBase` + `siteUrl` + `domainAliases` host across all sites in sites.json). Federal/state/partner-org and non-ICJIA links never make it into the Referenced column.
+- **Pipeline placement.** New full pipeline is `scan → references (per site) → cross-references (fleet-wide) → web-rollup`. References and cross-references are re-runnable independently when CMS data changes or routing rules are updated; a GraphQL failure for one content type only loses that type, not the whole run.
+
+### Module additions
+
+New `src/references/` directory:
+
+- `url-canonical.js` — host lowercasing, trailing-slash stripping, fragment dropping, idempotent canonicalization.
+- `extract-urls.js` — URL regex extraction from markdown / HTML / plain text. Captures `.pdf`/`.docx`/`.xlsx`/`.pptx`/`.zip` URLs with optional query strings, stops at common terminators, dedupes.
+- `field-classifier.js` — given a GraphQL `__type` field descriptor, returns `{kind: "url-string" | "body-string" | "upload-file" | "upload-file-list" | "relation" | "other"}`. Unwraps `NON_NULL` and `LIST` wrappers.
+- `domain-filter.js` — `buildFleetDomainSet(sitesJson)` + `isFleetUrl(url, set)` for the whitelist filter.
+- `strapi-v3.js` — Strapi v3 adapter: GraphQL introspection of content types and their fields, REST pagination, per-entry URL extraction via field-classifier dispatch.
+- `cross-resolver.js` — `buildReverseIndex` + `entryCanonicalUrl` + `resolveEntryReferences` + `buildAliasMap`. Pure functions; the orchestrator command wires them up.
+
+New commands:
+
+- `src/commands/references.js` — per-site orchestrator. Loads site config, dispatches to strategy, writes NDJSON sidecar.
+- `src/commands/cross-references.js` — fleet resolver orchestrator. Reads all sidecars + sites.json, builds the alias-aware reverse index, augments the inventory.
+
+### Tests
+
+- 82 new unit tests across the five new pure modules and the cross-resolver (url-canonical: 10, extract-urls: 12, domain-filter: 10, field-classifier: 19, strapi-v3: 13, cross-resolver: 16). Plus 8 new CSV-render tests + 5 new HTML-render tests + 5 new schema tests for the `entry.references[]` field. Total **539 tests passing** (up from 441 at v1.7.40).
+
+### Scope and what's deferred
+
+- **v1.8.0-alpha is icjia-agency-prod only.** The references block is configured for this single site so we can ship a working Referenced column for the most-critical site, prove the architecture end-to-end, and validate against real CMS content before extending.
+- **v1.8.0-beta** will extend the Strapi-v3 strategy to the other nine Strapi sites and add a git-repo strategy for the seven `type: "git"` Nuxt static sites (vpp, ilheals, sfs, ari-summits).
+- **v1.8.0** (stable) will add the index-page coverage stat ("X% of files have known references"), README docs for the new pipeline, and a Playwright-based verification harness for regression detection.
+
+[1.8.0-alpha.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0-alpha.1
+
 ## [1.7.40] — 2026-05-17
 
 ### Changed

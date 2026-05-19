@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { runScan } from "../src/commands/scan.js";
@@ -7,6 +8,8 @@ import { runRollup } from "../src/commands/rollup.js";
 import { runReport } from "../src/commands/report.js";
 import { runMcp } from "../src/commands/mcp.js";
 import { runWebRollup } from "../src/commands/web-rollup.js";
+import { runReferences } from "../src/commands/references.js";
+import { runCrossReferences } from "../src/commands/cross-references.js";
 import { loadConfig } from "../src/config/load.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
@@ -186,6 +189,86 @@ program
       }
     } catch (err) {
       process.stderr.write(`filecap web-rollup error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("references <siteName>")
+  .description(
+    "Discover per-entry file references for one site (v1.8.0). Reads the site's references.* config from sites.json (graphqlEndpoint, restApiBase, contentTypeRoutes) and writes an NDJSON sidecar with one record per content entry.",
+  )
+  .requiredOption(
+    "-o, --output <path>",
+    "output path for the references sidecar NDJSON",
+  )
+  .action(async (siteName, opts) => {
+    try {
+      const sitesPath =
+        process.env.FILECAP_SITES_FILE
+        ?? path.join(os.homedir(), ".filecap", "sites.json");
+      const raw = fs.readFileSync(sitesPath, "utf8");
+      const sitesJson = JSON.parse(raw);
+      const siteConfig = (sitesJson?.sites ?? []).find(
+        (s) => s.name === siteName,
+      );
+      if (!siteConfig) {
+        process.stderr.write(`filecap references: site "${siteName}" not found in ${sitesPath}\n`);
+        process.exit(1);
+      }
+      await runReferences({
+        siteConfig,
+        sitesJson,
+        outputPath: opts.output,
+      });
+    } catch (err) {
+      process.stderr.write(`filecap references error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("cross-references <inventory>")
+  .description(
+    "Resolve cross-site references: read per-site sidecars, build the fleet-wide URL → referrers index, and write an augmented inventory with entry.references[] populated.",
+  )
+  .requiredOption(
+    "-s, --sidecar <path>",
+    "path to a references sidecar NDJSON (repeatable)",
+    (value, prev) => (prev ? [...prev, value] : [value]),
+  )
+  .requiredOption(
+    "-o, --output <path>",
+    "output path for the augmented inventory NDJSON",
+  )
+  .option(
+    "--public-url-base <url>",
+    "override the inventory's publicUrlBase (rarely needed; usually read from the header metadata)",
+  )
+  .action(async (inventory, opts) => {
+    try {
+      const sitesPath =
+        process.env.FILECAP_SITES_FILE
+        ?? path.join(os.homedir(), ".filecap", "sites.json");
+      let sitesJson = { sites: [] };
+      try {
+        sitesJson = JSON.parse(fs.readFileSync(sitesPath, "utf8"));
+      } catch {
+        // sites.json is optional for cross-references (the alias map just
+        // ends up empty), but log so the operator knows.
+        process.stderr.write(
+          `filecap cross-references: no sites.json at ${sitesPath} — domain aliases disabled\n`,
+        );
+      }
+      await runCrossReferences({
+        inventoryPath: inventory,
+        sidecarPaths: Array.isArray(opts.sidecar) ? opts.sidecar : [opts.sidecar],
+        sitesJson,
+        outputPath: opts.output,
+        publicUrlBaseOverride: opts.publicUrlBase,
+      });
+    } catch (err) {
+      process.stderr.write(`filecap cross-references error: ${err.message}\n`);
       process.exit(1);
     }
   });

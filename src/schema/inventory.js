@@ -134,6 +134,20 @@ export const legacyOfficeIntrospectionSchema = z.object({
   format: z.enum(["doc", "ppt", "xls"]),
 });
 
+// v1.8.0: per-file references discovered by the references step + cross-
+// references resolver. pageUrl is required; everything else is metadata that
+// helps the HTML render produce useful hover labels and the CSV consumer
+// trace back to the source entry. The field is optional on entries so that
+// inventories produced before the references step shipped still validate.
+export const referenceSchema = z.object({
+  pageUrl: z.string(),
+  anchorText: z.string().optional(),
+  contentType: z.string().optional(),
+  entryId: z.union([z.string(), z.number()]).optional(),
+  siteName: z.string().optional(),
+  source: z.string().optional(),
+});
+
 export const entrySchema = z.object({
   path: z.string(),
   absolutePath: z.string(),
@@ -153,6 +167,7 @@ export const entrySchema = z.object({
       legacyOfficeIntrospectionSchema,
     ])
     .optional(),
+  references: z.array(referenceSchema).optional(),
 });
 
 export const consolidatedEntrySchema = entrySchema.extend({
@@ -163,6 +178,8 @@ export const consolidatedEntrySchema = entrySchema.extend({
       path: z.string(),
     })
     .nullable(),
+  // references is inherited from entrySchema (still optional) — kept so a
+  // consolidated row can carry per-site reference back-pointers as well.
 });
 
 export const footerSchema = z.object({

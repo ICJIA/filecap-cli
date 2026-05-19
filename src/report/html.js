@@ -124,6 +124,32 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   return "";
 }
 
+// v1.8.0: Build the Referenced cell. Three states:
+//   undefined / null / non-array → empty cell (cross-references not run yet
+//                                  or this entry's site doesn't support
+//                                  reference discovery).
+//   empty array []              → "No references found" muted chip — file is
+//                                  orphaned, no known referrers in the fleet.
+//   one or more entries         → comma-separated "Page N" anchor chips, each
+//                                  linking to entry.references[N].pageUrl,
+//                                  with the full URL surfaced via title on
+//                                  hover. Anchors open in a new tab.
+function buildReferencedCell(refs) {
+  if (refs == null || !Array.isArray(refs)) return "<td></td>";
+  if (refs.length === 0) {
+    return '<td><span class="no-refs">No references found</span></td>';
+  }
+  const anchors = refs.map((r, i) => {
+    const url = r?.pageUrl ?? "";
+    const safe = safeUrl(url);
+    const label = `Page ${i + 1}`;
+    if (!safe) return `<span class="ref-link-bad">${label}</span>`;
+    const escapedUrl = htmlEscape(safe);
+    return `<a class="ref-link" href="${escapedUrl}" title="${escapedUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+  }).join(", ");
+  return `<td>${anchors}</td>`;
+}
+
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
   let serverName, siteName, serverIp, scannedPath;
   if (isConsolidated) {
@@ -161,6 +187,11 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.sizeBytes,
     entry.sha256 ?? "",
     duplicateOf,
+    // v1.8.0: placeholder for the Referenced column. The cell loop in
+    // writeHtml() bypasses this value and renders entry.references[] as
+    // anchor chips directly, so the placeholder is only here to keep array
+    // indices aligned with CSV_COLUMNS positions.
+    "",
   ];
 
   return raw.map(formatCellValue);
@@ -296,6 +327,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
 
   // ── build table rows ─────────────────────────────────────────────────────────
   const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
+  const referencedColIdx = CSV_COLUMNS.findIndex((c) => c.name === "referenced");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -319,6 +351,9 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
         // Unsafe scheme (e.g. javascript:, data:) — show as plain text
         // so the value still appears in the table but is not clickable.
         return `<td>${escaped}</td>`;
+      }
+      if (i === referencedColIdx) {
+        return buildReferencedCell(entry.references);
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -351,6 +386,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     sizeBytes:    110,
     sha256:       220,
     duplicateOf:  220,
+    referenced:   260,
   };
   // v1.7.16: csvOnly columns (Delete?, Notes) are filtered out of the HTML
   // table — the web view is informational, the CSV is the actionable artefact.
@@ -623,6 +659,44 @@ h2 { font-size: 1.1rem; margin: 1.25rem 0 0.5rem; color: #e5e5e5; font-weight: 6
 p { margin: 0 0 0.5rem; }
 a { color: #60a5fa; text-decoration: none; }
 a:hover { color: #93c5fd; text-decoration: underline; }
+
+/* ─── Referenced column chips v1.8.0 ───
+   The Referenced column shows comma-separated Page-N anchors, each linking
+   to a page that references this file. Hover surfaces the full URL via
+   title="…". The .no-refs muted chip marks files the cross-references
+   resolver checked but found no referrers for (entry.references === []). */
+.ref-link {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px 2px 0;
+  border-radius: 4px;
+  background: #1f2a37;
+  border: 1px solid #2e3b4d;
+  color: #93c5fd;
+  font-size: 0.85em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ref-link:hover {
+  background: #2a3a52;
+  color: #bfdbfe;
+  text-decoration: none;
+}
+.ref-link-bad {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #2a1d1d;
+  border: 1px solid #4d2e2e;
+  color: #ff8888;
+  font-size: 0.85em;
+  font-style: italic;
+}
+.no-refs {
+  color: #6b7280;
+  font-style: italic;
+  font-size: 0.9em;
+}
 
 /* ─── Detail-page hero block v1.7.0 ─── */
 .dp-hero {

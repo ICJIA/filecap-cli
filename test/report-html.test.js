@@ -527,11 +527,11 @@ describe("writeHtml", () => {
       outputPath,
     });
     const html = await fs.readFile(outputPath, "utf8");
-    // Every <th> has the resize handle. As of v1.7.16 the HTML view filters out
-    // CSV-only columns (Delete?, Notes), so the count is the 14 non-csvOnly
-    // entries in CSV_COLUMNS — not 16.
+    // Every <th> has the resize handle. The HTML view filters out csvOnly
+    // columns (Delete?, Notes). As of v1.8.0 we added the Referenced column,
+    // bringing the non-csvOnly count from 14 to 15.
     const handles = html.match(/<span class="col-resize-handle"/g) || [];
-    expect(handles.length).toBe(14);
+    expect(handles.length).toBe(15);
   });
 
   describe("access-method panel (v1.7.6)", () => {
@@ -821,6 +821,131 @@ describe("writeHtml", () => {
       // The fallback (execCommand copy) is also wired so the buttons still
       // work on file:// loads and very old browsers.
       expect(html).toContain("execCommand");
+    });
+  });
+
+  describe("Referenced column (v1.8.0)", () => {
+    it("includes a 'Referenced' column header", async () => {
+      const out = path.join(tmpDir, "ref-header.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: sampleEntries,
+        sources: null,
+        outputPath: out,
+      });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain(">Referenced<");
+    });
+
+    it("renders 'No references found' muted chip when entry.references is an empty array", async () => {
+      const out = path.join(tmpDir, "ref-empty.html");
+      const entries = [{ ...sampleEntries[0], references: [] }];
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries,
+        sources: null,
+        outputPath: out,
+      });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("No references found");
+    });
+
+    it("renders an anchor with target=_blank for each reference", async () => {
+      const out = path.join(tmpDir, "ref-anchors.html");
+      const entries = [
+        {
+          ...sampleEntries[0],
+          references: [
+            {
+              pageUrl: "https://icjia.illinois.gov/grants/funding/2020-casa/",
+              anchorText: "LINK TO NOFO",
+            },
+            {
+              pageUrl: "https://icjia.illinois.gov/news/something/",
+              anchorText: "Press release",
+            },
+          ],
+        },
+      ];
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries,
+        sources: null,
+        outputPath: out,
+      });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain(
+        'href="https://icjia.illinois.gov/grants/funding/2020-casa/"',
+      );
+      expect(html).toContain(
+        'href="https://icjia.illinois.gov/news/something/"',
+      );
+      const refAnchors = html.match(
+        /<a[^>]*class="ref-link"[^>]*target="_blank"/g,
+      );
+      expect(refAnchors).not.toBeNull();
+      expect(refAnchors.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("labels references as 'Page 1', 'Page 2', ... in order", async () => {
+      const out = path.join(tmpDir, "ref-labels.html");
+      const entries = [
+        {
+          ...sampleEntries[0],
+          references: [
+            { pageUrl: "https://icjia.illinois.gov/a/" },
+            { pageUrl: "https://icjia.illinois.gov/b/" },
+            { pageUrl: "https://icjia.illinois.gov/c/" },
+          ],
+        },
+      ];
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries,
+        sources: null,
+        outputPath: out,
+      });
+      const html = await fs.readFile(out, "utf8");
+      // Confirm the visible labels are Page 1 / 2 / 3, not the URL itself
+      expect(html).toMatch(/>Page 1</);
+      expect(html).toMatch(/>Page 2</);
+      expect(html).toMatch(/>Page 3</);
+    });
+
+    it("puts the full URL in the anchor title attribute so hover reveals destination", async () => {
+      const out = path.join(tmpDir, "ref-title.html");
+      const entries = [
+        {
+          ...sampleEntries[0],
+          references: [
+            { pageUrl: "https://icjia.illinois.gov/grants/funding/2020-casa/" },
+          ],
+        },
+      ];
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries,
+        sources: null,
+        outputPath: out,
+      });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain(
+        'title="https://icjia.illinois.gov/grants/funding/2020-casa/"',
+      );
+    });
+
+    it("emits an empty Referenced cell when entry.references is undefined (cross-ref not run)", async () => {
+      const out = path.join(tmpDir, "ref-undef.html");
+      // sampleEntries[0] has no references field
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: [sampleEntries[0]],
+        sources: null,
+        outputPath: out,
+      });
+      const html = await fs.readFile(out, "utf8");
+      // The "No references found" chip should NOT appear (only for empty array)
+      expect(html).not.toContain("No references found");
     });
   });
 });

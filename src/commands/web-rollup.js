@@ -59,6 +59,25 @@ const siteEntrySchema = z
     // a FILECAP_BEARER_TOKEN_<SERVER_NAME> env var. The token itself never lives
     // in this file — sites.json is shareable, secrets.json is local-only.
     requiresBearerToken: z.boolean().optional(),
+    // v1.8.0: extra hostnames that point at the same content as this site
+    // (e.g. archive.icjia-api.cloud is the backend for archive.icjia.cloud).
+    // The references domain-filter unions these into the fleet whitelist so
+    // cross-site URLs aren't dropped during extraction.
+    domainAliases: z.array(z.string()).optional(),
+    // v1.8.0: references discovery config. When present, `filecap references
+    // <siteName>` knows how to fetch this site's CMS data, classify fields,
+    // and resolve deployed page URLs from entry slugs.
+    references: z
+      .object({
+        strategy: z.enum(["strapi-v3"]),
+        graphqlEndpoint: z.string(),
+        restApiBase: z.string(),
+        siteFrontendUrl: z.string().optional(),
+        sitemapUrl: z.string().optional(),
+        contentTypeRoutes: z.record(z.string()).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .refine(
