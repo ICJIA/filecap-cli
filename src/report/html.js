@@ -152,7 +152,12 @@ function buildReferencedCell(refs) {
     if (safe) {
       pageNum += 1;
       const escapedUrl = htmlEscape(safe);
-      return `<a class="ref-link" href="${escapedUrl}" title="${escapedUrl}" target="_blank" rel="noopener noreferrer">Page ${pageNum}</a>`;
+      const anchor = `<a class="ref-link" href="${escapedUrl}" title="${escapedUrl}" target="_blank" rel="noopener noreferrer">Page ${pageNum}</a>`;
+      // v1.10.0: tiny page-accessibility grade chip next to the anchor
+      // when ref.pageAudit has been populated by `filecap audits
+      // --enable-pages`. Answers the manager's "but is that page
+      // accessible too?" question inline, without expanding the cell.
+      return `${anchor}${buildPageAuditChip(r?.pageAudit)}`;
     }
     const sourceParts = [];
     if (r?.siteName) sourceParts.push(r.siteName);
@@ -164,6 +169,34 @@ function buildReferencedCell(refs) {
     return `<span class="ref-link-bad" title="${htmlEscape(tip)}">no page URL</span>`;
   }).join(", ");
   return `<td>${chips}</td>`;
+}
+
+// v1.10.0: tiny chip rendered next to each "Page N" anchor when the
+// page-audit pass has scored that URL via audit.icjia.app's axe-core
+// endpoint. Three states:
+//   - no audit data            → "" (page-audit pass didn't run)
+//   - error from audit endpoint → muted "—" chip
+//   - score                    → "(B)" small chip in the grade colour
+function buildPageAuditChip(pa) {
+  if (!pa || typeof pa !== "object") return "";
+  if (pa.error) {
+    return ` <span class="page-audit-chip page-audit-chip-error" title="${htmlEscape(`Page audit unavailable — ${pa.error}`)}">(—)</span>`;
+  }
+  const grade = typeof pa.grade === "string" ? pa.grade : null;
+  const score = typeof pa.score === "number" ? pa.score : null;
+  if (!grade) return "";
+  const cls = `page-audit-chip-${grade.toLowerCase()}`;
+  const violationLabel =
+    typeof pa.violationCount === "number"
+      ? ` — ${pa.violationCount} violation${pa.violationCount === 1 ? "" : "s"}`
+      : "";
+  const tip = `Page accessibility: ${grade}${score != null ? ` (${score})` : ""}${violationLabel}`;
+  const safeReport =
+    typeof pa.reportUrl === "string" ? safeUrl(pa.reportUrl) : null;
+  if (safeReport) {
+    return ` <a class="page-audit-chip ${cls}" href="${htmlEscape(safeReport)}" target="_blank" rel="noopener noreferrer" title="${htmlEscape(tip + " — click for full report")}">(${htmlEscape(grade)})</a>`;
+  }
+  return ` <span class="page-audit-chip ${cls}" title="${htmlEscape(tip)}">(${htmlEscape(grade)})</span>`;
 }
 
 // v1.9.0: Audit Score cell. Renders a small grade chip ("C") in a colour
@@ -797,6 +830,37 @@ a:hover { color: #93c5fd; text-decoration: underline; }
 .audit-report-link:hover {
   color: #bfdbfe;
   text-decoration: underline;
+}
+
+/* ─── Page-audit grade chips v1.10.0 ───
+   Rendered next to each "Page N" anchor in the Referenced column. Tiny
+   parenthesised letter (A/B/C/D/F) in the same colour register as the
+   file audit grades. When the chip carries a reportUrl, it itself is
+   a clickable anchor — click to open the axe-core deep-dive on
+   audit.icjia.app. */
+.page-audit-chip {
+  display: inline-block;
+  font-size: 0.78em;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 3px;
+  text-decoration: none;
+  vertical-align: baseline;
+  margin-left: 2px;
+}
+a.page-audit-chip:hover {
+  text-decoration: underline;
+}
+.page-audit-chip-a { color: #4ade80; background: rgba(34, 197, 94, 0.10);  border: 1px solid #166534; }
+.page-audit-chip-b { color: #5eead4; background: rgba(20, 184, 166, 0.10); border: 1px solid #115e59; }
+.page-audit-chip-c { color: #fde047; background: rgba(234, 179, 8, 0.10);  border: 1px solid #854d0e; }
+.page-audit-chip-d { color: #fdba74; background: rgba(249, 115, 22, 0.10); border: 1px solid #9a3412; }
+.page-audit-chip-f { color: #fca5a5; background: rgba(239, 68, 68, 0.10);  border: 1px solid #991b1b; }
+.page-audit-chip-error {
+  color: #9ca3af;
+  background: rgba(107, 114, 128, 0.10);
+  border: 1px solid #4b5563;
+  font-style: italic;
 }
 
 /* ─── Detail-page hero block v1.7.0 ─── */

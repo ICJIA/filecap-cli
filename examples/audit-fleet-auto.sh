@@ -205,8 +205,22 @@ if [[ "${SKIP_AUDITS:-0}" == "1" ]]; then
   echo "[fleet-auto] SKIP_AUDITS=1 — skipping PDF accessibility scoring"
 else
   echo "[fleet-auto] Stage 3.5: running 'filecap audits' over each augmented inventory"
-  for site_dir in "$AUDITS_BASE"/*/; do
-    site=$(basename "$site_dir")
+  # v1.9.0+: only audit directories whose name matches a site in
+  # sites.json. Older filecap-audits/ dirs (manual test scans, IP-named
+  # leftovers from pre-1.6.x audits, etc.) often carry malformed
+  # publicUrlBase values that fail the audit step's URL validation and
+  # produce dozens of "Unavailable" cells on the deployed bundle.
+  # Listing only known sites keeps stale data out without forcing
+  # operators to clean up the directory.
+  KNOWN_SITES=$(python3 -c "
+import json
+with open('$SITES_JSON') as f: d = json.load(f)
+for s in d.get('sites', []):
+    if s.get('name'): print(s['name'])
+" 2>/dev/null)
+  for site in $KNOWN_SITES; do
+    site_dir="$AUDITS_BASE/$site"
+    [[ -d "$site_dir" ]] || continue
     # Audits step consumes the most-augmented inventory available
     # (cross-ref'd if present, otherwise raw). Output is
     # inventory.audited.ndjson which web-rollup loader prefers.

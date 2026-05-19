@@ -305,6 +305,23 @@ program
     "--cache-path <path>",
     "override the audit-cache.json location (default ~/.filecap/audit-cache.json)",
   )
+  .option(
+    "--enable-pages",
+    "v1.10.0 preview: after PDF scoring, also score every URL in entry.references[] via audit.icjia.app's /api/audit-url-page (axe-core). Default off until 1.10.0 stable.",
+  )
+  .option(
+    "--page-audit-endpoint <url>",
+    "override the page-audit endpoint (default https://audit.icjia.app/api/audit-url-page)",
+  )
+  .option(
+    "--page-cache-path <path>",
+    "override the page-audit cache location (default ~/.filecap/page-audit-cache.json)",
+  )
+  .option(
+    "--page-ttl-days <n>",
+    "page-audit cache TTL in days (default 14) — pages change more than file content",
+    (v) => parseInt(v, 10),
+  )
   .action(async (inventory, opts) => {
     try {
       // 1.8.0-era bearer-token in secrets.json: if present under
@@ -352,6 +369,11 @@ program
         cachePath: opts.cachePath,
         bearerToken,
         pathPrefix,
+        // v1.10.0 preview — page-audit pass
+        skipPages: opts.enablePages !== true,
+        pageAuditEndpoint: opts.pageAuditEndpoint,
+        pageCachePath: opts.pageCachePath,
+        pageTtlDays: opts.pageTtlDays ?? 14,
       });
     } catch (err) {
       process.stderr.write(`filecap audits error: ${err.message}\n`);
