@@ -697,12 +697,19 @@ export async function runWebRollup({
     }
 
     const auditsBase = _auditsBase ?? path.join(os.homedir(), "filecap-audits");
-    const latestInv = path.join(auditsBase, siteKey, "latest", "inventory.ndjson");
+    const rawInv = path.join(auditsBase, siteKey, "latest", "inventory.ndjson");
+    // v1.8.0: when `filecap cross-references` has been run, it writes an
+    // augmented inventory alongside the raw scan inventory. We prefer the
+    // augmented file so the Referenced column gets populated on the bundle.
+    const augmentedInv = path.join(auditsBase, siteKey, "latest", "inventory.cross-ref.ndjson");
+    let augmentedStat;
+    try { augmentedStat = await fs.stat(augmentedInv); } catch { augmentedStat = null; }
+    const latestInv = augmentedStat ? augmentedInv : rawInv;
     let stat;
     try { stat = await fs.stat(latestInv); } catch { stat = null; }
 
     if (!stat) {
-      process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: no scan at ${latestInv}\n`);
+      process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: no scan at ${rawInv}\n`);
       continue;
     }
 

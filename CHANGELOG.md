@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.4] — 2026-05-19
+
+### Added
+
+- **`web-rollup` now consumes the augmented inventory.** When `filecap cross-references` has been run for a site, it writes the augmented NDJSON to `<siteName>/latest/inventory.cross-ref.ndjson`. `web-rollup` previously read only `inventory.ndjson` (the raw scan output), so the populated `entry.references[]` was invisible in the bundle's CSV/HTML — managers saw an empty `Referenced` column. The loader now prefers the `.cross-ref.ndjson` companion when present and falls back to the raw inventory when absent.
+
+### End-to-end fleet audit deployed
+
+The full pipeline (`scan → references → cross-references → web-rollup --deploy`) ran against all 18 fleet sites and pushed the resulting bundle to https://icjia-fleet-audit.netlify.app:
+
+| Site | Entries | With cross-site refs |
+| --- | --- | --- |
+| archive-prod | 1,849 | 909 (49%) |
+| icjia-agency-prod | 3,110 | 1,379 (44%) |
+| researchhub-prod | 315 | 250 (**79%**) |
+| dvfr-strapi-prod | 102 | 61 (**60%**) |
+| ari-api-prod | 553 | 150 (27%) |
+| ilfvcc-api-prod | 420 | 112 (27%) |
+| infonet-strapi-prod | 534 | 101 (19%) |
+| spac-prod | 501 | 61 (12%) |
+| i2i-strapi-prod | 393 | 50 (13%) |
+| r3-strapi-prod | 337 | 19 (6%) |
+| 7× git-type Nuxt sites | 362 | 0 (extractor TBD) |
+| intranet-api-prod | 706 | 0 (bearer-token TBD) |
+| **Total** | **9,484** | **3,092 (33%)** |
+
+The Referenced column appears as column 15 of every per-site CSV (between `Duplicate of` and `Delete?`) and as anchor chips in the per-site HTML view. Of 9,398 master-CSV rows, 2,095 carry at least one referenced page URL.
+
+[1.8.0-beta.4]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0-beta.4
+
 ## [1.8.0-beta.3] — 2026-05-19
 
 ### Added
