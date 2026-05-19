@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] — 2026-05-19
+
+### Added
+
+- **Orphaned-files report.** New `audit-orphaned-files.html` + `audit-orphaned-files.csv` sit alongside the existing master CSV in every fleet bundle. Lists every file with `references: []` after cross-reference resolution, fuzzy-matched against same-stem siblings to identify likely upgrade-replaced revisions vs. genuinely orphan content. Each row carries a 0-95% `replaceabilityConfidence` score (the likelihood the orphan is a stale older copy whose current version is still referenced).
+- **Per-site orphan-rate breakdown** in the report — sortable table of every site's total resolved files, orphan count, orphan %, plus split between stale-revision and truly-unreferenced. Lets you spot which site is dragging the fleet-wide orphan rate (e.g. our intranet at 73% vs. 12% benchmark = extraction gap, not real orphans).
+- **Fuzzy-match algorithm** in `src/report/orphans.js` — deterministic, no Levenshtein. Strips Strapi 10-char hex hash suffix (`_[a-f0-9]{10}` before extension), explicit version markers (`_vN`, `-vN`, ` (N)`, ` copy [N]`), then lowercase + collapse whitespace. Groups by `(normalized stem, extension)`. Confidence factors: base 70 → +20 for ≥30-day age gap vs. the referenced sibling → +5 for hash-only difference → −25 for same-batch (within 7 days). Capped at 95 (never claim certainty). Floored at 0 for newer-than-live anomalies or truly-orphan singletons.
+- **Reason flags** per orphan: `strapi-hash-variant` (sibling is same name with different Strapi hash), `newer-than-live` (orphan is newer than the referenced sibling — anomaly worth investigating), `same-batch` (uploaded within 7 days of the referenced sibling), `older-than-1yr` (likely deprecated content).
+- **Explainer block** at the top of the HTML report — five most-common reasons a file ends up orphan, plus how to use the report (sort by Confidence % desc; ≥85% is safe-to-delete; 0% needs human eyes).
+
+### Tests
+
+671 passing (+28 from new `report-orphans.test.js`).
+
 ## [1.10.2] — 2026-05-19
 
 ### Changed

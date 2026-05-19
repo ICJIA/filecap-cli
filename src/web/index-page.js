@@ -112,6 +112,20 @@ function renderMasterCsvSection(masterCsv) {
   </section>`;
 }
 
+function renderOrphansSection(orphans) {
+  if (!orphans || !orphans.htmlFilename) return "";
+  return `
+  <section class="section orphans">
+    <h2>Orphaned files</h2>
+    <p>${he(orphans.orphanCount)} files on the fleet had no detectable references after cross-resolution. ${he(orphans.staleRevisionCount)} look like upgrade-replaced stale revisions (a newer version of the same logical file is still attached). ${he(orphans.trulyUnreferencedCount)} are truly unreferenced — uploaded and never linked.</p>
+    <ul class="action-list">
+      <li><a href="${he(orphans.htmlFilename)}">Open orphan report (HTML)</a> — sortable table with per-site breakdown, confidence scores, fuzzy-match replacements, reason flags.</li>
+      <li><a href="${he(orphans.csvFilename)}" download>Download orphan report (CSV, ${humanBytes(orphans.csvByteCount ?? 0)})</a> — pivot in Excel/Sheets.</li>
+    </ul>
+  </section>
+`;
+}
+
 function renderDuplicatesSection(groups, duplicatesCsv) {
   if (!groups || groups.length === 0) return "";
 
@@ -643,6 +657,7 @@ export function generateIndexHtml({
   duplicatesCsv = null, // { filename: string, groupCount: number, occurrenceCount: number, byteCount: number } | null
   byTypeCsvs = [], // v1.7.14: [{ slug, side, label, keys, csvFilename, htmlFilename, fileCount, byteCount }, …]
   llmContext = null, // v1.7.21: { ndjsonFilename, ndjsonByteCount, contextMdFilename, contextMdByteCount, lastAuditAt } | null
+  orphans = null, // v1.11.0: { csvFilename, htmlFilename, orphanCount, staleRevisionCount, trulyUnreferencedCount, csvByteCount, htmlByteCount } | null
 }) {
   // Fleet totals
   let fleetTotalFiles = 0;
@@ -3248,6 +3263,7 @@ ${cardsHtml}
   </section>
 
 ${renderMasterCsvSection(masterCsv)}
+${renderOrphansSection(orphans)}
 ${renderLlmContextSection(llmContext)}
 ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
 ${renderTodoSection()}

@@ -8,6 +8,9 @@ import { z } from "zod";
 import { runReport } from "./report.js";
 import { writeCsv } from "../report/csv.js";
 import { writeHtml } from "../report/html.js";
+import { classifyOrphans } from "../report/orphans.js";
+import { writeOrphansHtml } from "../report/orphans-html.js";
+import { writeOrphansCsv } from "../report/orphans-csv.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
@@ -1042,6 +1045,65 @@ export async function runWebRollup({
     };
   }
 
+  // 6b-iii. v1.11.0 — orphaned-files report.
+  //   audit-orphaned-files.csv : every file with `references: []` after
+  //                              cross-resolution, plus its fuzzy-matched
+  //                              upgrade-replacement (if any) and a
+  //                              confidence score (0-95).
+  //   audit-orphaned-files.html: same data, rendered with explainer +
+  //                              per-site orphan-rate breakdown.
+  // Only entries with references resolved (i.e. an array, not undefined or
+  // null) participate. Per-site totals count only resolved entries.
+  let orphansMeta = null;
+  if (allEntries.length > 0) {
+    const resolvableEntries = allEntries
+      .map((it) => it.entry)
+      .filter((e) => Array.isArray(e?.references));
+    const orphans = classifyOrphans(resolvableEntries);
+    if (orphans.length > 0) {
+      const siteTotals = new Map();
+      for (const e of resolvableEntries) {
+        const k = e.serverName ?? "";
+        siteTotals.set(k, (siteTotals.get(k) ?? 0) + 1);
+      }
+      const orphansCsvFilename = "audit-orphaned-files.csv";
+      const orphansHtmlFilename = "audit-orphaned-files.html";
+      const csvText = writeOrphansCsv({ orphans, sources: consolidatedSources });
+      await fs.writeFile(path.join(output, orphansCsvFilename), csvText);
+      const csvStat = await fs.stat(path.join(output, orphansCsvFilename));
+      const htmlText = writeOrphansHtml({
+        orphans,
+        sources: consolidatedSources,
+        siteTotals,
+        backHref: "index.html",
+      });
+      const htmlPath = path.join(output, orphansHtmlFilename);
+      await fs.writeFile(htmlPath, htmlText);
+      if (!noClientGate && password !== null) {
+        const hexHash = computeHash(password);
+        const gated = injectPasswordGate(
+          await fs.readFile(htmlPath, "utf8"),
+          hexHash,
+        );
+        await fs.writeFile(htmlPath, gated);
+      }
+      const htmlStat = await fs.stat(htmlPath);
+      orphansMeta = {
+        csvFilename: orphansCsvFilename,
+        htmlFilename: orphansHtmlFilename,
+        orphanCount: orphans.length,
+        staleRevisionCount: orphans.filter(
+          (o) => o.status === "stale-revision",
+        ).length,
+        trulyUnreferencedCount: orphans.filter(
+          (o) => o.status === "truly-unreferenced",
+        ).length,
+        csvByteCount: csvStat.size,
+        htmlByteCount: htmlStat.size,
+      };
+    }
+  }
+
   // 6b-ii. v1.7.21 — "For AI models" companion files.
   //   audit-fleet.ndjson  : consolidated NDJSON with full introspection
   //                         (every field the CSV strips for readability)
@@ -1100,6 +1162,7 @@ export async function runWebRollup({
     duplicatesCsv: duplicatesCsvMeta,
     byTypeCsvs,
     llmContext: llmContextMeta,
+    orphans: orphansMeta,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 
