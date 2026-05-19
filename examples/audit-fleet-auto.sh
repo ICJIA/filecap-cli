@@ -31,10 +31,11 @@
 #    - ~/.filecap/sites.json  (or a sites.json the inner script can auto-find)
 #
 #  USAGE
-#    ./audit-fleet-auto.sh                # full pipeline (scan → references → rollup → deploy)
+#    ./audit-fleet-auto.sh                # full pipeline (scan → references → audits → rollup → deploy)
 #    AUDIT_HTML=0 ./audit-fleet-auto.sh   # skip HTML report generation
 #    SKIP_VERSION_CHECK=0 ./audit-fleet-auto.sh   # keep the npm version check
 #    SKIP_REFERENCES=1 ./audit-fleet-auto.sh      # skip references + cross-references
+#    SKIP_AUDITS=1 ./audit-fleet-auto.sh          # skip the PDF accessibility scoring (v1.9.0)
 #    SKIP_ROLLUP=1 ./audit-fleet-auto.sh          # skip web-rollup bundle build
 #    FILECAP_NO_DEPLOY=1 ./audit-fleet-auto.sh    # build but don't deploy to Netlify
 #
@@ -190,6 +191,41 @@ for s in d.get('sites', []):
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
+#  Stage 3.5 (v1.9.0): PDF audits — score every PDF in every augmented
+#  inventory via audit.icjia.app's /api/audit-url endpoint. Each PDF gets
+#  entry.audit = { score, grade, reportUrl, ... } attached. Other file
+#  types (docx, xlsx, pptx, image) pass through unchanged — they have
+#  their own remediation checkers inside their authoring apps.
+#
+#  Local cache at ~/.filecap/audit-cache.json (30-day TTL) means subsequent
+#  runs make zero HTTP calls for unchanged files. The first full fleet run
+#  is the heavy one; everything after is essentially free.
+# ────────────────────────────────────────────────────────────────────────────
+if [[ "${SKIP_AUDITS:-0}" == "1" ]]; then
+  echo "[fleet-auto] SKIP_AUDITS=1 — skipping PDF accessibility scoring"
+else
+  echo "[fleet-auto] Stage 3.5: running 'filecap audits' over each augmented inventory"
+  for site_dir in "$AUDITS_BASE"/*/; do
+    site=$(basename "$site_dir")
+    # Audits step consumes the most-augmented inventory available
+    # (cross-ref'd if present, otherwise raw). Output is
+    # inventory.audited.ndjson which web-rollup loader prefers.
+    inv="$site_dir/latest/inventory.cross-ref.ndjson"
+    [[ -f "$inv" ]] || inv="$site_dir/latest/inventory.ndjson"
+    out="$site_dir/latest/inventory.audited.ndjson"
+    if [[ -f "$inv" ]]; then
+      if npx --yes @icjia/filecap@latest audits "$inv" \
+           -o "$out" >/tmp/filecap-audit-"$site".log 2>&1; then
+        result=$(tail -1 /tmp/filecap-audit-"$site".log)
+        echo "[fleet-auto]   ✓ audits $site: $result"
+      else
+        echo "[fleet-auto] WARN: audits failed for $site (see /tmp/filecap-audit-$site.log)" >&2
+      fi
+    fi
+  done
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
 #  Stage 4: web-rollup — bundle every site into a static-site directory
 #  (deploys to Netlify if ~/.filecap/config.json has webRollup.autoDeploy:
 #  true and FILECAP_NO_DEPLOY is not set)
@@ -205,5 +241,5 @@ else
   echo "[fleet-auto] ✓ web-rollup complete"
 fi
 
-echo "[fleet-auto] Full pipeline complete (scan → references → cross-references → rollup)"
+echo "[fleet-auto] Full pipeline complete (scan → references → cross-references → audits → rollup)"
 exit 0

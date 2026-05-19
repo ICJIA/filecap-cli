@@ -589,6 +589,16 @@ async function computeSiteSummary(inventoryPath) {
   let withRefs = 0;
   let withoutRefs = 0;
   let refsUnknown = 0;
+  // v1.9.0: audit stats for the fleet-hero accessibility band.
+  //   auditedPdfCount: PDFs with a numeric score
+  //   auditScoreSum:   sum of scores for averaging
+  //   auditErrorCount: PDFs we tried but couldn't score (5xx / 4xx)
+  //   auditPending:    PDFs we haven't audited yet (no entry.audit field
+  //                    AND category is pdf)
+  let auditedPdfCount = 0;
+  let auditScoreSum = 0;
+  let auditErrorCount = 0;
+  let auditPending = 0;
 
   const REMEDIABLE_CATS = new Set(["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"]);
 
@@ -626,11 +636,31 @@ async function computeSiteSummary(inventoryPath) {
     } else {
       refsUnknown++;
     }
+
+    // v1.9.0 audit stats — only PDFs are scored by the audits step.
+    if (cat === "pdf") {
+      const audit = obj.audit;
+      if (audit && typeof audit === "object") {
+        if (typeof audit.score === "number") {
+          auditedPdfCount++;
+          auditScoreSum += audit.score;
+        } else if (audit.error) {
+          auditErrorCount++;
+        } else {
+          // skipped (no public URL, etc.) — counted as pending so the
+          // operator knows there's something to investigate.
+          auditPending++;
+        }
+      } else {
+        auditPending++;
+      }
+    }
   }
 
   return {
     totalFiles, totalBytes, remediable, byCategory,
     withRefs, withoutRefs, refsUnknown,
+    auditedPdfCount, auditScoreSum, auditErrorCount, auditPending,
   };
 }
 
@@ -731,13 +761,18 @@ export async function runWebRollup({
 
     const auditsBase = _auditsBase ?? path.join(os.homedir(), "filecap-audits");
     const rawInv = path.join(auditsBase, siteKey, "latest", "inventory.ndjson");
-    // v1.8.0: when `filecap cross-references` has been run, it writes an
-    // augmented inventory alongside the raw scan inventory. We prefer the
-    // augmented file so the Referenced column gets populated on the bundle.
-    const augmentedInv = path.join(auditsBase, siteKey, "latest", "inventory.cross-ref.ndjson");
-    let augmentedStat;
-    try { augmentedStat = await fs.stat(augmentedInv); } catch { augmentedStat = null; }
-    const latestInv = augmentedStat ? augmentedInv : rawInv;
+    // v1.8.0 + v1.9.0: prefer the most-augmented inventory available.
+    //   inventory.audited.ndjson      ← v1.9.0, has entry.audit + entry.references[]
+    //   inventory.cross-ref.ndjson    ← v1.8.0, has entry.references[]
+    //   inventory.ndjson              ← v1.0.0, raw scan
+    // The most-augmented file is always a strict superset of the previous,
+    // so this chain just walks "most-recent pipeline step" backward.
+    const auditedInv = path.join(auditsBase, siteKey, "latest", "inventory.audited.ndjson");
+    const crossRefInv = path.join(auditsBase, siteKey, "latest", "inventory.cross-ref.ndjson");
+    let auditedStat, crossRefStat;
+    try { auditedStat = await fs.stat(auditedInv); } catch { auditedStat = null; }
+    try { crossRefStat = await fs.stat(crossRefInv); } catch { crossRefStat = null; }
+    const latestInv = auditedStat ? auditedInv : (crossRefStat ? crossRefInv : rawInv);
     let stat;
     try { stat = await fs.stat(latestInv); } catch { stat = null; }
 

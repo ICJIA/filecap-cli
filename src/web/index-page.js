@@ -653,6 +653,11 @@ export function generateIndexHtml({
   // hasn't (git Nuxt sites, intranet pre-bearer-token) sit in refsUnknown.
   // The headline % is computed against the resolved denominator so we don't
   // penalise the coverage number for sites we haven't extended to yet.
+  // v1.9.0 audit-band totals
+  let fleetAuditedPdfCount = 0;
+  let fleetAuditScoreSum = 0;
+  let fleetAuditErrorCount = 0;
+  let fleetAuditPending = 0;
   let fleetWithRefs = 0;
   let fleetWithoutRefs = 0;
   let fleetRefsUnknown = 0;
@@ -661,6 +666,10 @@ export function generateIndexHtml({
     const s = sr.summary ?? {};
     fleetTotalFiles += s.totalFiles ?? 0;
     fleetRemediable += s.remediable ?? 0;
+    fleetAuditedPdfCount += s.auditedPdfCount ?? 0;
+    fleetAuditScoreSum += s.auditScoreSum ?? 0;
+    fleetAuditErrorCount += s.auditErrorCount ?? 0;
+    fleetAuditPending += s.auditPending ?? 0;
     fleetWithRefs += s.withRefs ?? 0;
     fleetWithoutRefs += s.withoutRefs ?? 0;
     fleetRefsUnknown += s.refsUnknown ?? 0;
@@ -676,6 +685,23 @@ export function generateIndexHtml({
   const fleetRefsPct = fleetRefsDenom > 0
     ? Math.round((fleetWithRefs / fleetRefsDenom) * 100)
     : 0;
+
+  // v1.9.0 fleet-wide audit averages. Only PDFs are scored; the average
+  // is computed across PDFs that actually got a score (not pending /
+  // error). Grade letter is derived from the same brackets used per-file:
+  //   90-100 → A, 80-89 → B, 70-79 → C, 60-69 → D, < 60 → F.
+  const fleetAvgScore = fleetAuditedPdfCount > 0
+    ? Math.round(fleetAuditScoreSum / fleetAuditedPdfCount)
+    : null;
+  function gradeFor(score) {
+    if (score === null || typeof score !== "number") return null;
+    if (score >= 90) return "A";
+    if (score >= 80) return "B";
+    if (score >= 70) return "C";
+    if (score >= 60) return "D";
+    return "F";
+  }
+  const fleetAvgGrade = gradeFor(fleetAvgScore);
 
   // Manager-friendly categories for the by-type breakdown tables
   const remediableCategories = [
@@ -1230,6 +1256,85 @@ main {
   color: #9aa5b1;
   line-height: 1.5;
   max-width: 80ch;
+}
+
+/* ── fleet-audit-band (v1.9.0) ──────────────────────────────────
+   Strip below the cross-site reference band. Surfaces the PDF
+   accessibility-score average + counts from audit.icjia.app, distinct
+   colour register (green/teal) so the eye can tell it apart from the
+   amber audit-count hero and the blue references band. */
+.fleet-audit-band {
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #1f4837;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(20, 184, 166, 0.10) 0%, rgba(20, 184, 166, 0.04) 100%);
+}
+.fleet-audit-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #5eead4;
+  margin: 0 0 0.6rem;
+}
+.fleet-audit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem 3rem;
+  align-items: center;
+}
+.fleet-audit-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.fleet-audit-grade {
+  display: inline-block;
+  font-size: clamp(1.6em, 4vw, 2.2em);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  padding: 0.05em 0.45em;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.fleet-audit-grade-a { background: rgba(34, 197, 94, 0.18);  color: #4ade80; border: 1px solid #166534; }
+.fleet-audit-grade-b { background: rgba(20, 184, 166, 0.18); color: #5eead4; border: 1px solid #115e59; }
+.fleet-audit-grade-c { background: rgba(234, 179, 8, 0.18);  color: #fde047; border: 1px solid #854d0e; }
+.fleet-audit-grade-d { background: rgba(249, 115, 22, 0.18); color: #fdba74; border: 1px solid #9a3412; }
+.fleet-audit-grade-f { background: rgba(239, 68, 68, 0.18);  color: #fca5a5; border: 1px solid #991b1b; }
+.fleet-audit-grade-x { background: rgba(107, 114, 128, 0.15); color: #9ca3af; border: 1px solid #4b5563; }
+.fleet-audit-num {
+  font-size: clamp(1.6em, 4vw, 2.2em);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #5eead4;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.fleet-audit-num-dim {
+  color: #c0cdda;
+}
+.fleet-audit-lbl {
+  font-size: 0.95rem;
+  color: #c0cdda;
+  line-height: 1.4;
+}
+.fleet-audit-lbl strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+.fleet-audit-context {
+  margin: 0.9rem 0 0;
+  font-size: 0.88rem;
+  color: #9aa5b1;
+  line-height: 1.5;
+  max-width: 80ch;
+}
+.fleet-audit-context a {
+  color: #5eead4;
 }
 
 /* ── explanation section ───────────────────────────────────────── */
@@ -2943,6 +3048,34 @@ dialog.access-modal .access-modal-cta a {
         <p class="fleet-refs-context">A file is "referenced" when a CMS page on this fleet links to it. Files with no known referrers are candidates for deletion — verify in your CMS before removing.</p>
       </div>
       ` : "";
+
+      // v1.9.0: accessibility-score band. Sits below the cross-site refs
+      // band. Only rendered when at least one PDF has been audited; sites
+      // / fleets that haven't run the audits step show nothing extra.
+      const auditBandHtml = fleetAuditedPdfCount > 0 ? `
+      <div class="fleet-audit-band" role="region" aria-label="PDF accessibility scoring summary">
+        <p class="fleet-audit-eyebrow">PDF accessibility scoring</p>
+        <div class="fleet-audit-row">
+          <div class="fleet-audit-stat">
+            <span class="fleet-audit-grade fleet-audit-grade-${fleetAvgGrade ? fleetAvgGrade.toLowerCase() : "x"}">${he(fleetAvgGrade ?? "—")}</span>
+            <span class="fleet-audit-lbl">average score <strong>(${fleetAvgScore ?? "—"})</strong></span>
+          </div>
+          <div class="fleet-audit-stat">
+            <span class="fleet-audit-num">${he(fleetAuditedPdfCount.toLocaleString())}</span>
+            <span class="fleet-audit-lbl">PDFs audited</span>
+          </div>
+          ${fleetAuditPending > 0 ? `<div class="fleet-audit-stat">
+            <span class="fleet-audit-num fleet-audit-num-dim">${he(fleetAuditPending.toLocaleString())}</span>
+            <span class="fleet-audit-lbl">PDFs awaiting audit</span>
+          </div>` : ""}
+          ${fleetAuditErrorCount > 0 ? `<div class="fleet-audit-stat">
+            <span class="fleet-audit-num fleet-audit-num-dim">${he(fleetAuditErrorCount.toLocaleString())}</span>
+            <span class="fleet-audit-lbl">PDFs with audit errors</span>
+          </div>` : ""}
+        </div>
+        <p class="fleet-audit-context">Accessibility scores come from <a href="https://audit.icjia.app" target="_blank" rel="noopener">audit.icjia.app</a> — strict WCAG 2.1 AA + IITAA §E205.4 scoring. Click "Open report" on any PDF row for the per-file breakdown and remediation hints. Spreadsheets, Word docs, and PowerPoints are not scored here; use their authoring apps' built-in checkers.</p>
+      </div>
+      ` : "";
       return `<div class="fleet-hero" role="img" aria-label="${he(fleetAriaLabel)}">
       <div class="fleet-hero-num-block">
         <p class="fleet-hero-eyebrow">Files that may need accessibility audit</p>
@@ -2956,7 +3089,8 @@ dialog.access-modal .access-modal-cta a {
         <p class="fleet-hero-phrase"><strong>${he(fleetPhrase)}</strong></p>
       </div>
     </div>
-    ${refsBandHtml}`;
+    ${refsBandHtml}
+    ${auditBandHtml}`;
     })()}
   </section>
 

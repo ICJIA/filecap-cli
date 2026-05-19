@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0-alpha.1] — 2026-05-19
+
+Phase 1.9.0 — PDF accessibility scoring via audit.icjia.app.
+
+### Added
+
+- **`filecap audits <inventory>` subcommand** — walks an inventory NDJSON, scores every PDF via `POST https://audit.icjia.app/api/audit-url`, writes an augmented `inventory.audited.ndjson` with `entry.audit = { score, grade, reportUrl, reportId, reportExpiresAt, audited, checkedAt, cached }` populated for each PDF. Non-PDF entries (docx, xlsx, pptx, image) pass through unchanged — they have their own remediation checkers inside Word / Excel / PowerPoint and aren't in scope for this scorer.
+
+- **Local SHA-256-keyed cache** at `~/.filecap/audit-cache.json` (mode 0600, atomic write, default 30-day TTL). audit.icjia.app already dedups server-side by content hash, but cached responses still go through its rate-limiter middleware — the local cache lets us skip the HTTP call entirely for files whose hash we've seen recently. First full fleet pass is the only expensive one; subsequent refreshes hit cache for ~all unchanged files.
+
+- **Bounded-concurrency request pool** (default 2 parallel requests) — respects audit.icjia.app's `pdfAnalyzer` 2-at-a-time semaphore and the global 100-per-minute IP rate limit.
+
+- **Auth-fetcher forward-compat** — sends `Authorization: Bearer <token>` when `credentials.audit-icjia-app.bearerToken` is set in `~/.filecap/secrets.json`. audit.icjia.app currently runs with `AUTH.REQUIRE_LOGIN=false` (anonymous), so no token is needed today; the path is in place for when auth flips on.
+
+- **`Audit Score` + `Audit Report` columns** in CSV + HTML, slotted at positions 6 + 7 (immediately after `Referenced`). HTML renders the score as a colour-coded grade chip (A green → F red) plus the numeric score in muted text; the report column is a "Open report" anchor opening the persisted audit.icjia.app report in a new tab. Errors render as a muted "Unavailable" chip. Non-PDF rows render empty cells.
+
+- **Fleet-index accessibility band** on the deployed bundle's `index.html`. Sits below the cross-site reference coverage band, surfaces the fleet-wide average grade + score + count of audited PDFs + pending/error counts. Teal/green colour register distinguishes it from the amber audit-count hero and the blue references band.
+
+- **`audit-fleet-auto.sh` stage 3.5** — the full-pipeline wrapper now runs `filecap audits` between cross-references and web-rollup. `SKIP_AUDITS=1` opts out.
+
+- **Augmented-inventory chain in web-rollup** — loader now prefers `inventory.audited.ndjson` → `inventory.cross-ref.ndjson` → `inventory.ndjson` so partial-pipeline runs still produce a sensible bundle.
+
+### Notes
+
+- `audit.icjia.app`'s default `RATE_LIMITS.analyze.max` is **35 per hour**, well below what a first-time full fleet audit (~2,200 PDFs) needs. Bump it to ~5000/hour in `audit.config.ts` before the first big run; revert once the cache is warm if you want to tighten back down.
+- Old Vue 2 non-Nuxt git sites (the ARI Summit 2017–2023 archive) deploy to Netlify with an SPA catch-all `_redirects` that returns HTML for unmatched URLs. audit.icjia.app's magic-bytes check correctly identifies this as not-a-PDF and returns 422 — the cell renders "Unavailable", which is the honest output. Strapi-hosted PDFs (the bulk of the fleet) audit cleanly.
+
+### Tests
+
+**634 passing** (up from 602 at 1.8.0; +32 across the score-fetcher, cache, orchestrator, and column-position assertions).
+
+[1.9.0-alpha.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.9.0-alpha.1
+
 ## [1.8.0] — 2026-05-19
 
 **Stable.** Consolidates the seven pre-releases (alpha.1 + beta.1–beta.6) into a single shipped release. No code changes vs `1.8.0-beta.6`; this entry is the stable summary. Pre-release notes below remain as the version-by-version history.

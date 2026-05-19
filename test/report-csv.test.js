@@ -71,9 +71,21 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[4].label).toBe("Referenced");
   });
 
-  it("sixth column is modifiedAt with label Date published", () => {
-    expect(CSV_COLUMNS[5].name).toBe("modifiedAt");
-    expect(CSV_COLUMNS[5].label).toBe("Date published");
+  // 1.9.0: two new columns Audit Score + Audit Report from audit.icjia.app
+  // slot in at positions 6 + 7 (after Referenced). modifiedAt slid to 8.
+  it("sixth column is auditScore with label Audit Score", () => {
+    expect(CSV_COLUMNS[5].name).toBe("auditScore");
+    expect(CSV_COLUMNS[5].label).toBe("Audit Score");
+  });
+
+  it("seventh column is auditReport with label Audit Report", () => {
+    expect(CSV_COLUMNS[6].name).toBe("auditReport");
+    expect(CSV_COLUMNS[6].label).toBe("Audit Report");
+  });
+
+  it("eighth column is modifiedAt with label Date published", () => {
+    expect(CSV_COLUMNS[7].name).toBe("modifiedAt");
+    expect(CSV_COLUMNS[7].label).toBe("Date published");
   });
 
   it("modifiedAt column label is 'Date published' not 'Last modified'", () => {
@@ -122,11 +134,11 @@ describe("CSV_COLUMNS", () => {
     expect(names).not.toContain("docxHeadingLevelsUsed");
     expect(names).not.toContain("xlsxSheetNames");
     expect(names).not.toContain("xlsxTotalCells");
-    expect(names).not.toContain("auditLink");
-    expect(names).not.toContain("auditScore");
-    expect(names).not.toContain("auditGrade");
-    expect(names).not.toContain("auditReport");
+    expect(names).not.toContain("auditLink");  // 1.9.0 uses auditScore + auditReport instead
+    expect(names).not.toContain("auditGrade"); // grade is folded into the auditScore cell
     expect(names).not.toContain("flags");
+    // 1.9.0 NOTE: auditScore + auditReport ARE present (added for the
+    // audit.icjia.app integration). See the position assertions above.
   });
 });
 
@@ -367,8 +379,10 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     const headerRow = csv.trim().split("\n")[0];
     expect(headerRow).toContain("Delete?");
     expect(headerRow).toContain("Notes");
-    // 17 columns total (15 file-descriptor incl. Referenced + 2 action)
-    expect(headerRow.split(",").length).toBe(17);
+    // 1.9.0: 19 columns total (15 file-descriptor + Referenced + Audit Score
+    // + Audit Report + Delete? + Notes = 17 file-descriptor (incl. new 1.9.0
+    // pair) + 2 action). Pre-1.9.0 was 17.
+    expect(headerRow.split(",").length).toBe(19);
   });
 
   it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {

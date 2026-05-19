@@ -166,6 +166,35 @@ function buildReferencedCell(refs) {
   return `<td>${chips}</td>`;
 }
 
+// v1.9.0: Audit Score cell. Renders a small grade chip ("C") in a colour
+// keyed to the grade. Score number sits next to it in muted text. Non-PDF
+// entries and missing audits render an empty cell. audit.error renders an
+// "Unavailable" italic chip.
+function buildAuditScoreCell(audit) {
+  if (!audit || typeof audit !== "object") return "<td></td>";
+  if (audit.skipped) return "<td></td>";
+  if (audit.error) {
+    return `<td><span class="audit-grade audit-grade-error" title="${htmlEscape(audit.error)}">Unavailable</span></td>`;
+  }
+  if (typeof audit.score !== "number") return "<td></td>";
+  const grade = typeof audit.grade === "string" ? audit.grade : "?";
+  const gradeClass = `audit-grade-${grade.toLowerCase()}`;
+  return `<td><span class="audit-grade ${gradeClass}" title="Strict-profile score (WCAG 2.1 AA + IITAA §E205.4)">${htmlEscape(grade)}</span> <span class="audit-score-num">(${audit.score})</span></td>`;
+}
+
+// v1.9.0: Audit Report cell. Renders an anchor to the audit.icjia.app
+// report page. Empty cell when no report URL.
+function buildAuditReportCell(audit) {
+  if (!audit || typeof audit !== "object") return "<td></td>";
+  if (audit.skipped || audit.error) return "<td></td>";
+  const url = audit.reportUrl;
+  if (typeof url !== "string") return "<td></td>";
+  const safe = safeUrl(url);
+  if (!safe) return "<td></td>";
+  const escaped = htmlEscape(safe);
+  return `<td><a class="audit-report-link" href="${escaped}" target="_blank" rel="noopener noreferrer" title="${escaped}">Open report</a></td>`;
+}
+
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
   let serverName, siteName, serverIp, scannedPath;
   if (isConsolidated) {
@@ -198,6 +227,11 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     // anchor chips directly, so the placeholder is only here to keep array
     // indices aligned with CSV_COLUMNS positions. v1.8.0-beta.5: position
     // moved to be immediately after publicUrl.
+    "",
+    // v1.9.0: placeholders for Audit Score + Audit Report. Same pattern as
+    // Referenced — the cell loop reads entry.audit and renders a chip
+    // + anchor directly, so these placeholders just preserve column indices.
+    "",
     "",
     entry.modifiedAt,
     scannedPath,
@@ -345,6 +379,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // ── build table rows ─────────────────────────────────────────────────────────
   const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
   const referencedColIdx = CSV_COLUMNS.findIndex((c) => c.name === "referenced");
+  const auditScoreColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditScore");
+  const auditReportColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditReport");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -371,6 +407,12 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
       }
       if (i === referencedColIdx) {
         return buildReferencedCell(entry.references);
+      }
+      if (i === auditScoreColIdx) {
+        return buildAuditScoreCell(entry.audit);
+      }
+      if (i === auditReportColIdx) {
+        return buildAuditReportCell(entry.audit);
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -404,6 +446,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     sha256:       220,
     duplicateOf:  220,
     referenced:   260,
+    auditScore:   110,
+    auditReport:  130,
   };
   // v1.7.16: csvOnly columns (Delete?, Notes) are filtered out of the HTML
   // table — the web view is informational, the CSV is the actionable artefact.
@@ -713,6 +757,46 @@ a:hover { color: #93c5fd; text-decoration: underline; }
   color: #6b7280;
   font-style: italic;
   font-size: 0.9em;
+}
+
+/* ─── Audit Score + Audit Report chips v1.9.0 ───
+   The Audit Score column renders a coloured grade chip + the numeric score
+   in muted text alongside. Colours map to the strict-profile grade scale
+   audit.icjia.app uses (A green → F red). The Audit Report column is a
+   plain anchor to the persisted shareable report on audit.icjia.app. */
+.audit-grade {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.9em;
+  min-width: 1.5em;
+  text-align: center;
+}
+.audit-grade-a { background: rgba(34, 197, 94, 0.15);  color: #4ade80; border: 1px solid #166534; }
+.audit-grade-b { background: rgba(20, 184, 166, 0.15); color: #5eead4; border: 1px solid #115e59; }
+.audit-grade-c { background: rgba(234, 179, 8, 0.15);  color: #fde047; border: 1px solid #854d0e; }
+.audit-grade-d { background: rgba(249, 115, 22, 0.15); color: #fdba74; border: 1px solid #9a3412; }
+.audit-grade-f { background: rgba(239, 68, 68, 0.15);  color: #fca5a5; border: 1px solid #991b1b; }
+.audit-grade-error {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border: 1px solid #4b5563;
+  font-style: italic;
+  font-weight: 500;
+}
+.audit-score-num {
+  color: #9aa5b1;
+  font-size: 0.85em;
+}
+.audit-report-link {
+  color: #6fbafd;
+  font-size: 0.9em;
+  text-decoration: none;
+}
+.audit-report-link:hover {
+  color: #bfdbfe;
+  text-decoration: underline;
 }
 
 /* ─── Detail-page hero block v1.7.0 ─── */

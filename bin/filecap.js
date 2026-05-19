@@ -10,6 +10,7 @@ import { runMcp } from "../src/commands/mcp.js";
 import { runWebRollup } from "../src/commands/web-rollup.js";
 import { runReferences } from "../src/commands/references.js";
 import { runCrossReferences } from "../src/commands/cross-references.js";
+import { runAudits } from "../src/commands/audits.js";
 import { loadConfig } from "../src/config/load.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
@@ -269,6 +270,67 @@ program
       });
     } catch (err) {
       process.stderr.write(`filecap cross-references error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("audits <inventory>")
+  .description(
+    "Score every PDF in an inventory via audit.icjia.app's /api/audit-url endpoint. Writes an augmented NDJSON with entry.audit populated for each PDF (score, grade, reportUrl). Only PDFs are scored — docx/xlsx/pptx/image files pass through unchanged. Caches by SHA-256 (default 30-day TTL) so subsequent runs short-circuit on unchanged files.",
+  )
+  .requiredOption(
+    "-o, --output <path>",
+    "output path for the augmented inventory NDJSON (convention: inventory.audited.ndjson)",
+  )
+  .option(
+    "--audit-endpoint <url>",
+    "override the audit.icjia.app endpoint (default https://audit.icjia.app/api/audit-url)",
+  )
+  .option(
+    "--concurrency <n>",
+    "max parallel audit requests (default 2 — respects the server's 2-at-a-time pdfAnalyzer semaphore)",
+    (v) => parseInt(v, 10),
+  )
+  .option(
+    "--ttl-days <n>",
+    "cache TTL in days (default 30) — entries older than this re-audit",
+    (v) => parseInt(v, 10),
+  )
+  .option(
+    "--force",
+    "ignore the cache and re-audit every PDF (also sends force=true to the server)",
+  )
+  .option(
+    "--cache-path <path>",
+    "override the audit-cache.json location (default ~/.filecap/audit-cache.json)",
+  )
+  .action(async (inventory, opts) => {
+    try {
+      // 1.8.0-era bearer-token in secrets.json: if present under
+      // credentials.audit-icjia-app.bearerToken, send it as Authorization
+      // Bearer. With audit.icjia.app currently running anonymous (auth
+      // off), no token is needed — but this stays forward-compatible.
+      let bearerToken;
+      try {
+        const secretsPath = path.join(os.homedir(), ".filecap", "secrets.json");
+        const s = JSON.parse(fs.readFileSync(secretsPath, "utf8"));
+        bearerToken = s?.credentials?.["audit-icjia-app"]?.bearerToken;
+      } catch {
+        // Secrets file missing or malformed — fine in anonymous mode.
+      }
+      await runAudits({
+        inventoryPath: inventory,
+        outputPath: opts.output,
+        auditEndpoint: opts.auditEndpoint,
+        concurrency: opts.concurrency ?? 2,
+        ttlDays: opts.ttlDays ?? 30,
+        force: opts.force === true,
+        cachePath: opts.cachePath,
+        bearerToken,
+      });
+    } catch (err) {
+      process.stderr.write(`filecap audits error: ${err.message}\n`);
       process.exit(1);
     }
   });
