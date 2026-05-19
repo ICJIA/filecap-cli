@@ -59,6 +59,15 @@ describe("normalizeStem", () => {
     expect(normalizeStem("Memo copy 2.pdf").stem).toBe("memo");
   });
 
+  it("strips multiple consecutive trailing Strapi hashes", () => {
+    const r = normalizeStem(
+      "Traffic_Data_Agenda_NEW_07_24_24_df57bde328_5bb02ff5b1.pdf",
+    );
+    expect(r.stem).toBe("traffic_data_agenda_new_07_24_24");
+    expect(r.stripped.hash).toBe("5bb02ff5b1");
+    expect(r.stripped.priorHashes).toEqual(["df57bde328"]);
+  });
+
   it("strips Strapi hash AND a version marker", () => {
     expect(normalizeStem("Report_v2_5b025d2897.pdf").stem).toBe("report");
   });

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] — 2026-05-19
+
+### Changed
+
+- **`normalizeStem` now strips consecutive trailing Strapi hashes**, not just one. Confirmed pattern on agency.icjia-api.cloud: re-uploading a file whose original name already ends in a Strapi hash produces a new file whose name ends in BOTH hashes (the old one becomes a stem-suffix, then Strapi appends a fresh hash). Example: `Traffic_Data_Agenda_NEW_07_24_24_df57bde328_5bb02ff5b1.pdf` → orphan revision of `Traffic_Data_Agenda_NEW_07_24_24_df57bde328.pdf`. Without multi-strip, the two would land in different fuzzy groups and the stale-revision detection misses. `stripped.priorHashes` exposes the inner hashes for forensic traceability.
+
 ## [1.11.0] — 2026-05-19
 
 ### Added

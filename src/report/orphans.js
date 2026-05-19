@@ -45,12 +45,21 @@ export function normalizeStem(filename) {
 
   const stripped = {};
 
-  // Strip Strapi hash before extension (operates on the raw stem since the
-  // hash sits just before the dot in the original filename).
-  const hashMatch = stemRaw.match(STRAPI_HASH_RE);
-  if (hashMatch && hashMatch.groups) {
-    stripped.hash = hashMatch.groups.hash;
-    stemRaw = stemRaw.slice(0, hashMatch.index);
+  // Strip Strapi hash(es) before extension. In practice, sometimes a file
+  // already had a hash baked into its filename (someone copied a Strapi-
+  // hashed filename into a new "NEW_..." name, then re-uploaded — the new
+  // upload appends a second hash). Strip consecutive trailing hashes
+  // until no more match.
+  const hashes = [];
+  while (true) {
+    const m = stemRaw.match(/_(?<hash>[a-f0-9]{10})$/);
+    if (!m || !m.groups) break;
+    hashes.unshift(m.groups.hash);
+    stemRaw = stemRaw.slice(0, m.index);
+  }
+  if (hashes.length > 0) {
+    stripped.hash = hashes[hashes.length - 1];
+    if (hashes.length > 1) stripped.priorHashes = hashes.slice(0, -1);
   }
 
   // Strip explicit version suffixes (one pass each, since they can stack:
