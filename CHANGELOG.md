@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] — 2026-05-19
+
+### Changed
+
+- **`Referenced` column relabeled to `Page References`** in CSV + HTML. Same data; clearer manager-facing wording.
+- **`Audit Score` + `Audit Report` columns merged into a single `Audit Score` column.** Matches the multi-line cell pattern of `Page References` — score chip + report link read as one signal, not two adjacent cells. HTML: grade chip, score in muted text, "Open report" anchor inline. CSV: grade and score on line 1, audit.icjia.app report URL on line 2 of the same multi-line cell.
+- **Page-audit grade chips now carry an `axe-core` attribution** in tiny muted italic text after each chip. Hover tooltip explains: "Page accessibility graded by axe-core, run server-side via headless Chromium on audit.icjia.app". Distinguishes the page-grading methodology (axe-core) from the file-grading methodology (WCAG 2.1 AA + IITAA §E205.4 strict profile).
+
+### Tests
+
+643 passing (down 1 from 644 — the removed "seventh column is Audit Report" assertion, replaced with the merged-column expectations).
+
 ## [1.10.1] — 2026-05-19
 
 ### Changed

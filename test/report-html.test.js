@@ -528,11 +528,11 @@ describe("writeHtml", () => {
     });
     const html = await fs.readFile(outputPath, "utf8");
     // Every <th> has the resize handle. The HTML view filters out csvOnly
-    // columns (Delete?, Notes). As of v1.9.0 we have Referenced + Audit Score
-    // + Audit Report (positions 5, 6, 7), bringing the non-csvOnly count
-    // from 15 (at v1.8.0) to 17.
+    // columns (Delete?, Notes). As of v1.10.2 we have Page References +
+    // Audit Score (chip + report link combined), positions 5 + 6 — bringing
+    // the non-csvOnly count from 17 (at 1.9.0 / 1.10.0 / 1.10.1) to 16.
     const handles = html.match(/<span class="col-resize-handle"/g) || [];
-    expect(handles.length).toBe(17);
+    expect(handles.length).toBe(16);
   });
 
   it("inline drag-to-pan handler scrolls both axes (1.8.0)", async () => {
@@ -855,7 +855,7 @@ describe("writeHtml", () => {
         outputPath: out,
       });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toContain(">Referenced<");
+      expect(html).toContain(">Page References<");
     });
 
     it("renders 'No references found' muted chip when entry.references is an empty array", async () => {

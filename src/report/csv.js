@@ -29,23 +29,23 @@ export const CSV_COLUMNS = [
   //                          line count matches the reference count and
   //                          unresolved refs don't silently collide with the
   //                          "" / "not run" state.
-  { name: "referenced",   label: "Referenced" },
-  // v1.9.0: Audit Score + Audit Report from audit.icjia.app's /api/audit-url
-  // endpoint. Slot 6 + 7 (immediately after Referenced) so the four manager
-  // decision columns sit side-by-side: Public URL (where the file lives),
-  // Referenced (where it's linked from), Audit Score (how accessible is
-  // it), Audit Report (deep-dive link). Only PDFs are scored — other
-  // categories (docx, xlsx, pptx) render empty here since they have their
-  // own checkers inside their authoring tools.
+  { name: "referenced",   label: "Page References" },
+  // v1.9.0+: PDF audit score + report link, combined into a single column
+  // (1.10.2) for symmetry with the Page References column — managers read
+  // the chip and the link as one signal, not two adjacent cells. Slot 6
+  // (immediately after Page References) so the file's referrers, score,
+  // and per-issue drill-down sit side-by-side.
   //
   // Cell value semantics (CSV):
   //   undefined audit               → "" (audits step not run)
   //   audit.skipped (e.g. no URL)   → "" (we tried but couldn't)
   //   audit.error                   → "Unavailable"
-  //   audit.score is a number       → "<grade> (<score>)" e.g. "C (78)"
+  //   audit.score is a number       → "<grade> (<score>)" on line 1, the
+  //                                    audit.icjia.app report URL on line 2
+  //                                    (multi-line cell; Excel + Sheets auto-
+  //                                    hyperlink the URL on open).
   //   non-PDF entries               → "" (audits step doesn't touch them)
   { name: "auditScore",   label: "Audit Score" },
-  { name: "auditReport",  label: "Audit Report" },
   { name: "modifiedAt",   label: "Date published" },
   { name: "scannedPath",  label: "Source folder on server" },
   { name: "path",         label: "File location (relative to source folder)" },
@@ -115,22 +115,24 @@ function formatReferenced(refs) {
     .join("\n");
 }
 
-// 1.9.0: format the audit.icjia.app score into a CSV cell. We render
-// "<grade> (<score>)" for actual results so the spreadsheet reader can
-// scan grades visually but still has the number for sorting/filtering.
+// 1.9.0: format the audit.icjia.app score into a CSV cell.
+// 1.10.2: combined with the report URL so score + report drill-down read
+// as one signal (matches the multi-line Page References cell pattern).
+//   "<grade> (<score>)\n<reportUrl>"   — when both are present
+//   "<grade> (<score>)"                — when no reportUrl available
+//   "Unavailable"                      — audit.error set
+//   ""                                 — undefined / skipped / not a PDF
 function formatAuditScore(audit) {
   if (!audit || typeof audit !== "object") return "";
   if (audit.skipped) return "";
   if (audit.error) return "Unavailable";
   if (typeof audit.score !== "number") return "";
   const grade = typeof audit.grade === "string" ? audit.grade : "?";
-  return `${grade} (${audit.score})`;
-}
-
-function formatAuditReport(audit) {
-  if (!audit || typeof audit !== "object") return "";
-  if (audit.skipped || audit.error) return "";
-  return typeof audit.reportUrl === "string" ? audit.reportUrl : "";
+  const base = `${grade} (${audit.score})`;
+  if (typeof audit.reportUrl === "string" && audit.reportUrl.length > 0) {
+    return `${base}\n${audit.reportUrl}`;
+  }
+  return base;
 }
 
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
@@ -212,7 +214,6 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const referenced = formatReferenced(entry.references);
   const auditScore = formatAuditScore(entry.audit);
-  const auditReport = formatAuditReport(entry.audit);
 
   return [
     serverName,
@@ -221,7 +222,6 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     publicUrl,
     referenced,
     auditScore,
-    auditReport,
     entry.modifiedAt,
     scannedPath,
     entry.path,

@@ -68,24 +68,21 @@ describe("CSV_COLUMNS", () => {
   // referenced from" side-by-side. modifiedAt slid to position 6.
   it("fifth column is referenced with label Referenced", () => {
     expect(CSV_COLUMNS[4].name).toBe("referenced");
-    expect(CSV_COLUMNS[4].label).toBe("Referenced");
+    expect(CSV_COLUMNS[4].label).toBe("Page References");
   });
 
-  // 1.9.0: two new columns Audit Score + Audit Report from audit.icjia.app
-  // slot in at positions 6 + 7 (after Referenced). modifiedAt slid to 8.
+  // 1.9.0: Audit Score column from audit.icjia.app slotted at position 6
+  // (after Page References). 1.10.2 merged the separate Audit Report column
+  // into Audit Score itself (score chip + report link, multi-line CSV cell)
+  // — modifiedAt slid back to position 7.
   it("sixth column is auditScore with label Audit Score", () => {
     expect(CSV_COLUMNS[5].name).toBe("auditScore");
     expect(CSV_COLUMNS[5].label).toBe("Audit Score");
   });
 
-  it("seventh column is auditReport with label Audit Report", () => {
-    expect(CSV_COLUMNS[6].name).toBe("auditReport");
-    expect(CSV_COLUMNS[6].label).toBe("Audit Report");
-  });
-
-  it("eighth column is modifiedAt with label Date published", () => {
-    expect(CSV_COLUMNS[7].name).toBe("modifiedAt");
-    expect(CSV_COLUMNS[7].label).toBe("Date published");
+  it("seventh column is modifiedAt with label Date published", () => {
+    expect(CSV_COLUMNS[6].name).toBe("modifiedAt");
+    expect(CSV_COLUMNS[6].label).toBe("Date published");
   });
 
   it("modifiedAt column label is 'Date published' not 'Last modified'", () => {
@@ -379,10 +376,11 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     const headerRow = csv.trim().split("\n")[0];
     expect(headerRow).toContain("Delete?");
     expect(headerRow).toContain("Notes");
-    // 1.9.0: 19 columns total (15 file-descriptor + Referenced + Audit Score
-    // + Audit Report + Delete? + Notes = 17 file-descriptor (incl. new 1.9.0
-    // pair) + 2 action). Pre-1.9.0 was 17.
-    expect(headerRow.split(",").length).toBe(19);
+    // 1.10.2: 18 columns total (15 file-descriptor + Page References +
+    // Audit Score (combined chip + report link as of 1.10.2) + Delete?
+    // + Notes = 16 file-descriptor + 2 action). 1.9.0 was 19 with the
+    // separate Audit Report column.
+    expect(headerRow.split(",").length).toBe(18);
   });
 
   it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {
@@ -417,10 +415,10 @@ describe("writeCsv Referenced column", () => {
     expect(refIdx).toBeLessThan(delIdx);
   });
 
-  it("uses the human label 'Referenced'", () => {
+  it("uses the human label 'Page References'", () => {
     const col = CSV_COLUMNS.find((c) => c.name === "referenced");
     expect(col).toBeDefined();
-    expect(col.label).toBe("Referenced");
+    expect(col.label).toBe("Page References");
   });
 
   it("Referenced column is NOT csvOnly (it appears in the HTML view too)", () => {

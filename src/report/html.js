@@ -179,8 +179,13 @@ function buildReferencedCell(refs) {
 //   - score                    → "(B)" small chip in the grade colour
 function buildPageAuditChip(pa) {
   if (!pa || typeof pa !== "object") return "";
+  // Tiny attribution after the chip — managers should know who scored the
+  // page (axe-core via audit.icjia.app's Puppeteer renderer), distinct from
+  // the WCAG/IITAA strict profile used for PDF audits. Same string on both
+  // the error and success branches.
+  const source = ` <small class="page-audit-source" title="Page accessibility graded by axe-core, run server-side via headless Chromium on audit.icjia.app">axe-core</small>`;
   if (pa.error) {
-    return ` <span class="page-audit-chip page-audit-chip-error" title="${htmlEscape(`Page audit unavailable — ${pa.error}`)}">(—)</span>`;
+    return ` <span class="page-audit-chip page-audit-chip-error" title="${htmlEscape(`Page audit unavailable — ${pa.error}`)}">(—)</span>${source}`;
   }
   const grade = typeof pa.grade === "string" ? pa.grade : null;
   const score = typeof pa.score === "number" ? pa.score : null;
@@ -197,13 +202,15 @@ function buildPageAuditChip(pa) {
   // release; only PDF audits get an "Open report" link. The tooltip
   // still shows the full score + violation count for hover.
   const tip = `Page accessibility: ${grade}${score != null ? ` (${score})` : ""}${violationLabel}`;
-  return ` <span class="page-audit-chip ${cls}" title="${htmlEscape(tip)}">(${htmlEscape(grade)})</span>`;
+  return ` <span class="page-audit-chip ${cls}" title="${htmlEscape(tip)}">(${htmlEscape(grade)})</span>${source}`;
 }
 
-// v1.9.0: Audit Score cell. Renders a small grade chip ("C") in a colour
-// keyed to the grade. Score number sits next to it in muted text. Non-PDF
-// entries and missing audits render an empty cell. audit.error renders an
-// "Unavailable" italic chip.
+// v1.9.0: Audit Score cell. v1.10.2: combined with the report-link
+// (previously a separate column) so score + drill-down read as one signal.
+// Layout: grade chip ("C"), numeric score in muted text, then a small
+// "Open report" anchor to audit.icjia.app/report/<id>. Non-PDF entries
+// and missing audits render an empty cell. audit.error renders an
+// "Unavailable" italic chip without a link.
 function buildAuditScoreCell(audit) {
   if (!audit || typeof audit !== "object") return "<td></td>";
   if (audit.skipped) return "<td></td>";
@@ -213,20 +220,14 @@ function buildAuditScoreCell(audit) {
   if (typeof audit.score !== "number") return "<td></td>";
   const grade = typeof audit.grade === "string" ? audit.grade : "?";
   const gradeClass = `audit-grade-${grade.toLowerCase()}`;
-  return `<td><span class="audit-grade ${gradeClass}" title="Strict-profile score (WCAG 2.1 AA + IITAA §E205.4)">${htmlEscape(grade)}</span> <span class="audit-score-num">(${audit.score})</span></td>`;
-}
-
-// v1.9.0: Audit Report cell. Renders an anchor to the audit.icjia.app
-// report page. Empty cell when no report URL.
-function buildAuditReportCell(audit) {
-  if (!audit || typeof audit !== "object") return "<td></td>";
-  if (audit.skipped || audit.error) return "<td></td>";
-  const url = audit.reportUrl;
-  if (typeof url !== "string") return "<td></td>";
-  const safe = safeUrl(url);
-  if (!safe) return "<td></td>";
-  const escaped = htmlEscape(safe);
-  return `<td><a class="audit-report-link" href="${escaped}" target="_blank" rel="noopener noreferrer" title="${escaped}">Open report</a></td>`;
+  const chip = `<span class="audit-grade ${gradeClass}" title="Strict-profile score (WCAG 2.1 AA + IITAA §E205.4)">${htmlEscape(grade)}</span> <span class="audit-score-num">(${audit.score})</span>`;
+  const safeReport =
+    typeof audit.reportUrl === "string" ? safeUrl(audit.reportUrl) : null;
+  if (safeReport) {
+    const escaped = htmlEscape(safeReport);
+    return `<td>${chip} <a class="audit-report-link" href="${escaped}" target="_blank" rel="noopener noreferrer" title="${escaped}">Open report</a></td>`;
+  }
+  return `<td>${chip}</td>`;
 }
 
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
@@ -262,10 +263,9 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     // indices aligned with CSV_COLUMNS positions. v1.8.0-beta.5: position
     // moved to be immediately after publicUrl.
     "",
-    // v1.9.0: placeholders for Audit Score + Audit Report. Same pattern as
-    // Referenced — the cell loop reads entry.audit and renders a chip
-    // + anchor directly, so these placeholders just preserve column indices.
-    "",
+    // v1.9.0: placeholder for the Audit Score column (single column as
+    // of 1.10.2 — score chip + report link combined). Cell loop bypasses
+    // this and renders entry.audit directly.
     "",
     entry.modifiedAt,
     scannedPath,
@@ -414,7 +414,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
   const referencedColIdx = CSV_COLUMNS.findIndex((c) => c.name === "referenced");
   const auditScoreColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditScore");
-  const auditReportColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditReport");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -444,9 +443,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
       }
       if (i === auditScoreColIdx) {
         return buildAuditScoreCell(entry.audit);
-      }
-      if (i === auditReportColIdx) {
-        return buildAuditReportCell(entry.audit);
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -480,8 +476,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     sha256:       220,
     duplicateOf:  220,
     referenced:   260,
-    auditScore:   110,
-    auditReport:  130,
+    auditScore:   240,
   };
   // v1.7.16: csvOnly columns (Delete?, Notes) are filtered out of the HTML
   // table — the web view is informational, the CSV is the actionable artefact.
@@ -862,6 +857,14 @@ a.page-audit-chip:hover {
   background: rgba(107, 114, 128, 0.10);
   border: 1px solid #4b5563;
   font-style: italic;
+}
+.page-audit-source {
+  font-size: 0.62em;
+  color: #6b7280;
+  margin-left: 2px;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  vertical-align: baseline;
 }
 
 /* ─── Detail-page hero block v1.7.0 ─── */
