@@ -3,10 +3,37 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
+// 1.8.0-beta.6: per-site credentials with optional auto-refresh login.
+// `bearerLogin` lets the references command auto-renew an expired JWT by
+// POSTing identifier+password to the Strapi `/auth/local` endpoint. Mode
+// 0600 + same-UID trust model already governs this file; adding the
+// password here trades JWT rotation for operational convenience.
+const bearerLoginSchema = z
+  .object({
+    url: z.string().refine(
+      (s) => {
+        try { const u = new URL(s); return u.protocol === "http:" || u.protocol === "https:"; }
+        catch { return false; }
+      },
+      { message: "bearerLogin.url must be an http(s) URL" },
+    ),
+    identifier: z.string().min(1),
+    password: z.string().min(1),
+  })
+  .strict();
+
+const credentialSchema = z
+  .object({
+    bearerToken: z.string().optional(),
+    bearerLogin: bearerLoginSchema.optional(),
+  })
+  .strict();
+
 const secretsSchema = z
   .object({
     version: z.number().optional(),
     tokens: z.record(z.string(), z.string()).default({}),
+    credentials: z.record(z.string(), credentialSchema).default({}),
   })
   .strict();
 
@@ -21,7 +48,7 @@ export function loadSecrets({
   warn = (msg) => process.stderr.write(msg),
 } = {}) {
   if (!fs.existsSync(secretsPath)) {
-    return { tokens: {} };
+    return { tokens: {}, credentials: {} };
   }
 
   // 1.7.36 — Warn if the file is group- or world-readable. The bearer
@@ -80,13 +107,9 @@ export function tokenEnvVarName(serverName) {
 }
 
 /**
- * Resolve the bearer token for a server. Env var wins over secrets.json.
+ * Resolve the bearer token for a server. Env var wins; then
+ * credentials.<serverName>.bearerToken; then legacy tokens.<serverName>.
  * Returns null when no token is set.
- *
- * @param {object} secrets       loaded secrets object
- * @param {string} serverName    e.g. "infonet-strapi-prod"
- * @param {object} [env]         process.env stand-in for tests
- * @returns {string|null}
  */
 export function getSiteToken(secrets, serverName, env = process.env) {
   const envName = tokenEnvVarName(serverName);
@@ -94,9 +117,70 @@ export function getSiteToken(secrets, serverName, env = process.env) {
   if (typeof fromEnv === "string" && fromEnv.length > 0) {
     return fromEnv;
   }
+  const fromCredentials = secrets?.credentials?.[serverName]?.bearerToken;
+  if (typeof fromCredentials === "string" && fromCredentials.length > 0) {
+    return fromCredentials;
+  }
   const fromFile = secrets?.tokens?.[serverName];
   if (typeof fromFile === "string" && fromFile.length > 0) {
     return fromFile;
   }
   return null;
+}
+
+/**
+ * Return the bearerLogin (auto-refresh credentials) for a server, or null
+ * if none configured. Env-var override path isn't supported for login —
+ * passwords belong in a mode-0600 file or not at all.
+ */
+export function getSiteLogin(secrets, serverName) {
+  const login = secrets?.credentials?.[serverName]?.bearerLogin;
+  if (!login) return null;
+  return login;
+}
+
+/**
+ * 1.8.0-beta.6: persist a refreshed bearer token to secrets.json. Reads
+ * the current file, splices in the new token under
+ * credentials.<serverName>.bearerToken, writes back atomically. Preserves
+ * unrelated entries (other sites' creds + legacy tokens map).
+ *
+ * Mode 0600 is enforced on write — the file may have been created by the
+ * user with a wider mode; we tighten it on every write.
+ */
+export function persistSiteToken({
+  secretsPath = DEFAULT_SECRETS_PATH,
+  serverName,
+  newToken,
+}) {
+  if (typeof serverName !== "string" || serverName.length === 0) {
+    throw new Error("persistSiteToken: serverName required");
+  }
+  if (typeof newToken !== "string" || newToken.length === 0) {
+    throw new Error("persistSiteToken: newToken required");
+  }
+  let current = { version: 1, tokens: {}, credentials: {} };
+  if (fs.existsSync(secretsPath)) {
+    try {
+      const raw = fs.readFileSync(secretsPath, "utf-8");
+      current = JSON.parse(raw);
+    } catch {
+      // Treat unparseable file as fresh start — but warn rather than
+      // overwrite silently. The caller typically already ran loadSecrets
+      // before this and would have surfaced parse errors there.
+    }
+  }
+  current.tokens = current.tokens ?? {};
+  current.credentials = current.credentials ?? {};
+  current.credentials[serverName] = {
+    ...(current.credentials[serverName] ?? {}),
+    bearerToken: newToken,
+  };
+  // Atomic write: tmp file + rename
+  const dir = path.dirname(secretsPath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = `${secretsPath}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(current, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, secretsPath);
+  try { fs.chmodSync(secretsPath, 0o600); } catch { /* best effort */ }
 }

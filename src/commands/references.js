@@ -16,9 +16,19 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
+import readline from "node:readline";
 import * as strapiV3 from "../references/strapi-v3.js";
 import * as strapiV4 from "../references/strapi-v4.js";
+import { runGitRepoReferences } from "../references/git-repo.js";
+import { createAuthFetcher } from "../references/auth-fetcher.js";
 import { buildFleetDomainSet, isFleetUrl } from "../references/domain-filter.js";
+import {
+  loadSecrets,
+  getSiteToken,
+  getSiteLogin,
+  persistSiteToken,
+} from "../config/secrets.js";
 
 const STRATEGIES = {
   "strapi-v3": strapiV3,
@@ -51,23 +61,100 @@ function defaultFetcher() {
   };
 }
 
+// 1.8.0-beta.6: prompt the operator for a fresh JWT on stdin when a 401
+// happens and no bearerLogin is configured. Only used when stderr is a
+// TTY — in non-interactive runs (CI, scripted), we'd rather fail loudly
+// than hang on a stdin read. The function resolves to null if the user
+// aborts (empty input / Ctrl-D).
+function ttyTokenPrompter(serverName) {
+  if (!process.stdin.isTTY || !process.stderr.isTTY) return null;
+  return async () => {
+    process.stderr.write(
+      `\n[references] bearer token for "${serverName}" was rejected (likely expired). ` +
+        `Paste a fresh JWT (or press Enter to abort):\n> `,
+    );
+    return new Promise((resolve) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stderr,
+        terminal: true,
+      });
+      rl.once("line", (line) => {
+        rl.close();
+        const trimmed = line.trim();
+        resolve(trimmed.length > 0 ? trimmed : null);
+      });
+      rl.once("close", () => resolve(null));
+    });
+  };
+}
+
+// 1.8.0-beta.6: assemble the fetcher used for the Strapi adapters. When
+// the site is marked `requiresBearerToken: true`, wrap the underlying
+// fetch with the auth-fetcher (Bearer injection + auto-refresh). Falls
+// back to the plain JSON fetcher otherwise.
+function buildAuthenticatedFetcher({ siteConfig, secretsPath, log }) {
+  if (!siteConfig.requiresBearerToken) return defaultFetcher();
+  const secrets = loadSecrets({ secretsPath });
+  const initialToken = getSiteToken(secrets, siteConfig.name);
+  const login = getSiteLogin(secrets, siteConfig.name);
+  if (!initialToken && !login) {
+    throw new Error(
+      `site "${siteConfig.name}" requires a bearer token but none is configured. ` +
+        `Add to ${secretsPath ?? "~/.filecap/secrets.json"}:\n` +
+        `  credentials.${siteConfig.name}.bearerToken (string) for a static JWT\n` +
+        `  credentials.${siteConfig.name}.bearerLogin { url, identifier, password } for auto-refresh\n` +
+        `  or set ${(siteConfig.name).toUpperCase().replace(/-/g, "_")}_BEARER_TOKEN env var (env override)`,
+    );
+  }
+  return createAuthFetcher({
+    initialToken,
+    login,
+    baseFetcher: defaultFetcher(),
+    persistToken: async (token) => {
+      persistSiteToken({
+        secretsPath: secretsPath ?? path.join(os.homedir(), ".filecap", "secrets.json"),
+        serverName: siteConfig.name,
+        newToken: token,
+      });
+    },
+    promptForToken: ttyTokenPrompter(siteConfig.name),
+    log,
+  });
+}
+
 export async function runReferences({
   siteConfig,
   sitesJson,
   outputPath,
   fetcher: injectedFetcher,
+  secretsPath,
   log = console.error,
 }) {
   const refsCfg = siteConfig.references;
+  // v1.8.0-beta.6: git-repo strategy has its own orchestrator (clone +
+  // filesystem walk, no GraphQL). Branch before the Strapi dispatch.
+  if (refsCfg?.strategy === "git-repo") {
+    return runGitRepoReferences({
+      siteConfig,
+      sitesJson,
+      outputPath,
+      log,
+    });
+  }
   const adapter = STRATEGIES[refsCfg?.strategy];
   if (!adapter) {
-    const known = Object.keys(STRATEGIES).map((s) => `"${s}"`).join(", ");
+    const known = [...Object.keys(STRATEGIES), "git-repo"].map((s) => `"${s}"`).join(", ");
     throw new Error(
       `site "${siteConfig.name}": references.strategy must be one of ${known} (got ${JSON.stringify(refsCfg?.strategy)})`,
     );
   }
   const isV4 = refsCfg.strategy === "strapi-v4";
-  const fetcher = injectedFetcher ?? defaultFetcher();
+  const fetcher = injectedFetcher ?? buildAuthenticatedFetcher({
+    siteConfig,
+    secretsPath,
+    log,
+  });
   const fleetDomainSet = buildFleetDomainSet(sitesJson);
 
   log(

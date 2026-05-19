@@ -21,8 +21,9 @@ describe("loadSecrets", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns empty tokens object when file is absent", () => {
-    expect(loadSecrets({ secretsPath })).toEqual({ tokens: {} });
+  it("returns empty tokens/credentials when file is absent", () => {
+    // 1.8.0-beta.6 added the credentials map for auto-refresh logins.
+    expect(loadSecrets({ secretsPath })).toEqual({ tokens: {}, credentials: {} });
   });
 
   it("reads a valid secrets file", () => {
@@ -37,11 +38,12 @@ describe("loadSecrets", () => {
     expect(s.tokens["infonet-strapi-prod"]).toBe("eyJhbGc.token.sig");
   });
 
-  it("defaults tokens to empty object when missing", () => {
+  it("defaults tokens and credentials to empty objects when missing", () => {
     fs.writeFileSync(secretsPath, JSON.stringify({ version: 1 }));
     expect(loadSecrets({ secretsPath })).toEqual({
       version: 1,
       tokens: {},
+      credentials: {},
     });
   });
 

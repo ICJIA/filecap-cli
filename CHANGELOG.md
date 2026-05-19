@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.6] — 2026-05-19
+
+Big batch — five user-requested items (A, B, C, D, E) shipped together:
+
+### Added
+
+- **Git-repo references adapter** (`src/references/git-repo.js`) for the 7 `type:"git"` Nuxt static sites: vpp, ilheals, sfs, ari-summits 2017–2023. Shallow-clones each repo, walks `content/*.md`, extracts file URLs via the same regex used by the Strapi adapters, derives the deployed page URL from Nuxt Content's default routing convention (`content/<rest>.md → /<rest>`, `index.md → /`). Strategy enum on `sites.json` references blocks now accepts `"git-repo"` alongside `"strapi-v3"` / `"strapi-v4"`; the orchestrator branches before the GraphQL dispatch. Tests cover the URL derivation rules (root, nested, `_hidden` directories, Windows-style backslashes) and the walker (markdown only, deduped URLs, missing-content dir tolerated). End-to-end fleet run: ilheals jumped from 0% to 41% coverage (32 of 78 files) via its content-markdown links to archive.icjia-api.cloud.
+
+- **Bearer-token references with auto-refresh login** (`src/references/auth-fetcher.js` + extended `src/config/secrets.js`). Adds optional `credentials.<serverName>.bearerLogin = { url, identifier, password }` to `~/.filecap/secrets.json`. On a 401 the auth-fetcher POSTs identifier+password to the configured `/auth/local` endpoint, captures the fresh JWT from the response, persists it back to `credentials.<serverName>.bearerToken` (atomic write, mode 0600 enforced), and retries the failed request — no manual token-paste required. If `bearerLogin` isn't set and the operator is on a TTY, falls back to an interactive paste prompt. Non-interactive runs (CI) without credentials fail loudly with a clear "configure bearerLogin or re-run interactively" message. 403 is never retried (auth refusal, not expiry). Tests cover the full state matrix (8 cases). Tradeoff documented: storing the password forfeits JWT rotation; the file's mode-0600 + same-UID trust model already governs comparable secrets like `secrets.json`'s legacy `tokens` map.
+
+- **Cross-site reference coverage band on the fleet index hero** (`src/web/index-page.js` + `src/commands/web-rollup.js`). New compact strip below the audit-count hero surfaces the manager-headline number: "X have known referrers (Y%) / Z have no known referrers — deletion candidates / N awaiting references run (git/intranet sites)". The denominator is `withRefs + withoutRefs` so the percentage isn't dragged down by sites whose references pipeline hasn't run; the explicit "awaiting" count tells the manager when that's happening. Blue accent register (distinct from the existing amber audit-count) so the eye reads it as supporting data, not as the primary metric.
+
+### Changed
+
+- **`contentTypeRoutes` fixes for 3 sites** (audited the other 8 Strapi sites' routes vs their sitemaps, same approach as icjia-agency-prod in beta.5):
+  - `ilfvcc-api-prod`: corrected `council` route from `/ifvcc/councils/:slug/` → `/ifvcc/circuits/:slug/` (24 entries land on `/ifvcc/circuits/` per the sitemap).
+  - `r3-strapi-prod`: added `resource` → `/resources/:slug` (4 entries).
+  - `infonet-strapi-prod`: added `tab` → `/tabs/:slug` (6 entries).
+  - 5 sites had no missing routes (spac, researchhub, ari, dvfr, i2i).
+- **Intranet `references` block added to sites.json** with `requiresBearerToken: true` and `contentTypeRoutes` for the visible Vue SPA routes (post, biography, document, event, form, unit, page). The actual references run requires `credentials.intranet-api-prod.bearerLogin` in secrets.json — see the auto-refresh design above.
+
+### Verified
+
+- **"No references found" cases sampled and confirmed as legitimate orphans** (not extraction bugs). Concrete example: 4 PDFs in icjia-agency-prod with stem `ICJIA_Budget_Committee_Meeting_Agenda_040926_*` — only the `_da501c9b93` hash is attached to the meeting record; the other 3 are superseded versions left on the file server. Across icjia, 179 of 3,110 PDFs (5.7%) currently sit with no references — these are the audit's deletion candidates.
+- Attachments capture verified for every Strapi content type that has an `attachments` field (grants 100%, publications 99.8%, meetings 99%, posts 91%, programs 92%; jobs 0% because they rarely populate attachments — matches user expectation).
+
+### Tests
+
+- **602 passing** (up from 579 at beta.5; +23 across the git-repo module, the auth-fetcher, the extended secrets schema, and the route-position assertions).
+
+[1.8.0-beta.6]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0-beta.6
+
 ## [1.8.0-beta.5] — 2026-05-19
 
 ### Changed

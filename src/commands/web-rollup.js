@@ -89,14 +89,23 @@ export const siteEntrySchema = z
     // and resolve deployed page URLs from entry slugs.
     references: z
       .object({
-        strategy: z.enum(["strapi-v3", "strapi-v4"]),
-        graphqlEndpoint: httpUrlSchema("graphqlEndpoint"),
-        restApiBase: httpUrlSchema("restApiBase"),
+        strategy: z.enum(["strapi-v3", "strapi-v4", "git-repo"]),
+        // graphqlEndpoint + restApiBase are required for strapi-v3 / strapi-v4
+        // strategies (FC-2026-030 schema enforcement) and unused for git-repo
+        // (which reads from the cloned filesystem). Optional at the schema
+        // level; the orchestrator validates per-strategy.
+        graphqlEndpoint: httpUrlSchema("graphqlEndpoint").optional(),
+        restApiBase: httpUrlSchema("restApiBase").optional(),
         siteFrontendUrl: z.string().optional(),
         sitemapUrl: z.string().optional(),
         contentTypeRoutes: z.record(z.string()).optional(),
       })
       .strict()
+      .refine(
+        (refs) => refs.strategy === "git-repo" ||
+          (typeof refs.graphqlEndpoint === "string" && typeof refs.restApiBase === "string"),
+        { message: "strapi-v3 / strapi-v4 require graphqlEndpoint + restApiBase" },
+      )
       .optional(),
   })
   .strict()
@@ -566,6 +575,20 @@ async function computeSiteSummary(inventoryPath) {
   let totalBytes = 0;
   let remediable = 0;
   const byCategory = {};
+  // v1.8.0-beta.6: track references coverage so the index hero can surface
+  // "X of Y files have known references" as a manager headline number.
+  //   withRefs: entry.references exists and has length > 0
+  //   withoutRefs: entry.references exists and is empty []
+  //   refsUnknown: entry.references is missing (cross-references step
+  //                hasn't been run for this site — git Nuxt sites, intranet
+  //                pre-bearer-token, etc.). These don't count toward
+  //                either bucket; the coverage % is computed against
+  //                (withRefs + withoutRefs), not totalFiles, so sites
+  //                without the references pipeline don't drag the
+  //                denominator.
+  let withRefs = 0;
+  let withoutRefs = 0;
+  let refsUnknown = 0;
 
   const REMEDIABLE_CATS = new Set(["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"]);
 
@@ -596,9 +619,19 @@ async function computeSiteSummary(inventoryPath) {
     if (REMEDIABLE_CATS.has(cat)) {
       remediable++;
     }
+
+    if (Array.isArray(obj.references)) {
+      if (obj.references.length > 0) withRefs++;
+      else withoutRefs++;
+    } else {
+      refsUnknown++;
+    }
   }
 
-  return { totalFiles, totalBytes, remediable, byCategory };
+  return {
+    totalFiles, totalBytes, remediable, byCategory,
+    withRefs, withoutRefs, refsUnknown,
+  };
 }
 
 // ── main export ────────────────────────────────────────────────────────────────
