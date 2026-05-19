@@ -70,6 +70,13 @@ export async function runAudits({
   concurrency = 2,
   force = false,
   ttlDays = 30,
+  // v1.9.0-alpha.2: optional pathPrefix to insert between publicUrlBase
+  // and entry.path when building the URL we send to the audit endpoint.
+  // Set this for old Vue 2 ARI Summit sites where the repo's static/
+  // folder deploys to /static/ on the URL (vue-cli preserves the
+  // directory segment; Nuxt collapses it). Strapi + Nuxt sites leave
+  // this empty.
+  pathPrefix = "",
   log = console.error,
 }) {
   if (typeof inventoryPath !== "string" || inventoryPath.length === 0) {
@@ -98,6 +105,12 @@ export async function runAudits({
       break;
     }
   }
+  // Normalise the optional pathPrefix to "/<segment>" (no trailing slash)
+  // for clean concatenation. Empty when unset (default).
+  const cleanPrefix = pathPrefix
+    ? "/" + String(pathPrefix).replace(/^\/+|\/+$/g, "")
+    : "";
+
   function resolveEntryUrl(entry) {
     if (typeof entry.publicUrl === "string" && entry.publicUrl.length > 0) {
       return entry.publicUrl;
@@ -111,7 +124,7 @@ export async function runAudits({
     // matters for the git Nuxt sites where filenames may carry spaces
     // (Strapi sites all use hash-mangled filenames with no spaces).
     const encoded = rel.split("/").map((s) => encodeURIComponent(s)).join("/");
-    return `${base}/${encoded}`;
+    return `${base}${cleanPrefix}/${encoded}`;
   }
 
   const cache = loadAuditCache({ cachePath });

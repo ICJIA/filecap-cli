@@ -158,16 +158,26 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   // is a /home/forge/... filesystem path, never https://, so the
   // publicUrlBase + path shape has always been their URL and stays so.
   let base;
+  let pathPrefix;
   if (isConsolidated) {
     const src = sourceMap.get(entry.serverName);
     base = src?.publicUrlBase ?? "";
+    // v1.9.0: pathPrefix is populated by web-rollup from sites.json for
+    // sites where the repo's public directory deploys to a non-root URL
+    // path (old Vue 2 ARI Summit sites). Strapi + Nuxt sites leave it
+    // unset and the URL building is unaffected.
+    pathPrefix = src?.pathPrefix ?? "";
   } else {
     base = sourceHeader.metadata?.publicUrlBase ?? "";
+    pathPrefix = sourceHeader.metadata?.pathPrefix ?? "";
   }
   if (base) {
     const cleanBase = base.replace(/\/+$/, "");
     const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
-    return `${cleanBase}/${cleanPath}`;
+    const cleanPrefix = pathPrefix
+      ? "/" + String(pathPrefix).replace(/^\/+|\/+$/g, "")
+      : "";
+    return `${cleanBase}${cleanPrefix}/${cleanPath}`;
   }
   // Defensive fallback for legacy inventories missing publicUrlBase but
   // carrying an https:// absolutePath from an older audit-static.sh run.

@@ -319,6 +319,29 @@ program
       } catch {
         // Secrets file missing or malformed — fine in anonymous mode.
       }
+      // v1.9.0-alpha.2: read pathPrefix from sites.json so old Vue 2 ARI
+      // Summit sites get the right URL (/static/foo.pdf instead of
+      // /foo.pdf). Match the inventory header's serverName against
+      // sites[].name. Strapi + Nuxt sites leave pathPrefix unset.
+      let pathPrefix = "";
+      try {
+        const sitesPath = process.env.FILECAP_SITES_FILE
+          ?? path.join(os.homedir(), ".filecap", "sites.json");
+        const sitesJson = JSON.parse(fs.readFileSync(sitesPath, "utf8"));
+        // Cheap header probe: grab the inventory's first non-empty line.
+        const invText = fs.readFileSync(inventory, "utf8");
+        const firstLine = invText.split("\n").find((l) => l.trim().length > 0);
+        if (firstLine) {
+          const header = JSON.parse(firstLine);
+          const serverName = header?.metadata?.serverName;
+          if (typeof serverName === "string") {
+            const site = (sitesJson.sites ?? []).find((s) => s.name === serverName);
+            if (site?.pathPrefix) pathPrefix = site.pathPrefix;
+          }
+        }
+      } catch {
+        // No sites.json or malformed — proceed with empty pathPrefix.
+      }
       await runAudits({
         inventoryPath: inventory,
         outputPath: opts.output,
@@ -328,6 +351,7 @@ program
         force: opts.force === true,
         cachePath: opts.cachePath,
         bearerToken,
+        pathPrefix,
       });
     } catch (err) {
       process.stderr.write(`filecap audits error: ${err.message}\n`);

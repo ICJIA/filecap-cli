@@ -84,6 +84,13 @@ export const siteEntrySchema = z
     // The references domain-filter unions these into the fleet whitelist so
     // cross-site URLs aren't dropped during extraction.
     domainAliases: z.array(z.string()).optional(),
+    // v1.9.0: extra URL path segment to prepend between publicUrlBase and
+    // the per-entry path. Set on git-type sites where the repo's public
+    // directory deploys to a non-root URL path — e.g. the old Vue 2
+    // ARI Summit sites where files in static/<name>.pdf deploy at
+    // https://<host>/static/<name>.pdf (vue-cli preserves the static/
+    // segment; Nuxt collapses it). Leading slash is normalised on load.
+    pathPrefix: z.string().optional(),
     // v1.8.0: references discovery config. When present, `filecap references
     // <siteName>` knows how to fetch this site's CMS data, classify fields,
     // and resolve deployed page URLs from entry slugs.
@@ -878,6 +885,10 @@ export async function runWebRollup({
       siteName: site.siteName ?? header.metadata?.siteName ?? "",
       serverName: header.metadata?.serverName ?? siteServerName,
       publicUrlBase: sitePublicUrlBase || header.metadata?.publicUrlBase || "",
+      // v1.9.0: pathPrefix lives in sites.json. Passed through to the
+      // master CSV / consolidated rollup so buildPublicUrl can include
+      // it for sites that need it (old Vue 2 ARI Summit deploys).
+      pathPrefix: site.pathPrefix ?? null,
     });
 
     siteResults.push({

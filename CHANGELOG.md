@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0-alpha.2] — 2026-05-19
+
+### Added
+
+- **`pathPrefix` field on `sites.json` site entries** (optional string). Set on the four ARI Summit 2017–2023 sites, which are old Vue 2 (non-Nuxt) vue-cli builds where the repo's `static/` folder deploys to `/static/` on the URL — vue-cli preserves the directory segment, unlike Nuxt which collapses it. Strapi + Nuxt sites leave it unset.
+- `filecap audits` reads `~/.filecap/sites.json`, matches the inventory header's serverName against the site's entry, and prepends `pathPrefix` to the URL it sends to audit.icjia.app. ARI Summit PDFs now audit correctly (previously got 422 because audit.icjia.app fetched the Netlify SPA catch-all HTML instead of the real PDF).
+- Master CSV's Public URL column also picks up `pathPrefix` for consolidated rollups (via the existing `consolidatedSources` plumbing). Per-site report Public URL column behavior unchanged from 1.8.0 — that fix needs the inventory header to carry `pathPrefix`, which the scan step doesn't write today.
+
+### Verified
+
+- ari-summit-2018-git audits: 14 PDFs scored, 0 errors. Sample: `Bloomington State Rate Hotels.pdf` → **32 (F)**, stable report URL on audit.icjia.app.
+
+### Tests
+
+634 passing (same as alpha.1; this release only adds runtime config plumbing).
+
+[1.9.0-alpha.2]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.9.0-alpha.2
+
 ## [1.9.0-alpha.1] — 2026-05-19
 
 Phase 1.9.0 — PDF accessibility scoring via audit.icjia.app.
