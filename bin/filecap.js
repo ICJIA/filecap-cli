@@ -306,8 +306,8 @@ program
     "override the audit-cache.json location (default ~/.filecap/audit-cache.json)",
   )
   .option(
-    "--enable-pages",
-    "v1.10.0 preview: after PDF scoring, also score every URL in entry.references[] via audit.icjia.app's /api/audit-url-page (axe-core). Default off until 1.10.0 stable.",
+    "--skip-pages",
+    "skip the page-audit pass (v1.10.0+ scores every URL in entry.references[] via /api/audit-url-page by default). Use this when the page-audit endpoint is not deployed.",
   )
   .option(
     "--page-audit-endpoint <url>",
@@ -369,8 +369,8 @@ program
         cachePath: opts.cachePath,
         bearerToken,
         pathPrefix,
-        // v1.10.0 preview — page-audit pass
-        skipPages: opts.enablePages !== true,
+        // v1.10.0 — page-audit pass (ON by default; --skip-pages opts out)
+        skipPages: opts.skipPages === true,
         pageAuditEndpoint: opts.pageAuditEndpoint,
         pageCachePath: opts.pageCachePath,
         pageTtlDays: opts.pageTtlDays ?? 14,

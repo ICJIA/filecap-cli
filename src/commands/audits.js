@@ -81,16 +81,16 @@ export async function runAudits({
   force = false,
   ttlDays = 30,
   pathPrefix = "",
-  // v1.10.0 (preview, disabled by default): page-audit options. When
-  // enabled with skipPages=false, walks every entry.references[] in the
-  // inventory, dedupes unique pageUrls, scores each via /api/audit-url-page
-  // (axe-core), attaches the result back to each reference as
-  // ref.pageAudit. Default is ON skipPages=true while the audit.icjia.app
-  // endpoint is being deployed; flip to false in 1.10.0 when stable.
+  // v1.10.0: page-audit options. After scoring PDFs, walks every
+  // entry.references[] in the inventory, dedupes unique pageUrls, scores
+  // each via /api/audit-url-page (axe-core via headless Chromium), and
+  // attaches the result back to each reference as ref.pageAudit. ON by
+  // default in 1.10.0; pass skipPages=true to opt out for environments
+  // where the page-audit endpoint isn't deployed yet.
   pageAuditEndpoint = DEFAULT_PAGE_AUDIT_ENDPOINT,
   pageCachePath = DEFAULT_PAGE_CACHE_PATH,
   pageTtlDays = 14, // pages change more than file content; shorter TTL
-  skipPages = true,
+  skipPages = false,
   log = console.error,
 }) {
   if (typeof inventoryPath !== "string" || inventoryPath.length === 0) {

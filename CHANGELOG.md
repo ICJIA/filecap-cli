@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] — 2026-05-19
+
+**Page accessibility scoring.** The third and final layer of the three-layer accessibility story manager-friendly audit reports tell — alongside the PDF audit (1.9.0) and the cross-site references (1.8.0):
+
+- Layer 1 — **Is the file accessible?** (PDF audit, 1.9.0)
+- Layer 2 — **Where on our site is it linked from?** (Cross-references, 1.8.0)
+- Layer 3 — **Is that page itself accessible?** (this release)
+
+### Added
+
+- `filecap audits` now scores every URL in `entry.references[]` via audit.icjia.app's new **`POST /api/audit-url-page`** endpoint (headless Chromium + `@axe-core/puppeteer` + persisted as a shareable shared_reports row). Each reference object in the augmented inventory gets a `pageAudit = { score, grade, violationCount, bySeverity, reportUrl, reportId, reportExpiresAt, pageTitle, audited, checkedAt, cached }` field attached. ON by default; opt out with `--skip-pages`.
+
+- **Page-grade chips in the HTML report.** Tiny parenthesised letter chip (`(B)`) rendered next to each `Page N` anchor in the Referenced column. Same colour register as the file-audit chips so the eye reads file accessibility + page accessibility as the same metric kind. Chip is itself a clickable anchor → audit.icjia.app/page-report/<id> for the per-violation deep-dive.
+
+- **`src/audits/page-scorer.js`** — POST /api/audit-url-page wrapper, mirrors `score-fetcher.js`. Same error semantics (5xx + 504 → null for graceful skip; 4xx → throws).
+
+- **Page cache at `~/.filecap/page-audit-cache.json`** — URL-keyed (pages don't have content hashes the way files do — same URL with rendered content vs SSR shell), separate file from the PDF cache. Default 14-day TTL (pages change more than file content). audit.icjia.app also dedups by `sha256(url)` server-side; the local cache lets us skip the HTTP round-trip entirely.
+
+### Operator notes
+
+- audit.icjia.app's `/api/audit-url-page` endpoint launches headless Chromium (~5–15 s per page render + axe analysis). On first deploy the audit.icjia.app server needs Chromium's runtime libraries installed:
+  ```bash
+  sudo apt install -y libatk1.0-0t64 libatk-bridge2.0-0t64 libcairo2 libcups2t64 libdbus-1-3 libdrm2 libexpat1 libfontconfig1 libgbm1 libglib2.0-0t64 libgtk-3-0t64 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libx11-6 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 libxkbcommon0 libatspi2.0-0t64 libasound2t64 fonts-liberation xdg-utils
+  ```
+- The audit-url-page endpoint reuses the existing `analyzeLimiter` rate-limit budget (default 35/hour; the fleet flow assumes the operator bumped this to 5000 already for the PDF pass). The `global` rate limiter (default 100/min per IP) also applies — if you see batches of `Unavailable` cells in the deployed bundle, bump it to 1000.
+- audit-fleet-auto.sh's Stage 3.5 now runs page audits by default in addition to PDF audits. `SKIP_AUDITS=1` opts out of both. Use `--skip-pages` on a direct `filecap audits` call to score PDFs but skip pages.
+
+### Verified
+
+End-to-end on dvfr-strapi-prod: 62 PDFs audited (B/C/F grades), 32 unique pages audited (24 A, 8 B), every reference now carries both a file-audit grade and a page-audit grade. Sample meeting-minutes PDF row in the deployed report:
+- File audit: **B (84)** — clickable to per-file violation list
+- Referenced on: dvfr.illinois.gov/meetings/...may-21-2024/
+- Page audit: **A (100)** 0 violations — clickable to per-issue page audit
+
+### Tests
+
+644 passing (same as 1.9.0; the 1.10.0 page-scorer + cache + orchestrator-extension test infrastructure was scaffolded in 1.9.0-alpha.1 with the preview flag off, and the orchestrator tests gate on `skipPages` so flipping the default doesn't break them).
+
+[1.10.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.10.0
+
 ## [1.9.0] — 2026-05-19
 
 **Stable.** Consolidates `1.9.0-alpha.1` + `1.9.0-alpha.2` into a single shipped release. PDF accessibility scoring is now live on the `latest` npm dist-tag so `audit-fleet-auto.sh` (which calls `@icjia/filecap@latest`) picks it up by default.
