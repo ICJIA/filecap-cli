@@ -314,6 +314,26 @@ describe("fetchAllEntries", () => {
     expect(calls[2]).toContain("_start=4");
   });
 
+  // FC-2026-031 (1.8.0-beta.3): an outer page-count cap protects against
+  // a runaway pagination loop (misconfigured site, hostile fixture, bug in
+  // Strapi's pagination total field). Default is generous (10k pages); the
+  // test pins a tiny cap to exercise the guard.
+  it("throws when pagination exceeds maxPages (FC-2026-031)", async () => {
+    let calls = 0;
+    const fetcher = async () => {
+      calls++;
+      // Return a full page forever — without the cap this loop runs until OOM.
+      return [{ id: calls }];
+    };
+    await expect(
+      fetchAllEntries("https://x.com", "things", fetcher, {
+        limit: 1,
+        maxPages: 5,
+      }),
+    ).rejects.toThrow(/maxPages/);
+    expect(calls).toBeLessThanOrEqual(6); // up to 5 pages then the throw
+  });
+
   it("stops paginating when a page returns fewer entries than the limit", async () => {
     let calls = 0;
     const fetcher = async () => {

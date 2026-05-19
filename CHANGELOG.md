@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.3] — 2026-05-19
+
+### Added
+
+- **Vertical click-and-drag pan on report tables.** The pre-1.8.0 pan handler tracked only horizontal scroll (`scrollLeft`); mouse users with no scrollwheel access had no way to navigate the vertical content of a 75-vh-bounded file table. The handler now tracks both axes — `start.x` / `start.y` / `start.scrollLeft` / `start.scrollTop` — and pans both `wrap.scrollLeft` and `wrap.scrollTop` simultaneously. Threshold is `Math.hypot(dx, dy) ≥ 5px` so diagonal drags trip the gesture and a purely vertical drag pans the table down without first nudging horizontally. Touch panning was already handled natively via `overflow: auto` + `touch-action: pan-x pan-y` — unchanged. One new test pins the rendered-HTML assertion.
+
+### Security
+
+A fresh red/blue team pass against the 1.8.0 references code paths produced **three findings — one Moderate, one Low, one Note. Both Moderate / Low fixed in this release.** Full audit detail in [`docs/security/audit-2026-05-19.md`](docs/security/audit-2026-05-19.md).
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| FC-2026-030 | Moderate | `references.graphqlEndpoint` / `restApiBase` in sites.json accepted any string — no URL scheme validation. A malicious `sites.json` bundle could redirect `filecap references` at SSRF targets (loopback, link-local, cloud-metadata) or `http://` MITM-vulnerable endpoints. | **Fixed in 1.8.0-beta.3** — Zod refinement rejects non-`http:`/`https:` URLs (`file://`, `javascript:`, bare hosts, `ws://`, malformed strings) at schema load time. |
+| FC-2026-031 | Low | `fetchAllEntries` paginators (v3 + v4) had no outer page-count cap. A misbehaving or hostile site that returned a full page indefinitely would loop until the operator's process OOM'd. | **Fixed in 1.8.0-beta.3** — both adapters accept `options.maxPages` (default 10,000 → 1M-entry ceiling at default `limit=100`); the loop throws if the cap is hit so the orchestrator logs a WARN and moves on. |
+| FC-2026-032 | Note | Sidecar NDJSON inputs to `cross-references` trusted under the standard same-UID model — write access to the sidecar would let a local attacker inject false references. | Accepted (documented). Same threat model as `~/.filecap/secrets.json` and `sites.json`. |
+
+Tests: **576 passing** (up from 565 at beta.2; +11 new across the URL-scheme validation, the maxPages cap, and the rendered-HTML vertical-pan assertion).
+
+### Notes
+
+- `siteEntrySchema` is now an exported binding from `src/commands/web-rollup.js` so the schema can be exercised in unit tests without round-tripping through a sites.json file.
+- The audit doc replaces the previously-pointed-at-but-missing `docs/security/audit-2026-05-13.md` reference in the README; the 2026-05-13 per-finding detail now lives only in the README + CHANGELOG (one source of truth) and the new 2026-05-19 doc covers the 1.8.0 surface from scratch.
+
+[1.8.0-beta.3]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0-beta.3
+
 ## [1.8.0-beta.2] — 2026-05-19
 
 ### Added

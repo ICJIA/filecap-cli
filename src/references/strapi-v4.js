@@ -90,6 +90,8 @@ function buildPageUrl(base, plural, limit, start) {
 
 export async function fetchAllEntries(restApiBase, plural, fetcher, options = {}) {
   const limit = options.limit ?? 100;
+  // FC-2026-031: hard cap on iterations. See strapi-v3.js for rationale.
+  const maxPages = options.maxPages ?? 10_000;
   const base = restApiBase.replace(/\/+$/, "");
 
   // Strapi v4's REST `pluralName` isn't derivable from the GraphQL plural —
@@ -114,12 +116,18 @@ export async function fetchAllEntries(restApiBase, plural, fetcher, options = {}
 
   const out = [];
   let start = 0;
+  let pages = 1; // first page already fetched above
   while (true) {
     const data = Array.isArray(response?.data) ? response.data : [];
     if (data.length === 0) break;
     for (const entry of data) out.push(entry);
     if (data.length < limit) break;
     start += limit;
+    if (++pages > maxPages) {
+      throw new Error(
+        `fetchAllEntries: exceeded maxPages=${maxPages} for ${pluralToUse} (FC-2026-031 guard)`,
+      );
+    }
     response = await fetcher(buildPageUrl(base, pluralToUse, limit, start));
   }
   return out;

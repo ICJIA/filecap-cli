@@ -91,9 +91,20 @@ export async function introspectTypeFields(graphqlEndpoint, typeName, fetcher) {
 
 export async function fetchAllEntries(restApiBase, contentType, fetcher, options = {}) {
   const limit = options.limit ?? 100;
+  // FC-2026-031: hard cap on iterations. 10k pages × default limit 100 =
+  // 1M entries — well past any realistic Strapi instance, but a hard
+  // guarantee that a runaway loop (misconfigured site, broken pagination,
+  // hostile fixture) terminates rather than OOMing the operator.
+  const maxPages = options.maxPages ?? 10_000;
   const out = [];
   let start = 0;
+  let pages = 0;
   while (true) {
+    if (++pages > maxPages) {
+      throw new Error(
+        `fetchAllEntries: exceeded maxPages=${maxPages} for ${contentType} (FC-2026-031 guard)`,
+      );
+    }
     const url = `${restApiBase.replace(/\/+$/, "")}/${contentType}?_limit=${limit}&_start=${start}`;
     const page = await fetcher(url);
     if (!Array.isArray(page) || page.length === 0) break;

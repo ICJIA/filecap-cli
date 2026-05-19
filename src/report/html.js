@@ -1689,11 +1689,12 @@ ${rowsHtml}
   }
 })();
 
-/* ── click-and-drag horizontal pan ──────────────────────────────────────────
-   Mouse: drag-to-pan with a 5px threshold so small clicks still trigger text
-   selection. Once threshold is exceeded, takes pointer capture and pans.
-   Touch: skipped — the browser's native overflow-x:auto handles touch
-   scrolling (with momentum on iOS). */
+/* ── click-and-drag pan (both axes, 1.8.0) ──────────────────────────────────
+   Mouse: drag-to-pan in both X and Y with a 5px threshold so small clicks
+   still trigger text selection. Once threshold is exceeded in either axis,
+   takes pointer capture and pans both axes simultaneously.
+   Touch: skipped — the browser's native overflow:auto + touch-action:pan-x
+   pan-y handles touch scrolling (with momentum on iOS) in both directions. */
 (function() {
   const wrap = document.querySelector(".table-wrap");
   if (!wrap || typeof wrap.scrollBy !== "function") return;
@@ -1711,7 +1712,9 @@ ${rowsHtml}
     if (e.target.closest("a, button, input, select, [role='button'], [data-resize-handle]")) return;
     start = {
       x: e.clientX,
+      y: e.clientY,
       scrollLeft: wrap.scrollLeft,
+      scrollTop: wrap.scrollTop,
       pointerId: e.pointerId,
     };
   });
@@ -1719,8 +1722,12 @@ ${rowsHtml}
   wrap.addEventListener("pointermove", function (e) {
     if (!start || e.pointerId !== start.pointerId) return;
     const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
     if (!panning) {
-      if (Math.abs(dx) < PAN_THRESHOLD) return;
+      // Trigger as soon as the pointer travels far enough in EITHER axis —
+      // diagonal drags count, and a purely vertical drag pans the table down
+      // without first nudging horizontally.
+      if (Math.hypot(dx, dy) < PAN_THRESHOLD) return;
       panning = true;
       wrap.classList.add("is-panning");
       try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1731,6 +1738,7 @@ ${rowsHtml}
     if (panning) {
       e.preventDefault();
       wrap.scrollLeft = start.scrollLeft - dx;
+      wrap.scrollTop = start.scrollTop - dy;
     }
   });
 

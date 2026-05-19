@@ -187,9 +187,19 @@ inline-JS additions). The summary below is for managers and auditors.
 
 The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master CSV — verified HTTP 401 on `/`, the master CSV, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`. The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline.
 
+### 2026-05-19 red/blue team audit of the 1.8.0 references pipeline (1.8.0-beta.2 → fixed in 1.8.0-beta.3)
+
+Fresh adversarial pass against the 1.8.0 references code (Strapi v3 + v4 adapters, cross-site resolver, new `references` block in `sites.json`, Referenced column in CSV/HTML). **Zero Critical findings.** Three findings total: one Moderate, one Low, one Note. Both Moderate + Low fixed in 1.8.0-beta.3. Full detail in [`docs/security/audit-2026-05-19.md`](docs/security/audit-2026-05-19.md).
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| FC-2026-030 | Moderate | `references.graphqlEndpoint` / `restApiBase` lacked URL-scheme validation (SSRF / MITM via crafted sites.json) | Fixed in 1.8.0-beta.3 (Zod refinement rejects non-http(s) URLs) |
+| FC-2026-031 | Low | Pagination loops had no outer page-count cap (OOM risk) | Fixed in 1.8.0-beta.3 (`maxPages` option, default 10,000) |
+| FC-2026-032 | Note | Sidecar NDJSON files trusted under same-UID model | Accepted (documented) |
+
 ### 2026-05-13 red/blue team re-audit (v1.7.35 → fixed in v1.7.36)
 
-A fresh adversarial pass against `@icjia/filecap@1.7.35`. **Zero Critical findings.** Seven findings total: three Moderate, three Low, one Informational. Five were fixed in v1.7.36; two are mitigated by the Netlify Pro Site Password gate or deferred. Per-finding detail in [`docs/security/audit-2026-05-13.md`](docs/security/audit-2026-05-13.md).
+Fresh adversarial pass against `@icjia/filecap@1.7.35`. **Zero Critical findings.** Seven findings total: three Moderate, three Low, one Informational. Five were fixed in v1.7.36; two are mitigated by the Netlify Pro Site Password gate or deferred.
 
 | # | Severity | Finding | Status |
 |---|---|---|---|

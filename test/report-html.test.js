@@ -534,6 +534,26 @@ describe("writeHtml", () => {
     expect(handles.length).toBe(15);
   });
 
+  it("inline drag-to-pan handler scrolls both axes (1.8.0)", async () => {
+    // The original v1.7.2 handler only tracked horizontal scroll
+    // (scrollLeft). 1.8.0 extends mouse-drag panning to vertical too — the
+    // file tables already exceed max-height (75vh) on most fleets, so a
+    // mouse user with no scrollwheel access needs drag-to-pan in both
+    // directions. Touch already pans both axes natively via overflow:auto.
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: sampleHeader,
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    // The pan handler must capture starting scrollTop, track dy, and update
+    // wrap.scrollTop alongside wrap.scrollLeft.
+    expect(html).toContain("scrollTop: wrap.scrollTop");
+    expect(html).toMatch(/wrap\.scrollTop\s*=\s*start\.scrollTop\s*-\s*dy/);
+  });
+
   describe("access-method panel (v1.7.6)", () => {
     it("renders a Strapi-CMS access panel when accessKind is 'strapi'", async () => {
       const outputPath = path.join(tmpDir, "out.html");

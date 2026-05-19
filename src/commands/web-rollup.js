@@ -23,7 +23,27 @@ import { darkModeCss } from "../web/styles.js";
 // 2026-05-13 audit finding #3.
 const SITE_NAME_SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
 
-const siteEntrySchema = z
+// FC-2026-030 (1.8.0-beta.3): references endpoints (graphqlEndpoint /
+// restApiBase) must be http(s) URLs. Bare hosts, file://, javascript:, and
+// other schemes are rejected at schema load time so a malicious or
+// misconfigured sites.json bundle can't redirect the references command at
+// SSRF / MITM targets. Blast radius is limited (responses are domain-filtered
+// before being written anywhere), but rejecting up-front saves the
+// unauthorized outbound request itself + the timing-side-channel info leak.
+const httpUrlSchema = (label) =>
+  z.string().refine(
+    (s) => {
+      try {
+        const u = new URL(s);
+        return u.protocol === "http:" || u.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    { message: `${label} must be an http(s) URL` },
+  );
+
+export const siteEntrySchema = z
   .object({
     name: z.string().regex(SITE_NAME_SLUG, "name must be a kebab-case slug ([a-z0-9-], no leading/trailing hyphen)"),
     siteName: z.string().optional(),
@@ -70,8 +90,8 @@ const siteEntrySchema = z
     references: z
       .object({
         strategy: z.enum(["strapi-v3", "strapi-v4"]),
-        graphqlEndpoint: z.string(),
-        restApiBase: z.string(),
+        graphqlEndpoint: httpUrlSchema("graphqlEndpoint"),
+        restApiBase: httpUrlSchema("restApiBase"),
         siteFrontendUrl: z.string().optional(),
         sitemapUrl: z.string().optional(),
         contentTypeRoutes: z.record(z.string()).optional(),

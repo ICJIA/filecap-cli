@@ -433,6 +433,23 @@ describe("fetchAllEntries (v4)", () => {
     expect(calls.length).toBe(1);
   });
 
+  // FC-2026-031 (1.8.0-beta.3): an outer page-count cap protects against
+  // a runaway pagination loop. Mirror of the v3 guard.
+  it("throws when pagination exceeds maxPages (FC-2026-031)", async () => {
+    let calls = 0;
+    const fetcher = async () => {
+      calls++;
+      return { data: [{ id: calls }], meta: { pagination: { total: 9999 } } };
+    };
+    await expect(
+      fetchAllEntries("https://x.com", "posts", fetcher, {
+        limit: 1,
+        maxPages: 5,
+      }),
+    ).rejects.toThrow(/maxPages/);
+    expect(calls).toBeLessThanOrEqual(6);
+  });
+
   it("does not retry on non-404 errors (auth, server)", async () => {
     // 403 is the Public-role permissions case — kebab won't help, so don't waste a request
     const calls = [];
