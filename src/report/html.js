@@ -190,12 +190,13 @@ function buildPageAuditChip(pa) {
     typeof pa.violationCount === "number"
       ? ` — ${pa.violationCount} violation${pa.violationCount === 1 ? "" : "s"}`
       : "";
+  // 1.10.0 final: render as a non-clickable label, NOT a link. The grade
+  // chip is the whole signal we want next to "Page N" — managers ask
+  // "is that page accessible?" and the letter answers it. A clickable
+  // page-report viewer was scoped out of audit.icjia.app's 1.10.0
+  // release; only PDF audits get an "Open report" link. The tooltip
+  // still shows the full score + violation count for hover.
   const tip = `Page accessibility: ${grade}${score != null ? ` (${score})` : ""}${violationLabel}`;
-  const safeReport =
-    typeof pa.reportUrl === "string" ? safeUrl(pa.reportUrl) : null;
-  if (safeReport) {
-    return ` <a class="page-audit-chip ${cls}" href="${htmlEscape(safeReport)}" target="_blank" rel="noopener noreferrer" title="${htmlEscape(tip + " — click for full report")}">(${htmlEscape(grade)})</a>`;
-  }
   return ` <span class="page-audit-chip ${cls}" title="${htmlEscape(tip)}">(${htmlEscape(grade)})</span>`;
 }
 

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] — 2026-05-19
+
+### Changed
+
+- `buildPageAuditChip` (in `src/report/html.js`) now renders the page-audit grade as a plain non-clickable `<span>` instead of an anchor to `audit.icjia.app/page-report/<id>`. The audit.icjia.app `/page-report/<id>` Nuxt viewer was scoped out of the 1.10.0 audit-tool release — the API persists the JSON but no Nuxt route serves it, so clicks landed on 404s. The chip itself is the whole intended signal next to each "Page N" anchor: the grade letter (A through F) answers the manager question "is that page accessible too?" inline. PDFs still get a separate clickable `Open report` link in the Audit Report column.
+- The `reportUrl` field on `entry.references[].pageAudit` is still emitted by the audits step (no orchestrator change) so the data is available for any future viewer; it's just not exposed in the HTML chip.
+
 ## [1.10.0] — 2026-05-19
 
 **Page accessibility scoring.** The third and final layer of the three-layer accessibility story manager-friendly audit reports tell — alongside the PDF audit (1.9.0) and the cross-site references (1.8.0):
