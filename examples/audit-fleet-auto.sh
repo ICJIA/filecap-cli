@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 #  audit-fleet-auto.sh — non-interactive wrapper around audit-fleet.sh
+#                       plus the v1.8.0 references pipeline + web-rollup
 # ============================================================================
 #
 #  WHY THIS EXISTS
@@ -17,24 +18,37 @@
 #    With a pty, ssh no longer drains the parent script's stdin, and expect
 #    sends an answer to each prompt as it appears.
 #
+#    v1.8.0: after scan + report finishes, the wrapper also runs the new
+#    references pipeline (filecap references → cross-references → web-rollup)
+#    so a single fleet refresh produces the deployed bundle with the
+#    Referenced column populated. Set SKIP_REFERENCES=1 to opt out of the
+#    references step; SKIP_ROLLUP=1 to opt out of the bundle build.
+#
 #  REQUIREMENTS
-#    - expect  (preinstalled on macOS; `apt install expect` on Debian/Ubuntu)
+#    - expect    (preinstalled on macOS; `apt install expect` on Debian/Ubuntu)
+#    - python3   (for parsing sites.json — ships with macOS and most Linux)
 #    - audit-fleet.sh, audit-remote.sh, (audit-static.sh) in the same dir
 #    - ~/.filecap/sites.json  (or a sites.json the inner script can auto-find)
 #
 #  USAGE
-#    ./audit-fleet-auto.sh                # full fleet, all auto-answered
+#    ./audit-fleet-auto.sh                # full pipeline (scan → references → rollup → deploy)
 #    AUDIT_HTML=0 ./audit-fleet-auto.sh   # skip HTML report generation
 #    SKIP_VERSION_CHECK=0 ./audit-fleet-auto.sh   # keep the npm version check
+#    SKIP_REFERENCES=1 ./audit-fleet-auto.sh      # skip references + cross-references
+#    SKIP_ROLLUP=1 ./audit-fleet-auto.sh          # skip web-rollup bundle build
+#    FILECAP_NO_DEPLOY=1 ./audit-fleet-auto.sh    # build but don't deploy to Netlify
 #
 #  EXIT CODE
-#    Mirrors audit-fleet.sh's exit code.
+#    Mirrors audit-fleet.sh's exit code if scan fails; otherwise reflects
+#    references / rollup outcome. Non-zero on any step's failure.
 # ============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 AUDIT_FLEET_PATH="${SCRIPT_DIR}/audit-fleet.sh"
+SITES_JSON="${SITES_JSON:-${HOME}/.filecap/sites.json}"
+AUDITS_BASE="${AUDITS_BASE:-${HOME}/filecap-audits}"
 
 if ! command -v expect >/dev/null 2>&1; then
   echo "ERROR: 'expect' is required but not installed." >&2
@@ -52,7 +66,10 @@ export AUDIT_FLEET_PATH
 export SKIP_VERSION_CHECK="${SKIP_VERSION_CHECK:-1}"
 export AUDIT_HTML="${AUDIT_HTML:-1}"
 
-exec expect <<'EXPECT_EOF'
+# ────────────────────────────────────────────────────────────────────────────
+#  Stage 1: scan + report (existing expect-driven audit-fleet.sh)
+# ────────────────────────────────────────────────────────────────────────────
+expect <<'EXPECT_EOF'
 # Allow any single rsync to take as long as it needs (no overall timeout).
 set timeout -1
 log_user 1
@@ -88,3 +105,105 @@ expect {
 catch wait result
 exit [lindex $result 3]
 EXPECT_EOF
+FLEET_EXIT=$?
+
+if [[ $FLEET_EXIT -ne 0 ]]; then
+  echo "[fleet-auto] audit-fleet.sh exited with code $FLEET_EXIT — skipping references/rollup" >&2
+  exit $FLEET_EXIT
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Stage 2 (v1.8.0): references — per-site CMS reference extraction
+# ────────────────────────────────────────────────────────────────────────────
+if [[ "${SKIP_REFERENCES:-0}" == "1" ]]; then
+  echo "[fleet-auto] SKIP_REFERENCES=1 — skipping references + cross-references"
+else
+  if [[ ! -f "$SITES_JSON" ]]; then
+    echo "[fleet-auto] WARN: no sites.json at $SITES_JSON; skipping references" >&2
+  else
+    SIDECARS_DIR="${TMPDIR:-/tmp}/filecap-references-$$"
+    mkdir -p "$SIDECARS_DIR"
+    trap 'rm -rf "$SIDECARS_DIR"' EXIT
+
+    # Discover sites that have a `references` block in sites.json. Sites
+    # without one (e.g. archive-prod, ones whose pipeline hasn't been
+    # configured yet) are skipped naturally — cross-references can still
+    # resolve their files against sidecars from other sites.
+    SITES_WITH_REFS=$(python3 -c "
+import json, sys
+with open('$SITES_JSON') as f: d = json.load(f)
+for s in d.get('sites', []):
+    if s.get('references'): print(s['name'])
+")
+
+    if [[ -z "$SITES_WITH_REFS" ]]; then
+      echo "[fleet-auto] No sites in sites.json have a references block — skipping references"
+    else
+      echo "[fleet-auto] Stage 2: running 'filecap references' for $(echo "$SITES_WITH_REFS" | wc -l | tr -d ' ') sites (in parallel)"
+
+      # Run references in parallel — each site's references step is
+      # independent. Bounded by however many sites have a references block
+      # (typically ≤ 11 in the ICJIA fleet). Each one is network-bound to
+      # its own Strapi backend so parallelism doesn't contend.
+      for site in $SITES_WITH_REFS; do
+        (
+          if ! npx --yes @icjia/filecap@latest references "$site" \
+                 -o "$SIDECARS_DIR/$site.refs.ndjson" >/tmp/filecap-refs-"$site".log 2>&1; then
+            echo "[fleet-auto] WARN: references failed for $site (see /tmp/filecap-refs-$site.log)" >&2
+          else
+            echo "[fleet-auto]   ✓ references $site"
+          fi
+        ) &
+      done
+      wait
+
+      # Cross-references: walk every inventory in ~/filecap-audits/ and
+      # build entry.references[] from the sidecars. Sites without their
+      # own sidecar still get matched against the fleet-wide index, so
+      # archive-prod's files pick up references from icjia-agency-prod's
+      # meeting attachments, etc.
+      SIDECAR_ARGS=()
+      for s in "$SIDECARS_DIR"/*.refs.ndjson; do
+        [[ -f "$s" ]] && SIDECAR_ARGS+=(-s "$s")
+      done
+
+      if [[ ${#SIDECAR_ARGS[@]} -eq 0 ]]; then
+        echo "[fleet-auto] No sidecars were produced; skipping cross-references"
+      else
+        echo "[fleet-auto] Stage 3: running 'filecap cross-references' over $(ls "$AUDITS_BASE"/*/latest/inventory.ndjson 2>/dev/null | wc -l | tr -d ' ') inventories"
+        for site_dir in "$AUDITS_BASE"/*/; do
+          site=$(basename "$site_dir")
+          inv="$site_dir/latest/inventory.ndjson"
+          out="$site_dir/latest/inventory.cross-ref.ndjson"
+          if [[ -f "$inv" ]]; then
+            if npx --yes @icjia/filecap@latest cross-references "$inv" \
+                 "${SIDECAR_ARGS[@]}" -o "$out" >/tmp/filecap-xref-"$site".log 2>&1; then
+              echo "[fleet-auto]   ✓ cross-references $site"
+            else
+              echo "[fleet-auto] WARN: cross-references failed for $site" >&2
+            fi
+          fi
+        done
+      fi
+    fi
+  fi
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Stage 4: web-rollup — bundle every site into a static-site directory
+#  (deploys to Netlify if ~/.filecap/config.json has webRollup.autoDeploy:
+#  true and FILECAP_NO_DEPLOY is not set)
+# ────────────────────────────────────────────────────────────────────────────
+if [[ "${SKIP_ROLLUP:-0}" == "1" ]]; then
+  echo "[fleet-auto] SKIP_ROLLUP=1 — skipping web-rollup"
+else
+  echo "[fleet-auto] Stage 4: running 'filecap web-rollup'"
+  if ! npx --yes @icjia/filecap@latest web-rollup; then
+    echo "[fleet-auto] ERROR: web-rollup failed" >&2
+    exit 1
+  fi
+  echo "[fleet-auto] ✓ web-rollup complete"
+fi
+
+echo "[fleet-auto] Full pipeline complete (scan → references → cross-references → rollup)"
+exit 0
