@@ -71,12 +71,14 @@ export async function runReferences({
     refsCfg.graphqlEndpoint,
     fetcher,
   );
-  log(`[references] ${contentTypes.length} content types: ${contentTypes.join(", ")}`);
+  log(
+    `[references] ${contentTypes.length} content types: ${contentTypes.map((c) => c.singular).join(", ")}`,
+  );
 
   const sidecarRecords = [];
 
-  for (const ct of contentTypes) {
-    const pascalCt = ct.charAt(0).toUpperCase() + ct.slice(1);
+  for (const { singular, plural } of contentTypes) {
+    const pascalCt = singular.charAt(0).toUpperCase() + singular.slice(1);
     let classifiedFields;
     try {
       classifiedFields = await introspectTypeFields(
@@ -89,13 +91,16 @@ export async function runReferences({
       continue;
     }
 
-    // Strapi v3 REST path uses the plural form (`grants`, `publications`, etc.)
-    const restPlural = ct.endsWith("s") ? ct : `${ct}s`;
+    // Plural from schema (Strapi's pluralizer handles irregular forms like
+    // county→counties; naive `+s` would 404 on those). Strapi v3 also
+    // kebab-cases camelCase type names in the REST URL path even when the
+    // GraphQL query name stays camelCase (`requiredForms` → /required-forms).
+    const restPath = plural.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
     let entries;
     try {
-      entries = await fetchAllEntries(refsCfg.restApiBase, restPlural, fetcher);
+      entries = await fetchAllEntries(refsCfg.restApiBase, restPath, fetcher);
     } catch (err) {
-      log(`[references] WARN: failed to fetch ${restPlural}: ${err.message}`);
+      log(`[references] WARN: failed to fetch ${restPath}: ${err.message}`);
       continue;
     }
     log(`[references] ${pascalCt}: ${entries.length} entries`);
@@ -108,14 +113,14 @@ export async function runReferences({
       );
       const fleetUrls = allUrls.filter((u) => isFleetUrl(u, fleetDomainSet));
       const pageUrl = resolvePageUrl({
-        contentType: ct,
+        contentType: singular,
         entry,
         siteFrontendUrl: refsCfg.siteFrontendUrl ?? siteConfig.siteUrl,
         contentTypeRoutes: refsCfg.contentTypeRoutes,
       });
       sidecarRecords.push({
         siteName: siteConfig.name,
-        contentType: ct,
+        contentType: singular,
         entryId: entry.id,
         slug: entry.slug ?? null,
         pageUrl,

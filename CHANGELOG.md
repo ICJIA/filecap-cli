@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.1] — 2026-05-19
+
+### Added
+
+- **Strapi-v3 references extraction extended to four more sites: spac-prod, researchhub-prod, ari-api-prod, ilfvcc-api-prod.** Combined with icjia-agency-prod (shipped in alpha.1) that's **5 of 9** Strapi sites in the audit fleet now contributing to the cross-site references index. The four added sites collectively emit ~1,300 sidecar records spanning publications, meetings, posts, biographies, councils, counties, events, programs, sections, articles, datasets, apps, and other content types.
+
+- **Schema-driven plural detection** for content types with irregular English plurals (`county → counties`, `policy → policies`, `biography → biographies`). Previously the orchestrator naively appended `s` to the singular form, which 404'd on irregular plurals and silently dropped the content type. The new implementation derives each plural from the schema's `*Connection` paginator field (Strapi exposes `xs` + `xsConnection` for every content type, so the plural is always discoverable), then pairs it back to a singular by reversing common pluralization rules. This pickup recovered **102 county entries** on ilfvcc-api-prod and dozens of policies / biographies on icjia-agency-prod that prior versions silently dropped.
+
+- **Kebab-case REST URL conversion** for camelCase content type names (e.g. `requiredForm` → `/required-forms`). Strapi v3's GraphQL keeps the field name camelCase but the REST endpoint kebab-cases it; without the conversion `requiredForms` 404'd. Fix recovered 21 RequiredForm entries on icjia-agency-prod.
+
+- **Per-site `references` blocks added to sites.json** for spac-prod, researchhub-prod, ari-api-prod, ilfvcc-api-prod (graphqlEndpoint, restApiBase, siteFrontendUrl, sitemapUrl, contentTypeRoutes). Each site's `contentTypeRoutes` was derived empirically by sampling the site's own `sitemap.xml` and matching slug patterns to content-type counts:
+  - **spac.illinois.gov**: 191 `/publications/<slug>`, 43 `/meetings/<slug>`, 29 `/news/<slug>`, 3 `/about/<slug>`
+  - **icjia.illinois.gov/researchhub/**: 249 `/articles/<slug>`, 5 `/datasets/<slug>`, 5 `/apps/<slug>` (legacy Research Hub backend feeds the same `/researchhub/` paths icjia-agency-prod publishes to)
+  - **icjia.illinois.gov/adultredeploy/**: 125 `/about/<slug>`, 69 `/news/<slug>`, 56 `/resources/<slug>`, 25 `/sites/<slug>` (ARI sub-path served by its own backend)
+  - **icjia.illinois.gov/ifvcc/**: 101 `/news/<slug>`, 100 `/counties/<slug>`, 24 `/circuits/<slug>` (Family Violence Coordinating Council)
+
+### Cross-site coverage from this release's fleet run
+
+| Site | Entries augmented | With references | % |
+| --- | --- | --- | --- |
+| archive-prod | 1,849 | 909 | 49% |
+| icjia-agency-prod | 3,110 | 1,379 | 44% |
+| spac-prod | 501 | 61 | 12% |
+| **researchhub-prod** | 315 | **250** | **79%** |
+| ari-api-prod | 553 | 150 | 27% |
+| ilfvcc-api-prod | 420 | 112 | 27% |
+| **Total** | **6,748** | **2,861** | **42%** |
+
+researchhub-prod's 79% reflects its role as a file storage backend for icjia.illinois.gov publications — nearly four out of five files there are linked from a content page elsewhere in the fleet. ari-api-prod and ilfvcc-api-prod's 27% rates suggest the audit is surfacing many orphaned PDFs in those backends that staff can review for deletion.
+
+### Deferred to 1.8.0-beta.2 / beta.3
+
+- **Strapi v4 adapter for dvfr, r3, i2i, infonet** — these backends are Strapi v4, which has a fundamentally different REST shape (`/api/<plural>` paths, `pagination[limit]` syntax, and a wrapping `{data: [{id, attributes: {…}}]}` envelope around every entry, every relation, and every media item). The existing `strapi-v3.js` will not work on them; a parallel `strapi-v4.js` module is required.
+- **Bearer-token auth for intranet-api-prod** — extractor needs to inject `Authorization: Bearer <token>` reading from `~/.filecap/secrets.json` (the existing convention used by the scan step).
+- **Git-repo extraction strategy** for the 7 type:"git" Nuxt static sites (vpp, ilheals, sfs, ari-summits 2017–2023). Same URL-regex approach over markdown files in the cloned `/content/` directory.
+
+### Verification
+
+- 541 tests passing (up from 539 at alpha.1). 2 new tests for irregular-plural detection.
+- End-to-end fleet run verified — 6 inventories augmented with cross-site references, no errors mid-run other than the pre-existing 403s on Strapi auth-restricted content types (build/form/test entries that the Public role isn't permitted to read; these are intentional and don't carry user-visible references).
+
+[1.8.0-beta.1]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0-beta.1
+
 ## [1.8.0-alpha.1] — 2026-05-19
 
 ### Added

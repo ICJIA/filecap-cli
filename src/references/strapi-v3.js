@@ -39,16 +39,37 @@ export async function introspectContentTypes(graphqlEndpoint, fetcher) {
     (f) => f.name,
   );
   const set = new Set(names);
-  // A content type X has both `x` (singular) and `xs` (plural). We keep the
-  // singular form. Strapi v3 exposes both plus an `xsConnection` paginator —
-  // ignored. Auth types and the upload plugin are excluded.
+  // Strapi v3 exposes three query fields per content type:
+  //   - singular (e.g. `county`)
+  //   - plural (e.g. `counties`)            ← Strapi's pluralizer handles
+  //                                            irregular forms; we cannot
+  //                                            reliably derive this from the
+  //                                            singular alone (county→countys
+  //                                            would 404).
+  //   - paginated (e.g. `countiesConnection`)
+  //
+  // We use the *Connection name to derive the actual plural (strip
+  // "Connection"), then pair it back to a singular by trying common
+  // English pluralization rules in reverse — `+s`, `+es`, `y→ies`. This
+  // catches county/counties, policy/policies, etc. while still working
+  // for the regular grant/grants case.
   const result = [];
   for (const name of names) {
-    if (NON_CONTENT_TYPE_FIELDS.has(name)) continue;
-    if (name.endsWith("Connection")) continue;
-    if (name.endsWith("s") && set.has(name.slice(0, -1))) continue; // skip plurals
-    if (!set.has(name + "s")) continue; // singular must have a plural
-    result.push(name);
+    if (!name.endsWith("Connection")) continue;
+    const plural = name.slice(0, -"Connection".length);
+    if (NON_CONTENT_TYPE_FIELDS.has(plural)) continue;
+    // Find the singular by reversing common English pluralization rules
+    let singular = null;
+    if (plural.endsWith("ies") && set.has(plural.slice(0, -3) + "y")) {
+      singular = plural.slice(0, -3) + "y";
+    } else if (plural.endsWith("es") && set.has(plural.slice(0, -2))) {
+      singular = plural.slice(0, -2);
+    } else if (plural.endsWith("s") && set.has(plural.slice(0, -1))) {
+      singular = plural.slice(0, -1);
+    }
+    if (!singular) continue;
+    if (NON_CONTENT_TYPE_FIELDS.has(singular)) continue;
+    result.push({ singular, plural });
   }
   return result;
 }

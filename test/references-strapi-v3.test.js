@@ -151,7 +151,7 @@ Questions posted [here](https://archive.icjia-api.cloud/files/icjia/gata/materia
 // --- introspectContentTypes ---
 
 describe("introspectContentTypes", () => {
-  it("returns content-type names from a Strapi v3 __schema response", async () => {
+  it("returns {singular, plural} pairs for each content type", async () => {
     // Mirror of the actual /graphql introspection result observed in the
     // verification probe against agency.icjia-api.cloud.
     const fetcher = async () => ({
@@ -184,7 +184,63 @@ describe("introspectContentTypes", () => {
       "https://agency.icjia-api.cloud/graphql",
       fetcher,
     );
-    expect(types).toEqual(["grant", "publication", "post"]);
+    expect(types).toEqual([
+      { singular: "grant", plural: "grants" },
+      { singular: "publication", plural: "publications" },
+      { singular: "post", plural: "posts" },
+    ]);
+  });
+
+  it("derives irregular plurals from the schema (county → counties, policy → policies)", async () => {
+    // ilfvcc-api-prod's real schema has county/counties/countiesConnection
+    // and would silently skip it under naive +s pluralization.
+    const fetcher = async () => ({
+      data: {
+        __schema: {
+          queryType: {
+            fields: [
+              { name: "county" },
+              { name: "counties" },
+              { name: "countiesConnection" },
+              { name: "policy" },
+              { name: "policies" },
+              { name: "policiesConnection" },
+              { name: "post" },
+              { name: "posts" },
+              { name: "postsConnection" },
+              { name: "role" },
+              { name: "roles" },
+            ],
+          },
+        },
+      },
+    });
+    const types = await introspectContentTypes("x", fetcher);
+    expect(types).toEqual([
+      { singular: "county", plural: "counties" },
+      { singular: "policy", plural: "policies" },
+      { singular: "post", plural: "posts" },
+    ]);
+  });
+
+  it("skips singletons (no plural form in schema) and home/me", async () => {
+    const fetcher = async () => ({
+      data: {
+        __schema: {
+          queryType: {
+            fields: [
+              { name: "home" },
+              { name: "page" },
+              { name: "pages" },
+              { name: "pagesConnection" },
+              { name: "me" },
+            ],
+          },
+        },
+      },
+    });
+    const types = await introspectContentTypes("x", fetcher);
+    expect(types).toEqual([{ singular: "page", plural: "pages" }]);
   });
 });
 

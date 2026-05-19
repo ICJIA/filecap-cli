@@ -399,7 +399,8 @@ describe("filecap CLI end-to-end", () => {
   it("prints version and exits 0", async () => {
     const result = await runCli(["--version"], outDir);
     expect(result.code).toBe(0);
-    expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+    // Allow optional SemVer pre-release suffix (e.g. -alpha.1, -beta.2)
+    expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+(?:-[\w.]+)?$/);
   });
 
   it("introspects PDFs in a real CLI subprocess invocation", async () => {
