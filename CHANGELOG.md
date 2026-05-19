@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] — 2026-05-19
+
+**Stable.** Consolidates `1.9.0-alpha.1` + `1.9.0-alpha.2` into a single shipped release. PDF accessibility scoring is now live on the `latest` npm dist-tag so `audit-fleet-auto.sh` (which calls `@icjia/filecap@latest`) picks it up by default.
+
+### Headline
+
+For every PDF in a filecap fleet inventory: an **accessibility score (0–100, letter grade A–F) + a stable link to the per-file audit report** on audit.icjia.app. Two new columns on every CSV and HTML view:
+
+- **`Audit Score`** at position 6 — coloured grade chip + numeric score
+- **`Audit Report`** at position 7 — "Open report" anchor to audit.icjia.app/report/...
+
+Non-PDF rows (docx, xlsx, pptx, image) render empty in these columns. Those formats have their own checkers inside their authoring tools.
+
+### Pipeline
+
+```
+scan → references → cross-references → audits → web-rollup
+                                       ^^^^^^ new
+```
+
+`filecap audits <inventory>` walks the augmented inventory, scores every PDF via `POST https://audit.icjia.app/api/audit-url`, writes `inventory.audited.ndjson` with `entry.audit = { score, grade, reportUrl, reportId, reportExpiresAt, audited, checkedAt, cached }` populated. `audit-fleet-auto.sh` runs it automatically as Stage 3.5 (between cross-references and web-rollup). `SKIP_AUDITS=1` opts out.
+
+### Local cache
+
+`~/.filecap/audit-cache.json` (mode 0600, atomic write, default 30-day TTL), keyed by SHA-256 of the PDF content. audit.icjia.app dedups server-side too, but cached responses still go through the rate-limiter middleware before the cache lookup — the local cache lets us skip the HTTP call entirely for recently-seen hashes. First full fleet pass is the only heavy one; subsequent refreshes hit cache for ~all unchanged PDFs.
+
+### Bounded concurrency
+
+Default 2 parallel requests — respects audit.icjia.app's `pdfAnalyzer` 2-at-a-time semaphore and the global 100-per-minute IP rate limit.
+
+### Fleet-index accessibility band
+
+New teal band on the deployed bundle's `index.html`, below the cross-site reference coverage band. Surfaces fleet-wide average grade + average score + count of audited PDFs + pending/error counts. Distinct from the amber audit-count hero and the blue references band so the eye reads each as its own metric.
+
+### sites.json: `pathPrefix` field
+
+Optional string per site entry. Set on the four ARI Summit 2017–2023 sites — old vue-cli (not Nuxt) builds where the repo's `static/` folder deploys to `/static/` on the URL (vue-cli preserves the directory segment; Nuxt collapses it). Strapi + Nuxt sites leave it unset. `filecap audits` reads sites.json, matches the inventory header's serverName against the site entry, and prepends `pathPrefix` to the URL it sends to audit.icjia.app. Master CSV's Public URL column also picks it up via the `consolidatedSources` plumbing.
+
+### Auth-fetcher forward-compat
+
+Sends `Authorization: Bearer <token>` when `credentials.audit-icjia-app.bearerToken` is set in `~/.filecap/secrets.json`. audit.icjia.app currently runs with `AUTH.REQUIRE_LOGIN=false` (anonymous), so no token is needed today; the code path is in place for when auth flips on.
+
+### Operator notes
+
+- audit.icjia.app's `RATE_LIMITS.analyze.max` defaults to **35 per hour** out-of-the-box. For a full fleet pass against ~2,200 PDFs, bump it to ~5000 in `audit.config.ts` once before the first run. Cache makes subsequent runs essentially free.
+- Old Vue 2 git sites (ARI Summit 2017–2023) need `pathPrefix: "/static"` in sites.json for their PDFs to audit correctly; without it, the audit endpoint fetches the Netlify SPA catch-all HTML and returns 422. The four ari-summit entries in the ICJIA fleet bundle ship with this set.
+
+### Preview behind a flag
+
+A page-audit code path (target 1.10.0) is included in this release but **defaults to OFF** (`skipPages: true` on `runAudits`). When 1.10.0 ships, the default flips and `audit-fleet-auto.sh` will also score every URL in `entry.references[]` via audit.icjia.app's `/api/audit-url-page` (axe-core via Puppeteer) so each referenced page in the report carries an accessibility grade chip alongside the PDF score. The endpoint code is on the audit.icjia.app `feat/audit-url-page` PR; deployment + filecap-side wiring lands in 1.10.0.
+
+### Tests
+
+**644 passing** (up from 602 at 1.8.0; +42 across the score-fetcher, cache, orchestrator, page-scorer scaffolding, schema additions, and column-position assertions).
+
+[1.9.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.9.0
+
 ## [1.9.0-alpha.2] — 2026-05-19
 
 ### Added

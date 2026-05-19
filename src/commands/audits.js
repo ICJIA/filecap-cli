@@ -14,6 +14,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import {
   loadAuditCache,
   saveAuditCache,
@@ -21,8 +22,17 @@ import {
   DEFAULT_CACHE_PATH,
 } from "../audits/cache.js";
 import { fetchAuditScore } from "../audits/score-fetcher.js";
+import { fetchPageAuditScore } from "../audits/page-scorer.js";
 
 const DEFAULT_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url";
+const DEFAULT_PAGE_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url-page";
+// Page cache lives next to the PDF audit cache. URL-keyed (the URL is the
+// stable identity for a page; the rendered bytes change every request).
+const DEFAULT_PAGE_CACHE_PATH = path.join(
+  os.homedir(),
+  ".filecap",
+  "page-audit-cache.json",
+);
 
 // PDF is the only category we score. The others have native checkers in
 // their authoring tools (Word, Excel, PowerPoint) — duplicating that work
@@ -70,13 +80,17 @@ export async function runAudits({
   concurrency = 2,
   force = false,
   ttlDays = 30,
-  // v1.9.0-alpha.2: optional pathPrefix to insert between publicUrlBase
-  // and entry.path when building the URL we send to the audit endpoint.
-  // Set this for old Vue 2 ARI Summit sites where the repo's static/
-  // folder deploys to /static/ on the URL (vue-cli preserves the
-  // directory segment; Nuxt collapses it). Strapi + Nuxt sites leave
-  // this empty.
   pathPrefix = "",
+  // v1.10.0 (preview, disabled by default): page-audit options. When
+  // enabled with skipPages=false, walks every entry.references[] in the
+  // inventory, dedupes unique pageUrls, scores each via /api/audit-url-page
+  // (axe-core), attaches the result back to each reference as
+  // ref.pageAudit. Default is ON skipPages=true while the audit.icjia.app
+  // endpoint is being deployed; flip to false in 1.10.0 when stable.
+  pageAuditEndpoint = DEFAULT_PAGE_AUDIT_ENDPOINT,
+  pageCachePath = DEFAULT_PAGE_CACHE_PATH,
+  pageTtlDays = 14, // pages change more than file content; shorter TTL
+  skipPages = true,
   log = console.error,
 }) {
   if (typeof inventoryPath !== "string" || inventoryPath.length === 0) {
@@ -224,13 +238,125 @@ export async function runAudits({
     log(`[audits] WARN: failed to persist audit cache: ${err.message}`);
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // v1.10.0: page-audit pass
+  //
+  // Walk every entry.references[] in the inventory, collect the unique
+  // set of pageUrls, score each via audit.icjia.app's /api/audit-url-page
+  // endpoint (axe-core via headless Chromium on the server), attach
+  // ref.pageAudit = { score, grade, violationCount, bySeverity,
+  // reportUrl, reportId, reportExpiresAt, pageTitle, cached } back to
+  // every reference that points at that page. Cache is URL-keyed (not
+  // hash-keyed like the PDF cache) because pages change more often than
+  // file contents — 14-day default TTL.
+  //
+  // Skip entirely with skipPages=true. Pages with audit errors or 5xx
+  // get { error: "..." } so the report layer can render explicitly.
+  // ──────────────────────────────────────────────────────────────────
+  let pagesAuditedCount = 0;
+  let pagesCachedCount = 0;
+  let pagesErrorCount = 0;
+  let pagesTotalUnique = 0;
+  if (!skipPages) {
+    const pageCache = loadAuditCache({ cachePath: pageCachePath });
+    const pageUrlSet = new Set();
+    for (const r of records) {
+      if (!Array.isArray(r?.references)) continue;
+      for (const ref of r.references) {
+        const u = ref?.pageUrl;
+        if (typeof u === "string" && u.length > 0) pageUrlSet.add(u);
+      }
+    }
+    const uniquePageUrls = [...pageUrlSet];
+    pagesTotalUnique = uniquePageUrls.length;
+
+    // Partition into cache hits vs URLs we need to fetch.
+    const urlsToFetch = [];
+    const urlToResult = new Map();
+    for (const url of uniquePageUrls) {
+      const cached = pageCache[url];
+      if (!force && isCacheEntryFresh(cached, { now, ttlDays: pageTtlDays })) {
+        urlToResult.set(url, { ...cached, cached: true });
+        pagesCachedCount++;
+      } else {
+        urlsToFetch.push(url);
+      }
+    }
+
+    log(
+      `[audits] page-audit pass: ${pagesTotalUnique} unique pageUrls (${pagesCachedCount} cached, ${urlsToFetch.length} to fetch)`,
+    );
+
+    await mapWithConcurrency(urlsToFetch, concurrency, async (pageUrl) => {
+      try {
+        const result = await fetchPageAuditScore({
+          pageUrl,
+          auditEndpoint: pageAuditEndpoint,
+          bearerToken,
+          force,
+          fetcher: httpFetcher,
+        });
+        if (result === null) {
+          urlToResult.set(pageUrl, { error: "server-unavailable" });
+          pagesErrorCount++;
+          return;
+        }
+        const checkedAt = new Date().toISOString();
+        const stored = {
+          score: result.score,
+          grade: result.grade,
+          violationCount: result.violationCount,
+          bySeverity: result.bySeverity,
+          reportUrl: result.reportUrl,
+          reportId: result.reportId,
+          reportExpiresAt: result.reportExpiresAt,
+          pageTitle: result.pageTitle,
+          audited: result.audited,
+          checkedAt,
+        };
+        pageCache[pageUrl] = stored;
+        urlToResult.set(pageUrl, { ...stored, cached: result.cached });
+        pagesAuditedCount++;
+      } catch (err) {
+        urlToResult.set(pageUrl, { error: err?.message ?? String(err) });
+        pagesErrorCount++;
+        log(`[audits] page-audit WARN: ${pageUrl}: ${err?.message ?? err}`);
+      }
+    });
+
+    // Persist page cache + attach pageAudit back to every reference.
+    try {
+      saveAuditCache({ cachePath: pageCachePath, cache: pageCache });
+    } catch (err) {
+      log(`[audits] WARN: failed to persist page-audit cache: ${err.message}`);
+    }
+    for (const r of records) {
+      if (!Array.isArray(r?.references)) continue;
+      for (const ref of r.references) {
+        const u = ref?.pageUrl;
+        if (typeof u !== "string" || u.length === 0) continue;
+        const result = urlToResult.get(u);
+        if (result) ref.pageAudit = result;
+      }
+    }
+  }
+
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   const ndjson = records.map((r) => JSON.stringify(r)).join("\n") + "\n";
   await fs.writeFile(outputPath, ndjson);
   log(
     `[audits] wrote ${records.length} records → ${outputPath} ` +
-      `(${auditedCount} freshly audited, ${errorCount} errors, ${pdfsToAudit.length === 0 ? "0" : (records.filter(r => r.audit?.cached).length)} from cache)`,
+      `(PDFs: ${auditedCount} freshly audited, ${errorCount} errors, ${pdfsToAudit.length === 0 ? "0" : (records.filter(r => r.audit?.cached).length)} from cache; ` +
+      `pages: ${pagesTotalUnique} unique, ${pagesAuditedCount} freshly audited, ${pagesCachedCount} cached, ${pagesErrorCount} errors)`,
   );
 
-  return { totalRecords: records.length, audited: auditedCount, errors: errorCount };
+  return {
+    totalRecords: records.length,
+    audited: auditedCount,
+    errors: errorCount,
+    pagesTotalUnique,
+    pagesAudited: pagesAuditedCount,
+    pagesCached: pagesCachedCount,
+    pagesErrors: pagesErrorCount,
+  };
 }
