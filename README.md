@@ -49,7 +49,7 @@ The deployed page reads like an infographic, not a spreadsheet. Five major areas
 
 **Language and staff workflow.** Manager-facing strings use *"may need"* rather than prescriptive *"needs"* — filecap describes what the data suggests, the audit team decides what to do. Every CSV the bundle emits carries two staff-fill columns: `Delete?` (empty default — staff writes any non-blank value to flag for removal) and free-text `Notes`. These are CSV-only and don't appear in the HTML view.
 
-**1.8.0 Referenced column** *(shipping in pre-releases now)*. A new `Referenced` column slots in after `Duplicate of` on every CSV and HTML view, listing the page URLs that link to each file. Managers use it as the inflection point for the delete-vs-keep decision: if a file has no known referrers, it's a deletion candidate; if it's linked from one or more live pages, every linking URL surfaces directly in the cell. See [Reference discovery (1.8.0)](#reference-discovery-180) below.
+**1.8.0 Referenced column.** A `Referenced` column sits at position 5 of every CSV and HTML view, immediately after `Public URL`, listing the page URLs that link to each file. Managers use it as the inflection point for the delete-vs-keep decision: if a file has no known referrers, it's a deletion candidate; if it's linked from one or more live pages, every linking URL surfaces directly in the cell. See [Reference discovery (1.8.0)](#reference-discovery-180) below.
 
 See the [CHANGELOG](CHANGELOG.md) for the version-by-version breakdown.
 
@@ -269,7 +269,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.8.0 in pre-release.** Reference-discovery pipeline (`scan → references → cross-references → web-rollup`) shipping in v1.8.0-alpha / beta tags. The Referenced column on every CSV and HTML view, plus a fleet-wide URL → referrers reverse index, is the headline change. See [Reference discovery (1.8.0)](#reference-discovery-180) for the manager-facing overview.
+**v1.8.0 shipped.** Reference-discovery pipeline (`scan → references → cross-references → web-rollup`) landed. The `Referenced` column on every CSV and HTML view, plus a fleet-wide URL → referrers reverse index, is the headline change. See [Reference discovery (1.8.0)](#reference-discovery-180) for the manager-facing overview.
 
 **v1.7.x shipped.** Manager-friendly visual redesign, complete pipeline `scan → rollup → report → web-rollup → deploy`:
 
@@ -299,8 +299,7 @@ npx vitest run test/web-rollup.test.js
 | v1.4.x – v1.5.x | shipped | CSV trim to 14 columns; click-and-drag horizontal pan; cross-server duplicates section with explainer; master + duplicates CSVs in bundle |
 | v1.6.x | shipped | `type:"git"` site mode for Nuxt static-site repos (shallow-clone + scan); mixed strapi + git fleets in one bundle |
 | v1.7.x | shipped | Manager-friendly visual redesign: infographic site cards, big audit-count hero, copy-to-clipboard buttons throughout, per-file-type drill-down, `Delete?` + `Notes` staff-fill columns, access-method modal, PII reassurance banner, sticky-bar polish on per-site detail pages |
-| **v1.8.0-alpha.1 / beta.1 / beta.2** | **pre-release** | **References pipeline: `Referenced` column on CSV + HTML, per-site Strapi extractor (v3 + v4 GraphQL/REST), fleet-wide cross-site reverse index, domain-alias-aware URL matching. 9 of 9 Strapi sites in fleet now contributing.** |
-| v1.8.0 beta.3 / stable | planned | Bearer-token references for `intranet-api-prod`; git-repo references for the 7 `type:"git"` Nuxt sites; index-page coverage stat; optional Playwright regression harness |
+| **v1.8.0** | **shipped** | **References pipeline: `Referenced` column at CSV/HTML position 5 next to `Public URL`, per-site Strapi extractor (v3 + v4 GraphQL/REST), git-repo extractor for Nuxt sites, bearer-token + auto-refresh login for intranet, fleet-wide cross-site reverse index, domain-alias-aware URL matching, cross-site reference coverage band on the fleet index hero. 10 of 10 Strapi sites + 7 git Nuxt sites in fleet now contributing.** |
 | vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; `filecap process-deletions <csv>` to act on staff-edited `Delete?=Yes` rows |
 
 ### Production deployment
@@ -462,7 +461,7 @@ web-rollup                      → CSV + HTML + Netlify bundle with Referenced 
 
 This was the deciding factor: Strapi data is strictly more complete than what the rendered SPA exposes, so Strapi-API extraction is the primary strategy, not headless scraping.
 
-**Coverage as of v1.8.0-beta.2.** 9 of 9 Strapi sites in the audit fleet contribute to the cross-site references index (all v3 + all v4). End-to-end fleet runs at beta.1 produced 2,861 of 6,748 inventoried files (42%) with at least one known referrer — including 49% of archive files and 79% of the legacy Research Hub files. See the [CHANGELOG](CHANGELOG.md) entries for per-release coverage tables.
+**Coverage at 1.8.0 ship.** All 10 Strapi sites (v3 + v4) and 7 git Nuxt sites in the audit fleet contribute to the cross-site references index. End-to-end fleet runs at ship time produced **3,504 of 9,408 inventoried files (37%)** with at least one known referrer — including 49% of archive files, 83% of the legacy Research Hub, 60% of DVFR meeting attachments, and 41% of the ilheals git-content links. The 6 sites still at 0% (vpp, sfs, 4× ari-summit) reference their files via Vue/HTML templates the git-repo adapter doesn't yet walk; planned for a future release. See the [CHANGELOG](CHANGELOG.md) entries for per-release coverage tables.
 
 ---
 

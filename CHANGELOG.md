@@ -5,6 +5,108 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] — 2026-05-19
+
+**Stable.** Consolidates the seven pre-releases (alpha.1 + beta.1–beta.6) into a single shipped release. No code changes vs `1.8.0-beta.6`; this entry is the stable summary. Pre-release notes below remain as the version-by-version history.
+
+### Headline
+
+A new **`Referenced` column** sits at CSV/HTML position 5 (immediately after `Public URL`) on every per-site report. For every PDF, Word doc, spreadsheet, or other audited file, the column lists the page URLs that link to it — the inflection point for the delete-vs-keep decision managers make on every audit. The column is populated by two new pipeline steps that slot between the existing `scan` and `web-rollup`:
+
+```
+scan (per server)            → per-server inventory NDJSON
+↓
+references <siteName>        → per-site references sidecar
+                               (queries the site's CMS, extracts file URLs,
+                                resolves deployed page URLs)
+↓
+cross-references <inventory> → augmented inventory with entry.references[]
+                               populated (fleet-wide URL → referrers index,
+                                with domain-alias resolution)
+↓
+web-rollup                   → Netlify bundle with the Referenced column live
+```
+
+### Capabilities
+
+- **Strapi v3 adapter** — schema-driven content-type discovery via GraphQL introspection; field classification (URL string, body markdown, single UploadFile, list UploadFile, relation, other); REST pagination; irregular-plural detection via `*Connection` paginator; kebab-case REST path conversion for camelCase content types. Covers `icjia-agency-prod`, `spac-prod`, `researchhub-prod`, `ari-api-prod`, `ilfvcc-api-prod`, `intranet-api-prod`.
+- **Strapi v4 adapter** — parallel module for the v4-shaped fleet (`dvfr-strapi-prod`, `r3-strapi-prod`, `i2i-strapi-prod`, `infonet-strapi-prod`). Handles the `/api/<plural>` REST path, `pagination[limit/start]` syntax, wrapping `{data: [{id, attributes: {…}}]}` envelope, and typed media wrappers `UploadFileEntityResponse` / `UploadFileRelationResponseCollection`. Includes a kebab-case fallback for sites where the per-content-type `pluralName` diverges from the GraphQL plural.
+- **Git-repo adapter** — shallow-clones each `type:"git"` Nuxt static-site, walks `content/*.md`, extracts file URLs via regex, derives deployed page URLs from Nuxt Content routing convention (`content/<rest>.md → /<rest>`, `index.md → /`).
+- **Bearer-token + auto-refresh login** — Strapi sites that gate content (the ICJIA intranet) can declare `credentials.<site>.bearerLogin = { url, identifier, password }` in `~/.filecap/secrets.json` (mode 0600). On a 401, the references command POSTs to `/auth/local`, captures the fresh JWT, persists it back to `credentials.<site>.bearerToken`, and retries. Falls back to a TTY paste-prompt when no `bearerLogin` is configured. Non-interactive runs fail loudly.
+- **Cross-site reverse-index resolver** — reads every site's sidecar, builds a `Map<canonicalUrl, Array<{siteName, contentType, entryId, pageUrl}>>`, walks each scan inventory and attaches `entry.references[]` to every file via canonical-URL match. Domain-alias resolution collapses backend hosts onto canonical fronts (e.g. `archive.icjia-api.cloud` → `archive.icjia.cloud`) so cross-site references match correctly.
+- **`Referenced` column in the report** — column 5 on CSV and HTML. Cell semantics: undefined → empty cell (cross-references not run); empty array → muted "No references found" chip; populated → anchor chips (HTML) or newline-joined URLs (CSV). Refs whose `pageUrl` couldn't be resolved render as a clearly-labeled `no page URL` non-link chip with a tooltip identifying the source (site / contentType / entryId).
+- **Fleet-index coverage band** — new strip below the audit-count hero on `index.html` shows "X have known referrers (Y%) / Z have no known referrers — deletion candidates / N awaiting references run". The denominator excludes sites the references pipeline hasn't been run for, so the percentage isn't dragged down by sites we haven't extended to yet.
+- **Vertical click-and-drag pan** — the table-pan handler now scrolls both axes simultaneously; touch panning was already native via `overflow:auto` + `touch-action:pan-x pan-y`.
+
+### Coverage at ship
+
+| Site | Entries | With cross-site references |
+| --- | --- | --- |
+| researchhub-prod | 428 | 358 (83%) |
+| dvfr-strapi-prod | 107 | 65 (60%) |
+| archive-prod | 1,889 | 941 (49%) |
+| icjia-agency-prod | 3,170 | 1,416 (44%) |
+| ilheals-git | 78 | 32 (41%) |
+| intranet-api-prod | 708 | 193 (27%) |
+| ari-api-prod | 555 | 152 (27%) |
+| ilfvcc-api-prod | 420 | 112 (26%) |
+| infonet-strapi-prod | 536 | 103 (19%) |
+| spac-prod | 502 | 62 (12%) |
+| i2i-strapi-prod | 393 | 50 (12%) |
+| r3-strapi-prod | 338 | 20 (5%) |
+| vpp-git | 54 | 0 (Vue templates, not yet walked) |
+| sfs-git | 72 | 0 |
+| ari-summit-2017/18/19/23-git | 158 | 0 |
+| **Total** | **9,408** | **3,504 (37%)** |
+
+### Security
+
+Two red/blue team audits this release. Three findings, one Moderate + one Low + one Note. Both Moderate and Low fixed in-release:
+
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| FC-2026-030 | Moderate | `references.graphqlEndpoint` / `restApiBase` accepted any string (SSRF / MITM risk via crafted sites.json) | Fixed: Zod refinement rejects non-`http(s):` URLs at schema load |
+| FC-2026-031 | Low | Pagination loops had no outer page-count cap (OOM risk on misbehaving sites) | Fixed: `maxPages` option, default 10,000 |
+| FC-2026-032 | Note | Sidecar NDJSON files trusted under same-UID model | Accepted (documented) |
+
+Full audit: [`docs/security/audit-2026-05-19.md`](docs/security/audit-2026-05-19.md).
+
+### Tests
+
+**602 passing** (up from 441 at v1.7.40). Coverage spans the six new `src/references/` modules (url-canonical, extract-urls, domain-filter, field-classifier, strapi-v3, strapi-v4, git-repo, cross-resolver, auth-fetcher), the extended `secrets.json` schema with credentials/bearerLogin, the new `Referenced` column in CSV+HTML, and the URL-scheme + maxPages security guards.
+
+### sites.json schema additions
+
+Three new optional fields per site entry:
+
+```jsonc
+{
+  "name": "icjia-agency-prod",
+  // ... existing fields ...
+  "domainAliases": ["archive.icjia-api.cloud"],         // optional: extra fleet hosts
+  "references": {                                       // optional: enables references step
+    "strategy": "strapi-v3" | "strapi-v4" | "git-repo",
+    "graphqlEndpoint": "https://api.example.com/graphql",  // strapi only
+    "restApiBase":     "https://api.example.com",          // strapi only
+    "siteFrontendUrl": "https://example.illinois.gov",
+    "sitemapUrl":      "https://example.illinois.gov/sitemap.xml",
+    "contentTypeRoutes": {
+      "post":    "/news/:slug/",
+      "grant":   "/grants/funding/:slug/",
+      // ... per-content-type → deployed-route map
+    }
+  }
+}
+```
+
+### Deferred to future releases
+
+- Vue/HTML template walker for the 6 git Nuxt sites still at 0% coverage (their file references live in `.vue` templates, not `content/` markdown). Coverage gain likely modest since most file references on these sites point to external archives.
+- PDF→PDF references (extract PDF body text via `pdfjs-dist`, regex over it, attach). Adds processing cost; uncommon enough that we deferred.
+- `audit-fleet-auto.sh` integration so a single fleet refresh runs scan → references → cross-references → rollup → deploy in one command. Shipping alongside 1.8.0 stable as a small follow-up.
+
+[1.8.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0
+
 ## [1.8.0-beta.6] — 2026-05-19
 
 Big batch — five user-requested items (A, B, C, D, E) shipped together:
