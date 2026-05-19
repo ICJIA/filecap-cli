@@ -23,6 +23,19 @@ const BODY_FIELD_NAMES = new Set([
   "searchMeta",
 ]);
 
+// Strapi v4 wraps single-media references in `UploadFileEntityResponse` and
+// list-media references in `UploadFileRelationResponseCollection`. Both are
+// OBJECT kind at this level; the actual array-ness lives inside `.data`. We
+// classify them by name as the same logical kinds the v3 extractor uses; the
+// v4 extractor peels the envelope at extraction time.
+const UPLOAD_FILE_SINGLE_TYPES = new Set([
+  "UploadFile", // v3
+  "UploadFileEntityResponse", // v4 single
+]);
+const UPLOAD_FILE_LIST_TYPES = new Set([
+  "UploadFileRelationResponseCollection", // v4 list
+]);
+
 function unwrapNonNull(type) {
   if (type && type.kind === "NON_NULL") return type.ofType ?? null;
   return type;
@@ -40,7 +53,7 @@ export function classifyField(field) {
   if (inner.kind === "LIST") {
     const listInner = unwrapNonNull(inner.ofType);
     if (!listInner) return { kind: "other", fieldName };
-    if (listInner.name === "UploadFile") {
+    if (UPLOAD_FILE_SINGLE_TYPES.has(listInner.name)) {
       return { kind: "upload-file-list", fieldName };
     }
     if (listInner.kind === "OBJECT" || listInner.kind === "INTERFACE") {
@@ -50,8 +63,11 @@ export function classifyField(field) {
   }
 
   if (inner.kind === "OBJECT" || inner.kind === "INTERFACE") {
-    if (inner.name === "UploadFile") {
+    if (UPLOAD_FILE_SINGLE_TYPES.has(inner.name)) {
       return { kind: "upload-file", fieldName };
+    }
+    if (UPLOAD_FILE_LIST_TYPES.has(inner.name)) {
+      return { kind: "upload-file-list", fieldName };
     }
     return { kind: "relation", fieldName };
   }

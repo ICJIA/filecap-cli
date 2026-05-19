@@ -96,6 +96,25 @@ describe("classifyField", () => {
         fieldName: "attachments",
       });
     });
+
+    // Strapi v4 wraps single-media references in UploadFileEntityResponse and
+    // list-media references in UploadFileRelationResponseCollection. The
+    // GraphQL type is OBJECT (not LIST) at the outer level — the array-ness
+    // lives one layer deeper inside `.data`. We classify by name so the
+    // extractor can decide how to peel the envelope.
+    it("classifies UploadFileEntityResponse as upload-file (v4 single)", () => {
+      expect(
+        classifyField(field("splash", obj("UploadFileEntityResponse"))),
+      ).toEqual({ kind: "upload-file", fieldName: "splash" });
+    });
+
+    it("classifies UploadFileRelationResponseCollection as upload-file-list (v4 list)", () => {
+      expect(
+        classifyField(
+          field("attachments", obj("UploadFileRelationResponseCollection")),
+        ),
+      ).toEqual({ kind: "upload-file-list", fieldName: "attachments" });
+    });
   });
 
   describe("Relations to other content types", () => {

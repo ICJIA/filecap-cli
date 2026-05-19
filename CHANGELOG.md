@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-beta.2] — 2026-05-19
+
+### Added
+
+- **Strapi v4 references adapter** (`src/references/strapi-v4.js`) extending the references pipeline to the four v4 sites in the fleet: dvfr-strapi-prod, r3-strapi-prod, i2i-strapi-prod, infonet-strapi-prod. Strapi v4 has a fundamentally different REST shape than v3 — `/api/<plural>` paths instead of `/<plural>`, `pagination[limit]=N&pagination[start]=N` query syntax instead of `_limit`/`_start`, and a wrapping `{data: [{id, attributes: {…}}]}` envelope around every entry, every relation, and every media item — so it required a parallel adapter rather than a tweak to the v3 module. With this release **9 of 9 (100%) of the Strapi sites in the audit fleet now contribute to the cross-site references index.**
+
+- **Field classifier extended to recognize v4 typed-media envelopes.** Strapi v4 wraps single-media references in `UploadFileEntityResponse` (`{data: {id, attributes: {url}}}`) and list-media references in `UploadFileRelationResponseCollection` (`{data: [{id, attributes: {url}}, …]}`). The shared classifier maps both new GraphQL type names back to the existing `upload-file` / `upload-file-list` kinds, so the same field-classification logic serves both v3 and v4; the v4 extractor peels the `.data.attributes.url` wrapper at extraction time.
+
+- **Kebab-case REST path fallback for Strapi v4** (`weeklyFaqs` → `/api/weekly-faqs` retry on 404). Strapi v4's REST `pluralName` is configured per content-type in `schema.json` and is not deterministically derivable from the GraphQL query name. Observed in the r3 fleet: `weeklyFaqs` 404s but `weekly-faqs` 200s, while sibling `v2Weeklyfaqs` works camelCase and 404s kebab. The v4 adapter now retries the very first request with the kebab-cased plural on 404 and pins whichever form works for subsequent paginated calls. 403 (Public-role permissions) is intentionally not retried — kebab won't change auth.
+
+- **Per-site `references` blocks added to sites.json** for the four v4 sites (graphqlEndpoint, restApiBase, siteFrontendUrl, sitemapUrl, contentTypeRoutes). Routes derived empirically from each site's `sitemap.xml`:
+  - **dvfr.illinois.gov**: 23 `/meetings/<slug>/`, 6 `/publications/<slug>/`, plus posts, pages, faq.
+  - **r3.illinois.gov**: news, faqs, page routes flat-rooted (no trailing slash, matches deployed Nuxt).
+  - **i2i.illinois.gov**: announcements, biographies, cohorts, graduations, spotlights, pages — all with trailing slashes.
+  - **infonet.icjia.illinois.gov**: news, faqs, resources, pages.
+
+### v4 fleet extraction this release
+
+| Site | Content types | Records | With refs |
+| --- | --- | --- | --- |
+| dvfr-strapi-prod | 5 | 54 | 31 |
+| r3-strapi-prod | 7 (1× 403 forms) | 21 | ~10 |
+| i2i-strapi-prod | 7 (1× 403 forms) | 26 | ~12 |
+| infonet-strapi-prod | 5 (1× 403 forms) | 173 | varies |
+| **Total** | | **274** | |
+
+The 403s on `forms` content types across r3/i2i/infonet are Public-role permission denials and don't affect user-visible references — `form` content rarely carries PDF attachments.
+
+### Strategy dispatch in references command
+
+`src/commands/references.js` now dispatches on `references.strategy` to either the v3 or v4 adapter via a small `STRATEGIES` map. Each adapter exposes the same four-function interface (`introspectContentTypes`, `introspectTypeFields`, `fetchAllEntries`, `extractEntryUrls`); `introspectTypeFields` is shared verbatim because the GraphQL `__type` introspection shape is identical between v3 and v4 (only the media envelope type names differ, and the classifier already understands both). Slug lookup is strategy-aware — v3 stores `entry.slug` flat, v4 nests it under `entry.attributes.slug`.
+
+### Deferred to 1.8.0-beta.3 / stable
+
+- **Bearer-token auth for intranet-api-prod** — the only remaining Strapi backend that needs auth to read content.
+- **Git-repo extraction strategy** for the 7 `type:"git"` Nuxt static sites (vpp, ilheals, sfs, ari-summits 2017–2023).
+- **README pipeline section** for the new `scan → references → cross-references → rollup` flow.
+
+### Verification
+
+- **564 tests passing** (up from 541 at beta.1; +23 new tests across v4 module, classifier extension, kebab fallback).
+- All 4 v4 sites extract end-to-end with kebab-case REST path fallback for irregular pluralName configurations.
+
+[1.8.0-beta.2]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.8.0-beta.2
+
 ## [1.8.0-beta.1] — 2026-05-19
 
 ### Added

