@@ -6,6 +6,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import { runReport } from "./report.js";
+import { fetchSitemapUrls } from "../references/sitemap.js";
 import { writeCsv } from "../report/csv.js";
 import { writeHtml } from "../report/html.js";
 import { classifyOrphans } from "../report/orphans.js";
@@ -820,6 +821,23 @@ export async function runWebRollup({
     // siteUrl is the site's front-end homepage URL from sites.json (e.g.
     // dvfr.illinois.gov), distinct from publicUrlBase (the file server).
     const accessKind = deriveAccessKind(site);
+    // v1.14.0: fetch the site's sitemap.xml so the Page view lists every page,
+    // not just the file-linking ones. Try references.sitemapUrl, then the
+    // frontend siteUrl, then publicUrlBase — some sites' siteUrl domain isn't
+    // live and the deployed copy sits on the publicUrlBase host (e.g. VPP).
+    // First non-empty hit wins; a missing or broken sitemap resolves to [].
+    const sitemapCandidates = [];
+    if (site.references?.sitemapUrl) sitemapCandidates.push(site.references.sitemapUrl);
+    for (const b of [site.siteUrl, site.publicUrlBase]) {
+      const base = String(b ?? "").replace(/\/+$/, "");
+      if (base) sitemapCandidates.push(`${base}/sitemap.xml`);
+    }
+    let sitemapUrls = [];
+    for (const cand of sitemapCandidates) {
+      sitemapUrls = await fetchSitemapUrls(cand);
+      if (sitemapUrls.length > 0) break;
+    }
+    process.stderr.write(`[web-rollup] ${site.siteName ?? siteKey}: ${sitemapUrls.length} sitemap page URLs\n`);
     const reportResult = await runReport({
       input: latestInv,
       outputDir: tempDir,
@@ -830,6 +848,7 @@ export async function runWebRollup({
       siteFullName: site.siteFullName ?? null,
       accessKind,
       pathPrefix: site.pathPrefix ?? null,
+      sitemapUrls,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);

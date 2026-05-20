@@ -64,3 +64,30 @@ describe("buildPageList", () => {
     expect(pages).toHaveLength(1);
   });
 });
+
+describe("buildPageList — sitemap merge (1.14.0)", () => {
+  it("works with no sitemap argument (back-compat)", () => {
+    expect(buildPageList([fileEntry("a.pdf", [ref("https://x/p/")])])).toHaveLength(1);
+  });
+
+  it("adds sitemap URLs that aren't already derived pages, as thin rows", () => {
+    const entries = [fileEntry("a.pdf", [ref("https://x/has-files/")])];
+    const pages = buildPageList(entries, [
+      "https://x/has-files/",
+      "https://x/no-files/",
+      "https://x/about/",
+    ]);
+    expect(pages).toHaveLength(3);
+    const thin = pages.find((p) => p.pageUrl === "https://x/no-files/");
+    expect(thin.fromSitemap).toBe(true);
+    expect(thin.files).toEqual([]);
+    expect(thin.pageAudit).toBeNull();
+  });
+
+  it("does not duplicate a sitemap URL matching a derived page (trailing-slash + case insensitive)", () => {
+    const entries = [fileEntry("a.pdf", [ref("https://x/Page-1/")])];
+    const pages = buildPageList(entries, ["https://x/page-1", "https://x/page-1/"]);
+    expect(pages).toHaveLength(1);
+    expect(pages[0].fromSitemap).toBeUndefined();
+  });
+});

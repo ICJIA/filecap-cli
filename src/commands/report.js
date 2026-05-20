@@ -78,7 +78,7 @@ For more details: https://github.com/ICJIA/filecap-cli
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null }) {
+export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null, sitemapUrls = [] }) {
   let header;
   const entries = [];
 
@@ -158,6 +158,9 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
       // site's files" panel near the top of the per-site report. Null when
       // the report is generated outside of web-rollup (panel is skipped).
       accessKind,
+      // v1.14.0: page URLs from the site's sitemap.xml, merged into the
+      // Page view so it lists every page, not just file-linking ones.
+      sitemapUrls,
     });
   }
 

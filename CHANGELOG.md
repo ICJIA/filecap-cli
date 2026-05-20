@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.14.0] — 2026-05-20
+
+### Added
+
+- **Complete page list in the Page view.** The Page view previously listed only pages that link to ≥1 file (the inversion of `references[]`). It now also merges in every URL from each site's `sitemap.xml`, so it's a *complete* list of the site's pages — including the static git sites, which until now had an empty Page view. Pages with no file links show as thin rows tagged **sitemap** (URL only — no audit score or attached files, since that data comes from the reference/audit pipeline). New module `src/references/sitemap.js` (`parseSitemapXml`, `fetchSitemapUrls`); `web-rollup` fetches each site's sitemap at bundle time and a missing/broken sitemap degrades gracefully to nothing.
+
+### Changed
+
+- **File / Page view toggle moved directly above the table.** It now sits between the File view's controls (filter chips, search box, row-marker legend) and the table itself, so the connection between the toggle and the table it controls is unmistakable for non-technical readers.
+
+### Tests
+
+705 passing (+8 — sitemap XML parsing, the page-list sitemap merge, and the `writeHtml` integration).
+
 ## [1.13.1] — 2026-05-20
 
 ### Changed

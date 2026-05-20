@@ -282,9 +282,12 @@ function buildPageFilesCell(page, ctx) {
 function buildPageRow(page, ctx) {
   const safePageUrl = safeUrl(page.pageUrl);
   const title = htmlEscape(page.pageTitle || page.pageUrl || "(untitled page)");
+  const tag = page.fromSitemap
+    ? ` <span class="page-sitemap-tag" title="Listed in the site's sitemap; filecap found no files linked from this page.">sitemap</span>`
+    : "";
   const pageCell = safePageUrl
-    ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${title}</a></td>`
-    : `<td>${title}</td>`;
+    ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${title}</a>${tag}</td>`
+    : `<td>${title}${tag}</td>`;
   const typeCell = `<td>${htmlEscape(page.contentType || "—")}</td>`;
   return `<tr>${pageCell}${typeCell}${buildPageAuditCell(page.pageAudit)}${buildPageFilesCell(page, ctx)}</tr>`;
 }
@@ -299,7 +302,7 @@ function buildPageViewSection(pages, ctx) {
   const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
   return `<div id="page-view" hidden>
   <h2>Pages on this site</h2>
-  <p class="page-view-note">One row per page. <strong>Page Audit Score</strong> is that page's own accessibility grade; <strong>Files</strong> are the documents the page links to.</p>
+  <p class="page-view-note">One row per page. <strong>Page Audit Score</strong> is that page's own accessibility grade; <strong>Files</strong> are the documents the page links to. Rows tagged <span class="page-sitemap-tag">sitemap</span> come from the site's sitemap.xml — filecap found no files linked from them.</p>
   <nav class="paginator" aria-label="Page table pagination">
     <span class="pag-info" id="pv-page-info"></span>
     <span class="pag-controls">
@@ -439,7 +442,7 @@ const ACCESS_PANEL_COPY = {
   },
 };
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [] }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -584,7 +587,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   ).join("");
 
   // ── Page view (v1.13.0): invert the file entries into a page list ────────────
-  const pageList = buildPageList(entries);
+  const pageList = buildPageList(entries, sitemapUrls);
   const pageViewSectionHtml = buildPageViewSection(pageList, { sourceHeader, sourceMap, isConsolidated });
   const viewToggleHtml = `
 <div class="view-toggle" role="group" aria-label="Switch report view">
@@ -1487,6 +1490,19 @@ thead th {
   font-weight: 700;
   color: #e5e5e5;
 }
+.page-sitemap-tag {
+  display: inline-block;
+  font-size: 0.72em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9aa5b1;
+  background: #1f2632;
+  border: 1px solid #2e3b4d;
+  border-radius: 3px;
+  padding: 0 4px;
+  vertical-align: middle;
+}
 thead th:hover { background: #1a1a1a; }
 thead th.sort-asc::after  { content: " ▲"; font-size: 10px; color: #60a5fa; }
 thead th.sort-desc::after { content: " ▼"; font-size: 10px; color: #60a5fa; }
@@ -1828,8 +1844,7 @@ ${categoryRows}
   </tbody>
 </table>
 
-${viewToggleHtml}
-<div id="file-view">
+<div class="file-view">
 <h2>File inventory</h2>
 ${filterBarHtml}
 <div class="controls">
@@ -1872,7 +1887,9 @@ ${filterBarHtml}
     </tbody>
   </table>
 </aside>
-
+</div>
+${viewToggleHtml}
+<div class="file-view">
 <nav class="paginator" aria-label="Table pagination">
   <span class="pag-info" id="page-info"></span>
   <span class="pag-controls">
@@ -2123,18 +2140,19 @@ ${pageViewSectionHtml}
    drag-pan handler was the source of links occasionally not registering a
    click. Native wheel/scrollbar/touch scrolling still works. */
 
-/* v1.13.0 — File view / Page view toggle. Shows one of #file-view /
-   #page-view; File view is the default. */
+/* v1.13.0 — File view / Page view toggle. The File view's controls and its
+   table are two .file-view blocks; the toggle sits between them (directly
+   above the table) and shows/hides both as a unit, vs #page-view. */
 (function () {
   "use strict";
   var buttons = document.querySelectorAll(".view-toggle-btn");
-  var fileView = document.getElementById("file-view");
+  var fileViews = document.querySelectorAll(".file-view");
   var pageView = document.getElementById("page-view");
-  if (!buttons.length || !fileView || !pageView) return;
+  if (!buttons.length || !fileViews.length || !pageView) return;
   buttons.forEach(function (btn) {
     btn.addEventListener("click", function () {
       var showPage = btn.getAttribute("data-view") === "page";
-      fileView.hidden = showPage;
+      fileViews.forEach(function (fv) { fv.hidden = showPage; });
       pageView.hidden = !showPage;
       buttons.forEach(function (b) {
         var on = b === btn;

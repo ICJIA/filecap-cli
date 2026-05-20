@@ -1123,5 +1123,24 @@ describe("writeHtml", () => {
       expect(html).toMatch(/<div id="page-view"/);
       expect(html).toContain("Page view needs CMS reference data");
     });
+
+    it("merges sitemap-only URLs into the page table as extra rows (1.14.0)", async () => {
+      const out = path.join(tmpDir, "pagesitemap.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: entriesWithPages,
+        sources: [sampleHeader],
+        outputPath: out,
+        sitemapUrls: [
+          "https://icjia.illinois.gov/news/meetings/m1/",
+          "https://icjia.illinois.gov/about/standalone/",
+        ],
+      });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('href="https://icjia.illinois.gov/about/standalone/"');
+      const bodyMatch = html.match(/<tbody id="page-body">([\s\S]*?)<\/tbody>/);
+      // 2 derived pages (m1, g1) + 1 sitemap-only (standalone); m1 de-dupes
+      expect((bodyMatch[1].match(/<tr>/g) || []).length).toBe(3);
+    });
   });
 });
