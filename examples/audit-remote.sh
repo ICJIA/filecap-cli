@@ -84,6 +84,19 @@
 
 set -euo pipefail
 
+# ── filecap CLI ────────────────────────────────────────────────────────────────
+# The @icjia/filecap npm package is deprecated — filecap is git-only now. Run
+# the CLI from this checkout (these scripts live in examples/, so bin/filecap.js
+# is one directory up) instead of `npx @icjia/filecap@latest`. The one exception
+# is the native-mode remote scan further down: it runs on the file server, which
+# has no checkout, so it still uses npx.
+FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
+if [[ ! -f "$FILECAP_BIN" ]]; then
+  echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
+  echo "       Run this script from inside a filecap-cli checkout." >&2
+  exit 1
+fi
+
 RUN_START_EPOCH=$(date +%s)
 
 # Format seconds as a human-readable duration: "1s", "45s", "2m 34s", "1h 15m"
@@ -764,7 +777,7 @@ if [[ "$SHOULD_SHOW_MENU" == "1" ]]; then
         read -r -p "  Auto-deploy to Netlify? [y/N]: " AUTO_DEPLOY
         [[ "$AUTO_DEPLOY" =~ ^[Yy]$ ]] && ROLLUP_ARGS+=( --deploy )
 
-        if npx --yes @icjia/filecap@latest web-rollup "${ROLLUP_ARGS[@]}"; then
+        if node "$FILECAP_BIN" web-rollup "${ROLLUP_ARGS[@]}"; then
           info "Bundle ready. To preview: open ${WEB_OUT}/index.html"
           if ! [[ "$AUTO_DEPLOY" =~ ^[Yy]$ ]]; then
             info "To deploy: drop the directory at https://app.netlify.com/drop"
@@ -1167,6 +1180,9 @@ SCAN_PHASE_START=$(date +%s)
 
 if [[ "$REMOTE_NODE_MAJOR" -ge 20 ]]; then
   # ─ native mode: filecap runs on the remote, NDJSON streams back ─────────────
+  #   This scan stays on `npx @icjia/filecap` (not $FILECAP_BIN): it executes on
+  #   the file server, which has no local checkout. `scan` output is unchanged
+  #   across versions, so the deprecated npm package is still correct here.
   step "Mode: NATIVE (remote Node ${REMOTE_NODE} >= 20 — scan runs on the server)"
   info "Running: ssh ${SSH_USER}@${HOST} npx @icjia/filecap@latest scan '${REMOTE_PATH}' ..."
 
@@ -1222,7 +1238,7 @@ else
   [[ -n "$SITE_NAME" ]] && SCAN_ARGS+=( --site-name "${SITE_NAME}" )
   [[ -n "$PUBLIC_URL_BASE" ]] && SCAN_ARGS+=( --public-url-base "${PUBLIC_URL_BASE}" )
 
-  if ! npx --yes @icjia/filecap@latest scan "${SCAN_ARGS[@]}" \
+  if ! node "$FILECAP_BIN" scan "${SCAN_ARGS[@]}" \
       2> >(grep -v 'Warning:' >&2); then
     die "Local filecap scan failed. Check stderr above for details."
   fi
@@ -1285,7 +1301,7 @@ PYREWRITE
 # ── generate report ───────────────────────────────────────────────────────────
 REPORT_PHASE_START=$(date +%s)
 step "Generating filecap report ..."
-if ! npx --yes @icjia/filecap@latest report "${INVENTORY}" -o "${REPORT_DIR}" ${HTML_FLAG} \
+if ! node "$FILECAP_BIN" report "${INVENTORY}" -o "${REPORT_DIR}" ${HTML_FLAG} \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap report generation failed."
 fi

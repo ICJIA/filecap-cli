@@ -93,6 +93,17 @@
 
 set -euo pipefail
 
+# ── filecap CLI ────────────────────────────────────────────────────────────────
+# The @icjia/filecap npm package is deprecated — filecap is git-only now. Run
+# the CLI from this checkout (these scripts live in examples/, so bin/filecap.js
+# is one directory up) instead of `npx @icjia/filecap@latest`.
+FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
+if [[ ! -f "$FILECAP_BIN" ]]; then
+  echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
+  echo "       Run this script from inside a filecap-cli checkout." >&2
+  exit 1
+fi
+
 FLEET_START_EPOCH=$(date +%s)
 
 # Format seconds as a human-readable duration: "1s", "45s", "2m 34s", "1h 15m"
@@ -829,7 +840,7 @@ info "${#INVENTORY_FILES[@]} inventory file(s) available for rollup"
 # ── rollup ────────────────────────────────────────────────────────────────────
 CONSOLIDATED="${FLEET_DIR}/consolidated.ndjson"
 step "Rolling up ${#INVENTORY_FILES[@]} inventories → ${CONSOLIDATED}"
-if ! npx --yes @icjia/filecap@latest rollup "${INVENTORIES_DIR}"/*.ndjson \
+if ! node "$FILECAP_BIN" rollup "${INVENTORIES_DIR}"/*.ndjson \
     -o "${CONSOLIDATED}" \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap rollup failed. Check stderr above."
@@ -838,7 +849,7 @@ info "Rollup complete"
 
 # ── consolidated report ───────────────────────────────────────────────────────
 step "Generating consolidated report → ${CONSOLIDATED_REPORT_DIR}/"
-if ! npx --yes @icjia/filecap@latest report "${CONSOLIDATED}" \
+if ! node "$FILECAP_BIN" report "${CONSOLIDATED}" \
     -o "${CONSOLIDATED_REPORT_DIR}" ${HTML_FLAG} \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap report generation failed."

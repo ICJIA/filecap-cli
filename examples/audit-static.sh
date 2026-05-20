@@ -46,6 +46,17 @@
 
 set -euo pipefail
 
+# ── filecap CLI ────────────────────────────────────────────────────────────────
+# The @icjia/filecap npm package is deprecated — filecap is git-only now. Run
+# the CLI from this checkout (these scripts live in examples/, so bin/filecap.js
+# is one directory up) instead of `npx @icjia/filecap@latest`.
+FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
+if [[ ! -f "$FILECAP_BIN" ]]; then
+  echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
+  echo "       Run this script from inside a filecap-cli checkout." >&2
+  exit 1
+fi
+
 # ── colors ────────────────────────────────────────────────────────────────────
 G='\033[0;32m'
 R='\033[0;31m'
@@ -172,7 +183,7 @@ SCAN_ARGS=( "${SCAN_TARGET}" --server-name "${SERVER_NAME}" --server-ip "github.
 [[ -n "$SITE_NAME" ]]       && SCAN_ARGS+=( --site-name "${SITE_NAME}" )
 [[ -n "$PUBLIC_URL_BASE" ]] && SCAN_ARGS+=( --public-url-base "${PUBLIC_URL_BASE}" )
 
-if ! npx --yes @icjia/filecap@latest scan "${SCAN_ARGS[@]}" \
+if ! node "$FILECAP_BIN" scan "${SCAN_ARGS[@]}" \
     2> >(grep -v 'Warning:' >&2); then
   die "filecap scan failed. Check stderr above for details."
 fi

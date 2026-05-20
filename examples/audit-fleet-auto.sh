@@ -51,6 +51,17 @@ AUDIT_FLEET_PATH="${SCRIPT_DIR}/audit-fleet.sh"
 SITES_JSON="${SITES_JSON:-${HOME}/.filecap/sites.json}"
 AUDITS_BASE="${AUDITS_BASE:-${HOME}/filecap-audits}"
 
+# ── filecap CLI ────────────────────────────────────────────────────────────────
+# The @icjia/filecap npm package is deprecated — filecap is git-only now. Run
+# the CLI from this checkout (these scripts live in examples/, so bin/filecap.js
+# is one directory up) instead of `npx @icjia/filecap@latest`.
+FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
+if [[ ! -f "$FILECAP_BIN" ]]; then
+  echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
+  echo "       Run this script from inside a filecap-cli checkout." >&2
+  exit 1
+fi
+
 if ! command -v expect >/dev/null 2>&1; then
   echo "ERROR: 'expect' is required but not installed." >&2
   echo "       macOS:  brew install expect" >&2
@@ -148,7 +159,7 @@ for s in d.get('sites', []):
       # its own Strapi backend so parallelism doesn't contend.
       for site in $SITES_WITH_REFS; do
         (
-          if ! npx --yes @icjia/filecap@latest references "$site" \
+          if ! node "$FILECAP_BIN" references "$site" \
                  -o "$SIDECARS_DIR/$site.refs.ndjson" >/tmp/filecap-refs-"$site".log 2>&1; then
             echo "[fleet-auto] WARN: references failed for $site (see /tmp/filecap-refs-$site.log)" >&2
           else
@@ -177,7 +188,7 @@ for s in d.get('sites', []):
           inv="$site_dir/latest/inventory.ndjson"
           out="$site_dir/latest/inventory.cross-ref.ndjson"
           if [[ -f "$inv" ]]; then
-            if npx --yes @icjia/filecap@latest cross-references "$inv" \
+            if node "$FILECAP_BIN" cross-references "$inv" \
                  "${SIDECAR_ARGS[@]}" -o "$out" >/tmp/filecap-xref-"$site".log 2>&1; then
               echo "[fleet-auto]   ✓ cross-references $site"
             else
@@ -228,7 +239,7 @@ for s in d.get('sites', []):
     [[ -f "$inv" ]] || inv="$site_dir/latest/inventory.ndjson"
     out="$site_dir/latest/inventory.audited.ndjson"
     if [[ -f "$inv" ]]; then
-      if npx --yes @icjia/filecap@latest audits "$inv" \
+      if node "$FILECAP_BIN" audits "$inv" \
            -o "$out" >/tmp/filecap-audit-"$site".log 2>&1; then
         result=$(tail -1 /tmp/filecap-audit-"$site".log)
         echo "[fleet-auto]   ✓ audits $site: $result"
@@ -248,7 +259,7 @@ if [[ "${SKIP_ROLLUP:-0}" == "1" ]]; then
   echo "[fleet-auto] SKIP_ROLLUP=1 — skipping web-rollup"
 else
   echo "[fleet-auto] Stage 4: running 'filecap web-rollup'"
-  if ! npx --yes @icjia/filecap@latest web-rollup; then
+  if ! node "$FILECAP_BIN" web-rollup; then
     echo "[fleet-auto] ERROR: web-rollup failed" >&2
     exit 1
   fi
