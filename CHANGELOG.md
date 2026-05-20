@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.15.3] — 2026-05-20
+
+### Fixed
+
+- **Page view table — readable columns and page URLs.** The per-site report's Page view had two layout problems. The table used `table-layout: auto`, so the file column (long, unbreakable filenames) claimed most of the width and the **Page** column collapsed to a sliver of vertically-wrapped text. And the first column showed each page's CMS `<title>` — which on many sites is the same generic site name for every page, so every row read identically. Now the table uses a fixed 4-column layout (the URL column gets 46%), the first column shows the page's own **URL** — the real per-page identifier — and long file-name chips wrap inside the Files column instead of overflowing it. `src/report/html.js`.
+
+### Tests
+
+721 passing — the Page-view row test now asserts the page URL is the link text.
+
 ## [1.15.2] — 2026-05-20
 
 ### Fixed

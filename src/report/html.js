@@ -281,7 +281,11 @@ function buildPageFilesCell(page, ctx) {
 
 function buildPageRow(page, ctx) {
   const safePageUrl = safeUrl(page.pageUrl);
-  const title = htmlEscape(page.pageTitle || page.pageUrl || "(untitled page)");
+  // v1.15.3: the first column shows the page's own URL, not its CMS <title>.
+  // Many CMS sites set every page's <title> to the same generic site name,
+  // so a title column read identically on every row; the URL is the real,
+  // distinct per-page identifier.
+  const urlText = htmlEscape(safePageUrl || page.pageUrl || "(no URL)");
   let tag = "";
   if (page.fromSitemap) {
     tag = ` <span class="page-sitemap-tag" title="Listed in the site's sitemap; filecap found no files linked from this page.">sitemap</span>`;
@@ -289,8 +293,8 @@ function buildPageRow(page, ctx) {
     tag = ` <span class="page-cms-tag" title="A page from the site's CMS; filecap found no files linked from it.">cms</span>`;
   }
   const pageCell = safePageUrl
-    ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${title}</a>${tag}</td>`
-    : `<td>${title}${tag}</td>`;
+    ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${urlText}</a>${tag}</td>`
+    : `<td>${urlText}${tag}</td>`;
   const typeCell = `<td>${htmlEscape(page.contentType || "—")}</td>`;
   return `<tr>${pageCell}${typeCell}${buildPageAuditCell(page.pageAudit)}${buildPageFilesCell(page, ctx)}</tr>`;
 }
@@ -1378,6 +1382,22 @@ table {
   width: 100%;
   font-size: 13px;
 }
+/* v1.15.3 — Page view table: a fixed 4-column layout. Under the default
+   table-layout:auto the file-chip column (a long, unbreakable filename)
+   claimed most of the width and the page-URL column collapsed to a sliver
+   of vertically-wrapped text. Explicit widths give the URL column the room
+   it needs; overflow-wrap lets long URLs and file names wrap inside their
+   cells instead of forcing the column wider. */
+#page-table { table-layout: fixed; }
+#page-table th:nth-child(1), #page-table td:nth-child(1) { width: 46%; }
+#page-table th:nth-child(2), #page-table td:nth-child(2) { width: 11%; }
+#page-table th:nth-child(3), #page-table td:nth-child(3) { width: 19%; }
+#page-table th:nth-child(4), #page-table td:nth-child(4) { width: 24%; }
+#page-table td { overflow-wrap: anywhere; vertical-align: top; }
+/* The shared .ref-link chip is nowrap — right for the short "Page N" chips in
+   the File view, but in the Page view the chips carry long file names. Let
+   them wrap inside the fixed-width Files column instead of overflowing it. */
+#page-table .ref-link { white-space: normal; }
 thead {
   position: sticky;
   top: 0;

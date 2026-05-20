@@ -1107,12 +1107,17 @@ describe("writeHtml", () => {
       expect((bodyMatch[1].match(/<tr>/g) || []).length).toBe(2);
     });
 
-    it("page rows link to the live page and show the page audit grade", async () => {
+    it("page rows show the page URL as the link text, plus the audit grade", async () => {
       const out = path.join(tmpDir, "pagerow.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: entriesWithPages, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toContain('href="https://icjia.illinois.gov/news/meetings/m1/"');
-      expect(html).toContain("Meeting One");
+      // The first column links to the page and shows the URL itself as the
+      // link text — not the CMS <title>, which is often the generic site
+      // name and renders identically on every row.
+      expect(html).toMatch(
+        /<a href="https:\/\/icjia\.illinois\.gov\/news\/meetings\/m1\/"[^>]*>https:\/\/icjia\.illinois\.gov\/news\/meetings\/m1\/<\/a>/,
+      );
+      expect(html).not.toContain("Meeting One");
       expect(html).toMatch(/audit-grade audit-grade-a/);
     });
 
