@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Note — internal tool, npm package deprecated.** As of v1.13.0 the npm
+> package `@icjia/filecap` is **deprecated**. `filecap` is internal ICJIA
+> tooling — run it from the GitHub repository, not from npm. Releases are still
+> tagged in git and documented below; they are no longer published to npm.
+
+## [1.13.0] — 2026-05-20
+
+### Added
+
+- **Page view.** Each per-site report now has a **File view / Page view** toggle at the top — File view is the default. The Page view is the transpose of the file table: one row per page on the site, showing the page's own accessibility score and the files it links to. Columns — **Page** (title, linked to the live page), **Content type**, **Page Audit Score** (the page's A–F grade), **Files** (count + the documents the page links to). Sortable headers and the same 25/50/100 paginator as the file table. No new pipeline data is required — the page list is built by inverting each file's `references[]` (every reference already carries the page URL, title, content type, and `pageAudit`). New module `src/report/pages.js` (`buildPageList`).
+- **Static-site empty-state.** Page mapping comes from CMS reference extraction, which exists only for the Strapi sites. On the static git sites (the ARI Summits, vpp, ilheals, sfs) the Page view shows a short plain-English explanation instead of an empty table.
+
+### Tests
+
+697 passing (+10 — `report-pages` for the page-list inverter, plus Page-view markup cases in `report-html`).
+
 ## [1.12.2] — 2026-05-20
 
 ### Fixed

@@ -2,6 +2,13 @@
 
 **File inventory CLI for accessibility audit scoping.**
 
+> **Internal tooling — not for external use.** `filecap` is an accessibility-audit
+> tool built for **ICJIA's own use**. The npm package `@icjia/filecap` is
+> **deprecated**: it is not maintained, supported, or documented for anyone
+> outside ICJIA. If you want to run it, clone this repository and run it directly
+> (`node bin/filecap.js …`) — do **not** `npm install` it. It remains public here
+> for transparency, not for distribution.
+
 `filecap` walks a directory tree, introspects each file (PDFs, DOCX, XLSX), and produces a structured NDJSON inventory suitable for accessibility remediation scoping. The primary use case is generating per-server inventories of file stores (Strapi `/uploads` directories, general file servers) to hand to remediation vendors so they can produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
 
 ## Are you a...

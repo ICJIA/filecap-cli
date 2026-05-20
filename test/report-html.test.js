@@ -1072,4 +1072,56 @@ describe("writeHtml", () => {
       expect(html).toMatch(/title="[^"]*ilfvcc-api-prod[^"]*form[^"]*#17/);
     });
   });
+
+  describe("Page view (v1.13.0)", () => {
+    const refWithAudit = (pageUrl, title, grade, score) => ({
+      siteName: "test-server",
+      contentType: "meeting",
+      entryId: 1,
+      pageUrl,
+      pageAudit: { score, grade, violationCount: 0, pageTitle: title, reportUrl: "https://audit.icjia.app/page-report/abc" },
+    });
+    const entriesWithPages = [
+      { ...sampleEntries[0], path: "a.pdf", filename: "a.pdf", references: [refWithAudit("https://icjia.illinois.gov/news/meetings/m1/", "Meeting One", "A", 95)] },
+      { ...sampleEntries[0], path: "b.pdf", filename: "b.pdf", references: [refWithAudit("https://icjia.illinois.gov/news/meetings/m1/", "Meeting One", "A", 95)] },
+      { ...sampleEntries[0], path: "c.pdf", filename: "c.pdf", references: [refWithAudit("https://icjia.illinois.gov/grants/g1/", "Grant One", "D", 61)] },
+    ];
+
+    it("renders a File view / Page view toggle, File view active by default", async () => {
+      const out = path.join(tmpDir, "toggle.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: entriesWithPages, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<div class="view-toggle"/);
+      expect(html).toMatch(/data-view="file"[^>]*aria-pressed="true"/);
+      expect(html).toMatch(/data-view="page"/);
+    });
+
+    it("renders a #page-view page table with one row per referenced page", async () => {
+      const out = path.join(tmpDir, "pageview.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: entriesWithPages, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<div id="page-view"/);
+      expect(html).toContain('<table id="page-table"');
+      const bodyMatch = html.match(/<tbody id="page-body">([\s\S]*?)<\/tbody>/);
+      expect(bodyMatch).not.toBeNull();
+      expect((bodyMatch[1].match(/<tr>/g) || []).length).toBe(2);
+    });
+
+    it("page rows link to the live page and show the page audit grade", async () => {
+      const out = path.join(tmpDir, "pagerow.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: entriesWithPages, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('href="https://icjia.illinois.gov/news/meetings/m1/"');
+      expect(html).toContain("Meeting One");
+      expect(html).toMatch(/audit-grade audit-grade-a/);
+    });
+
+    it("shows the static-site empty-state when no entry has references", async () => {
+      const out = path.join(tmpDir, "pageempty.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<div id="page-view"/);
+      expect(html).toContain("Page view needs CMS reference data");
+    });
+  });
 });

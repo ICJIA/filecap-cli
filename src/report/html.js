@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import { CSV_COLUMNS } from "./csv.js";
+import { buildPageList } from "./pages.js";
 import { humanizeBytes } from "./format.js";
 import { FILECAP_VERSION } from "../version.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
@@ -239,6 +240,95 @@ function buildAuditScoreCell(audit) {
     return `<td>${chip} <a class="audit-report-link" href="${escaped}" target="_blank" rel="noopener noreferrer" title="${escaped}">Open report</a></td>`;
   }
   return `<td>${chip}</td>`;
+}
+
+// ── Page view (v1.13.0) — the transpose of the file table ───────────────────
+// buildPageList() (pages.js) inverts the file entries into a list of pages;
+// these helpers render the page table. `ctx` = { sourceHeader, sourceMap,
+// isConsolidated } so buildPublicUrl can resolve each attached file's URL.
+
+function buildPageAuditCell(pageAudit) {
+  if (!pageAudit || typeof pageAudit.score !== "number") {
+    return `<td data-score="-1"><span class="no-refs">No score</span></td>`;
+  }
+  const grade = String(pageAudit.grade ?? "").toUpperCase();
+  const gradeClass = grade ? `audit-grade-${grade.toLowerCase()}` : "audit-grade-error";
+  const chip = `<span class="audit-grade ${gradeClass}">${htmlEscape(grade || "?")}</span> <span class="audit-score-num">(${pageAudit.score})</span>`;
+  const safe = safeUrl(pageAudit.reportUrl);
+  const link = safe
+    ? ` <a class="audit-report-link" href="${htmlEscape(safe)}" target="_blank" rel="noopener noreferrer">Open report</a>`
+    : "";
+  return `<td data-score="${pageAudit.score}">${chip}${link}</td>`;
+}
+
+function buildPageFilesCell(page, ctx) {
+  const files = page.files ?? [];
+  if (files.length === 0) {
+    return `<td data-count="0"><span class="no-refs">No files</span></td>`;
+  }
+  const chips = files
+    .map((entry) => {
+      const url = buildPublicUrl({ entry, ...ctx });
+      const safe = safeUrl(url);
+      const name = htmlEscape(entry.filename ?? entry.path ?? "");
+      return safe
+        ? `<a class="ref-link" href="${htmlEscape(safe)}" target="_blank" rel="noopener noreferrer" title="${htmlEscape(safe)}">${name}</a>`
+        : `<span class="ref-link-bad">${name}</span>`;
+    })
+    .join(" ");
+  return `<td data-count="${files.length}"><span class="page-file-count">${files.length}</span> ${chips}</td>`;
+}
+
+function buildPageRow(page, ctx) {
+  const safePageUrl = safeUrl(page.pageUrl);
+  const title = htmlEscape(page.pageTitle || page.pageUrl || "(untitled page)");
+  const pageCell = safePageUrl
+    ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${title}</a></td>`
+    : `<td>${title}</td>`;
+  const typeCell = `<td>${htmlEscape(page.contentType || "—")}</td>`;
+  return `<tr>${pageCell}${typeCell}${buildPageAuditCell(page.pageAudit)}${buildPageFilesCell(page, ctx)}</tr>`;
+}
+
+function buildPageViewSection(pages, ctx) {
+  if (!pages || pages.length === 0) {
+    return `<div id="page-view" hidden>
+  <h2>Pages</h2>
+  <p class="page-view-empty">Page view needs CMS reference data — the map of which pages link to which files. filecap extracts that from CMS sites (Strapi); this is a static (non-CMS) site, so file-to-page mapping isn't available for it. The <strong>File view</strong> above lists every file on the site.</p>
+</div>`;
+  }
+  const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
+  return `<div id="page-view" hidden>
+  <h2>Pages on this site</h2>
+  <p class="page-view-note">One row per page. <strong>Page Audit Score</strong> is that page's own accessibility grade; <strong>Files</strong> are the documents the page links to.</p>
+  <nav class="paginator" aria-label="Page table pagination">
+    <span class="pag-info" id="pv-page-info"></span>
+    <span class="pag-controls">
+      <label class="pag-size">Rows per page
+        <select id="pv-page-size">
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+      <button type="button" id="pv-pag-prev" class="pag-btn">&larr; Prev</button>
+      <span class="pag-pages" id="pv-pag-pages"></span>
+      <button type="button" id="pv-pag-next" class="pag-btn">Next &rarr;</button>
+    </span>
+  </nav>
+  <div class="table-wrap table-scroll">
+    <table id="page-table" aria-label="Page inventory">
+      <thead><tr>
+        <th data-sort="page">Page</th>
+        <th data-sort="type">Content type</th>
+        <th data-sort="score">Page Audit Score</th>
+        <th data-sort="files">Files</th>
+      </tr></thead>
+      <tbody id="page-body">
+${rows}
+      </tbody>
+    </table>
+  </div>
+</div>`;
 }
 
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
@@ -492,6 +582,18 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const headerCells = HTML_TABLE_COLUMNS.map((col) =>
     `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}</th>`
   ).join("");
+
+  // ── Page view (v1.13.0): invert the file entries into a page list ────────────
+  const pageList = buildPageList(entries);
+  const pageViewSectionHtml = buildPageViewSection(pageList, { sourceHeader, sourceMap, isConsolidated });
+  const viewToggleHtml = `
+<div class="view-toggle" role="group" aria-label="Switch report view">
+  <div class="view-toggle-buttons">
+    <button type="button" class="view-toggle-btn is-active" data-view="file" aria-pressed="true">File view</button>
+    <button type="button" class="view-toggle-btn" data-view="page" aria-pressed="false">Page view</button>
+  </div>
+  <p class="view-toggle-blurb"><strong>File view</strong> (shown) lists every file and the pages that link to it. <strong>Page view</strong> flips it around — one row per page on the site, with that page's accessibility score and the files it links to.</p>
+</div>`;
 
   // ── server/scan metadata display ─────────────────────────────────────────────
   // Per-site reports pull from top-level metadata fields. Consolidated fleet
@@ -1336,6 +1438,55 @@ thead th {
 }
 .pag-pages { display: inline-flex; gap: 0.25rem; align-items: center; }
 .pag-gap { color: #6b7280; padding: 0 1px; }
+
+/* ── File / Page view toggle (v1.13.0) ──────────────────────── */
+.view-toggle { margin: 1.2rem 0 0.5rem; }
+.view-toggle-buttons {
+  display: inline-flex;
+  border: 1px solid #2e3b4d;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.view-toggle-btn {
+  background: #161b22;
+  color: #c9d1d9;
+  border: 0;
+  padding: 8px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.view-toggle-btn + .view-toggle-btn { border-left: 1px solid #2e3b4d; }
+.view-toggle-btn:hover { background: #1f2a37; }
+.view-toggle-btn.is-active { background: #2563eb; color: #fff; }
+.view-toggle-blurb {
+  margin: 0.5rem 0 0;
+  font-size: 13px;
+  color: #9aa5b1;
+  max-width: 78ch;
+  line-height: 1.5;
+}
+.view-toggle-blurb strong { color: #e5e5e5; }
+.page-view-note,
+.page-view-empty {
+  font-size: 14px;
+  color: #c9d1d9;
+  line-height: 1.55;
+  max-width: 78ch;
+}
+.page-view-empty {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-left: 4px solid #4dabf7;
+  border-radius: 4px;
+  padding: 0.9rem 1.1rem;
+}
+.page-file-count {
+  display: inline-block;
+  min-width: 1.6em;
+  font-weight: 700;
+  color: #e5e5e5;
+}
 thead th:hover { background: #1a1a1a; }
 thead th.sort-asc::after  { content: " ▲"; font-size: 10px; color: #60a5fa; }
 thead th.sort-desc::after { content: " ▼"; font-size: 10px; color: #60a5fa; }
@@ -1677,6 +1828,8 @@ ${categoryRows}
   </tbody>
 </table>
 
+${viewToggleHtml}
+<div id="file-view">
 <h2>File inventory</h2>
 ${filterBarHtml}
 <div class="controls">
@@ -1743,6 +1896,8 @@ ${rowsHtml}
     </tbody>
   </table>
 </div>
+</div>
+${pageViewSectionHtml}
 
 <footer>
   Generated by filecap v${htmlEscape(FILECAP_VERSION)} &mdash; ${htmlEscape(fmtChicagoGeneratedAt(scannedAt) || scannedAt)}
@@ -1967,6 +2122,133 @@ ${rowsHtml}
    paginator (see the IIFE above), so neither handler is needed — and the
    drag-pan handler was the source of links occasionally not registering a
    click. Native wheel/scrollbar/touch scrolling still works. */
+
+/* v1.13.0 — File view / Page view toggle. Shows one of #file-view /
+   #page-view; File view is the default. */
+(function () {
+  "use strict";
+  var buttons = document.querySelectorAll(".view-toggle-btn");
+  var fileView = document.getElementById("file-view");
+  var pageView = document.getElementById("page-view");
+  if (!buttons.length || !fileView || !pageView) return;
+  buttons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var showPage = btn.getAttribute("data-view") === "page";
+      fileView.hidden = showPage;
+      pageView.hidden = !showPage;
+      buttons.forEach(function (b) {
+        var on = b === btn;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+  });
+})();
+
+/* v1.13.0 — Page view table: column sort + paginator. Scoped to #page-table;
+   the file table's paginator is a separate IIFE above. */
+(function () {
+  "use strict";
+  var table = document.getElementById("page-table");
+  var tbody = table ? table.querySelector("tbody") : null;
+  if (!tbody) return;
+  var allRows = Array.prototype.slice.call(tbody.children);
+  var matched = allRows.slice();
+  var pageSize = 25;
+  var currentPage = 1;
+  var pageInfo = document.getElementById("pv-page-info");
+  var pagPrev = document.getElementById("pv-pag-prev");
+  var pagNext = document.getElementById("pv-pag-next");
+  var pagPages = document.getElementById("pv-pag-pages");
+  var pageSizeSel = document.getElementById("pv-page-size");
+
+  function renderPageButtons(totalPages) {
+    if (!pagPages) return;
+    pagPages.textContent = "";
+    if (totalPages <= 1) return;
+    var want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+    var prev = 0;
+    for (var p = 1; p <= totalPages; p++) {
+      if (want.indexOf(p) < 0) continue;
+      if (p - prev > 1) {
+        var gap = document.createElement("span");
+        gap.className = "pag-gap";
+        gap.textContent = "…";
+        pagPages.appendChild(gap);
+      }
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
+      b.textContent = String(p);
+      (function (target) {
+        b.addEventListener("click", function () { currentPage = target; renderPage(); });
+      })(p);
+      pagPages.appendChild(b);
+      prev = p;
+    }
+  }
+
+  function renderPage() {
+    var total = matched.length;
+    var totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    var start = (currentPage - 1) * pageSize;
+    var end = Math.min(start + pageSize, total);
+    allRows.forEach(function (r) { r.style.display = "none"; });
+    for (var i = start; i < end; i++) matched[i].style.display = "";
+    if (pageInfo) {
+      pageInfo.textContent = total === 0
+        ? "No pages"
+        : "Showing " + (start + 1).toLocaleString() + "–" + end.toLocaleString() +
+          " of " + total.toLocaleString() + " pages";
+    }
+    if (pagPrev) pagPrev.disabled = currentPage <= 1;
+    if (pagNext) pagNext.disabled = currentPage >= totalPages;
+    renderPageButtons(totalPages);
+  }
+
+  function cellSortValue(row, idx) {
+    var cell = row.children[idx];
+    if (!cell) return "";
+    if (cell.dataset.score !== undefined) return Number(cell.dataset.score);
+    if (cell.dataset.count !== undefined) return Number(cell.dataset.count);
+    return cell.textContent.trim().toLowerCase();
+  }
+
+  var headers = Array.prototype.slice.call(table.querySelectorAll("thead th"));
+  headers.forEach(function (th, idx) {
+    th.addEventListener("click", function () {
+      var asc = th.dataset.dir !== "asc";
+      th.dataset.dir = asc ? "asc" : "desc";
+      headers.forEach(function (h) { h.classList.remove("sort-asc", "sort-desc"); });
+      th.classList.add(asc ? "sort-asc" : "sort-desc");
+      var rows = allRows.slice();
+      rows.sort(function (a, b) {
+        var av = cellSortValue(a, idx), bv = cellSortValue(b, idx);
+        var cmp;
+        if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+        else cmp = String(av).localeCompare(String(bv));
+        return asc ? cmp : -cmp;
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+      matched = Array.prototype.slice.call(tbody.children);
+      currentPage = 1;
+      renderPage();
+    });
+  });
+
+  if (pagPrev) pagPrev.addEventListener("click", function () { currentPage--; renderPage(); });
+  if (pagNext) pagNext.addEventListener("click", function () { currentPage++; renderPage(); });
+  if (pageSizeSel) pageSizeSel.addEventListener("change", function () {
+    var n = parseInt(pageSizeSel.value, 10);
+    if (!isNaN(n) && n > 0) pageSize = n;
+    currentPage = 1;
+    renderPage();
+  });
+
+  renderPage();
+})();
 
 // v1.7.7 — meta-grid copy-to-clipboard handler. One delegated listener on
 // document.body covers every copy button (no per-button wiring, works
