@@ -322,4 +322,26 @@ describe("index page accessibility (v1.x)", () => {
     const html = generateIndexHtml({ siteResults: [], password: null });
     expect(html).toMatch(/<link[^>]*rel="icon"/);
   });
+
+  it("marks the LLM-context download names as headings (axe heading-markup)", () => {
+    // axe DevTools' advanced/heading-markup rule flagged the .llm-context-file-name
+    // labels as heading-like but unmarked. Each is the title of its download card,
+    // a level-3 heading under the section's <h2 id="llm-context-heading">.
+    const html = generateIndexHtml({
+      siteResults: [],
+      password: null,
+      llmContext: {
+        ndjsonFilename: "audit-fleet.ndjson",
+        ndjsonByteCount: 1234,
+        contextMdFilename: "audit-fleet-context.md",
+        contextMdByteCount: 567,
+      },
+    });
+    const nameSpans = html.match(/<span class="llm-context-file-name"[^>]*>/g) || [];
+    expect(nameSpans).toHaveLength(2);
+    for (const span of nameSpans) {
+      expect(span).toMatch(/role="heading"/);
+      expect(span).toMatch(/aria-level="\d"/);
+    }
+  });
 });

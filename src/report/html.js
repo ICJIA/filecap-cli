@@ -776,7 +776,7 @@ body {
      navbar buttons (FAQ + PDF Audit Tool) sitting next to it. Color
      register: download / get / "take this artefact away." */
   display: inline-block;
-  background: linear-gradient(180deg, #2ea043 0%, #238636 100%);
+  background: linear-gradient(180deg, #1f7a30 0%, #176127 100%);
   color: #ffffff !important;
   text-decoration: none;
   font-weight: 700;

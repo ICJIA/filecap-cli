@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.15.2] — 2026-05-20
+
+### Fixed
+
+- **Accessibility — contrast and heading markup the open-source axe-core missed.** v1.15.1 reported Lighthouse 100 and 0 axe-core violations, but those run the *open-source* axe-core, which rounds contrast ratios and defers text-over-image to "needs review." Re-checking the deployed site with the **axe DevTools browser extension** (Deque's stricter `advanced/` ruleset) and **contrastcap** (pixel-sampling) surfaced real issues the "100" had hidden — 28 on the fleet index, 1 on each per-site report:
+  - **Muted text contrast (WCAG 1.4.3 AA).** The index's secondary text — the per-site `scan-meta` lines and tech-details toggles — used `#788391`, which measures **4.41–4.47:1** on the dark card: just under the 4.5 minimum (open-source axe-core rounds it to a pass). Raised to `#9aa5b1`, ~7:1. 26 instances, in `src/web/index-page.js`.
+  - **CSV-download button contrast (WCAG 1.4.3 AA).** The per-site reports' green "Download spreadsheet (CSV)" button used a gradient whose light end (`#2ea043`) gave white button text only ~3.9:1. Darkened the gradient to `#1f7a30 → #176127`, white text ≥5:1, in `src/report/html.js`.
+  - **Heading markup (WCAG 1.3.1 A).** The index's two LLM-context download labels (`audit-fleet.ndjson`, `audit-fleet-context.md`) were styled as headings but not marked up as such. Each is now a `role="heading"` level-3 heading under the section's `<h2>`.
+- Re-verified with contrastcap (the `#788391` and CSV-button failures are gone) and axe-core / Lighthouse (still 0 violations / 100). The contrastcap items that remain are pixel-sampling artifacts over the cards' decorative background-images plus one `aria-hidden` glyph — confirmed against screenshots, not WCAG failures.
+
+### Tests
+
+721 passing (+1 — the LLM-context heading-markup assertion).
+
 ## [1.15.1] — 2026-05-20
 
 ### Fixed

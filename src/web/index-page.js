@@ -69,12 +69,12 @@ function renderLlmContextSection(llmContext) {
 
     <div class="llm-context-files">
       <a class="llm-context-file" href="${he(llmContext.ndjsonFilename)}" download>
-        <span class="llm-context-file-name">${he(llmContext.ndjsonFilename)}</span>
+        <span class="llm-context-file-name" role="heading" aria-level="3">${he(llmContext.ndjsonFilename)}</span>
         <span class="llm-context-file-meta">${he(ndjsonSize)} · the full data</span>
         <span class="llm-context-file-desc">One JSON object per file across every site. Includes everything the spreadsheets do, plus the PDF / Word / Excel details the spreadsheets leave out (page counts, image-only flag, heading coverage, alt-text coverage, etc.).</span>
       </a>
       <a class="llm-context-file" href="${he(llmContext.contextMdFilename)}" download>
-        <span class="llm-context-file-name">${he(llmContext.contextMdFilename)}</span>
+        <span class="llm-context-file-name" role="heading" aria-level="3">${he(llmContext.contextMdFilename)}</span>
         <span class="llm-context-file-meta">${he(mdSize)} · the narrative</span>
         <span class="llm-context-file-desc">A short readable summary of the audit (total counts, per-site breakdown), a schema description for the NDJSON, and a few sample prompts you can paste into the AI tool to get started.</span>
       </a>
@@ -1510,7 +1510,7 @@ main {
 .site-card .site-url {
   margin: 6px 0 0;
   font-size: 0.85em;
-  color: var(--fc-text-muted, #788391);
+  color: var(--fc-text-muted, #9aa5b1);
 }
 .site-card .site-url span { color: var(--fc-accent, #4dabf7); }
 
@@ -1672,12 +1672,12 @@ main {
 
 .site-card .scan-meta {
   font-size: 0.82em;
-  color: var(--fc-text-muted, #788391);
+  color: var(--fc-text-muted, #9aa5b1);
   margin: 6px 0 12px;
   text-align: center;
 }
 
-.site-card .tech-details { margin: 6px 0 12px; font-size: 0.82em; color: var(--fc-text-muted, #788391); }
+.site-card .tech-details { margin: 6px 0 12px; font-size: 0.82em; color: var(--fc-text-muted, #9aa5b1); }
 .site-card .tech-details summary { cursor: pointer; min-height: 24px; padding: 3px 0; }
 .site-card .tech-details .hostname,
 .site-card .tech-details .ip { margin: 4px 0 0; }
@@ -1783,7 +1783,7 @@ main {
   margin: 0;
   font-size: 0.78em;
   text-align: center;
-  color: var(--fc-text-muted, #788391);
+  color: var(--fc-text-muted, #9aa5b1);
   letter-spacing: 0.02em;
 }
 .site-card .actions .csv-last-audit strong { color: #c0cdda; font-weight: 700; }
@@ -1985,7 +1985,7 @@ main {
 .master-csv-last-audit {
   margin: 0.45rem 0 0;
   font-size: 0.82rem;
-  color: #788391;
+  color: #9aa5b1;
   letter-spacing: 0.02em;
 }
 .master-csv-last-audit strong { color: #c0cdda; font-weight: 700; }
