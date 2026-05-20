@@ -280,3 +280,39 @@ describe("index page CSS (v1.7.7 whole-card click fix)", () => {
     expect(html).toMatch(/\.site-card \.actions \.btn,\s*\.site-card \.tech-details summary[\s\S]{0,200}\{\s*pointer-events:\s*auto/);
   });
 });
+
+describe("index page duplicates table (v1.12.1 paginator + trimmed columns)", () => {
+  const dupGroups = [
+    {
+      normalizedFilename: "annual-report.pdf",
+      isExactDuplicate: true,
+      items: [
+        { siteName: "DVFR", serverName: "dvfr-strapi-prod", publicUrl: "https://dvfr.illinois.gov/r/annual-report.pdf", modifiedAt: "2025-01-01T00:00:00.000Z", sizeBytes: 100 },
+        { siteName: "ICJIA", serverName: "icjia-agency-prod", publicUrl: "https://icjia.illinois.gov/r/annual-report.pdf", modifiedAt: "2025-02-01T00:00:00.000Z", sizeBytes: 100 },
+      ],
+    },
+  ];
+  const html = generateIndexHtml({ siteResults: [], password: null, duplicateGroups: dupGroups });
+
+  it("renders a paginator with prev/next, page-size selector, and page info", () => {
+    expect(html).toMatch(/<nav class="paginator"/);
+    expect(html).toContain('id="dup-page-info"');
+    expect(html).toContain('id="dup-pag-prev"');
+    expect(html).toContain('id="dup-pag-next"');
+    expect(html).toContain('id="dup-page-size"');
+  });
+
+  it("trims the HTML table to essential columns (dates + size columns dropped)", () => {
+    expect(html).toMatch(/<th[^>]*class="dup-col-filename"/);
+    expect(html).toMatch(/<th[^>]*class="dup-col-match"/);
+    expect(html).toMatch(/<th[^>]*class="dup-col-sites"/);
+    expect(html).toMatch(/<th[^>]*class="dup-col-copies"/);
+    expect(html).not.toMatch(/<th[^>]*class="dup-col-dates"/);
+    expect(html).not.toMatch(/<th[^>]*class="dup-col-size"/);
+  });
+
+  it("no longer embeds the click-and-drag pan handler", () => {
+    expect(html).not.toContain("is-panning");
+    expect(html).not.toContain("setPointerCapture");
+  });
+});

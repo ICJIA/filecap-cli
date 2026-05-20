@@ -165,10 +165,6 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
   // per-occurrence detail lives in audit-file-duplicates.csv for pivot work.
   const groupRows = groups.map((g) => {
     const items = g.items ?? [];
-    const dates = items.map((i) => i.modifiedAt).filter(Boolean).sort();
-    const newest = dates[dates.length - 1] ?? "";
-    const oldest = dates[0] ?? "";
-    const totalBytes = items.reduce((s, i) => s + (i.sizeBytes ?? 0), 0);
     // Each site is rendered as a link to its file's public URL (the canonical
     // way for a manager / remediator to actually go look at the document).
     // Falls back to plain text when the site has no publicUrlBase configured.
@@ -182,28 +178,17 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
     const matchBadge = g.isExactDuplicate
       ? `<span class="dup-kind dup-exact">exact</span>`
       : `<span class="dup-kind dup-variant">variant</span>`;
-    const datesText = (newest && oldest && newest !== oldest)
-      ? `${he(fmtDate(newest))} <span class="dup-dim">↓</span> ${he(fmtDate(oldest))}`
-      : he(newest ? fmtDate(newest) : "—");
     const sitesText = items.map((i) => i.siteName || i.serverName || "").join(", ");
     const side = sideForFilename(g.normalizedFilename);
+    // v1.12.1: HTML table trimmed to the essential columns; the full
+    // per-occurrence detail (dates, sizes) stays in audit-file-duplicates.csv.
     return `<tr data-dup-side="${he(side)}">
       <td title="${he(g.normalizedFilename)}">${he(g.normalizedFilename)}</td>
       <td>${matchBadge}</td>
       <td title="${he(sitesText)}">${sites}</td>
       <td class="num">${he(String(items.length))}</td>
-      <td title="${he(datesPlain(items))}">${datesText}</td>
-      <td class="num">${he(humanBytes(totalBytes))}</td>
     </tr>`;
   });
-
-  // Plain-text dates for the title tooltip (no markup, friendly for SR users).
-  function datesPlain(items) {
-    const dates = items.map((i) => i.modifiedAt).filter(Boolean).sort();
-    if (dates.length === 0) return "—";
-    if (dates.length === 1) return fmtDate(dates[0]);
-    return `Newest ${fmtDate(dates[dates.length - 1])}, oldest ${fmtDate(dates[0])}`;
-  }
 
   // v1.7.17: the duplicates CSV download was pulled (the file is still
   // generated server-side and accessible via direct URL for the audit lead,
@@ -302,6 +287,21 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
           <button type="button" class="dup-filter-chip" data-dup-filter="all" aria-pressed="false">All <span class="dup-filter-count">${he(groups.length.toLocaleString())}</span></button>
         </div>
       </div>
+      <nav class="paginator" aria-label="Duplicate table pagination">
+        <span class="pag-info" id="dup-page-info"></span>
+        <span class="pag-controls">
+          <label class="pag-size">Rows per page
+            <select id="dup-page-size">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          <button type="button" id="dup-pag-prev" class="pag-btn">&larr; Prev</button>
+          <span class="pag-pages" id="dup-pag-pages"></span>
+          <button type="button" id="dup-pag-next" class="pag-btn">Next &rarr;</button>
+        </span>
+      </nav>
       <div class="dup-pan-wrap" data-dup-pan data-dup-active-filter="remediable">
         <table class="dup-table">
           <thead>
@@ -310,8 +310,6 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
               <th scope="col" class="dup-col-match">Match</th>
               <th scope="col" class="dup-col-sites">Sites</th>
               <th scope="col" class="dup-col-copies">Copies</th>
-              <th scope="col" class="dup-col-dates">Newest → oldest</th>
-              <th scope="col" class="dup-col-size">Total size</th>
             </tr>
           </thead>
           <tbody>
@@ -2701,25 +2699,45 @@ dialog.access-modal .access-modal-cta a {
    momentum, grab/grabbing cursor for mouse drag-pan, sticky first column +
    sticky header so the filename / column labels stay anchored. */
 .dup-pan-wrap {
-  /* width:fit-content + max-width:100% means the wrapper hugs the table on
-     wide monitors (no blank padding to the right of the last column) but
-     caps at 100% on narrow viewports, where overflow-x kicks in for the
-     horizontal scroll / drag-pan path. */
-  width: fit-content;
-  max-width: 100%;
+  /* v1.12.1: the trimmed 4-column table fills the width and wraps, so there
+     is no horizontal panning — overflow-x:auto stays only as a mobile safety
+     net. Vertical scroll within max-height keeps the sticky header useful. */
+  width: 100%;
   overflow-x: auto;
   overflow-y: auto;
   max-height: 70vh;
   border-top: 1px solid #21262d;
   -webkit-overflow-scrolling: touch;
-  cursor: grab;
   border-radius: 2px;
 }
-.dup-pan-wrap.is-panning {
-  cursor: grabbing;
-  user-select: none;
+.paginator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem 1rem;
+  margin: 0.7rem 0 0.5rem;
+  font-size: 13px;
+  color: #c9d1d9;
 }
-.dup-pan-wrap.is-panning * { user-select: none !important; }
+.pag-info { font-weight: 600; }
+.pag-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
+.pag-size { color: #9aa5b1; }
+.pag-size select {
+  background: #161b22; color: #e5e5e5; border: 1px solid #2e3b4d;
+  border-radius: 4px; padding: 2px 5px; font-size: 13px; margin-left: 4px;
+}
+.pag-btn, .pag-num {
+  background: #1f2a37; color: #93c5fd; border: 1px solid #2e3b4d;
+  border-radius: 4px; padding: 3px 9px; font-size: 13px; cursor: pointer;
+}
+.pag-btn:hover:not(:disabled), .pag-num:hover { background: #2a3a52; color: #bfdbfe; }
+.pag-btn:disabled { opacity: 0.4; cursor: default; }
+.pag-num-active, .pag-num-active:hover {
+  background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 700;
+}
+.pag-pages { display: inline-flex; gap: 0.25rem; align-items: center; }
+.pag-gap { color: #6b7280; padding: 0 1px; }
 /* Mirror the per-site report table styling exactly (src/report/html.js)
    so every data table in the app looks the same: 12px tabular type, tight
    padding, alternating dark stripes, brighter hover row, sticky thead +
@@ -2730,8 +2748,9 @@ dialog.access-modal .access-modal-cta a {
    filenames; the full text is in a title= tooltip on the cell. */
 .dup-table {
   border-collapse: collapse;
-  width: max-content;
-  font-size: 12px;
+  width: 100%;
+  table-layout: auto;
+  font-size: 13px;
 }
 .dup-table thead {
   position: sticky;
@@ -2751,14 +2770,11 @@ dialog.access-modal .access-modal-cta a {
 .dup-table tbody tr:nth-child(odd)  { background: #0d1117; }
 .dup-table tbody tr:hover { background: #1a1a1a; }
 .dup-table td {
-  padding: 0.35rem 0.65rem;
-  white-space: nowrap;
+  padding: 0.4rem 0.7rem;
   border-bottom: 1px solid #1a1a1a;
-  max-width: 320px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: #e5e5e5;
   vertical-align: top;
+  word-break: break-word;
 }
 .dup-table td a { color: #60a5fa; text-decoration: none; }
 .dup-table td a:hover { color: #93c5fd; text-decoration: underline; }
@@ -2927,10 +2943,8 @@ dialog.access-modal .access-modal-cta a {
   opacity: 0.85;
 }
 .dup-filter-chip.is-active .dup-filter-count { opacity: 1; }
-/* Show/hide rows by matching tr[data-dup-side] against
-   [data-dup-active-filter] on the wrapper. */
-.dup-pan-wrap[data-dup-active-filter="remediable"] tr[data-dup-side="reference"] { display: none; }
-.dup-pan-wrap[data-dup-active-filter="reference"] tr[data-dup-side="remediable"] { display: none; }
+/* v1.12.1: row kind-filtering is JS-driven (see the duplicates IIFE) so it
+   composes with the paginator's inline row show/hide. */
 .dup-kind {
   display: inline-block;
   margin-left: 0.6rem;
@@ -3283,57 +3297,9 @@ ${renderAccessModals()}
 </footer>
 
 <script>
-/* Drag-to-pan for the duplicates table, mirroring the per-site report's
-   pan behaviour. Mouse-only — touch users get native overflow scrolling
-   (with iOS momentum) for free via overflow-x:auto + -webkit-overflow-scrolling.
-   5px threshold so small clicks still select text and interactive elements
-   still fire. setPointerCapture keeps the drag alive even if the cursor
-   leaves the wrapper. */
-(function() {
-  const wraps = document.querySelectorAll("[data-dup-pan]");
-  if (wraps.length === 0) return;
-  const PAN_THRESHOLD = 5;
-
-  wraps.forEach(function (wrap) {
-    let start = null;
-    let panning = false;
-
-    wrap.addEventListener("pointerdown", function (e) {
-      if (e.pointerType !== "mouse") return;
-      if (e.button !== 0) return;
-      if (e.target.closest("a, button, input, select, [role='button']")) return;
-      start = { x: e.clientX, scrollLeft: wrap.scrollLeft, pointerId: e.pointerId };
-    });
-
-    wrap.addEventListener("pointermove", function (e) {
-      if (!start || e.pointerId !== start.pointerId) return;
-      const dx = e.clientX - start.x;
-      if (!panning) {
-        if (Math.abs(dx) < PAN_THRESHOLD) return;
-        panning = true;
-        wrap.classList.add("is-panning");
-        try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
-        const sel = window.getSelection && window.getSelection();
-        if (sel && sel.removeAllRanges) sel.removeAllRanges();
-      }
-      if (panning) {
-        e.preventDefault();
-        wrap.scrollLeft = start.scrollLeft - dx;
-      }
-    });
-
-    function endPan(e) {
-      if (!start) return;
-      if (e.pointerId !== undefined && e.pointerId !== start.pointerId) return;
-      start = null;
-      panning = false;
-      wrap.classList.remove("is-panning");
-    }
-    wrap.addEventListener("pointerup", endPan);
-    wrap.addEventListener("pointercancel", endPan);
-    wrap.addEventListener("pointerleave", endPan);
-  });
-})();
+/* v1.12.1: duplicates-table click-and-drag panning removed — the trimmed
+   4-column table fits without horizontal panning, and the drag handler was
+   a click-eating hazard. The filter + paginator IIFE below replaces it. */
 
 /* v1.7.8 — clipboard handler for the expanded tech-details on each site
    card. One delegated listener on document.body covers every copy
@@ -3386,39 +3352,100 @@ ${renderAccessModals()}
   });
 })();
 
-/* v1.7.19 / v1.7.20 — duplicates table filter. Three chips above the
-   table (Remediable only / Reference only / All) toggle row visibility
-   AND swap the hero stat numbers so the big numbers always correspond
-   to the filter the user has active. Default is "remediable" so a
-   manager landing on the page sees the actionable subset first. Each
-   chip carries its own count so the user sees the proportions before
-   clicking. v1.7.20 also rewrites the small "Counting only files
-   that may need remediation" note when the filter changes to "All"
-   or "Reference only" so a non-technical reader is never confused
-   about which kind of duplicate the headline counts. */
+/* v1.12.1 — duplicates table: kind-filter chips + paginator. Replaces the
+   v1.7.19 CSS-driven filter (display:none rules that fought the paginator's
+   inline row show/hide). The chips also swap the hero stat numbers so the
+   headline count always matches the active filter. */
 (function () {
   "use strict";
-  var bar = document.querySelector("[data-dup-filter-bar]");
-  if (!bar) return;
   var wrap = document.querySelector("[data-dup-pan]");
   if (!wrap) return;
-  var hero = document.querySelector(".dup-hero");
-  if (!hero) return;
-  var chips = bar.querySelectorAll("[data-dup-filter]");
-  var stats;
-  try { stats = JSON.parse(hero.getAttribute("data-dup-stats") || "null"); }
-  catch (e) { stats = null; }
-  if (!stats) return;
+  var table = wrap.querySelector("table");
+  var tbody = table ? table.querySelector("tbody") : null;
+  if (!tbody) return;
+  var allRows = Array.prototype.slice.call(tbody.children);
 
+  var bar = document.querySelector("[data-dup-filter-bar]");
+  var hero = document.querySelector(".dup-hero");
+
+  var activeFilter = wrap.getAttribute("data-dup-active-filter") || "remediable";
+  var pageSize = 50;
+  var currentPage = 1;
+  var matched = [];
+
+  var pageInfo = document.getElementById("dup-page-info");
+  var pagPrev = document.getElementById("dup-pag-prev");
+  var pagNext = document.getElementById("dup-pag-next");
+  var pagPages = document.getElementById("dup-pag-pages");
+  var pageSizeSel = document.getElementById("dup-page-size");
+
+  function renderPageButtons(totalPages) {
+    if (!pagPages) return;
+    pagPages.textContent = "";
+    if (totalPages <= 1) return;
+    var want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+    var prev = 0;
+    for (var p = 1; p <= totalPages; p++) {
+      if (want.indexOf(p) < 0) continue;
+      if (p - prev > 1) {
+        var gap = document.createElement("span");
+        gap.className = "pag-gap";
+        gap.textContent = "…";
+        pagPages.appendChild(gap);
+      }
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
+      b.textContent = String(p);
+      (function (target) {
+        b.addEventListener("click", function () { currentPage = target; renderPage(); });
+      })(p);
+      pagPages.appendChild(b);
+      prev = p;
+    }
+  }
+
+  function renderPage() {
+    var total = matched.length;
+    var totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    var start = (currentPage - 1) * pageSize;
+    var end = Math.min(start + pageSize, total);
+    allRows.forEach(function (r) { r.style.display = "none"; });
+    for (var i = start; i < end; i++) matched[i].style.display = "";
+    if (pageInfo) {
+      pageInfo.textContent = total === 0
+        ? "No duplicates in this view"
+        : "Showing " + (start + 1).toLocaleString() + "–" + end.toLocaleString() +
+          " of " + total.toLocaleString() + " duplicate groups";
+    }
+    if (pagPrev) pagPrev.disabled = currentPage <= 1;
+    if (pagNext) pagNext.disabled = currentPage >= totalPages;
+    renderPageButtons(totalPages);
+  }
+
+  function apply() {
+    matched = allRows.filter(function (tr) {
+      return activeFilter === "all" || tr.getAttribute("data-dup-side") === activeFilter;
+    });
+    currentPage = 1;
+    renderPage();
+  }
+
+  // Hero stat numbers track the active filter.
+  var stats = null;
+  if (hero) {
+    try { stats = JSON.parse(hero.getAttribute("data-dup-stats") || "null"); }
+    catch (e) { stats = null; }
+  }
   var NOTES = {
     remediable: "<strong>Counting only files that may need accessibility remediation</strong> — PDFs, Word, Excel, PowerPoint, legacy Office. Images, text, markdown, and other reference files are duplicated too but they don’t affect audit scope, so they’re excluded from the headline number. Change the filter below the explainer to see all duplicates or only reference files.",
     reference:  "<strong>Counting reference-file duplicates only</strong> — images, text, markdown, archives, and similar. These don’t affect audit scope; the audit-actionable subset (PDFs, Word, Excel, PowerPoint, legacy Office) is hidden right now. Switch the filter back to <em>Remediable only</em> to see the headline number that matters.",
     all:        "<strong>Counting every duplicate</strong>, including non-actionable kinds (images, text, archives, etc.). The default <em>Remediable only</em> view shows just the duplicates that affect audit scope; switch back to that view for the headline number that matters most for accessibility planning."
   };
-
-  function fmtNum(n) { return Number(n).toLocaleString(); }
-
   function applyStats(side) {
+    if (!hero || !stats) return;
     var s = stats[side] || stats.remediable;
     var total = hero.querySelector('[data-dup-stat="total"]');
     var exact = hero.querySelector('[data-dup-stat="exact"]');
@@ -3426,27 +3453,42 @@ ${renderAccessModals()}
     var exactLbl = hero.querySelector('[data-dup-stat-label="exact"]');
     var variantLbl = hero.querySelector('[data-dup-stat-label="variant"]');
     var note = hero.querySelector('.dup-counting-note');
-    if (total) total.textContent = fmtNum(s.total);
-    if (exact) exact.textContent = fmtNum(s.exact);
-    if (variant) variant.textContent = fmtNum(s.variant);
+    if (total) total.textContent = Number(s.total).toLocaleString();
+    if (exact) exact.textContent = Number(s.exact).toLocaleString();
+    if (variant) variant.textContent = Number(s.variant).toLocaleString();
     if (exactLbl) exactLbl.textContent = s.exact === 1 ? "exact copy" : "exact copies";
     if (variantLbl) variantLbl.textContent = s.variant === 1 ? "variant" : "variants";
     if (note && NOTES[side]) note.innerHTML = NOTES[side];
     hero.setAttribute("data-dup-active", side);
   }
 
-  bar.addEventListener("click", function (e) {
-    var chip = e.target.closest ? e.target.closest("[data-dup-filter]") : null;
-    if (!chip) return;
-    var next = chip.getAttribute("data-dup-filter");
-    wrap.setAttribute("data-dup-active-filter", next);
-    chips.forEach(function (c) {
-      var active = c === chip;
-      c.classList.toggle("is-active", active);
-      c.setAttribute("aria-pressed", active ? "true" : "false");
+  if (bar) {
+    var chips = bar.querySelectorAll("[data-dup-filter]");
+    bar.addEventListener("click", function (e) {
+      var chip = e.target.closest ? e.target.closest("[data-dup-filter]") : null;
+      if (!chip) return;
+      activeFilter = chip.getAttribute("data-dup-filter");
+      wrap.setAttribute("data-dup-active-filter", activeFilter);
+      chips.forEach(function (c) {
+        var on = c === chip;
+        c.classList.toggle("is-active", on);
+        c.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      applyStats(activeFilter);
+      apply();
     });
-    applyStats(next);
+  }
+
+  if (pagPrev) pagPrev.addEventListener("click", function () { currentPage--; renderPage(); });
+  if (pagNext) pagNext.addEventListener("click", function () { currentPage++; renderPage(); });
+  if (pageSizeSel) pageSizeSel.addEventListener("change", function () {
+    var n = parseInt(pageSizeSel.value, 10);
+    if (!isNaN(n) && n > 0) pageSize = n;
+    currentPage = 1;
+    renderPage();
   });
+
+  apply();
 })();
 
 /* v1.7.34 — access-instructions modal: click any per-site "For bulk

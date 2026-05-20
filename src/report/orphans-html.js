@@ -314,35 +314,120 @@ const STYLES = `
   .action-guide li { margin-bottom: 8px; }
   .toolbar { margin-bottom: 12px; }
   .toolbar input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; min-width: 280px; font-size: 13px; }
+  .paginator { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 12px 0; font-size: 13px; color: #444; }
+  .pag-info { font-weight: 600; }
+  .pag-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .pag-size { color: #666; }
+  .pag-size select { padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; margin-left: 4px; }
+  .pag-btn, .pag-num { background: #fff; color: #0050a0; border: 1px solid #ccc; border-radius: 4px; padding: 3px 9px; font-size: 13px; cursor: pointer; }
+  .pag-btn:hover:not(:disabled), .pag-num:hover { background: #eef4fb; }
+  .pag-btn:disabled { opacity: 0.45; cursor: default; }
+  .pag-num-active, .pag-num-active:hover { background: #0050a0; color: #fff; border-color: #0050a0; font-weight: 700; }
+  .pag-pages { display: inline-flex; gap: 4px; align-items: center; }
+  .pag-gap { color: #999; padding: 0 1px; }
 `;
 
 const TABLE_SCRIPT = `
-  document.querySelectorAll('th[data-sort]').forEach((th) => {
-    th.addEventListener('click', () => {
-      const idx = Array.from(th.parentElement.children).indexOf(th);
-      const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
-      th.dataset.dir = dir;
-      const tbody = th.closest('table').querySelector('tbody');
-      const rows = Array.from(tbody.children);
-      rows.sort((a, b) => {
-        const av = a.children[idx]?.dataset.bytes ?? a.children[idx]?.dataset.confidence ?? a.children[idx]?.textContent.trim();
-        const bv = b.children[idx]?.dataset.bytes ?? b.children[idx]?.dataset.confidence ?? b.children[idx]?.textContent.trim();
-        const an = Number(av), bn = Number(bv);
-        const cmp = !Number.isNaN(an) && !Number.isNaN(bn) ? an - bn : String(av).localeCompare(String(bv));
-        return dir === 'asc' ? cmp : -cmp;
+  (function () {
+    const table = document.getElementById('orphan-table');
+    const tbody = table ? table.querySelector('tbody') : null;
+    if (!tbody) return;
+    const allRows = Array.from(tbody.children);
+    let matched = allRows.slice();
+    let pageSize = 50;
+    let currentPage = 1;
+
+    const pageInfo = document.getElementById('page-info');
+    const pagPrev = document.getElementById('pag-prev');
+    const pagNext = document.getElementById('pag-next');
+    const pagPages = document.getElementById('pag-pages');
+    const pageSizeSel = document.getElementById('page-size');
+    const filterInput = document.getElementById('orphan-filter');
+
+    function renderPageButtons(totalPages) {
+      if (!pagPages) return;
+      pagPages.textContent = '';
+      if (totalPages <= 1) return;
+      const want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+      let prev = 0;
+      for (let p = 1; p <= totalPages; p++) {
+        if (want.indexOf(p) < 0) continue;
+        if (p - prev > 1) {
+          const gap = document.createElement('span');
+          gap.className = 'pag-gap';
+          gap.textContent = '…';
+          pagPages.appendChild(gap);
+        }
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pag-num' + (p === currentPage ? ' pag-num-active' : '');
+        b.textContent = String(p);
+        const target = p;
+        b.addEventListener('click', () => { currentPage = target; renderPage(); });
+        pagPages.appendChild(b);
+        prev = p;
+      }
+    }
+
+    function renderPage() {
+      const total = matched.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+      const start = (currentPage - 1) * pageSize;
+      const end = Math.min(start + pageSize, total);
+      allRows.forEach((r) => { r.style.display = 'none'; });
+      for (let i = start; i < end; i++) matched[i].style.display = '';
+      if (pageInfo) {
+        pageInfo.textContent = total === 0
+          ? 'No matching files'
+          : 'Showing ' + (start + 1).toLocaleString() + '–' + end.toLocaleString() +
+            ' of ' + total.toLocaleString() + ' orphans';
+      }
+      if (pagPrev) pagPrev.disabled = currentPage <= 1;
+      if (pagNext) pagNext.disabled = currentPage >= totalPages;
+      renderPageButtons(totalPages);
+    }
+
+    function applyFilter() {
+      const q = filterInput ? filterInput.value.toLowerCase() : '';
+      matched = Array.from(tbody.children).filter(
+        (tr) => !q || tr.textContent.toLowerCase().includes(q),
+      );
+      currentPage = 1;
+      renderPage();
+    }
+
+    document.querySelectorAll('th[data-sort]').forEach((th) => {
+      th.addEventListener('click', () => {
+        const idx = Array.from(th.parentElement.children).indexOf(th);
+        const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+        th.dataset.dir = dir;
+        const rows = allRows.slice();
+        rows.sort((a, b) => {
+          const av = a.children[idx]?.dataset.bytes ?? a.children[idx]?.dataset.confidence ?? a.children[idx]?.textContent.trim();
+          const bv = b.children[idx]?.dataset.bytes ?? b.children[idx]?.dataset.confidence ?? b.children[idx]?.textContent.trim();
+          const an = Number(av), bn = Number(bv);
+          const cmp = !Number.isNaN(an) && !Number.isNaN(bn) ? an - bn : String(av).localeCompare(String(bv));
+          return dir === 'asc' ? cmp : -cmp;
+        });
+        tbody.replaceChildren(...rows);
+        applyFilter();
       });
-      tbody.replaceChildren(...rows);
     });
-  });
-  const filterInput = document.getElementById('orphan-filter');
-  if (filterInput) {
-    filterInput.addEventListener('input', () => {
-      const q = filterInput.value.toLowerCase();
-      document.querySelectorAll('tbody tr').forEach((tr) => {
-        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
-      });
+
+    if (filterInput) filterInput.addEventListener('input', applyFilter);
+    if (pagPrev) pagPrev.addEventListener('click', () => { currentPage--; renderPage(); });
+    if (pagNext) pagNext.addEventListener('click', () => { currentPage++; renderPage(); });
+    if (pageSizeSel) pageSizeSel.addEventListener('change', () => {
+      const n = parseInt(pageSizeSel.value, 10);
+      if (!isNaN(n) && n > 0) pageSize = n;
+      currentPage = 1;
+      renderPage();
     });
-  }
+
+    applyFilter();
+  })();
 `;
 
 export function writeOrphansHtml({
@@ -380,7 +465,22 @@ export function writeOrphansHtml({
   <div class="toolbar">
     <input id="orphan-filter" type="search" placeholder="Filter by site, filename, status, reason…" autocomplete="off" />
   </div>
-  <table>
+  <nav class="paginator" aria-label="Table pagination">
+    <span class="pag-info" id="page-info"></span>
+    <span class="pag-controls">
+      <label class="pag-size">Rows per page
+        <select id="page-size">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+      <button type="button" id="pag-prev" class="pag-btn">&larr; Prev</button>
+      <span class="pag-pages" id="pag-pages"></span>
+      <button type="button" id="pag-next" class="pag-btn">Next &rarr;</button>
+    </span>
+  </nav>
+  <table id="orphan-table">
     <thead>
       <tr>
         <th data-sort="site">Site</th>

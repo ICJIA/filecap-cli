@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] — 2026-05-20
+
+### Changed
+
+- **Orphaned-files report — paginated.** The orphan table (thousands of rows) is now paged (25 / 50 / 100 rows per page, default 50) with Prev / numbered / Next controls and a "Showing X–Y of N orphans" readout. The column sort and the filter box still work — they drive the matching set and the paginator shows the current slice.
+- **Fleet-index duplicates table — paginated, column-trimmed, drag removed.** The cross-server duplicates table is paged the same way. Its HTML columns are trimmed to the four a manager acts on — **Filename**, **Match** (exact/variant), **Sites**, **Copies**; the "Newest → oldest" and "Total size" columns move to CSV-only (`audit-file-duplicates.csv` keeps the full per-occurrence detail). The click-and-drag pan handler is removed — a 4-column table fits without horizontal panning. The Remediable / Reference / All kind-filter is now JS-driven (was CSS `display:none` rules) so it composes with the paginator's row show/hide.
+
+### Tests
+
+684 passing (+9 — new `report-orphans-html` suite, plus duplicates-table paginator + trimmed-column cases in `index-page`).
+
 ## [1.12.0] — 2026-05-20
 
 ### Changed
