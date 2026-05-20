@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] — 2026-05-20
+
+### Changed
+
+- **HTML report table redesigned for managers.** The per-site / by-type inventory table now shows only the six columns a manager acts on — **File name** (linked to the file), **File type**, **Audit Score**, **Page References**, **Duplicate of**, **Date published**. Consolidated multi-site reports prepend a **Website** column so each row's site stays identifiable. The forensic columns (server, IP, source/relative/absolute paths, extension, size, content hash, public URL) are unchanged in the CSV — the CSV stays the full 18-column record; the HTML is now a focused projection of it.
+- **Paginator replaces click-and-drag panning.** The table is paged (25 / 50 / 100 rows per page, default 50) with Prev / numbered / Next controls and a "Showing X–Y of N files" readout. Sorting, the filter chips, and search still work — they operate on the full matching set and the paginator shows the current slice. Diagnostic finding behind the change: the old click-and-drag pan handler occasionally swallowed a link click as the start of a drag, and a 16-column table forced horizontal panning to reach the Audit Score / Page References columns. A 6-column table fits without panning, so the drag handler — and the intermittent dead-click — are gone.
+- **Column-resize and drag-to-pan handlers removed.** With a six-column table there is nothing to resize or pan; the `<colgroup>`, the per-`<th>` resize handles, and both pointer-drag handlers (~150 lines of client JS) are deleted. Native wheel / scrollbar / touch scrolling is unaffected.
+
+### Added
+
+- **Orphaned-files report — lifecycle explainer.** The `audit-orphaned-files.html` detail page now opens with a "Why orphan files exist (and why some rate is normal)" section: a five-row lifecycle table (stale Strapi revision, replaced agenda/attachment, deleted entry, manual version naming, genuinely-unlinked upload) with "what it looks like" + "disposition" columns, plus a confidence-tier action guide (≥85% safe-to-delete, 60–84% verify, 0–59% manual review). Gives a non-technical reader the context to read the orphan table without assuming every orphan is a mistake.
+
+### Tests
+
+675 passing — the `report-html` suite was updated for the trimmed 6-column table, the paginator markup, the File-name → public-URL link, and the consolidated-report Website column.
+
 ## [1.11.1] — 2026-05-19
 
 ### Changed

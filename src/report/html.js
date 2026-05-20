@@ -411,9 +411,25 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   </section>`;
 
   // ── build table rows ─────────────────────────────────────────────────────────
-  const publicUrlColIdx = CSV_COLUMNS.findIndex((c) => c.name === "publicUrl");
-  const referencedColIdx = CSV_COLUMNS.findIndex((c) => c.name === "referenced");
-  const auditScoreColIdx = CSV_COLUMNS.findIndex((c) => c.name === "auditScore");
+  // v1.12.0: the HTML table shows only the columns a manager acts on. The CSV
+  // (CSV_COLUMNS, 18 cols) stays the full forensic record; the HTML table is a
+  // projection. buildRowValues() still returns the full value array (aligned to
+  // the non-csvOnly CSV columns) — we pick the columns we want by name.
+  const VALUE_COLUMNS = CSV_COLUMNS.filter((c) => !c.csvOnly);
+  const valueIdxByName = (name) => VALUE_COLUMNS.findIndex((c) => c.name === name);
+  // Single-site reports drop the Website column (the whole report is one site).
+  // Consolidated multi-site reports prepend it so each row's site is identifiable.
+  const HTML_TABLE_COLUMNS = [
+    ...(isConsolidated ? [{ name: "siteName", label: "Website" }] : []),
+    { name: "filename",    label: "File name" },
+    { name: "category",    label: "File type" },
+    { name: "auditScore",  label: "Audit Score" },
+    { name: "referenced",  label: "Page References" },
+    { name: "duplicateOf", label: "Duplicate of" },
+    { name: "modifiedAt",  label: "Date published" },
+  ];
+  const htmlColValueIdx = HTML_TABLE_COLUMNS.map((c) => valueIdxByName(c.name));
+  const publicUrlVi = valueIdxByName("publicUrl");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -427,22 +443,26 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
 
     const classAttr = classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
     const categoryAttr = ` data-category="${htmlEscape(entry.category ?? "other")}"`;
-    const cells = values.map((v, i) => {
-      if (i === publicUrlColIdx && v !== "" && v !== null && v !== undefined) {
-        const safe = safeUrl(v);
-        const escaped = htmlEscape(v);
-        if (safe) {
-          return `<td><a href="${htmlEscape(safe)}" target="_blank" rel="noopener noreferrer">${escaped}</a></td>`;
-        }
-        // Unsafe scheme (e.g. javascript:, data:) — show as plain text
-        // so the value still appears in the table but is not clickable.
-        return `<td>${escaped}</td>`;
-      }
-      if (i === referencedColIdx) {
+    const publicUrl = values[publicUrlVi];
+    const cells = HTML_TABLE_COLUMNS.map((col, i) => {
+      const v = values[htmlColValueIdx[i]];
+      if (col.name === "referenced") {
         return buildReferencedCell(entry.references);
       }
-      if (i === auditScoreColIdx) {
+      if (col.name === "auditScore") {
         return buildAuditScoreCell(entry.audit);
+      }
+      if (col.name === "filename") {
+        // File name text linked to the file's public URL. safeUrl() gates the
+        // href so a bad scheme renders as plain text, not a live anchor.
+        const safe = safeUrl(publicUrl);
+        const txt = htmlEscape(v);
+        return safe
+          ? `<td class="col-filename"><a href="${htmlEscape(safe)}" target="_blank" rel="noopener noreferrer">${txt}</a></td>`
+          : `<td class="col-filename">${txt}</td>`;
+      }
+      if (col.name === "category") {
+        return `<td>${htmlEscape(formatCategory(v))}</td>`;
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -456,39 +476,10 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     .join("\n");
 
   // ── header columns ───────────────────────────────────────────────────────────
-  // v1.7.3: per-column initial widths emitted into a <colgroup> so the table
-  // uses `table-layout: fixed`, which lets the user click-and-drag the right
-  // edge of any <th> to resize that column. Widths are starting points
-  // tuned to the typical content of each column.
-  const COL_INITIAL_PX = {
-    serverName:   140,
-    siteName:     110,
-    serverIp:     130,
-    publicUrl:    300,
-    modifiedAt:   170,
-    scannedPath:  220,
-    path:         260,
-    absolutePath: 300,
-    filename:     220,
-    extension:    90,
-    category:     110,
-    sizeBytes:    110,
-    sha256:       220,
-    duplicateOf:  220,
-    referenced:   260,
-    auditScore:   240,
-  };
-  // v1.7.16: csvOnly columns (Delete?, Notes) are filtered out of the HTML
-  // table — the web view is informational, the CSV is the actionable artefact.
-  const HTML_COLUMNS = CSV_COLUMNS.filter((c) => !c.csvOnly);
-  const colgroupHtml = `<colgroup>${
-    HTML_COLUMNS.map((col) => {
-      const w = COL_INITIAL_PX[col.name] ?? 140;
-      return `<col data-col="${htmlEscape(col.name)}" style="width:${w}px">`;
-    }).join("")
-  }</colgroup>`;
-  const headerCells = HTML_COLUMNS.map((col) =>
-    `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}<span class="col-resize-handle" data-resize-handle aria-hidden="true"></span></th>`
+  // v1.12.0: column-resize + drag-pan removed — the 6-column table fits without
+  // horizontal panning, so there is no <colgroup>/resize-handle machinery.
+  const headerCells = HTML_TABLE_COLUMNS.map((col) =>
+    `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}</th>`
   ).join("");
 
   // ── server/scan metadata display ─────────────────────────────────────────────
@@ -554,8 +545,13 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // never need to worry about JS string-literal escaping (single quotes from PDF
   // date metadata like 'D:20250207-08'00'' previously broke the IIFE silently).
   // We still escape </script> sequences to prevent premature script-tag termination.
+  // v1.12.0: projected onto HTML_TABLE_COLUMNS so sort/search indices line up
+  // with the visible headers.
   const jsonData = JSON.stringify(
-    entries.map((entry) => buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }))
+    entries.map((entry) => {
+      const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
+      return htmlColValueIdx.map((vi) => values[vi]);
+    })
   ).replace(/<\/script/gi, "<\\/script");
 
   // ── hero block (v1.7.0 manager-friendly rollup redesign, decision D7) ────────
@@ -1226,15 +1222,6 @@ a.page-audit-chip:hover {
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
   overscroll-behavior: contain;
-  /* Drag-to-pan affordance for mouse users; touch panning is native. */
-  cursor: grab;
-}
-.table-wrap.is-panning {
-  cursor: grabbing;
-  user-select: none;
-}
-.table-wrap.is-panning * {
-  user-select: none !important;
 }
 
 /* ── scrollable container (alias for table-wrap) ───────────── */
@@ -1266,15 +1253,10 @@ a.page-audit-chip:hover {
 /* ── data table ────────────────────────────────────────────── */
 table {
   border-collapse: collapse;
-  /* v1.7.3: switched to table-layout: fixed so the user can click-and-drag
-     the right edge of any <th> to resize that column. Widths are read from
-     the emitted <colgroup>; the table width adapts to the sum of column
-     widths so the parent .table-wrap can scroll horizontally as columns
-     expand. */
-  table-layout: fixed;
-  width: max-content;
-  min-width: 100%;
-  font-size: 12px;
+  /* v1.12.0: 6-column manager table — auto layout, full width, no resize. */
+  table-layout: auto;
+  width: 100%;
+  font-size: 13px;
 }
 thead {
   position: sticky;
@@ -1283,7 +1265,6 @@ thead {
   background: #161b22;
 }
 thead th {
-  position: relative;          /* anchor for .col-resize-handle */
   padding: 0.45rem 0.65rem;
   text-align: left;
   white-space: nowrap;
@@ -1294,36 +1275,56 @@ thead th {
   overflow: hidden;            /* clip the header label when col is narrow */
   text-overflow: ellipsis;
 }
-/* v1.7.3: column-resize handle on the right edge of each header cell.
-   8px wide hit zone (touch-friendly), 2px visual indicator on hover. */
-.col-resize-handle {
-  position: absolute;
-  top: 0; right: 0;
-  width: 8px;
-  height: 100%;
-  cursor: col-resize;
-  user-select: none;
-  z-index: 3;
-  touch-action: none;          /* let pointer events drive the resize */
+/* ── paginator (v1.12.0 — replaces click-and-drag panning) ──── */
+.paginator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem 1rem;
+  margin: 0.6rem 0;
+  font-size: 13px;
+  color: #c9d1d9;
 }
-.col-resize-handle::after {
-  content: "";
-  position: absolute;
-  top: 4px; bottom: 4px; right: 3px;
-  width: 2px;
-  background: transparent;
-  border-radius: 1px;
-  transition: background 120ms ease;
+.pag-info { font-weight: 600; }
+.pag-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
-.col-resize-handle:hover::after,
-.col-resize-handle.is-active::after {
-  background: #4dabf7;
+.pag-size { color: #9aa5b1; }
+.pag-size select {
+  background: #161b22;
+  color: #e5e5e5;
+  border: 1px solid #2e3b4d;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 13px;
+  margin-left: 4px;
 }
-.table-wrap.is-resizing,
-.table-wrap.is-resizing * {
-  cursor: col-resize !important;
-  user-select: none !important;
+.pag-btn,
+.pag-num {
+  background: #1f2a37;
+  color: #93c5fd;
+  border: 1px solid #2e3b4d;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 13px;
+  cursor: pointer;
 }
+.pag-btn:hover:not(:disabled),
+.pag-num:hover { background: #2a3a52; color: #bfdbfe; }
+.pag-btn:disabled { opacity: 0.4; cursor: default; }
+.pag-num-active,
+.pag-num-active:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  font-weight: 700;
+}
+.pag-pages { display: inline-flex; gap: 0.25rem; align-items: center; }
+.pag-gap { color: #6b7280; padding: 0 1px; }
 thead th:hover { background: #1a1a1a; }
 thead th.sort-asc::after  { content: " ▲"; font-size: 10px; color: #60a5fa; }
 thead th.sort-desc::after { content: " ▼"; font-size: 10px; color: #60a5fa; }
@@ -1331,13 +1332,11 @@ tbody tr:nth-child(even) { background: #0c0c0c; }
 tbody tr:nth-child(odd)  { background: #0d1117; }
 tbody tr:hover { background: #1a1a1a; }
 td {
-  padding: 0.35rem 0.65rem;
-  white-space: nowrap;
+  padding: 0.4rem 0.7rem;
   border-bottom: 1px solid #1a1a1a;
-  max-width: 320px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: #e5e5e5;
+  vertical-align: top;
+  word-break: break-word;
 }
 td a { color: #60a5fa; }
 td a:hover { color: #93c5fd; text-decoration: underline; }
@@ -1527,7 +1526,9 @@ footer {
   h1, h2 { color: #000; }
   .controls { display: none; }
   .filter-bar { display: none; }
+  .paginator { display: none; }
   .table-wrap { max-height: none; overflow: visible; border: 1px solid #ccc; }
+  #inventory-body tr { display: table-row !important; }
   thead { position: static; background: #f0f0f0; }
   thead th { background: #f0f0f0; color: #000; border-bottom: 2px solid #ccc; }
   td { color: #000; border-bottom: 1px solid #eee; }
@@ -1708,9 +1709,23 @@ ${filterBarHtml}
   </table>
 </aside>
 
+<nav class="paginator" aria-label="Table pagination">
+  <span class="pag-info" id="page-info"></span>
+  <span class="pag-controls">
+    <label class="pag-size">Rows per page
+      <select id="page-size">
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+      </select>
+    </label>
+    <button type="button" id="pag-prev" class="pag-btn">&larr; Prev</button>
+    <span class="pag-pages" id="pag-pages"></span>
+    <button type="button" id="pag-next" class="pag-btn">Next &rarr;</button>
+  </span>
+</nav>
 <div class="table-wrap table-scroll">
   <table id="inventory-table" aria-label="File inventory">
-    ${colgroupHtml}
     <thead><tr>${headerCells}</tr></thead>
     <tbody id="inventory-body">
 ${rowsHtml}
@@ -1729,30 +1744,45 @@ ${rowsHtml}
 (function () {
   "use strict";
 
-  // ── embedded data (column-parallel to CSV_COLUMNS) ─────────────────────────
+  // ── embedded data (column-parallel to the visible table headers) ────────────
   const data = JSON.parse(document.getElementById("filecap-data").textContent);
 
   const tbody = document.getElementById("inventory-body");
   const searchInput = document.getElementById("search");
   const rowCountEl = document.getElementById("row-count");
   const allRows = Array.from(tbody.querySelectorAll("tr"));
-
-  // ── filter ──────────────────────────────────────────────────────────────────
-  function updateRowCount(visible) {
-    rowCountEl.textContent = visible === allRows.length
-      ? \`\${visible.toLocaleString()} rows\`
-      : \`\${visible.toLocaleString()} of \${allRows.length.toLocaleString()} rows\`;
-  }
+  // Row element -> its data array. Survives DOM re-ordering by sort.
+  const rowData = new Map();
+  allRows.forEach(function (row, i) { rowData.set(row, data[i] || []); });
 
   let activeFilter = "remediable";
   let activeCategory = "";
-
   const REMEDIABLE_CATS = ["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"];
 
-  function applyFilters() {
+  // ── pagination state (v1.12.0 — replaces click-and-drag panning) ────────────
+  let pageSize = 50;
+  let currentPage = 1;
+  let matched = [];  // matching <tr>, in current (sorted) DOM order
+
+  const pageInfoEl = document.getElementById("page-info");
+  const pagPrev = document.getElementById("pag-prev");
+  const pagNext = document.getElementById("pag-next");
+  const pagPagesEl = document.getElementById("pag-pages");
+  const pageSizeSel = document.getElementById("page-size");
+
+  function updateRowCount(visible) {
+    if (!rowCountEl) return;
+    rowCountEl.textContent = visible === allRows.length
+      ? visible.toLocaleString() + " rows"
+      : visible.toLocaleString() + " of " + allRows.length.toLocaleString() + " rows";
+  }
+
+  // Recompute the matching set in current DOM order (filter + category + search).
+  function computeMatched() {
     const q = (searchInput ? searchInput.value.trim().toLowerCase() : "");
-    let visible = 0;
-    allRows.forEach(function (row, i) {
+    matched = [];
+    Array.from(tbody.children).forEach(function (row) {
+      if (row.tagName !== "TR") return;
       const cat = row.dataset.category || "other";
       let matchFilter;
       if (activeFilter === "all") matchFilter = true;
@@ -1761,15 +1791,71 @@ ${rowsHtml}
       else if (activeFilter === "image-only") matchFilter = row.classList.contains("image-only");
       else matchFilter = true;
       const matchCategory = !activeCategory || cat === activeCategory;
-      const rowData = data[i];
-      const matchSearch = !q || (rowData && rowData.some(function (v) {
-        return v !== null && v !== undefined && String(v).toLowerCase().includes(q);
+      const rd = rowData.get(row);
+      const matchSearch = !q || (rd && rd.some(function (v) {
+        return v !== null && v !== undefined && String(v).toLowerCase().indexOf(q) >= 0;
       }));
-      const show = matchFilter && matchCategory && matchSearch;
-      row.style.display = show ? "" : "none";
-      if (show) visible++;
+      if (matchFilter && matchCategory && matchSearch) matched.push(row);
     });
-    updateRowCount(visible);
+  }
+
+  // Show only the current page's slice of the matching set.
+  function renderPage() {
+    const total = matched.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = Math.min(startIdx + pageSize, total);
+
+    allRows.forEach(function (row) { row.style.display = "none"; });
+    for (let i = startIdx; i < endIdx; i++) matched[i].style.display = "";
+
+    updateRowCount(total);
+    if (pageInfoEl) {
+      pageInfoEl.textContent = total === 0
+        ? "No matching files"
+        : "Showing " + (startIdx + 1).toLocaleString() + "–" +
+          endIdx.toLocaleString() + " of " + total.toLocaleString() + " files";
+    }
+    if (pagPrev) pagPrev.disabled = currentPage <= 1;
+    if (pagNext) pagNext.disabled = currentPage >= totalPages;
+    renderPageButtons(totalPages);
+  }
+
+  // Windowed page-number buttons: 1 ... (cur-1) cur (cur+1) ... last.
+  function renderPageButtons(totalPages) {
+    if (!pagPagesEl) return;
+    pagPagesEl.textContent = "";
+    if (totalPages <= 1) return;
+    const want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+    const pages = [];
+    for (let p = 1; p <= totalPages; p++) {
+      if (want.indexOf(p) >= 0) pages.push(p);
+    }
+    let prev = 0;
+    pages.forEach(function (p) {
+      if (p - prev > 1) {
+        const gap = document.createElement("span");
+        gap.className = "pag-gap";
+        gap.textContent = "…";
+        pagPagesEl.appendChild(gap);
+      }
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
+      b.textContent = String(p);
+      b.addEventListener("click", function () { currentPage = p; renderPage(); });
+      pagPagesEl.appendChild(b);
+      prev = p;
+    });
+  }
+
+  // Re-derive matches then jump to page 1. Used by every filter/search change.
+  function applyFilters() {
+    computeMatched();
+    currentPage = 1;
+    renderPage();
   }
 
   // ── primary chip click handler ───────────────────────────────────────────────
@@ -1804,12 +1890,38 @@ ${rowsHtml}
   if (searchInput) {
     searchInput.addEventListener("input", applyFilters);
   }
-  applyFilters();
+
+  // ── paginator controls ───────────────────────────────────────────────────────
+  if (pagPrev) pagPrev.addEventListener("click", function () { currentPage--; renderPage(); });
+  if (pagNext) pagNext.addEventListener("click", function () { currentPage++; renderPage(); });
+  if (pageSizeSel) pageSizeSel.addEventListener("change", function () {
+    const n = parseInt(pageSizeSel.value, 10);
+    if (!isNaN(n) && n > 0) pageSize = n;
+    currentPage = 1;
+    renderPage();
+  });
 
   // ── sort ────────────────────────────────────────────────────────────────────
   const headers = Array.from(document.querySelectorAll("#inventory-table thead th"));
   let sortColIdx = -1;
   let sortAsc = true;
+
+  function sortBy(colIdx, asc) {
+    const pairs = allRows.map(function (row) {
+      return { row: row, vals: rowData.get(row) || [] };
+    });
+    pairs.sort(function (a, b) {
+      const av = a.vals[colIdx] == null ? "" : a.vals[colIdx];
+      const bv = b.vals[colIdx] == null ? "" : b.vals[colIdx];
+      const an = typeof av === "number" ? av : parseFloat(av);
+      const bn = typeof bv === "number" ? bv : parseFloat(bv);
+      let cmp;
+      if (!isNaN(an) && !isNaN(bn)) cmp = an - bn;
+      else cmp = String(av).localeCompare(String(bv));
+      return asc ? cmp : -cmp;
+    });
+    pairs.forEach(function (p) { tbody.appendChild(p.row); });
+  }
 
   headers.forEach(function (th, colIdx) {
     th.addEventListener("click", function () {
@@ -1821,173 +1933,29 @@ ${rowsHtml}
       }
       headers.forEach(function (h) { h.classList.remove("sort-asc", "sort-desc"); });
       th.classList.add(sortAsc ? "sort-asc" : "sort-desc");
-
-      // Pair data rows with their data for stable sort
-      const pairs = allRows.map(function (row, i) { return { row: row, vals: data[i] || [] }; });
-      pairs.sort(function (a, b) {
-        const av = a.vals[colIdx] ?? "";
-        const bv = b.vals[colIdx] ?? "";
-        const an = typeof av === "number" ? av : parseFloat(av);
-        const bn = typeof bv === "number" ? bv : parseFloat(bv);
-        let cmp;
-        if (!isNaN(an) && !isNaN(bn)) {
-          cmp = an - bn;
-        } else {
-          cmp = String(av).localeCompare(String(bv));
-        }
-        return sortAsc ? cmp : -cmp;
-      });
-      pairs.forEach(function (p) { tbody.appendChild(p.row); });
+      sortBy(colIdx, sortAsc);
+      applyFilters();
     });
   });
 
   // ── default sort: by Date published, descending (most recent first) ──────────
   const dateColIdx = headers.findIndex(function (th) { return th.dataset.col === "modifiedAt"; });
   if (dateColIdx >= 0) {
-    // Trigger the sort logic for this column, descending
     sortColIdx = dateColIdx;
     sortAsc = false;
     headers[dateColIdx].classList.add("sort-desc");
-    const pairs = allRows.map(function (row, i) { return { row: row, vals: data[i] || [] }; });
-    pairs.sort(function (a, b) {
-      const av = a.vals[dateColIdx] ?? "";
-      const bv = b.vals[dateColIdx] ?? "";
-      return String(bv).localeCompare(String(av));  // desc: bv vs av
-    });
-    pairs.forEach(function (p) { tbody.appendChild(p.row); });
-  }
-})();
-
-/* ── click-and-drag pan (both axes, 1.8.0) ──────────────────────────────────
-   Mouse: drag-to-pan in both X and Y with a 5px threshold so small clicks
-   still trigger text selection. Once threshold is exceeded in either axis,
-   takes pointer capture and pans both axes simultaneously.
-   Touch: skipped — the browser's native overflow:auto + touch-action:pan-x
-   pan-y handles touch scrolling (with momentum on iOS) in both directions. */
-(function() {
-  const wrap = document.querySelector(".table-wrap");
-  if (!wrap || typeof wrap.scrollBy !== "function") return;
-
-  const PAN_THRESHOLD = 5;
-  let start = null;
-  let panning = false;
-
-  wrap.addEventListener("pointerdown", function (e) {
-    // Mouse only — touch is native, pen is fine to ignore
-    if (e.pointerType !== "mouse") return;
-    if (e.button !== 0) return;
-    // Don't start drag on interactive children (links, buttons, sort headers, inputs)
-    // or on the v1.7.3 column-resize handles.
-    if (e.target.closest("a, button, input, select, [role='button'], [data-resize-handle]")) return;
-    start = {
-      x: e.clientX,
-      y: e.clientY,
-      scrollLeft: wrap.scrollLeft,
-      scrollTop: wrap.scrollTop,
-      pointerId: e.pointerId,
-    };
-  });
-
-  wrap.addEventListener("pointermove", function (e) {
-    if (!start || e.pointerId !== start.pointerId) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    if (!panning) {
-      // Trigger as soon as the pointer travels far enough in EITHER axis —
-      // diagonal drags count, and a purely vertical drag pans the table down
-      // without first nudging horizontally.
-      if (Math.hypot(dx, dy) < PAN_THRESHOLD) return;
-      panning = true;
-      wrap.classList.add("is-panning");
-      try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
-      // Cancel any in-progress text selection caused by the initial click
-      const sel = window.getSelection && window.getSelection();
-      if (sel && sel.removeAllRanges) sel.removeAllRanges();
-    }
-    if (panning) {
-      e.preventDefault();
-      wrap.scrollLeft = start.scrollLeft - dx;
-      wrap.scrollTop = start.scrollTop - dy;
-    }
-  });
-
-  function endPan(e) {
-    if (!start) return;
-    if (e.pointerId !== undefined && e.pointerId !== start.pointerId) return;
-    start = null;
-    panning = false;
-    wrap.classList.remove("is-panning");
+    sortBy(dateColIdx, false);
   }
 
-  wrap.addEventListener("pointerup", endPan);
-  wrap.addEventListener("pointercancel", endPan);
-  wrap.addEventListener("pointerleave", endPan);
+  // Initial paint.
+  applyFilters();
 })();
 
-/* ── v1.7.3 column-resize: drag the right edge of any <th> to resize the
-   column. Each handle has data-resize-handle and its <th> has data-col
-   matching a <col data-col="..."> in the table's <colgroup>. We update the
-   <col>'s style.width so the column actually resizes regardless of cell
-   content (works because table-layout is fixed). Pointer events handle
-   both mouse and touch. */
-(function() {
-  const wrap = document.querySelector(".table-wrap");
-  if (!wrap) return;
-  const table = wrap.querySelector("table");
-  if (!table) return;
-  const cols = Array.from(table.querySelectorAll("colgroup col"));
-  if (cols.length === 0) return;
-  const handles = wrap.querySelectorAll(".col-resize-handle");
-  if (handles.length === 0) return;
-
-  const MIN_WIDTH = 60;
-  const colByName = new Map(cols.map((c) => [c.getAttribute("data-col"), c]));
-
-  handles.forEach(function (handle) {
-    let state = null;
-
-    handle.addEventListener("pointerdown", function (e) {
-      if (e.button !== undefined && e.button !== 0) return;
-      const th = handle.parentElement;
-      if (!th) return;
-      const colName = th.getAttribute("data-col");
-      const col = colByName.get(colName);
-      if (!col) return;
-      // Measure the column's CURRENT rendered width so the drag is relative
-      // to whatever it is right now (initial 220px, or a previous resize).
-      const startW = th.getBoundingClientRect().width;
-      state = { startX: e.clientX, startW: startW, pointerId: e.pointerId, col: col };
-      handle.classList.add("is-active");
-      wrap.classList.add("is-resizing");
-      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
-      e.preventDefault();
-      e.stopPropagation();
-    });
-
-    handle.addEventListener("pointermove", function (e) {
-      if (!state || e.pointerId !== state.pointerId) return;
-      const dx = e.clientX - state.startX;
-      const newW = Math.max(MIN_WIDTH, state.startW + dx);
-      state.col.style.width = newW + "px";
-    });
-
-    function endResize(e) {
-      if (!state) return;
-      if (e.pointerId !== undefined && e.pointerId !== state.pointerId) return;
-      handle.classList.remove("is-active");
-      wrap.classList.remove("is-resizing");
-      try { handle.releasePointerCapture(state.pointerId); } catch (_) {}
-      state = null;
-    }
-    handle.addEventListener("pointerup",     endResize);
-    handle.addEventListener("pointercancel", endResize);
-
-    // Prevent click from bubbling up to the <th> sort handler when the user
-    // releases without dragging (a stationary click on the 8px handle is
-    // still a "resize intent," not a sort intent).
-    handle.addEventListener("click", function (e) { e.stopPropagation(); });
-  });
-})();
+/* v1.12.0: click-and-drag pan + column-resize handlers removed. The trimmed
+   6-column table fits without horizontal panning and is navigated with the
+   paginator (see the IIFE above), so neither handler is needed — and the
+   drag-pan handler was the source of links occasionally not registering a
+   click. Native wheel/scrollbar/touch scrolling still works. */
 
 // v1.7.7 — meta-grid copy-to-clipboard handler. One delegated listener on
 // document.body covers every copy button (no per-button wiring, works

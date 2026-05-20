@@ -100,7 +100,6 @@ describe("writeHtml", () => {
     // The literal script tag must not appear in the rendered output
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
-    expect(html).toContain("evil&amp;friends");
   });
 
   it("includes summary counts (total files, by category)", async () => {
@@ -111,19 +110,25 @@ describe("writeHtml", () => {
     expect(html).toMatch(/2/);
   });
 
-  it("uses human-readable column headers in <th> elements", async () => {
+  it("renders the trimmed 6-column manager HTML table with human-readable headers", async () => {
     const out = path.join(tmpDir, "labels.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toContain("File name");
-    expect(html).toContain("File location (relative to source folder)");
-    expect(html).toContain("Public URL");
-    expect(html).not.toContain("<th data-col=\"filename\">filename</th>");
-    // Format-specific introspection columns dropped in 1.4.x
-    expect(html).not.toContain("Remediation needed?");
-    expect(html).not.toContain("PDF: page count");
-    expect(html).not.toContain("DOCX:");
-    expect(html).not.toContain("XLSX:");
+    // v1.12.0: the HTML table shows only the six columns a manager acts on.
+    expect(html).toContain('<th data-col="filename">File name</th>');
+    expect(html).toContain('<th data-col="category">File type</th>');
+    expect(html).toContain('<th data-col="auditScore">Audit Score</th>');
+    expect(html).toContain('<th data-col="referenced">Page References</th>');
+    expect(html).toContain('<th data-col="duplicateOf">Duplicate of</th>');
+    expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
+    // Forensic columns are CSV-only — not rendered as HTML table columns.
+    for (const col of ["serverName", "serverIp", "publicUrl", "scannedPath", "path", "absolutePath", "extension", "sizeBytes", "sha256"]) {
+      expect(html).not.toMatch(new RegExp('<th data-col="' + col + '"'));
+    }
+    // Exactly six header cells in the inventory table.
+    const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
+    expect(theadMatch).not.toBeNull();
+    expect((theadMatch[1].match(/<th /g) || []).length).toBe(6);
   });
 
   it("flags image-only PDFs visually (e.g. row class or badge)", async () => {
@@ -168,11 +173,31 @@ describe("writeHtml", () => {
     expect(html).toContain("<title>filecap audit — test-server</title>");
   });
 
-  it("includes Website column header in the table", async () => {
+  it("omits the Website column from a single-site report table", async () => {
     const out = path.join(tmpDir, "website-col.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toContain("Website");
+    // A single-site report is already scoped to one site — no Website column.
+    expect(html).not.toMatch(/<th data-col="siteName"/);
+  });
+
+  it("prepends a Website column on a consolidated multi-site report", async () => {
+    const consolidatedHeader = {
+      schemaVersion: 1,
+      kind: "filecap-consolidated-header",
+      metadata: { consolidatedAt: "2026-05-09T12:00:00.000Z", sources: [] },
+    };
+    const sources = [
+      { serverName: "test-server", metadata: { ...sampleHeader.metadata, siteName: "DVFR" } },
+    ];
+    const consolidatedEntries = sampleEntries.map((e) => ({ ...e, serverName: "test-server" }));
+    const out = path.join(tmpDir, "consolidated-website.html");
+    await writeHtml({ sourceHeader: consolidatedHeader, entries: consolidatedEntries, sources, outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain('<th data-col="siteName">Website</th>');
+    const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
+    expect(theadMatch).not.toBeNull();
+    expect((theadMatch[1].match(/<th /g) || []).length).toBe(7);
   });
 
   it("renders Public URL as a clickable link when publicUrlBase is set in header", async () => {
@@ -303,9 +328,8 @@ describe("writeHtml", () => {
     const out = path.join(tmpDir, "date-published-header.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    // v1.7.3: th now contains the label plus a column-resize handle span,
-    // so the assertion checks the open-tag + label, not the entire <th>...</th>.
-    expect(html).toMatch(/<th data-col="modifiedAt">Date published<span class="col-resize-handle"/);
+    // v1.12.0: column-resize handles removed — the th is just label.
+    expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
     expect(html).not.toContain("Last modified");
   });
 
@@ -502,7 +526,7 @@ describe("writeHtml", () => {
     expect(html).toMatch(/<h1[^>]*>Domestic Violence Fatality Review<\/h1>/);
   });
 
-  it("emits a <colgroup> with one <col> per CSV column for table-layout: fixed (v1.7.3 column resize)", async () => {
+  it("no longer emits the inventory-table <colgroup> (column-resize removed in v1.12.0)", async () => {
     const outputPath = path.join(tmpDir, "out.html");
     await writeHtml({
       sourceHeader: sampleHeader,
@@ -511,14 +535,12 @@ describe("writeHtml", () => {
       outputPath,
     });
     const html = await fs.readFile(outputPath, "utf8");
-    expect(html).toMatch(/<colgroup>/);
-    // sanity-check three cols at expected positions
-    expect(html).toMatch(/<col data-col="serverName" style="width:140px">/);
-    expect(html).toMatch(/<col data-col="publicUrl" style="width:300px">/);
-    expect(html).toMatch(/<col data-col="filename" style="width:220px">/);
+    // The inventory table's per-column <col data-col="..."> group is gone.
+    // (The row-marker legend table keeps its own layout colgroup.)
+    expect(html).not.toMatch(/<col data-col=/);
   });
 
-  it("renders a column-resize handle inside every <th> (v1.7.3 column resize)", async () => {
+  it("no longer renders column-resize handles (removed in v1.12.0)", async () => {
     const outputPath = path.join(tmpDir, "out.html");
     await writeHtml({
       sourceHeader: sampleHeader,
@@ -527,20 +549,12 @@ describe("writeHtml", () => {
       outputPath,
     });
     const html = await fs.readFile(outputPath, "utf8");
-    // Every <th> has the resize handle. The HTML view filters out csvOnly
-    // columns (Delete?, Notes). As of v1.10.2 we have Page References +
-    // Audit Score (chip + report link combined), positions 5 + 6 — bringing
-    // the non-csvOnly count from 17 (at 1.9.0 / 1.10.0 / 1.10.1) to 16.
-    const handles = html.match(/<span class="col-resize-handle"/g) || [];
-    expect(handles.length).toBe(16);
+    expect(html).not.toContain("col-resize-handle");
   });
 
-  it("inline drag-to-pan handler scrolls both axes (1.8.0)", async () => {
-    // The original v1.7.2 handler only tracked horizontal scroll
-    // (scrollLeft). 1.8.0 extends mouse-drag panning to vertical too — the
-    // file tables already exceed max-height (75vh) on most fleets, so a
-    // mouse user with no scrollwheel access needs drag-to-pan in both
-    // directions. Touch already pans both axes natively via overflow:auto.
+  it("no longer embeds a click-and-drag pan handler (removed in v1.12.0)", async () => {
+    // v1.12.0 trims the table to 6 columns + adds a paginator, so there is
+    // nothing to pan — the finicky drag-to-pan handler is gone entirely.
     const outputPath = path.join(tmpDir, "out.html");
     await writeHtml({
       sourceHeader: sampleHeader,
@@ -549,10 +563,42 @@ describe("writeHtml", () => {
       outputPath,
     });
     const html = await fs.readFile(outputPath, "utf8");
-    // The pan handler must capture starting scrollTop, track dy, and update
-    // wrap.scrollTop alongside wrap.scrollLeft.
-    expect(html).toContain("scrollTop: wrap.scrollTop");
-    expect(html).toMatch(/wrap\.scrollTop\s*=\s*start\.scrollTop\s*-\s*dy/);
+    expect(html).not.toContain("scrollTop: wrap.scrollTop");
+    expect(html).not.toContain("setPointerCapture");
+    expect(html).not.toContain("is-panning");
+  });
+
+  it("includes a paginator with prev/next, page-size selector, and page info", async () => {
+    const outputPath = path.join(tmpDir, "out.html");
+    await writeHtml({
+      sourceHeader: sampleHeader,
+      entries: sampleEntries,
+      sources: null,
+      outputPath,
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    expect(html).toMatch(/<nav class="paginator"/);
+    expect(html).toContain('id="page-info"');
+    expect(html).toContain('id="pag-prev"');
+    expect(html).toContain('id="pag-next"');
+    expect(html).toContain('id="page-size"');
+  });
+
+  it("links the File name cell to the file's public URL", async () => {
+    const headerWithUrl = {
+      ...sampleHeader,
+      metadata: { ...sampleHeader.metadata, publicUrlBase: "https://cdn.example.com/uploads" },
+    };
+    const outputPath = path.join(tmpDir, "filename-link.html");
+    await writeHtml({
+      sourceHeader: headerWithUrl,
+      entries: sampleEntries,
+      sources: [headerWithUrl],
+      outputPath,
+    });
+    const html = await fs.readFile(outputPath, "utf8");
+    // The File name cell shows the filename text, linked to the file's URL.
+    expect(html).toMatch(/<a href="https:\/\/cdn\.example\.com\/uploads\/doc\.pdf"[^>]*target="_blank"[^>]*>doc\.pdf<\/a>/);
   });
 
   describe("access-method panel (v1.7.6)", () => {

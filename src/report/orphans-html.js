@@ -175,35 +175,91 @@ function tableRow(orphan, sourcesByServer) {
 
 const EXPLAINER = `
   <section class="explainer">
-    <h2>Why does a file end up orphan?</h2>
-    <p>An "orphan" is a file on the server that no Strapi entry, no page body, and no
-    attachments array currently links to. This report bucks orphans into two groups
-    and assigns a confidence score that the orphan is a stale upgrade-replaced version
-    (safe to delete) vs. a file that was uploaded but never linked anywhere.</p>
-    <h3>The five most common reasons</h3>
-    <ol>
-      <li><strong>Stale Strapi upload revision</strong> — Re-uploading a file to a
-        Strapi UploadFile field creates a new <code>_xxxxxxxxxx.ext</code> hash
-        on disk but doesn't delete the prior file. Old hash variants accumulate.</li>
-      <li><strong>Manual version naming</strong> — <code>Report_v1.pdf</code>,
-        <code>Report (1).pdf</code>, <code>Report copy.pdf</code>. Only the live
-        version is linked; the others sit on disk.</li>
-      <li><strong>Genuinely uploaded but never linked</strong> — A file was uploaded
-        through the Strapi admin but never attached to a page, post, grant, or
-        program entry. Common for content drafts that didn't ship.</li>
-      <li><strong>Cross-Strapi reference (extraction gap)</strong> — A file is
-        hosted on one site (e.g. agency.icjia-api.cloud) but referenced from a
-        different Strapi backend (e.g. ari.icjia-api.cloud). The cross-resolver
-        should catch these, but extraction bugs can hide cross-instance links.</li>
-      <li><strong>Historical / archived</strong> — Older fiscal-year reports kept
-        on disk for compliance even though the live program page only links the
-        current year's file.</li>
-    </ol>
-    <p class="next-steps"><strong>How to use this report:</strong> sort by
-    "Confidence %" descending. Anything ≥85% is high-confidence safe-to-delete
-    (a clearly newer revision exists in the same upload directory). Items at
-    0% confidence with status "Truly unreferenced" need human eyes — they're
-    uploaded files with no link anywhere on the fleet.</p>
+    <h2>Why orphan files exist (and why some rate is normal)</h2>
+
+    <p>An "orphan" is a file present on the server that no Strapi entry currently
+    references — not in any <code>attachments</code> list, not in any URL-typed
+    field, and not as an absolute URL in any entry's body markdown.</p>
+
+    <p>We verified that the <strong>Nuxt frontend (icjia.illinois.gov) only renders
+    files it pulls from Strapi at runtime</strong> — it never hardcodes file URLs
+    in source. So if a file isn't referenced from a Strapi entry, it isn't being
+    served from any public page. It really is orphan.</p>
+
+    <p>Across a 5+ year fleet of continuously-edited content, some orphan
+    rate is expected. Each of the following is a normal content-lifecycle event
+    that produces orphan files:</p>
+
+    <table class="lifecycle-table">
+      <thead>
+        <tr>
+          <th>How it became orphan</th>
+          <th>What it looks like</th>
+          <th>Disposition</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Stale Strapi revision</strong></td>
+          <td>Re-uploading a file to a Strapi <code>UploadFile</code> field creates a
+              new <code>_xxxxxxxxxx.ext</code> hash on disk; the prior hash stays
+              orphaned. On agency.icjia-api.cloud, re-uploads of already-hashed
+              filenames create double-hashed orphans
+              (<code>foo_HASH1_HASH2.pdf</code>).</td>
+          <td><strong>Safe to delete</strong> when the fuzzy matcher finds a live
+              sibling (≥85% confidence).</td>
+        </tr>
+        <tr>
+          <td><strong>Replaced agenda / attachment</strong></td>
+          <td>Staff swapped an old draft for a new one in a meeting or grant's
+              attachments list. Old file lives on disk; entry still references
+              only the new one.</td>
+          <td><strong>Safe to delete</strong> when fuzzy-matched (60-84% confidence
+              when the swap was close in time to the live sibling).</td>
+        </tr>
+        <tr>
+          <td><strong>Deleted entry</strong></td>
+          <td>A meeting, grant, or post entry was deleted entirely. Its attachments
+              stayed on disk.</td>
+          <td><strong>Needs human review</strong> — was the entry deleted on purpose?
+              If yes, the orphan attachments are too.</td>
+        </tr>
+        <tr>
+          <td><strong>Manual version naming</strong></td>
+          <td><code>Report_v1.pdf</code>, <code>Report (1).pdf</code>,
+              <code>Report copy.pdf</code>, "NEW_" prefixed agendas. Only the live
+              version is attached.</td>
+          <td><strong>Safe to delete</strong> when fuzzy-matched.</td>
+        </tr>
+        <tr>
+          <td><strong>Genuinely uploaded but never linked</strong></td>
+          <td>Admin uploaded a file through the Strapi backend but forgot to attach
+              it to a page or entry. Singleton on disk, no sibling.</td>
+          <td><strong>Needs human review</strong> — file has no live reference and
+              no clear replacement.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="action-guide-h">How to act on this report</h3>
+    <ul class="action-guide">
+      <li><strong>Confidence ≥85% (high)</strong> — A clearly newer, currently-referenced
+          revision of this file exists. Safe to delete with high confidence.</li>
+      <li><strong>Confidence 60-84% (medium)</strong> — A live sibling exists but the
+          time gap is short (within 30 days) or the match wasn't a clean Strapi-hash
+          variant. Spot-check that the live file really supersedes this one before
+          deleting.</li>
+      <li><strong>Confidence 0-59% (low / none)</strong> — Either no live sibling
+          exists, or this file is somehow newer than the referenced sibling
+          (anomaly). Treat as "truly unreferenced" and decide manually whether
+          it's still needed for compliance/archive.</li>
+    </ul>
+
+    <p class="next-steps"><strong>Recommended workflow:</strong> sort by
+    "Confidence %" descending. The top of the table is your safe-to-delete list.
+    The bottom is your manual-review list. The "Replaced by" column shows which
+    currently-attached file supersedes each orphan — open both side-by-side to
+    confirm before bulk-deleting.</p>
   </section>
 `;
 
@@ -248,6 +304,14 @@ const STYLES = `
   .pct-high { color: #c04000; font-weight: 700; }
   .pct-medium { color: #b07020; font-weight: 600; }
   .pct-low { color: #1a8055; }
+  .lifecycle-table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+  .lifecycle-table th, .lifecycle-table td { padding: 8px 12px; border-bottom: 1px solid #eee; vertical-align: top; text-align: left; font-size: 13px; line-height: 1.5; }
+  .lifecycle-table th { background: #fafafa; font-weight: 600; }
+  .lifecycle-table td:first-child { width: 200px; }
+  .lifecycle-table td:last-child { width: 200px; }
+  .action-guide-h { margin-top: 18px; }
+  .action-guide { line-height: 1.6; }
+  .action-guide li { margin-bottom: 8px; }
   .toolbar { margin-bottom: 12px; }
   .toolbar input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; min-width: 280px; font-size: 13px; }
 `;
