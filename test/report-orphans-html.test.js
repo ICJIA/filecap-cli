@@ -90,4 +90,28 @@ describe("writeOrphansHtml", () => {
     expect(html).toContain("getElementById('orphan-table')");
     expect(html).not.toContain("document.querySelector('table')");
   });
+
+  it("includes a favicon <link> right after the <title> (no /favicon.ico 404)", () => {
+    const html = writeOrphansHtml({ orphans: [orphan()], sources, siteTotals });
+    expect(html).toContain(
+      "<link rel=\"icon\" href=\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>\">",
+    );
+    // It must sit inside <head>, immediately after the closing </title>.
+    expect(html).toMatch(/<\/title>\s*<link rel="icon"/);
+  });
+
+  it("wraps the page body in exactly one <main> landmark", () => {
+    const html = writeOrphansHtml({ orphans: [orphan()], sources, siteTotals });
+    expect((html.match(/<main>/g) ?? []).length).toBe(1);
+    expect((html.match(/<\/main>/g) ?? []).length).toBe(1);
+    // <main> opens right after <body>; </main> closes before </body> (the
+    // trailing <script> may sit between </main> and </body>).
+    expect(html).toMatch(/<body>\s*<main>/);
+    expect(html.indexOf("</main>")).toBeLessThan(html.indexOf("</body>"));
+    // The page content (h1, table) lives inside the landmark.
+    expect(html.indexOf("<main>")).toBeLessThan(html.indexOf("<h1>"));
+    expect(html.indexOf('<table id="orphan-table">')).toBeLessThan(
+      html.indexOf("</main>"),
+    );
+  });
 });

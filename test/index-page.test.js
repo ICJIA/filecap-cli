@@ -316,3 +316,10 @@ describe("index page duplicates table (v1.12.1 paginator + trimmed columns)", ()
     expect(html).not.toContain("setPointerCapture");
   });
 });
+
+describe("index page accessibility (v1.x)", () => {
+  it("includes a favicon link so the page does not 404 on /favicon.ico", () => {
+    const html = generateIndexHtml({ siteResults: [], password: null });
+    expect(html).toMatch(/<link[^>]*rel="icon"/);
+  });
+});

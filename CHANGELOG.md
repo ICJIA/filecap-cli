@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.15.1] — 2026-05-20
+
+### Fixed
+
+- **Accessibility — the generated reports now score 100.** A red/blue review (`docs/site-review-2026-05-20.md`) found the deployed site — an accessibility-audit tool — scoring only 88–93 on its own Lighthouse accessibility. Fixed across every report generator (`src/report/html.js` for the per-site + by-type reports, `src/web/index-page.js`, `src/report/orphans-html.js`):
+  - **Color contrast (WCAG 1.4.3 AA)** — muted/secondary text (no-files chips, audit-source labels, footers, orphan-row hints) now clears ≥4.5:1.
+  - **Use of color (WCAG 1.4.1 A)** — in-text and footer links are underlined, no longer distinguished by color alone.
+  - **`<main>` landmark** — the per-site, by-type, and orphan reports now have one (the fleet index already did).
+  - **Target size (WCAG 2.5.8)** — the meta-copy buttons and tech-details toggles are ≥24×24 px; the non-interactive site-card URL is now plain text instead of a stray link.
+  - **Favicon** — every page declares an inline SVG favicon, ending the `/favicon.ico` 404 console error.
+- Result: Lighthouse accessibility **100** and **0 axe-core (WCAG A/AA) violations** on the fleet index, per-site reports, and the orphans report.
+
+### Tests
+
+720 passing (+5 — favicon and `<main>`-landmark structural assertions across the report generators).
+
 ## [1.15.0] — 2026-05-20
 
 ### Added

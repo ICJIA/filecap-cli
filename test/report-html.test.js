@@ -1164,4 +1164,21 @@ describe("writeHtml", () => {
       expect((bodyMatch[1].match(/<tr>/g) || []).length).toBe(3);
     });
   });
+
+  describe("accessibility structure (v1.x)", () => {
+    it("includes a favicon link so the page does not 404 on /favicon.ico", async () => {
+      const out = path.join(tmpDir, "favicon.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<link[^>]*rel="icon"/);
+    });
+
+    it("wraps the report body in exactly one <main> landmark", async () => {
+      const out = path.join(tmpDir, "main.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect((html.match(/<main\b/g) || []).length).toBe(1);
+      expect(html).toContain("</main>");
+    });
+  });
 });

@@ -607,7 +607,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
     <p class="nickname">${nickname}</p>
     <h3 class="full-name">${fullName}</h3>
-    ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
+    ${publicUrlBaseRaw ? `<p class="site-url"><span>${publicUrlBase}</span></p>` : ""}
   </header>
   <div class="nums">
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
@@ -802,6 +802,7 @@ export function generateIndexHtml({
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>${pageTitle}</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
 <style>
 /* ── base ────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -815,7 +816,7 @@ body {
   margin: 0;
   padding: 0;
 }
-a { color: #60a5fa; text-decoration: none; }
+a { color: #60a5fa; text-decoration: underline; }
 a:hover { color: #93c5fd; text-decoration: underline; }
 h1 {
   font-size: 1.6rem;
@@ -1511,7 +1512,7 @@ main {
   font-size: 0.85em;
   color: var(--fc-text-muted, #788391);
 }
-.site-card .site-url a { color: var(--fc-accent, #4dabf7); text-decoration: none; }
+.site-card .site-url span { color: var(--fc-accent, #4dabf7); }
 
 /* v1.7.6 — access-method chip in the card-head eyebrow position. Three
    variants (Strapi/GitHub/Server) with distinct hue so a manager can scan
@@ -1677,7 +1678,7 @@ main {
 }
 
 .site-card .tech-details { margin: 6px 0 12px; font-size: 0.82em; color: var(--fc-text-muted, #788391); }
-.site-card .tech-details summary { cursor: pointer; }
+.site-card .tech-details summary { cursor: pointer; min-height: 24px; padding: 3px 0; }
 .site-card .tech-details .hostname,
 .site-card .tech-details .ip { margin: 4px 0 0; }
 /* v1.7.8 — expanded tech-details: 5-row mini-grid mirroring the per-site
@@ -1902,7 +1903,7 @@ main {
   max-width: 1200px;
   margin: 0 auto;
   font-size: 0.8rem;
-  color: #666666;
+  color: #9aa5b1;
   display: flex;
   align-items: center;
   justify-content: space-between;

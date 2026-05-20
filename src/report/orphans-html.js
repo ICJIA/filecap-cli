@@ -280,21 +280,27 @@ const STYLES = `
   th:hover { background: #ebebeb; }
   tr:hover { background: #fafafa; }
   .filename-cell { max-width: 380px; word-break: break-all; }
-  .filename-cell a { color: #0050a0; text-decoration: none; }
-  .filename-cell a:hover { text-decoration: underline; }
-  .path-hint { font-size: 11px; color: #888; margin-top: 2px; }
+  /* WCAG 1.4.1 — in-text links (the filename anchors live in running table
+     text) must not rely on color alone, so they stay underlined, not just
+     on hover. */
+  .filename-cell a { color: #0050a0; text-decoration: underline; }
+  /* Muted/secondary text colors below are tuned for this report's LIGHT
+     background (#f7f7f7 page, #fff cards/table). #888 fails WCAG 1.4.3 AA
+     here (3.5:1 on white); #595959 clears it at ~7:1 while still reading
+     as muted next to the #222 body text. */
+  .path-hint { font-size: 11px; color: #595959; margin-top: 2px; }
   .size-cell { font-variant-numeric: tabular-nums; }
-  .days-old { font-size: 11px; color: #888; margin-top: 2px; }
+  .days-old { font-size: 11px; color: #595959; margin-top: 2px; }
   .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
   .status-stale { background: #e8f0ff; color: #0050a0; }
   .status-orphan { background: #fff0e8; color: #c04000; }
   .confidence-cell { font-weight: 700; font-variant-numeric: tabular-nums; }
   .conf-high { color: #1a8055; }
-  .conf-medium { color: #b07020; }
+  .conf-medium { color: #92590c; }
   .conf-low { color: #a44; }
-  .conf-none { color: #888; }
+  .conf-none { color: #595959; }
   .replaced-by { font-size: 12px; word-break: break-all; }
-  .replaced-on { font-size: 11px; color: #888; }
+  .replaced-on { font-size: 11px; color: #595959; }
   .reasons-cell { max-width: 260px; }
   .reason-tag { display: inline-block; background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 4px; margin-bottom: 2px; color: #444; }
   .site-breakdown { background: #fff; padding: 20px 28px; border-radius: 10px; border: 1px solid #e4e4e4; margin-bottom: 24px; }
@@ -302,7 +308,7 @@ const STYLES = `
   .site-table th, .site-table td { padding: 6px 10px; }
   .site-table .num { text-align: right; font-variant-numeric: tabular-nums; }
   .pct-high { color: #c04000; font-weight: 700; }
-  .pct-medium { color: #b07020; font-weight: 600; }
+  .pct-medium { color: #92590c; font-weight: 600; }
   .pct-low { color: #1a8055; }
   .lifecycle-table { width: 100%; margin: 16px 0; border-collapse: collapse; }
   .lifecycle-table th, .lifecycle-table td { padding: 8px 12px; border-bottom: 1px solid #eee; vertical-align: top; text-align: left; font-size: 13px; line-height: 1.5; }
@@ -324,7 +330,7 @@ const STYLES = `
   .pag-btn:disabled { opacity: 0.45; cursor: default; }
   .pag-num-active, .pag-num-active:hover { background: #0050a0; color: #fff; border-color: #0050a0; font-weight: 700; }
   .pag-pages { display: inline-flex; gap: 4px; align-items: center; }
-  .pag-gap { color: #999; padding: 0 1px; }
+  .pag-gap { color: #595959; padding: 0 1px; }
 `;
 
 const TABLE_SCRIPT = `
@@ -453,9 +459,11 @@ export function writeOrphansHtml({
 <head>
   <meta charset="utf-8" />
   <title>Orphaned files report (${totalCount})</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
   <style>${STYLES}</style>
 </head>
 <body>
+<main>
   <p><a href="${htmlEscape(backHref)}">&larr; Back to fleet index</a></p>
   <h1>Orphaned files (${totalCount})</h1>
   <p>Files on the server that no Strapi entry, page body, or attachments array currently references.</p>
@@ -498,6 +506,7 @@ export function writeOrphansHtml({
       ${rows}
     </tbody>
   </table>
+</main>
   <script>${TABLE_SCRIPT}</script>
 </body>
 </html>
