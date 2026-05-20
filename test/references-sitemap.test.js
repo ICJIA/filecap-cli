@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSitemapXml } from "../src/references/sitemap.js";
+import { parseSitemapXml, scopeSitemapUrlsToSite } from "../src/references/sitemap.js";
 
 describe("parseSitemapXml", () => {
   it("extracts page URLs from a <urlset>", () => {
@@ -30,5 +30,33 @@ describe("parseSitemapXml", () => {
     expect(parseSitemapXml("not xml at all")).toEqual({ pageUrls: [], subSitemaps: [] });
     expect(parseSitemapXml("")).toEqual({ pageUrls: [], subSitemaps: [] });
     expect(parseSitemapXml(null)).toEqual({ pageUrls: [], subSitemaps: [] });
+  });
+});
+
+describe("scopeSitemapUrlsToSite", () => {
+  it("keeps every URL when the site sits at the domain root", () => {
+    const urls = ["https://x.gov/a", "https://x.gov/b/c"];
+    expect(scopeSitemapUrlsToSite(urls, "https://x.gov/")).toEqual(urls);
+  });
+
+  it("keeps only the URLs under the site's path prefix", () => {
+    const urls = [
+      "https://icjia.illinois.gov/researchhub",
+      "https://icjia.illinois.gov/researchhub/articles/foo",
+      "https://icjia.illinois.gov/news/bar",
+      "https://icjia.illinois.gov/researchhubextra",
+    ];
+    expect(
+      scopeSitemapUrlsToSite(urls, "https://icjia.illinois.gov/researchhub/"),
+    ).toEqual([
+      "https://icjia.illinois.gov/researchhub",
+      "https://icjia.illinois.gov/researchhub/articles/foo",
+    ]);
+  });
+
+  it("keeps every URL when siteUrl yields no usable path", () => {
+    const urls = ["https://x.gov/a", "https://x.gov/b"];
+    expect(scopeSitemapUrlsToSite(urls, null)).toEqual(urls);
+    expect(scopeSitemapUrlsToSite(urls, "not a url")).toEqual(urls);
   });
 });

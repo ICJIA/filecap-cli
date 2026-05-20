@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.14.1] — 2026-05-20
+
+### Changed
+
+- **Page view sitemap merge is now scoped to the site's own path.** A site whose front-end URL carries a path — e.g. Research Hub 1.0 at `icjia.illinois.gov/researchhub/` — shares the parent site's `sitemap.xml`. `web-rollup` now keeps only the sitemap URLs under the site's own path prefix, so Research Hub's Page view lists its own `/researchhub/` pages instead of all ~2,377 `icjia.illinois.gov` URLs. Sites at a domain root are unaffected (every URL kept). New helper `scopeSitemapUrlsToSite` in `src/references/sitemap.js`.
+
+### Tests
+
+708 passing (+3 — sitemap URL path-scoping).
+
 ## [1.14.0] — 2026-05-20
 
 ### Added

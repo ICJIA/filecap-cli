@@ -6,7 +6,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import { runReport } from "./report.js";
-import { fetchSitemapUrls } from "../references/sitemap.js";
+import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeCsv } from "../report/csv.js";
 import { writeHtml } from "../report/html.js";
 import { classifyOrphans } from "../report/orphans.js";
@@ -837,6 +837,11 @@ export async function runWebRollup({
       sitemapUrls = await fetchSitemapUrls(cand);
       if (sitemapUrls.length > 0) break;
     }
+    // A site that lives under a path (e.g. Research Hub at
+    // icjia.illinois.gov/researchhub/) usually shares the parent site's full
+    // sitemap — scope the URLs to the site's own path so the Page view lists
+    // only its pages, not the whole parent site's.
+    sitemapUrls = scopeSitemapUrlsToSite(sitemapUrls, site.siteUrl);
     process.stderr.write(`[web-rollup] ${site.siteName ?? siteKey}: ${sitemapUrls.length} sitemap page URLs\n`);
     const reportResult = await runReport({
       input: latestInv,

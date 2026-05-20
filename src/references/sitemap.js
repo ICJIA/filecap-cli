@@ -77,3 +77,37 @@ export async function fetchSitemapUrls(sitemapUrl, depth = 0) {
   }
   return [...new Set(all)];
 }
+
+/**
+ * Scope a list of sitemap URLs to a site that lives under a path prefix.
+ *
+ * When a site's front-end URL carries a path (e.g.
+ * https://icjia.illinois.gov/researchhub/), its configured sitemap is often the
+ * parent site's full sitemap. Keep only the URLs under the site's own path so
+ * the Page view isn't padded with the parent site's pages. A site at the domain
+ * root (path "/" or none) — or one whose siteUrl can't be parsed — keeps every
+ * URL.
+ *
+ * @param {string[]} urls - page URLs from a sitemap
+ * @param {string} siteUrl - the site's front-end URL (may carry a path prefix)
+ * @returns {string[]}
+ */
+export function scopeSitemapUrlsToSite(urls, siteUrl) {
+  const list = Array.isArray(urls) ? urls : [];
+  let prefix;
+  try {
+    prefix = new URL(siteUrl).pathname.replace(/\/+$/, "").toLowerCase();
+  } catch {
+    return list;
+  }
+  if (!prefix) return list;
+  return list.filter((u) => {
+    let path;
+    try {
+      path = new URL(u).pathname.replace(/\/+$/, "").toLowerCase();
+    } catch {
+      return false;
+    }
+    return path === prefix || path.startsWith(`${prefix}/`);
+  });
+}
