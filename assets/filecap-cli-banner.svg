@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360"
+     font-family="Menlo, 'SF Mono', monospace" role="img"
+     aria-label="filecap-cli — file inventory CLI for accessibility audit scoping">
+  <title>filecap-cli — file inventory CLI for accessibility audit scoping</title>
+  <defs>
+    <!-- warm deep-ink background, a touch lighter up top -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14110b"/>
+      <stop offset="1" stop-color="#090807"/>
+    </linearGradient>
+    <!-- amber phosphor bloom behind the wordmark -->
+    <radialGradient id="bloom" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0"    stop-color="#ffb000" stop-opacity="0.24"/>
+      <stop offset="0.55" stop-color="#ff9d00" stop-opacity="0.07"/>
+      <stop offset="1"    stop-color="#ff9d00" stop-opacity="0"/>
+    </radialGradient>
+    <!-- corner vignette to focus the eye -->
+    <radialGradient id="vig" cx="0.5" cy="0.42" r="0.78">
+      <stop offset="0"   stop-color="#000000" stop-opacity="0"/>
+      <stop offset="0.68" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1"   stop-color="#000000" stop-opacity="0.58"/>
+    </radialGradient>
+    <!-- faint dot grid: a quiet technical texture -->
+    <pattern id="dots" width="38" height="38" patternUnits="userSpaceOnUse">
+      <circle cx="19" cy="19" r="1.05" fill="#ffb454" opacity="0.07"/>
+    </pattern>
+    <!-- CRT-style soft bloom for the wordmark -->
+    <filter id="glow" x="-30%" y="-70%" width="160%" height="240%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- background stack -->
+  <rect width="1280" height="360" fill="url(#bg)"/>
+  <rect width="1280" height="360" fill="url(#dots)"/>
+  <ellipse cx="640" cy="150" rx="600" ry="250" fill="url(#bloom)"/>
+  <rect width="1280" height="360" fill="url(#vig)"/>
+
+  <!-- crop-mark corners: the "capture" frame -->
+  <g stroke="#ffb000" stroke-width="2.2" stroke-linecap="square" fill="none" opacity="0.5">
+    <path d="M42 70 L42 42 L70 42"/>
+    <path d="M1238 70 L1238 42 L1210 42"/>
+    <path d="M42 290 L42 318 L70 318"/>
+    <path d="M1238 290 L1238 318 L1210 318"/>
+  </g>
+
+  <!-- terminal prompt -->
+  <path d="M360 136 L360 166 L390 151 Z" fill="#ffc24d"/>
+
+  <!-- wordmark: amber phosphor bloom, then crisp two-tone -->
+  <text x="667" y="178" text-anchor="middle" font-size="74" font-weight="700" letter-spacing="1.5"
+        fill="#ff9d00" opacity="0.45" filter="url(#glow)">filecap-cli</text>
+  <text x="667" y="178" text-anchor="middle" font-size="74" font-weight="700" letter-spacing="1.5">
+    <tspan fill="#f5efe3">filecap</tspan><tspan fill="#ffb000">-cli</tspan>
+  </text>
+
+  <!-- tagline -->
+  <text x="640" y="233" text-anchor="middle" font-size="19" letter-spacing="0.6"
+        fill="#8f8678">file inventory · accessibility audit scoping</text>
+</svg>

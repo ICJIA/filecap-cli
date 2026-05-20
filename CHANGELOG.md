@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.14.2] — 2026-05-20
+
+### Added
+
+- **README banner.** A header image at the top of the README — an amber-on-ink, terminal-style `filecap-cli` wordmark with a soft phosphor glow and crop-mark framing. Source SVG at `assets/filecap-cli-banner.svg`, rendered to `assets/filecap-cli-banner.png`. Documentation only — no change to the CLI or its output.
+
 ## [1.14.1] — 2026-05-20
 
 ### Changed

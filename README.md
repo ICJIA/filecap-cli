@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/filecap-cli-banner.png" alt="filecap-cli — file inventory CLI for accessibility audit scoping" width="820">
+</p>
+
 # @icjia/filecap
 
 **File inventory CLI for accessibility audit scoping.**
