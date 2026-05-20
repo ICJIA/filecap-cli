@@ -282,9 +282,12 @@ function buildPageFilesCell(page, ctx) {
 function buildPageRow(page, ctx) {
   const safePageUrl = safeUrl(page.pageUrl);
   const title = htmlEscape(page.pageTitle || page.pageUrl || "(untitled page)");
-  const tag = page.fromSitemap
-    ? ` <span class="page-sitemap-tag" title="Listed in the site's sitemap; filecap found no files linked from this page.">sitemap</span>`
-    : "";
+  let tag = "";
+  if (page.fromSitemap) {
+    tag = ` <span class="page-sitemap-tag" title="Listed in the site's sitemap; filecap found no files linked from this page.">sitemap</span>`;
+  } else if (page.fromCms) {
+    tag = ` <span class="page-cms-tag" title="A page from the site's CMS; filecap found no files linked from it.">cms</span>`;
+  }
   const pageCell = safePageUrl
     ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${title}</a>${tag}</td>`
     : `<td>${title}${tag}</td>`;
@@ -302,7 +305,7 @@ function buildPageViewSection(pages, ctx) {
   const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
   return `<div id="page-view" hidden>
   <h2>Pages on this site</h2>
-  <p class="page-view-note">One row per page. <strong>Page Audit Score</strong> is that page's own accessibility grade; <strong>Files</strong> are the documents the page links to. Rows tagged <span class="page-sitemap-tag">sitemap</span> come from the site's sitemap.xml — filecap found no files linked from them.</p>
+  <p class="page-view-note">One row per page. <strong>Page Audit Score</strong> is that page's own accessibility grade; <strong>Files</strong> are the documents the page links to. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively.</p>
   <nav class="paginator" aria-label="Page table pagination">
     <span class="pag-info" id="pv-page-info"></span>
     <span class="pag-controls">
@@ -442,7 +445,7 @@ const ACCESS_PANEL_COPY = {
   },
 };
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [] }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [] }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -587,7 +590,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   ).join("");
 
   // ── Page view (v1.13.0): invert the file entries into a page list ────────────
-  const pageList = buildPageList(entries, sitemapUrls);
+  const pageList = buildPageList(entries, sitemapUrls, cmsPages);
   const pageViewSectionHtml = buildPageViewSection(pageList, { sourceHeader, sourceMap, isConsolidated });
   const viewToggleHtml = `
 <div class="view-toggle" role="group" aria-label="Switch report view">
@@ -1499,6 +1502,19 @@ thead th {
   color: #9aa5b1;
   background: #1f2632;
   border: 1px solid #2e3b4d;
+  border-radius: 3px;
+  padding: 0 4px;
+  vertical-align: middle;
+}
+.page-cms-tag {
+  display: inline-block;
+  font-size: 0.72em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #86b8a6;
+  background: #18241f;
+  border: 1px solid #2d4339;
   border-radius: 3px;
   padding: 0 4px;
   vertical-align: middle;

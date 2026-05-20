@@ -1142,5 +1142,26 @@ describe("writeHtml", () => {
       // 2 derived pages (m1, g1) + 1 sitemap-only (standalone); m1 de-dupes
       expect((bodyMatch[1].match(/<tr>/g) || []).length).toBe(3);
     });
+
+    it("merges CMS pages into the page table as fromCms rows with content type (1.14.x)", async () => {
+      const out = path.join(tmpDir, "pagecms.html");
+      await writeHtml({
+        sourceHeader: sampleHeader,
+        entries: entriesWithPages,
+        sources: [sampleHeader],
+        outputPath: out,
+        cmsPages: [
+          { pageUrl: "https://icjia.illinois.gov/news/meetings/m1/", contentType: "meeting" },
+          { pageUrl: "https://icjia.illinois.gov/policies/p1/", contentType: "policy" },
+        ],
+      });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('href="https://icjia.illinois.gov/policies/p1/"');
+      expect(html).toContain('class="page-cms-tag"');
+      expect(html).toContain("<td>policy</td>");
+      const bodyMatch = html.match(/<tbody id="page-body">([\s\S]*?)<\/tbody>/);
+      // 2 derived (m1, g1) + 1 cms-only (p1); m1 de-dupes against the derived page
+      expect((bodyMatch[1].match(/<tr>/g) || []).length).toBe(3);
+    });
   });
 });

@@ -15,15 +15,18 @@ function normPageUrl(u) {
 }
 
 /**
- * Invert file entries into a list of pages, then merge in sitemap-only URLs.
+ * Invert file entries into a list of pages, then merge in CMS-only and
+ * sitemap-only URLs so the result is a complete list of the site's pages.
  *
  * @param {Array} entries - inventory file entries (each may carry references[])
- * @param {string[]} [sitemapUrls] - page URLs from the site's sitemap.xml; any
- *        not surfaced by the inversion are appended as thin rows
- *        (fromSitemap: true — URL only, no audit/files).
- * @returns {Array<{pageUrl,pageTitle,contentType,siteName,pageAudit,files,fromSitemap?}>}
+ * @param {string[]} [sitemapUrls] - page URLs from the site's sitemap.xml
+ * @param {Array<{pageUrl:string,contentType?:string}>} [cmsPages] - every CMS
+ *        entry's page (from the references sidecar). Pages not surfaced by the
+ *        inversion are appended as thin rows — cmsPages → fromCms (carry the
+ *        content type), sitemap URLs → fromSitemap — URL-only, no audit/files.
+ * @returns {Array<{pageUrl,pageTitle,contentType,siteName,pageAudit,files,fromSitemap?,fromCms?}>}
  */
-export function buildPageList(entries, sitemapUrls = []) {
+export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
   const byUrl = new Map();
   const seenByUrl = new Map();
   for (const entry of entries ?? []) {
@@ -52,10 +55,25 @@ export function buildPageList(entries, sitemapUrls = []) {
     }
   }
   const pages = [...byUrl.values()];
-  // v1.14.0: merge in sitemap URLs the inversion didn't surface — pages that
-  // exist but link to no files. They render as thin rows so the Page view is
-  // a complete list of the site's pages, not just the file-linking ones.
+  // Merge in pages the reference inversion didn't surface — pages that exist
+  // but link to no files — so the Page view is a complete list of the site's
+  // pages. Two sources, in priority order: the CMS's own entry list (carries
+  // the content type), then the sitemap.
   const seen = new Set(pages.map((p) => normPageUrl(p.pageUrl)));
+  for (const cp of cmsPages ?? []) {
+    const norm = normPageUrl(cp?.pageUrl);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    pages.push({
+      pageUrl: cp.pageUrl,
+      pageTitle: "",
+      contentType: cp.contentType ?? "",
+      siteName: "",
+      pageAudit: null,
+      files: [],
+      fromCms: true,
+    });
+  }
   for (const url of sitemapUrls ?? []) {
     const norm = normPageUrl(url);
     if (!norm || seen.has(norm)) continue;
@@ -71,4 +89,35 @@ export function buildPageList(entries, sitemapUrls = []) {
     });
   }
   return pages;
+}
+
+/**
+ * Parse a references sidecar (NDJSON, one record per CMS entry) into the
+ * site's page list — {pageUrl, contentType} for every entry with a resolvable
+ * page URL, de-duplicated by normalised URL. Malformed lines are skipped.
+ *
+ * @param {string} ndjson
+ * @returns {Array<{pageUrl: string, contentType: string}>}
+ */
+export function parseCmsPageList(ndjson) {
+  if (typeof ndjson !== "string" || ndjson.trim() === "") return [];
+  const out = [];
+  const seen = new Set();
+  for (const line of ndjson.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let rec;
+    try {
+      rec = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    const pageUrl = rec?.pageUrl;
+    if (typeof pageUrl !== "string" || pageUrl === "") continue;
+    const norm = normPageUrl(pageUrl);
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    out.push({ pageUrl, contentType: rec.contentType ?? "" });
+  }
+  return out;
 }

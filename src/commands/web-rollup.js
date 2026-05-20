@@ -9,6 +9,7 @@ import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeCsv } from "../report/csv.js";
 import { writeHtml } from "../report/html.js";
+import { parseCmsPageList } from "../report/pages.js";
 import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
 import { writeOrphansCsv } from "../report/orphans-csv.js";
@@ -843,6 +844,19 @@ export async function runWebRollup({
     // only its pages, not the whole parent site's.
     sitemapUrls = scopeSitemapUrlsToSite(sitemapUrls, site.siteUrl);
     process.stderr.write(`[web-rollup] ${site.siteName ?? siteKey}: ${sitemapUrls.length} sitemap page URLs\n`);
+    // v1.14.x: also merge the site's full CMS page list — every content
+    // entry's page, from the references sidecar retained in latest/ — so the
+    // Page view is complete even where the sitemap is missing or partial.
+    let cmsPages = [];
+    try {
+      const sidecarPath = path.join(path.dirname(latestInv), "references-sidecar.ndjson");
+      cmsPages = parseCmsPageList(await fs.readFile(sidecarPath, "utf8"));
+    } catch {
+      // no retained sidecar for this site — the Page view uses the sitemap only
+    }
+    if (cmsPages.length > 0) {
+      process.stderr.write(`[web-rollup] ${site.siteName ?? siteKey}: ${cmsPages.length} CMS page URLs\n`);
+    }
     const reportResult = await runReport({
       input: latestInv,
       outputDir: tempDir,
@@ -854,6 +868,7 @@ export async function runWebRollup({
       accessKind,
       pathPrefix: site.pathPrefix ?? null,
       sitemapUrls,
+      cmsPages,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);

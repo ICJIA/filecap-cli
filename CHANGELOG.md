@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.15.0] — 2026-05-20
+
+### Added
+
+- **Page view now lists every CMS page, not just the file-linking ones.** The Page view's page list came from two sources — the file→page inversion (pages that link ≥1 file) and the site's `sitemap.xml`. It now also merges the **CMS's own page list**: every content entry's page, taken from the references sidecar. `audit-fleet-auto.sh` retains that sidecar per site at `~/filecap-audits/<site>/latest/references-sidecar.ndjson`, and `web-rollup` reads it and merges it. CMS-derived pages that link no files render as thin rows tagged `cms` (parallel to the `sitemap` tag) and carry their content type. This completes the Page view for the **intranet** — an auth-walled site with no public sitemap, which now lists all ~270 of its CMS pages instead of only the file-linking ones. New export `parseCmsPageList` in `src/report/pages.js`; `buildPageList` gains a `cmsPages` argument.
+
+### Tests
+
+715 passing (+7 — CMS page-list parsing and the buildPageList / writeHtml merge).
+
 ## [1.14.2] — 2026-05-20
 
 ### Added

@@ -163,6 +163,9 @@ for s in d.get('sites', []):
                  -o "$SIDECARS_DIR/$site.refs.ndjson" >/tmp/filecap-refs-"$site".log 2>&1; then
             echo "[fleet-auto] WARN: references failed for $site (see /tmp/filecap-refs-$site.log)" >&2
           else
+            # v1.14.x: retain the sidecar in the site's audit dir so web-rollup
+            # can merge the full CMS page list into the Page view.
+            cp "$SIDECARS_DIR/$site.refs.ndjson" "$AUDITS_BASE/$site/latest/references-sidecar.ndjson" 2>/dev/null || true
             echo "[fleet-auto]   ✓ references $site"
           fi
         ) &
