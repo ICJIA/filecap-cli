@@ -144,7 +144,14 @@ const sitesFileSchema = z.object({
  */
 export function normalizeStrapiFilename(filename) {
   if (!filename) return "";
-  return filename.replace(/_[a-f0-9]{10}(\.[^.]+)$/, "$1");
+  // Strip the Strapi 10-hex upload hash, then fold runs of spaces and
+  // underscores to a single underscore. The pre-CMS sites moved files into
+  // /static with spaces in the name; Strapi sanitises the same name to
+  // underscores — folding both lets "Some File.pdf" and "Some_File.pdf" be
+  // recognised as the same logical file for cross-server duplicate detection.
+  return filename
+    .replace(/_[a-f0-9]{10}(\.[^.]+)$/, "$1")
+    .replace(/[ _]+/g, "_");
 }
 
 /**
@@ -822,6 +829,7 @@ export async function runWebRollup({
       siteUrl: site.siteUrl ?? null,
       siteFullName: site.siteFullName ?? null,
       accessKind,
+      pathPrefix: site.pathPrefix ?? null,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);

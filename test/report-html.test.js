@@ -601,6 +601,29 @@ describe("writeHtml", () => {
     expect(html).toMatch(/<a href="https:\/\/cdn\.example\.com\/uploads\/doc\.pdf"[^>]*target="_blank"[^>]*>doc\.pdf<\/a>/);
   });
 
+  it("applies the site pathPrefix and percent-encodes the File name link (v1.12.2)", async () => {
+    // Git sites (old ARI Summit deploys) serve files under /static, and
+    // their pre-CMS filenames can contain spaces. The link must include the
+    // prefix and encode the space, or it lands on the SPA catch-all.
+    const header = {
+      ...sampleHeader,
+      metadata: {
+        ...sampleHeader.metadata,
+        publicUrlBase: "https://ariallsites2017.icjia.cloud",
+        pathPrefix: "/static",
+      },
+    };
+    const entries = [{
+      ...sampleEntries[0],
+      path: "summit_documents/Agenda Final 2017.pdf",
+      filename: "Agenda Final 2017.pdf",
+    }];
+    const outputPath = path.join(tmpDir, "pathprefix.html");
+    await writeHtml({ sourceHeader: header, entries, sources: [header], outputPath });
+    const html = await fs.readFile(outputPath, "utf8");
+    expect(html).toContain('href="https://ariallsites2017.icjia.cloud/static/summit_documents/Agenda%20Final%202017.pdf"');
+  });
+
   describe("access-method panel (v1.7.6)", () => {
     it("renders a Strapi-CMS access panel when accessKind is 'strapi'", async () => {
       const outputPath = path.join(tmpDir, "out.html");

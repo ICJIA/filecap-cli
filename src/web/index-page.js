@@ -292,8 +292,8 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
         <span class="pag-controls">
           <label class="pag-size">Rows per page
             <select id="dup-page-size">
-              <option value="25">25</option>
-              <option value="50" selected>50</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
               <option value="100">100</option>
             </select>
           </label>
@@ -327,9 +327,8 @@ function renderDuplicatesSection(groups, duplicatesCsv) {
  * section banners (eyebrow + clamped headline + lede + accent bar), but
  * with a violet accent so the eye reads it as a third visual category:
  * not "current state" (blue), not "warning / awareness" (amber), but
- * "upcoming." The bullets summarise the major reference-discovery work
- * that's been built in-branch but is not yet shipped in this bundle —
- * surfaced here so managers see the roadmap without scrolling the repo.
+ * "upcoming." v1.12.2: the reference-discovery items shipped; this now
+ * previews the two upcoming features — the Page view and fuzzy search.
  */
 function renderTodoSection() {
   return `
@@ -337,26 +336,18 @@ function renderTodoSection() {
     <div class="todo-section-banner" role="presentation">
       <p class="todo-section-eyebrow">Section · Coming soon</p>
       <h2 class="todo-section-headline">What's next for this audit</h2>
-      <p class="todo-section-lede">These features are in active development and will appear in upcoming releases. They aim to answer the question every manager asks when reading an audit: <em>"where is this file used, and is it safe to delete?"</em></p>
+      <p class="todo-section-lede">Two new ways to explore the same audit data are in active development and will appear in upcoming releases. The numbers don&#39;t change &mdash; these are just different lenses on the same fleet.</p>
     </div>
 
     <ul class="todo-list">
       <li class="todo-item">
-        <h3 class="todo-item-h3">A "Referenced" column and a "Status" verdict</h3>
-        <p>Each PDF row will gain two new columns directly to the right of <strong>Public URL</strong>: <strong>Referenced</strong> (the live pages that link to the file) and <strong>Status</strong> (a single verdict chip: <em>Active</em>, <em>Orphan candidate</em>, or <em>Discovery N/A</em>). Sorting the spreadsheet on Status lets a manager scan for files that no published page links to — without reading every URL by hand.</p>
+        <h3 class="todo-item-h3">A &ldquo;Page view&rdquo; alongside the current &ldquo;File view&rdquo;</h3>
+        <p>Today every report is organised <strong>by file</strong> &mdash; one row per document, with the pages that link to it. A new <strong>Page view</strong> turns that around: one row per <strong>page</strong> on a site, showing that page&#39;s own accessibility score and the files attached to it. A clear toggle at the top of each report switches between the two &mdash; <strong>File view stays the default</strong>, with a short plain-English note by the toggle explaining the difference. Useful when a manager wants to walk a smaller site page by page rather than file by file.</p>
       </li>
       <li class="todo-item">
-        <h3 class="todo-item-h3">Cross-site reference detection</h3>
-        <p>Files inventoried on one ICJIA site that are linked from another (for example, an archive PDF embedded in a page on icjia.illinois.gov) will appear in the Referenced column with a "<em>from icjia</em>" tag. The current per-site view doesn't see across sites, so a PDF can look orphaned on the archive even when it's actively cited from another property.</p>
-      </li>
-      <li class="todo-item">
-        <h3 class="todo-item-h3">Reading pages our tool can&#39;t fully read today</h3>
-        <p>A few of the ICJIA sites &mdash; i2i, spac, and the main icjia.illinois.gov site &mdash; are built in a way that our auditing tool can&#39;t fully read today. The list of pages on those sites shows up, but when the tool opens each page it sees a blank document, with none of the document links inside it visible. That means files actually attached to those pages &mdash; for example, the agendas and minutes on the ARI meetings page &mdash; currently look <em>orphaned</em> in the audit even though they&#39;re actively in use. A future release will open each page the way a person&#39;s web browser does (clicking through and waiting for the content to load), so every file reference is captured.</p>
-        <p class="todo-item-payoff"><strong>Why it matters:</strong> fewer files mistakenly flagged as orphans, more confidence about which files are truly safe to delete, and a sharper list to hand the remediators &mdash; so they can quote the work faster and we don&#39;t accidentally break live page links by deleting a file the site is still using.</p>
-      </li>
-      <li class="todo-item">
-        <h3 class="todo-item-h3">Every clickable reference goes to a real page</h3>
-        <p>Before any reference URL appears in the spreadsheet or on a detail page, our tool will check that the page actually exists on the live website. The result: every link a manager clicks lands on a real, published page &mdash; no "page not found" errors from URLs the audit had to guess at.</p>
+        <h3 class="todo-item-h3">Fuzzy search across every file and page</h3>
+        <p>A fleet-wide search box: type part of a filename or a page name and it finds the match instantly across all the sites &mdash; no need for the exact name. Have a PDF and want to know where it lives? The result returns everything the audit knows about it: which site it&#39;s on, the pages that reference it, its accessibility score, and any duplicate copies on other sites.</p>
+        <p class="todo-item-payoff"><strong>Why it matters:</strong> answering &ldquo;is this file on our site, and where?&rdquo; goes from reading the spreadsheet by hand to a one-box lookup.</p>
       </li>
     </ul>
 
@@ -3257,11 +3248,11 @@ dialog.access-modal .access-modal-cta a {
     <div class="site-grid-sort" role="group" aria-label="Sort the websites list">
       <span class="site-grid-sort-label">Sort by:</span>
       <div class="site-grid-sort-buttons">
-        <button type="button" class="sort-btn is-active" data-sort="az" aria-pressed="true">
+        <button type="button" class="sort-btn" data-sort="az" aria-pressed="false">
           <span class="sort-btn-glyph" aria-hidden="true">A&thinsp;&rarr;&thinsp;Z</span>
           <span class="sort-btn-label">Alphabetical</span>
         </button>
-        <button type="button" class="sort-btn" data-sort="added" aria-pressed="false">
+        <button type="button" class="sort-btn is-active" data-sort="added" aria-pressed="true">
           <span class="sort-btn-glyph" aria-hidden="true">&#9733;</span>
           <span class="sort-btn-label">Most recently added</span>
         </button>
@@ -3369,7 +3360,7 @@ ${renderAccessModals()}
   var hero = document.querySelector(".dup-hero");
 
   var activeFilter = wrap.getAttribute("data-dup-active-filter") || "remediable";
-  var pageSize = 50;
+  var pageSize = 25;
   var currentPage = 1;
   var matched = [];
 
@@ -3571,13 +3562,14 @@ ${renderAccessModals()}
     });
   });
 
-  // Restore prior choice on load (default is "az", already rendered server-side).
+  // v1.12.2: default sort is "added" (most recently added first) so newer
+  // sites lead and the oldest (e.g. the ARI summits) sit at the bottom. Cards
+  // are rendered alphabetically server-side, so always sort on load.
   var saved = null;
   try { saved = sessionStorage.getItem("filecap-site-sort"); } catch (_) {}
-  if (saved && saved !== "az") {
-    sortCards(saved);
-    setActive(saved);
-  }
+  var initial = saved || "added";
+  sortCards(initial);
+  setActive(initial);
 })();
 </script>
 

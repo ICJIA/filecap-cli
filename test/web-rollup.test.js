@@ -878,6 +878,13 @@ describe("normalizeStrapiFilename", () => {
     expect(normalizeStrapiFilename(null)).toBe("");
     expect(normalizeStrapiFilename(undefined)).toBe("");
   });
+  it("folds spaces and underscore runs so pre-CMS and Strapi names match (v1.12.2)", () => {
+    // Pre-CMS sites moved files into /static with spaces in the name; Strapi
+    // sanitises the same name to underscores. Both must normalise alike or a
+    // cross-server duplicate is missed.
+    expect(normalizeStrapiFilename("Some File.pdf")).toBe(normalizeStrapiFilename("Some_File.pdf"));
+    expect(normalizeStrapiFilename("Agenda  Summit 2017.pdf")).toBe("Agenda_Summit_2017.pdf");
+  });
 });
 
 describe("findCrossServerDuplicates", () => {

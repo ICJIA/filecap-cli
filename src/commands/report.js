@@ -78,7 +78,7 @@ For more details: https://github.com/ICJIA/filecap-cli
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null }) {
+export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null }) {
   let header;
   const entries = [];
 
@@ -110,6 +110,13 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
 
   if (!header) {
     return { exitCode: 2, error: `${input} is missing a header — partial or malformed` };
+  }
+
+  // v1.12.2: web-rollup passes the site's pathPrefix (from sites.json); the
+  // scanned inventory header doesn't carry it. Inject it so buildPublicUrl
+  // (csv.js + html.js) can prefix git-site URLs (e.g. the /static deploys).
+  if (pathPrefix != null && header.metadata) {
+    header.metadata.pathPrefix = pathPrefix;
   }
 
   await fs.mkdir(outputDir, { recursive: true });

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] — 2026-05-20
+
+### Fixed
+
+- **Git-site file links were broken.** The per-site report's File name link (and the CSV Public URL) for the static git sites — the ARI Summits, vpp, ilheals, sfs — built `publicUrlBase + path` and **dropped the site's path prefix**. Those sites deploy files under `/static/…`, so the link was missing that segment and landed on the site's SPA catch-all (the homepage) instead of the file. `buildPublicUrl` (`html.js` + `csv.js`) now applies the site's `pathPrefix`, and `runReport` injects it from web-rollup (the scanned inventory header doesn't carry it). It also **percent-encodes each path segment**, so pre-CMS filenames containing spaces (e.g. `Agenda_ARI_AllSites_Summit _2017_FINAL.pdf`) produce valid `%20` URLs.
+- **Cross-server duplicate detection missed space/underscore pairs.** `normalizeStrapiFilename` only stripped the Strapi upload hash — it didn't treat a space and an underscore as equivalent. A pre-CMS file `Some File.pdf` and its Strapi-sanitised twin `Some_File.pdf` were keyed differently and never grouped, so the duplicate was missed entirely. The normaliser now folds runs of spaces and underscores to a single underscore.
+
+### Changed
+
+- **Fleet-index default sort is now "Most recently added"** (was alphabetical) — newer sites lead, and the oldest (the ARI Summits) sit at the bottom.
+- **HTML report tables default to 25 rows per page** (was 50).
+- **"Coming soon" section refreshed** — it now previews the two upcoming features (the Page view and fuzzy search) instead of the already-shipped reference-discovery work.
+
+### Tests
+
+687 passing (+2 — pathPrefix + percent-encoding in the File name link, and space/underscore folding in `normalizeStrapiFilename`).
+
 ## [1.12.1] — 2026-05-20
 
 ### Changed

@@ -179,7 +179,10 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
     const cleanPrefix = pathPrefix
       ? "/" + String(pathPrefix).replace(/^\/+|\/+$/g, "")
       : "";
-    return `${cleanBase}${cleanPrefix}/${cleanPath}`;
+    // v1.12.2: percent-encode each path segment so filenames with spaces
+    // (common on the pre-CMS sites) produce valid URLs.
+    const encodedPath = cleanPath.split("/").map(encodeURIComponent).join("/");
+    return `${cleanBase}${cleanPrefix}/${encodedPath}`;
   }
   // Defensive fallback for legacy inventories missing publicUrlBase but
   // carrying an https:// absolutePath from an older audit-static.sh run.

@@ -104,16 +104,27 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   // the deployed public site instead of github.com (which broke for
   // anyone without repo access).
   let base;
+  let pathPrefix;
   if (isConsolidated) {
     const src = sourceMap.get(entry.serverName);
     base = src?.publicUrlBase ?? "";
+    pathPrefix = src?.pathPrefix ?? "";
   } else {
     base = sourceHeader.metadata?.publicUrlBase ?? "";
+    pathPrefix = sourceHeader.metadata?.pathPrefix ?? "";
   }
   if (base) {
     const cleanBase = base.replace(/\/+$/, "");
     const cleanPath = (entry.path ?? "").replace(/^\/+/, "");
-    return `${cleanBase}/${cleanPath}`;
+    // v1.12.2: apply the site's pathPrefix (git sites such as the old ARI
+    // Summit deploys serve files under /static), and percent-encode each
+    // path segment so pre-CMS filenames with spaces produce valid URLs
+    // instead of links that bounce to the SPA catch-all (the homepage).
+    const cleanPrefix = pathPrefix
+      ? "/" + String(pathPrefix).replace(/^\/+|\/+$/g, "")
+      : "";
+    const encodedPath = cleanPath.split("/").map(encodeURIComponent).join("/");
+    return `${cleanBase}${cleanPrefix}/${encodedPath}`;
   }
   // Defensive fallback for legacy inventories missing publicUrlBase but
   // carrying an https:// absolutePath from an older audit-static.sh run.
@@ -1714,8 +1725,8 @@ ${filterBarHtml}
   <span class="pag-controls">
     <label class="pag-size">Rows per page
       <select id="page-size">
-        <option value="25">25</option>
-        <option value="50" selected>50</option>
+        <option value="25" selected>25</option>
+        <option value="50">50</option>
         <option value="100">100</option>
       </select>
     </label>
@@ -1760,7 +1771,7 @@ ${rowsHtml}
   const REMEDIABLE_CATS = ["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"];
 
   // ── pagination state (v1.12.0 — replaces click-and-drag panning) ────────────
-  let pageSize = 50;
+  let pageSize = 25;
   let currentPage = 1;
   let matched = [];  // matching <tr>, in current (sorted) DOM order
 

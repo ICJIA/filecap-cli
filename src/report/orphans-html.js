@@ -334,7 +334,7 @@ const TABLE_SCRIPT = `
     if (!tbody) return;
     const allRows = Array.from(tbody.children);
     let matched = allRows.slice();
-    let pageSize = 50;
+    let pageSize = 25;
     let currentPage = 1;
 
     const pageInfo = document.getElementById('page-info');
@@ -470,8 +470,8 @@ export function writeOrphansHtml({
     <span class="pag-controls">
       <label class="pag-size">Rows per page
         <select id="page-size">
-          <option value="25">25</option>
-          <option value="50" selected>50</option>
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
           <option value="100">100</option>
         </select>
       </label>
