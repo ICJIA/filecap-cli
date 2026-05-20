@@ -662,9 +662,6 @@ export function generateIndexHtml({
   let fleetAuditScoreSum = 0;
   let fleetAuditErrorCount = 0;
   let fleetAuditPending = 0;
-  let fleetWithRefs = 0;
-  let fleetWithoutRefs = 0;
-  let fleetRefsUnknown = 0;
 
   for (const sr of siteResults) {
     const s = sr.summary ?? {};
@@ -674,9 +671,6 @@ export function generateIndexHtml({
     fleetAuditScoreSum += s.auditScoreSum ?? 0;
     fleetAuditErrorCount += s.auditErrorCount ?? 0;
     fleetAuditPending += s.auditPending ?? 0;
-    fleetWithRefs += s.withRefs ?? 0;
-    fleetWithoutRefs += s.withoutRefs ?? 0;
-    fleetRefsUnknown += s.refsUnknown ?? 0;
     if (s.byCategory) {
       for (const [cat, n] of Object.entries(s.byCategory)) {
         fleetByCategory[cat] = (fleetByCategory[cat] ?? 0) + n;
@@ -685,10 +679,6 @@ export function generateIndexHtml({
   }
 
   const fleetNonRemediable = fleetTotalFiles - fleetRemediable;
-  const fleetRefsDenom = fleetWithRefs + fleetWithoutRefs;
-  const fleetRefsPct = fleetRefsDenom > 0
-    ? Math.round((fleetWithRefs / fleetRefsDenom) * 100)
-    : 0;
 
   // v1.9.0 fleet-wide audit averages. Only PDFs are scored; the average
   // is computed across PDFs that actually got a score (not pending /
@@ -1199,68 +1189,6 @@ main {
   max-width: 22ch;
 }
 .fleet-hero-phrase strong { color: #ffffff; font-weight: 700; }
-
-/* ── fleet-refs-band (v1.8.0-beta.6) ──────────────────────────────
-   Compact strip below the main audit hero. Surfaces the cross-site
-   reference coverage stat managers ask about ("how many of our files
-   are actually linked from somewhere?") without burying it inside
-   per-site cards. Uses the existing blue accent colour rather than
-   amber so the eye reads the audit-count as the headline number and
-   the references stat as supporting data. */
-.fleet-refs-band {
-  margin-top: 2rem;
-  padding: 1.25rem 1.5rem;
-  border: 1px solid #2d4860;
-  border-radius: 6px;
-  background: linear-gradient(180deg, rgba(58, 116, 168, 0.10) 0%, rgba(58, 116, 168, 0.04) 100%);
-}
-.fleet-refs-eyebrow {
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  color: #6fbafd;
-  margin: 0 0 0.6rem;
-}
-.fleet-refs-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2.5rem 3rem;
-  align-items: baseline;
-}
-.fleet-refs-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-}
-.fleet-refs-num {
-  font-size: clamp(1.6em, 4vw, 2.2em);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #6fbafd;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-.fleet-refs-num-dim {
-  color: #c0cdda;
-}
-.fleet-refs-lbl {
-  font-size: 0.95rem;
-  color: #c0cdda;
-  line-height: 1.4;
-}
-.fleet-refs-lbl strong {
-  color: #ffffff;
-  font-weight: 700;
-}
-.fleet-refs-context {
-  margin: 0.9rem 0 0;
-  font-size: 0.88rem;
-  color: #9aa5b1;
-  line-height: 1.5;
-  max-width: 80ch;
-}
 
 /* ── fleet-audit-band (v1.9.0) ──────────────────────────────────
    Strip below the cross-site reference band. Surfaces the PDF
@@ -3042,36 +2970,9 @@ dialog.access-modal .access-modal-cta a {
       else if (fleetPctInt <= 88)       fleetPhrase = "Most may need audit";
       else                              fleetPhrase = "Nearly all may need audit";
       const fleetAriaLabel = `${fleetRemediable.toLocaleString()} of ${fleetTotalFiles.toLocaleString()} files may need accessibility audit, ${fleetPctInt} percent.`;
-      // v1.8.0-beta.6: references coverage band sits below the main audit
-      // hero. Only shown when at least one site has run the references
-      // pipeline (fleetRefsDenom > 0). The denominator is files for which
-      // the references step ran — not totalFiles — so the percentage
-      // reflects reality and isn't dragged down by sites we haven't
-      // extended the pipeline to yet (git Nuxt sites, intranet pre-token).
-      const refsBandHtml = fleetRefsDenom > 0 ? `
-      <div class="fleet-refs-band" role="region" aria-label="Cross-site reference coverage">
-        <p class="fleet-refs-eyebrow">Cross-site reference coverage</p>
-        <div class="fleet-refs-row">
-          <div class="fleet-refs-stat">
-            <span class="fleet-refs-num">${he(fleetWithRefs.toLocaleString())}</span>
-            <span class="fleet-refs-lbl">have known referrers <strong>(${fleetRefsPct}%)</strong></span>
-          </div>
-          <div class="fleet-refs-stat">
-            <span class="fleet-refs-num fleet-refs-num-dim">${he(fleetWithoutRefs.toLocaleString())}</span>
-            <span class="fleet-refs-lbl">have no known referrers — deletion candidates</span>
-          </div>
-          ${fleetRefsUnknown > 0 ? `<div class="fleet-refs-stat">
-            <span class="fleet-refs-num fleet-refs-num-dim">${he(fleetRefsUnknown.toLocaleString())}</span>
-            <span class="fleet-refs-lbl">awaiting references run (git/intranet sites)</span>
-          </div>` : ""}
-        </div>
-        <p class="fleet-refs-context">A file is "referenced" when a CMS page on this fleet links to it. Files with no known referrers are candidates for deletion — verify in your CMS before removing.</p>
-      </div>
-      ` : "";
-
-      // v1.9.0: accessibility-score band. Sits below the cross-site refs
-      // band. Only rendered when at least one PDF has been audited; sites
-      // / fleets that haven't run the audits step show nothing extra.
+      // v1.9.0: accessibility-score band. Only rendered when at least one
+      // PDF has been audited; sites / fleets that haven't run the audits
+      // step show nothing extra.
       const auditBandHtml = fleetAuditedPdfCount > 0 ? `
       <div class="fleet-audit-band" role="region" aria-label="PDF accessibility scoring summary">
         <p class="fleet-audit-eyebrow">PDF accessibility scoring</p>
@@ -3109,7 +3010,6 @@ dialog.access-modal .access-modal-cta a {
         <p class="fleet-hero-phrase"><strong>${he(fleetPhrase)}</strong></p>
       </div>
     </div>
-    ${refsBandHtml}
     ${auditBandHtml}`;
     })()}
   </section>

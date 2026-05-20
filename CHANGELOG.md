@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.13.1] — 2026-05-20
+
+### Changed
+
+- **Removed the fleet-index "Cross-site reference coverage" band.** The summary strip that split the fleet into "have known referrers" vs. "have no known referrers — deletion candidates" is gone for now. It put a deletion frame on the audit, when the goal is for a manager to first see the *scope* of the website footprint; deletion candidates still surface naturally further down the page (the orphaned-files report, the per-site tables). The underlying per-file reference data is unchanged — only the index-page summary band was removed.
+
 ## [1.13.0] — 2026-05-20
 
 ### Added
