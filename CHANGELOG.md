@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.17.0] — 2026-05-21
+
+### Added
+
+- **`filecap scan` flags mislabeled files.** A new `content-type-mismatch` flag marks files whose extension implies a format whose magic bytes the content doesn't match — e.g. an HTML document saved with a `.pdf` extension. The scanner reads the leading bytes of every file with a known signature (`pdf`, `docx`/`xlsx`/`pptx`, `png`, `jpg`/`jpeg`, `gif`) and records the mismatch directly in the inventory's `flags[]`. Previously these surfaced only downstream — a "PDF" that's actually HTML fails the audit step with an HTTP 422 from audit.icjia.app. New `src/flag/content.js` (`computeContentFlags`) and `src/scanner/header.js` (leading-byte reader); `src/commands/scan.js` merges the result into each entry's flags.
+
+### Tests
+
+741 passing (+11 — the content-signature check and a scan integration case).
+
 ## [1.16.0] — 2026-05-21
 
 ### Added

@@ -25,6 +25,7 @@ export { introspectDocx } from "./introspect/docx.js";
 export { introspectXlsx } from "./introspect/xlsx.js";
 export { introspectLegacyOffice } from "./introspect/office-legacy.js";
 export { computeFilenameFlags } from "./flag/filename.js";
+export { computeContentFlags } from "./flag/content.js";
 export { rollupInventories } from "./rollup/merge.js";
 export { pickCanonical } from "./rollup/canonical.js";
 export { writeCsv, CSV_COLUMNS } from "./report/csv.js";

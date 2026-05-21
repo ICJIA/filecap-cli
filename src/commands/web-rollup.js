@@ -525,7 +525,7 @@ file entry each. Each entry has:
 - \`modifiedAt\` — ISO 8601 last-modified timestamp
 - \`sha256\` — 64-char hex content hash (cross-server duplicate detection)
 - \`serverName\` — which site this file came from (matches a \`sources[].serverName\` in the header)
-- \`flags\` — array of filename-heuristic flags (\`scanned-name-pattern\`, \`filename-has-spaces\`, \`filename-non-ascii\`, \`filename-long\`)
+- \`flags\` — array of heuristic flags (\`scanned-name-pattern\`, \`filename-has-spaces\`, \`filename-non-ascii\`, \`filename-long\`, \`content-type-mismatch\` — the extension implies one format, the file's bytes are another)
 - \`introspection\` — format-specific structure (present when applicable):
   - **PDF:** \`pageCount\`, \`hasTextLayer\`, \`textLayerCoverage\` (0–1), \`isImageOnly\` (true = needs OCR), \`hasTags\`, \`hasFormFields\`, \`hasSignatures\`, \`encrypted\`, \`documentLanguage\`
   - **DOCX:** \`hasHeadings\`, \`imageCount\`, \`altTextCoverage\` (0–1), \`tableCount\`, \`tablesHaveHeaders\`, \`vagueLinkCount\` ("click here" / "read more" anti-patterns)

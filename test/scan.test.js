@@ -242,8 +242,8 @@ describe("runScan", () => {
   });
 
   it("populates flags for filenames matching scanner patterns", async () => {
-    await fs.writeFile(path.join(tmpRoot, "Scan_001.pdf"), "x");
-    await fs.writeFile(path.join(tmpRoot, "regular-name.pdf"), "x");
+    await fs.writeFile(path.join(tmpRoot, "Scan_001.pdf"), "%PDF-1.4 test");
+    await fs.writeFile(path.join(tmpRoot, "regular-name.pdf"), "%PDF-1.4 test");
 
     const outPath = path.join(outDir, "scanflags.ndjson");
     await runScan({
@@ -260,6 +260,20 @@ describe("runScan", () => {
     const cleanEntry = lines.find((l) => l.filename === "regular-name.pdf");
     expect(scanEntry.flags).toContain("scanned-name-pattern");
     expect(cleanEntry.flags).toEqual([]);
+  });
+
+  it("flags a file whose content does not match its .pdf extension", async () => {
+    // An HTML document mislabeled with a .pdf extension — the real-world case
+    // that prompted this: the audit step would otherwise be first to notice.
+    await fs.writeFile(path.join(tmpRoot, "mislabeled.pdf"), "\n\n\n<!DOCTYPE html><html></html>");
+    await fs.writeFile(path.join(tmpRoot, "real.pdf"), "%PDF-1.7\nbody");
+    const outPath = path.join(outDir, "contentflags.ndjson");
+    await runScan({ directory: tmpRoot, output: outPath, hash: false, concurrency: 4, progress: false });
+    const lines = await readNdjson(outPath);
+    const bad = lines.find((l) => l.filename === "mislabeled.pdf");
+    const good = lines.find((l) => l.filename === "real.pdf");
+    expect(bad.flags).toContain("content-type-mismatch");
+    expect(good.flags).not.toContain("content-type-mismatch");
   });
 
   it("includes siteName in header metadata when provided", async () => {
@@ -507,11 +521,11 @@ describe("filecap CLI end-to-end", () => {
   });
 
   it("populates filename flags via the CLI", async () => {
-    await fs.writeFile(path.join(tmpRoot, "Scan_001.pdf"), "x");
-    await fs.writeFile(path.join(tmpRoot, "Untitled-1.docx"), "x");
+    await fs.writeFile(path.join(tmpRoot, "Scan_001.pdf"), "%PDF-1.4 test");
+    await fs.writeFile(path.join(tmpRoot, "Untitled-1.docx"), "PK test");
     await fs.writeFile(path.join(tmpRoot, "spaced name.txt"), "x");
-    await fs.writeFile(path.join(tmpRoot, "résumé.pdf"), "x");
-    await fs.writeFile(path.join(tmpRoot, "ok.pdf"), "x");
+    await fs.writeFile(path.join(tmpRoot, "résumé.pdf"), "%PDF-1.4 test");
+    await fs.writeFile(path.join(tmpRoot, "ok.pdf"), "%PDF-1.4 test");
 
     const outPath = path.join(outDir, "cli-flags.ndjson");
     const result = await runCli(

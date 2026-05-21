@@ -12,6 +12,8 @@ import { headerSchema, entrySchema, footerSchema, SCHEMA_VERSION } from "../sche
 import { FILECAP_VERSION } from "../version.js";
 import { introspect } from "../introspect/index.js";
 import { computeFilenameFlags } from "../flag/filename.js";
+import { computeContentFlags, SIGNATURE_EXTENSIONS, HEADER_BYTES } from "../flag/content.js";
+import { readHeader } from "../scanner/header.js";
 
 export async function runScan({
   directory,
@@ -153,6 +155,18 @@ export async function runScan({
             stats.introspectionFailures++;
           }
         }
+        // Content-signature flags — flag files whose extension implies a
+        // format whose magic bytes the content doesn't match (e.g. HTML saved
+        // as .pdf). Only the handful of signature-bearing extensions trigger
+        // the small extra header read.
+        let flags = computeFilenameFlags(path.basename(filePath));
+        if (SIGNATURE_EXTENSIONS.has(fileStats.extension)) {
+          const header = await readHeader(filePath, HEADER_BYTES);
+          const contentFlags = computeContentFlags(fileStats.extension, header);
+          if (contentFlags.length > 0) {
+            flags = [...flags, ...contentFlags].sort();
+          }
+        }
         const entry = {
           path: path.relative(absoluteRoot, filePath),
           absolutePath: filePath,
@@ -163,7 +177,7 @@ export async function runScan({
           sizeBytes: fileStats.sizeBytes,
           modifiedAt: fileStats.modifiedAt,
           sha256,
-          flags: computeFilenameFlags(path.basename(filePath)),
+          flags,
         };
         if (introspectionResult !== null && introspectionResult !== undefined) {
           entry.introspection = introspectionResult;
