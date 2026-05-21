@@ -464,7 +464,7 @@ export function writeOrphansHtml({
 </head>
 <body>
 <main>
-  <p><a href="${htmlEscape(backHref)}">&larr; Back to fleet index</a></p>
+  <p><a href="${htmlEscape(backHref)}">&larr; Back to fleet index</a> &middot; <a href="accessibility.html">Accessibility</a></p>
   <h1>Orphaned files (${totalCount})</h1>
   <p>Files on the server that no Strapi entry, page body, or attachments array currently references.</p>
   ${EXPLAINER}

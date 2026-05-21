@@ -1185,5 +1185,12 @@ describe("writeHtml", () => {
       expect((html.match(/<main\b/g) || []).length).toBe(1);
       expect(html).toContain("</main>");
     });
+
+    it("the report footer links to the /accessibility page", async () => {
+      const out = path.join(tmpDir, "axfooter.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
+    });
   });
 });

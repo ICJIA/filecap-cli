@@ -344,4 +344,9 @@ describe("index page accessibility (v1.x)", () => {
       expect(span).toMatch(/aria-level="\d"/);
     }
   });
+
+  it("footer links to the /accessibility page", () => {
+    const html = generateIndexHtml({ siteResults: [], password: null });
+    expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
+  });
 });

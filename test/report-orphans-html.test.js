@@ -39,6 +39,11 @@ describe("writeOrphansHtml", () => {
     expect(html).toMatch(/<\/html>\s*$/);
   });
 
+  it("links to the /accessibility page from the top nav", () => {
+    const html = writeOrphansHtml({ orphans: [orphan()], sources, siteTotals });
+    expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
+  });
+
   it("renders a table row per orphan with its filename", () => {
     const html = writeOrphansHtml({
       orphans: [orphan(), orphan({ entry: { filename: "Memo_b2c3d4e5f6.pdf", path: "uploads/Memo_b2c3d4e5f6.pdf", serverName: "icjia-agency-prod", extension: "pdf", sizeBytes: 10, modifiedAt: "2022-01-01T00:00:00.000Z" } })],
