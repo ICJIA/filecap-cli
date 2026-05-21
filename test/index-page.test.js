@@ -350,3 +350,21 @@ describe("index page accessibility (v1.x)", () => {
     expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
   });
 });
+
+describe("index page file-errors section", () => {
+  it("links to the file-errors report when fileErrors is provided", () => {
+    const html = generateIndexHtml({
+      siteResults: [],
+      password: null,
+      fileErrors: {
+        htmlFilename: "audit-file-errors.html",
+        csvFilename: "audit-file-errors.csv",
+        errorCount: 3,
+        siteCount: 5,
+        sitesWithErrors: 2,
+      },
+    });
+    expect(html).toMatch(/<a href="audit-file-errors\.html"[^>]*>/);
+    expect(html).toContain("audit-file-errors.csv");
+  });
+});

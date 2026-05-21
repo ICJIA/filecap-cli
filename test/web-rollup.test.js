@@ -194,6 +194,17 @@ describe("runWebRollup", () => {
     expect(html).toContain("<h1>Accessibility</h1>");
   });
 
+  it("emits a fleet file-errors report (audit-file-errors.html + .csv)", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const files = await fs.readdir(outputDir);
+    expect(files).toContain("audit-file-errors.html");
+    expect(files).toContain("audit-file-errors.csv");
+    const html = await fs.readFile(path.join(outputDir, "audit-file-errors.html"), "utf8");
+    expect(html).toContain("<h1>File errors</h1>");
+  });
+
   it("names per-site files as <slug>-<timestamp>.html and .csv", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture({
       siteName: "DVFR",

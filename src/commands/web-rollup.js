@@ -13,6 +13,8 @@ import { parseCmsPageList } from "../report/pages.js";
 import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
 import { writeOrphansCsv } from "../report/orphans-csv.js";
+import { collectAuditErrors, writeAuditErrorsCsv } from "../report/audit-errors.js";
+import { generateAuditErrorsPage } from "../report/audit-errors-page.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { generateAccessibilityPage } from "../web/accessibility-page.js";
 import { currentStatus, accessibilityLog } from "../web/accessibility-log.js";
@@ -1199,6 +1201,29 @@ export async function runWebRollup({
     };
   }
 
+  // 6b-iv. Fleet "File errors" report — every file the audit step (or the
+  //   scanner's content-type check) flagged, grouped by site. Sites with no
+  //   errors are listed too, explicitly marked clean.
+  let fileErrorsMeta = null;
+  if (allEntries.length > 0) {
+    const errorGroups = collectAuditErrors(allEntries);
+    const errorsCsvFilename = "audit-file-errors.csv";
+    const errorsHtmlFilename = "audit-file-errors.html";
+    await fs.writeFile(path.join(output, errorsCsvFilename), writeAuditErrorsCsv(errorGroups));
+    let errorsHtml = generateAuditErrorsPage({ groups: errorGroups, backHref: "index.html" });
+    if (!noClientGate && password !== null) {
+      errorsHtml = injectPasswordGate(errorsHtml, computeHash(password));
+    }
+    await fs.writeFile(path.join(output, errorsHtmlFilename), errorsHtml);
+    fileErrorsMeta = {
+      htmlFilename: errorsHtmlFilename,
+      csvFilename: errorsCsvFilename,
+      errorCount: errorGroups.reduce((s, g) => s + g.errors.length, 0),
+      siteCount: errorGroups.length,
+      sitesWithErrors: errorGroups.filter((g) => g.errors.length > 0).length,
+    };
+  }
+
   // 6c. Generate index.html with master-CSV link + duplicates section
   const useClientGateForIndex = !noClientGate && password !== null;
   const passwordHash = useClientGateForIndex ? computeHash(password) : null;
@@ -1212,6 +1237,7 @@ export async function runWebRollup({
     byTypeCsvs,
     llmContext: llmContextMeta,
     orphans: orphansMeta,
+    fileErrors: fileErrorsMeta,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 

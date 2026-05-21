@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.18.0] — 2026-05-21
+
+### Added
+
+- **Fleet "File errors" report.** A new `audit-file-errors.html` page — linked from the fleet index — lists every file the audit step could not score, **grouped by site**, with the file, its type, size, the raw error, a plain-English likely reason, and a link to the file. **Every site is listed**, so a site with no problems is explicitly marked clean. A companion `audit-file-errors.csv` carries the same data (Website · File · File type · Size · Public URL · Error · Likely reason). Reasons are categorized — a non-PDF saved with a `.pdf` name (HTTP 422), a large PDF that timed out (retryable), a `content-type-mismatch` from the scanner, etc. New `src/report/audit-errors.js` (`collectAuditErrors`, `categorizeAuditError`, `writeAuditErrorsCsv`) and `src/report/audit-errors-page.js` (`generateAuditErrorsPage`); `web-rollup` emits both files and the index links to them.
+
+### Tests
+
+756 passing (+15 — error collection/categorization, the page generator, and the web-rollup + index wiring).
+
 ## [1.17.0] — 2026-05-21
 
 ### Added

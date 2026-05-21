@@ -126,6 +126,26 @@ function renderOrphansSection(orphans) {
 `;
 }
 
+function renderFileErrorsSection(fileErrors) {
+  if (!fileErrors || !fileErrors.htmlFilename) return "";
+  const n = fileErrors.errorCount ?? 0;
+  const withErrors = fileErrors.sitesWithErrors ?? 0;
+  const blurb =
+    n === 0
+      ? `Every site's files were checked against audit.icjia.app — no file errors anywhere in the fleet.`
+      : `${he(n)} file${n === 1 ? "" : "s"} across ${he(withErrors)} site${withErrors === 1 ? "" : "s"} could not be audited — most are non-PDF files saved with a .pdf name, or large PDFs that timed out.`;
+  return `
+  <section class="section file-errors">
+    <h2>File errors</h2>
+    <p>${blurb}</p>
+    <ul class="action-list">
+      <li><a href="${he(fileErrors.htmlFilename)}">Open the file-errors report (HTML)</a> — every site, with the specific files, their type, the error, and the likely reason.</li>
+      <li><a href="${he(fileErrors.csvFilename)}" download>Download the file-errors report (CSV)</a> — pivot in Excel/Sheets.</li>
+    </ul>
+  </section>
+`;
+}
+
 function renderDuplicatesSection(groups, duplicatesCsv) {
   if (!groups || groups.length === 0) return "";
 
@@ -647,6 +667,7 @@ export function generateIndexHtml({
   byTypeCsvs = [], // v1.7.14: [{ slug, side, label, keys, csvFilename, htmlFilename, fileCount, byteCount }, …]
   llmContext = null, // v1.7.21: { ndjsonFilename, ndjsonByteCount, contextMdFilename, contextMdByteCount, lastAuditAt } | null
   orphans = null, // v1.11.0: { csvFilename, htmlFilename, orphanCount, staleRevisionCount, trulyUnreferencedCount, csvByteCount, htmlByteCount } | null
+  fileErrors = null, // { htmlFilename, csvFilename, errorCount, siteCount, sitesWithErrors } | null
 }) {
   // Fleet totals
   let fleetTotalFiles = 0;
@@ -3170,6 +3191,7 @@ ${cardsHtml}
 
 ${renderMasterCsvSection(masterCsv)}
 ${renderOrphansSection(orphans)}
+${renderFileErrorsSection(fileErrors)}
 ${renderLlmContextSection(llmContext)}
 ${renderDuplicatesSection(duplicateGroups, duplicatesCsv)}
 ${renderTodoSection()}
