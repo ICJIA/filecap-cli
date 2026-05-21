@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.16.0] — 2026-05-21
+
+### Added
+
+- **`/accessibility` page.** filecap audits other sites' accessibility, so the deployed fleet-audit bundle now holds itself to the same standard — and shows it. A new `/accessibility` page presents the bundle's current accessibility standing (Lighthouse 100, axe-core 0 violations, desktop + mobile) and a chronological, timestamped log of every accessibility check — from both the browser (axe DevTools, run by hand) and the backend build (axe-core, Lighthouse, contrastcap). The log is a committed data file (`src/web/accessibility-log.js`) appended to whenever accessibility work is done; the page generator is `src/web/accessibility-page.js`; `web-rollup` writes it as `accessibility.html` (Netlify serves it at `/accessibility`) and gates it like every other page. An **Accessibility** link is added to the footer of the fleet index, the per-site reports, and the by-type pages, plus the orphans report's top nav.
+- The new page is itself accessibility-clean — contrastcap 0 failures, axe-core 0 violations, Lighthouse 100, on desktop and mobile.
+
+### Tests
+
+730 passing (+9 — the page generator, the web-rollup emit, and the three footer links).
+
 ## [1.15.3] — 2026-05-20
 
 ### Fixed

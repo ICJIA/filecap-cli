@@ -10,11 +10,11 @@
 
 /** Current verified accessibility standing — shown in the page's status panel. */
 export const currentStatus = {
-  asOf: "2026-05-20",
+  asOf: "2026-05-21",
   lighthouse: 100,
   axeCore: "0 violations (WCAG A + AA)",
   axeDevTools: "0 serious — pending live re-verification",
-  viewports: "desktop",
+  viewports: "desktop + mobile",
 };
 
 /**
@@ -32,6 +32,16 @@ export const currentStatus = {
  *   notes    optional, e.g. the version it shipped in
  */
 export const accessibilityLog = [
+  {
+    date: "2026-05-21",
+    source: "backend",
+    tool: "contrastcap + axe-core + Lighthouse",
+    scope: "new /accessibility page (desktop); fleet index + per-site report (mobile)",
+    viewport: "desktop + mobile",
+    status: "pass",
+    result: "/accessibility page: 0 contrast failures, 0 axe-core violations, Lighthouse 100. Mobile pass on the index and a per-site report: 0 violations, Lighthouse 100.",
+    notes: "v1.16.0",
+  },
   {
     date: "2026-05-20",
     source: "backend",
