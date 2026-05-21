@@ -184,6 +184,16 @@ describe("runWebRollup", () => {
     expect(assets).toContain("style.css");
   });
 
+  it("emits an accessibility.html page into the bundle", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const files = await fs.readdir(outputDir);
+    expect(files).toContain("accessibility.html");
+    const html = await fs.readFile(path.join(outputDir, "accessibility.html"), "utf8");
+    expect(html).toContain("<h1>Accessibility</h1>");
+  });
+
   it("names per-site files as <slug>-<timestamp>.html and .csv", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture({
       siteName: "DVFR",

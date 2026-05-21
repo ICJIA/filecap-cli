@@ -14,6 +14,8 @@ import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
 import { writeOrphansCsv } from "../report/orphans-csv.js";
 import { generateIndexHtml } from "../web/index-page.js";
+import { generateAccessibilityPage } from "../web/accessibility-page.js";
+import { currentStatus, accessibilityLog } from "../web/accessibility-log.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
 import { generateNetlifyToml, generateNetlifyRedirects } from "../web/netlify-config.js";
@@ -1212,6 +1214,13 @@ export async function runWebRollup({
     orphans: orphansMeta,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
+
+  // 6d. Generate the /accessibility page — current a11y standing + audit log.
+  let accessibilityHtml = generateAccessibilityPage({ currentStatus, log: accessibilityLog });
+  if (passwordHash) {
+    accessibilityHtml = injectPasswordGate(accessibilityHtml, passwordHash);
+  }
+  await fs.writeFile(path.join(output, "accessibility.html"), accessibilityHtml);
 
   // 7. Generate robots.txt
   await fs.writeFile(path.join(output, "robots.txt"), generateRobotsTxt());
