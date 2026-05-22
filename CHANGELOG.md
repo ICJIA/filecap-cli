@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.19.0] — 2026-05-22
+
+### Changed
+
+- **PDF accessibility scoring is no longer surfaced on the fleet index.** The "PDF accessibility scoring" band on the bundle's index page — average grade, average score, and the PDFs-audited / awaiting / error counts — has been removed. The audit.icjia.app scoring heuristic is still being refined, so a headline aggregate grade on the landing page over-states a number that is not settled yet. The per-PDF audit data is unchanged; it is simply no longer rolled up into a fleet-wide score. (`src/web/index-page.js` — the render and its supporting computation are removed; the `.fleet-audit-*` CSS is retained, clearly marked, so the band can be restored in one place if the heuristic stabilizes.)
+- **The "Audit Score" column is renamed "Audit Report" and links to the report instead of printing a grade.** In both the per-site HTML tables and the CSV deliverables, the cell no longer renders a letter grade + numeric score (e.g. `B (84)`). The HTML cell is now just an "Open report" link; the CSV cell is just the audit.icjia.app report URL (Excel and Google Sheets auto-hyperlink it on open). The score still exists — it lives in the linked report — it is just no longer asserted inline while the scoring heuristic is being refined. The column header is relabeled **"Audit Report"** to match what the cell now contains. Errored audits still show "Unavailable"; non-PDFs and unaudited files are still blank. (`src/report/csv.js`, `src/report/html.js`.)
+- **`X-Robots-Tag: noindex, nofollow` now covers every file in the bundle**, not only HTML pages. The header moved from the `/*.html` rule to the `/*` catch-all in the generated `netlify.toml`, so the CSV spreadsheets, the consolidated NDJSON, and the context `.md` are no-index too. `robots.txt` already `Disallow: /`s the whole bundle for well-behaved crawlers; this closes the gap for crawlers that honor the header but ignore robots.txt. (`src/web/netlify-config.js`.)
+
+### Fixed
+
+- **The site URL on each fleet-index card is now a working link.** Every site card shows the live-site URL under the site name; it looked like a link but was not — the whole card is a stretched-link to the detail report, and the URL text sat under that overlay with `pointer-events: none`, so clicking it opened the detail report instead of the site. The URL is now a real `<a target="_blank" rel="noopener noreferrer">` to the live site, lifted above the overlay and added to the card's `pointer-events: auto` allowlist. Every other surface of the card still opens the detail report. (`src/web/index-page.js`.)
+
+### Internal
+
+- **All ESLint errors cleared (21 → 0).** Pre-existing lint debt across `src/` and `test/` — `eqeqeq` (`==`/`!=` → `===`/`!==`), unused variables and imports, a `prefer-const`, and an undeclared `AbortSignal` global — was fixed so `npm run lint` passes clean.
+
+### Tests
+
+764 passing (+8 — the Audit Report cell renders link-only in CSV + HTML, the scoring band is absent from the index, the card site-URL link is a clickable new-tab anchor, and `X-Robots-Tag` covers the `/*` catch-all).
+
 ## [1.18.0] — 2026-05-21
 
 ### Added

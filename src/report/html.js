@@ -147,7 +147,7 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
 //                                  with the full URL surfaced via title on
 //                                  hover. Anchors open in a new tab.
 function buildReferencedCell(refs) {
-  if (refs == null || !Array.isArray(refs)) return "<td></td>";
+  if (!Array.isArray(refs)) return "<td></td>";
   if (refs.length === 0) {
     return '<td><span class="no-refs">No references found</span></td>';
   }
@@ -174,7 +174,7 @@ function buildReferencedCell(refs) {
     const sourceParts = [];
     if (r?.siteName) sourceParts.push(r.siteName);
     if (r?.contentType) sourceParts.push(r.contentType);
-    if (r?.entryId != null) sourceParts.push(`#${r.entryId}`);
+    if (r?.entryId !== null && r?.entryId !== undefined) sourceParts.push(`#${r.entryId}`);
     const tip = sourceParts.length > 0
       ? `Reference from ${sourceParts.join(" ")} — deployed page URL could not be resolved`
       : "Reference exists but deployed page URL could not be resolved";
@@ -213,16 +213,17 @@ function buildPageAuditChip(pa) {
   // page-report viewer was scoped out of audit.icjia.app's 1.10.0
   // release; only PDF audits get an "Open report" link. The tooltip
   // still shows the full score + violation count for hover.
-  const tip = `Page accessibility: ${grade}${score != null ? ` (${score})` : ""}${violationLabel}`;
+  const tip = `Page accessibility: ${grade}${score !== null ? ` (${score})` : ""}${violationLabel}`;
   return ` <span class="page-audit-chip ${cls}" title="${htmlEscape(tip)}">(${htmlEscape(grade)})</span>${source}`;
 }
 
-// v1.9.0: Audit Score cell. v1.10.2: combined with the report-link
-// (previously a separate column) so score + drill-down read as one signal.
-// Layout: grade chip ("C"), numeric score in muted text, then a small
-// "Open report" anchor to audit.icjia.app/report/<id>. Non-PDF entries
-// and missing audits render an empty cell. audit.error renders an
-// "Unavailable" italic chip without a link.
+// v1.9.0: Audit Report column cell. v1.10.2: combined with the report-link.
+// v1.19.0: the grade chip + numeric score were removed — the
+// audit.icjia.app scoring heuristic is still being refined, so the table
+// no longer asserts a grade. The cell renders only an "Open report" anchor
+// to audit.icjia.app/report/<id>; the score lives in that report. Non-PDF
+// entries, missing audits, and audited PDFs with no report URL render an
+// empty cell. audit.error renders an "Unavailable" chip.
 function buildAuditScoreCell(audit) {
   if (!audit || typeof audit !== "object") return "<td></td>";
   if (audit.skipped) return "<td></td>";
@@ -230,16 +231,13 @@ function buildAuditScoreCell(audit) {
     return `<td><span class="audit-grade audit-grade-error" title="${htmlEscape(audit.error)}">Unavailable</span></td>`;
   }
   if (typeof audit.score !== "number") return "<td></td>";
-  const grade = typeof audit.grade === "string" ? audit.grade : "?";
-  const gradeClass = `audit-grade-${grade.toLowerCase()}`;
-  const chip = `<span class="audit-grade ${gradeClass}" title="Strict-profile score (WCAG 2.1 AA + IITAA §E205.4)">${htmlEscape(grade)}</span> <span class="audit-score-num">(${audit.score})</span>`;
   const safeReport =
     typeof audit.reportUrl === "string" ? safeUrl(audit.reportUrl) : null;
   if (safeReport) {
     const escaped = htmlEscape(safeReport);
-    return `<td>${chip} <a class="audit-report-link" href="${escaped}" target="_blank" rel="noopener noreferrer" title="${escaped}">Open report</a></td>`;
+    return `<td><a class="audit-report-link" href="${escaped}" target="_blank" rel="noopener noreferrer" title="${escaped}">Open report</a></td>`;
   }
-  return `<td>${chip}</td>`;
+  return `<td></td>`;
 }
 
 // ── Page view (v1.13.0) — the transpose of the file table ───────────────────
@@ -374,7 +372,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     // indices aligned with CSV_COLUMNS positions. v1.8.0-beta.5: position
     // moved to be immediately after publicUrl.
     "",
-    // v1.9.0: placeholder for the Audit Score column (single column as
+    // v1.9.0: placeholder for the Audit Report column (single column as
     // of 1.10.2 — score chip + report link combined). Cell loop bypasses
     // this and renders entry.audit directly.
     "",
@@ -534,7 +532,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     ...(isConsolidated ? [{ name: "siteName", label: "Website" }] : []),
     { name: "filename",    label: "File name" },
     { name: "category",    label: "File type" },
-    { name: "auditScore",  label: "Audit Score" },
+    { name: "auditScore",  label: "Audit Report" },
     { name: "referenced",  label: "Page References" },
     { name: "duplicateOf", label: "Duplicate of" },
     { name: "modifiedAt",  label: "Date published" },

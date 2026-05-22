@@ -9,7 +9,7 @@
 import { humanizeBytes } from "./format.js";
 
 function htmlEscape(s) {
-  if (s == null) return "";
+  if (s === null || s === undefined) return "";
   return String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

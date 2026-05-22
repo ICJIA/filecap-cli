@@ -75,9 +75,9 @@ describe("CSV_COLUMNS", () => {
   // (after Page References). 1.10.2 merged the separate Audit Report column
   // into Audit Score itself (score chip + report link, multi-line CSV cell)
   // — modifiedAt slid back to position 7.
-  it("sixth column is auditScore with label Audit Score", () => {
+  it("sixth column is auditScore with label Audit Report (v1.19.0 rename)", () => {
     expect(CSV_COLUMNS[5].name).toBe("auditScore");
-    expect(CSV_COLUMNS[5].label).toBe("Audit Score");
+    expect(CSV_COLUMNS[5].label).toBe("Audit Report");
   });
 
   it("seventh column is modifiedAt with label Date published", () => {
@@ -400,6 +400,45 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     const cells = dataRow.split(",");
     expect(cells[colIndex("deleteFlag")]).toBe("");
     expect(cells[colIndex("notes")]).toBe("");
+  });
+});
+
+describe("writeCsv Audit Report column (v1.19.0 — report link only)", () => {
+  // v1.19.0: the cell no longer prints "<grade> (<score>)" — the
+  // audit.icjia.app scoring heuristic is still being refined, so the
+  // spreadsheet links to the report instead of stating a grade.
+  const auditEntry = (audit) => ({ ...baseEntry, audit });
+
+  it("writes only the report URL — no letter grade, no numeric score", () => {
+    const csv = writeCsv({
+      sourceHeader: baseHeader,
+      entries: [auditEntry({ score: 84, grade: "B", reportUrl: "https://audit.icjia.app/report/abc123" })],
+      sources: null,
+    });
+    const cell = csv.trim().split("\n")[1].split(",")[colIndex("auditScore")];
+    expect(cell).toBe("https://audit.icjia.app/report/abc123");
+    expect(cell).not.toContain("84");
+    expect(cell).not.toContain("B (");
+  });
+
+  it("writes an empty cell for an audited PDF that has no report URL", () => {
+    const csv = writeCsv({
+      sourceHeader: baseHeader,
+      entries: [auditEntry({ score: 84, grade: "B" })],
+      sources: null,
+    });
+    const cell = csv.trim().split("\n")[1].split(",")[colIndex("auditScore")];
+    expect(cell).toBe("");
+  });
+
+  it("writes 'Unavailable' when the audit errored", () => {
+    const csv = writeCsv({
+      sourceHeader: baseHeader,
+      entries: [auditEntry({ error: "HTTP 422" })],
+      sources: null,
+    });
+    const cell = csv.trim().split("\n")[1].split(",")[colIndex("auditScore")];
+    expect(cell).toBe("Unavailable");
   });
 });
 

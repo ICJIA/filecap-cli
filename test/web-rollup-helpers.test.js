@@ -131,9 +131,13 @@ describe("generateNetlifyToml", () => {
     expect(toml).toContain("max-age=300");
   });
 
-  it("has X-Robots-Tag noindex on HTML pages", () => {
+  it("has X-Robots-Tag noindex on all files via the /* block (v1.19.0)", () => {
     const toml = generateNetlifyToml();
     expect(toml).toContain('X-Robots-Tag = "noindex, nofollow"');
+    // v1.19.0 — the directive lives in the /* catch-all (not just /*.html)
+    // so the CSVs and the consolidated NDJSON are noindex too.
+    const catchAll = toml.slice(toml.indexOf('for = "/*"'));
+    expect(catchAll).toContain('X-Robots-Tag = "noindex, nofollow"');
   });
 
   it("has security headers on all pages", () => {

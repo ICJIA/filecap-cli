@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createAuthFetcher } from "../src/references/auth-fetcher.js";
 
 // 1.8.0-beta.6: the auth fetcher wraps the references command's underlying

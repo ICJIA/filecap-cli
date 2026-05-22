@@ -77,6 +77,16 @@ describe("renderCard", () => {
     );
   });
 
+  // v1.19.0 — the site URL under the card title is a real link to the live
+  // site, opened in a new tab. Pre-v1.19.0 it was a non-link <span> and
+  // clicks fell through to the card's stretched-link (the detail report).
+  it("renders the site URL as a real link that opens the live site in a new tab", () => {
+    const html = renderCard(baseSr);
+    expect(html).toMatch(
+      /<p class="site-url"><a href="https:\/\/dvfr\.illinois\.gov\/" target="_blank" rel="noopener noreferrer">https:\/\/dvfr\.illinois\.gov\/<\/a><\/p>/,
+    );
+  });
+
   it("renders the CSV-download button as a separate <a download> inside .actions", () => {
     const html = renderCard(baseSr);
     expect(html).toMatch(
@@ -279,6 +289,14 @@ describe("index page CSS (v1.7.7 whole-card click fix)", () => {
     // the regex matches the leading two selectors plus a flexible tail.
     expect(html).toMatch(/\.site-card \.actions \.btn,\s*\.site-card \.tech-details summary[\s\S]{0,200}\{\s*pointer-events:\s*auto/);
   });
+
+  // v1.19.0 — the site-url link joins the pointer-events:auto allowlist and
+  // is lifted above the stretched-link overlay so its click opens the live
+  // site instead of falling through to the detail report.
+  it("re-enables pointer-events on the site-url link and lifts it above the overlay", () => {
+    expect(html).toMatch(/\.site-card \.site-url a,[\s\S]{0,80}\{\s*pointer-events:\s*auto/);
+    expect(html).toMatch(/\.site-card \.site-url a \{[^}]*z-index:\s*2/);
+  });
 });
 
 describe("index page duplicates table (v1.12.1 paginator + trimmed columns)", () => {
@@ -366,5 +384,26 @@ describe("index page file-errors section", () => {
     });
     expect(html).toMatch(/<a href="audit-file-errors\.html"[^>]*>/);
     expect(html).toContain("audit-file-errors.csv");
+  });
+});
+
+describe("index page — PDF scoring panel removed (v1.19.0)", () => {
+  // The fleet "PDF accessibility scoring" band (average grade / score /
+  // PDFs-audited counts) was removed in v1.19.0: the audit.icjia.app
+  // scoring heuristic is still being refined, so the fleet index no longer
+  // surfaces an aggregate grade.
+  const auditedSr = {
+    ...baseSr,
+    summary: {
+      ...baseSr.summary,
+      auditedPdfCount: 40, auditScoreSum: 3000, auditErrorCount: 2, auditPending: 1,
+    },
+  };
+  const html = generateIndexHtml({ siteResults: [auditedSr], password: null });
+
+  it("does not render the PDF accessibility scoring band", () => {
+    expect(html).not.toContain('aria-label="PDF accessibility scoring summary"');
+    expect(html).not.toContain("PDFs audited");
+    expect(html).not.toContain("Accessibility scores come from");
   });
 });

@@ -27,7 +27,6 @@
 //   base 70 → +20 for time gap ≥30d → +5 for hash-only difference
 //   capped at 95, floored at 0 (newer-than-live or no-live-sibling).
 
-const STRAPI_HASH_RE = /_(?<hash>[a-f0-9]{10})(?=\.[^.]+$|$)/;
 const VERSION_RE_PATTERNS = [
   /[ _-][vV]\d+$/, //  _v2 / -V3
   / \(\d+\)$/, // " (1)"
@@ -41,7 +40,7 @@ export function normalizeStem(filename) {
   // Split extension: last "." in the basename. No extension → ext = "".
   const lastDot = filename.lastIndexOf(".");
   let stemRaw = lastDot > 0 ? filename.slice(0, lastDot) : filename;
-  let extension = lastDot > 0 ? filename.slice(lastDot + 1).toLowerCase() : "";
+  const extension = lastDot > 0 ? filename.slice(lastDot + 1).toLowerCase() : "";
 
   const stripped = {};
 
@@ -120,7 +119,7 @@ function pickReplacement(orphan, liveSiblings) {
   return sorted[0];
 }
 
-function computeConfidence({ orphan, replacement, daysBetween, reasons }) {
+function computeConfidence({ replacement, daysBetween, reasons }) {
   if (!replacement) return 0;
   if (reasons.includes("newer-than-live")) return 0;
   let score = 70;

@@ -22,7 +22,7 @@ const HEADER = [
 ];
 
 function csvCell(v) {
-  if (v == null) return "";
+  if (v === null || v === undefined) return "";
   const s = String(v);
   if (s.includes('"') || s.includes(",") || s.includes("\n") || s.includes("\r")) {
     return `"${s.replace(/"/g, '""')}"`;

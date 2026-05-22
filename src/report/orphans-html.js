@@ -6,7 +6,7 @@
 import { humanizeBytes } from "./format.js";
 
 function htmlEscape(s) {
-  if (s == null) return "";
+  if (s === null || s === undefined) return "";
   return String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -165,7 +165,7 @@ function tableRow(orphan, sourcesByServer) {
   <td class="filename-cell">${filenameCell}<div class="path-hint">${htmlEscape(e.path ?? "")}</div></td>
   <td>${htmlEscape(e.extension ?? "")}</td>
   <td class="size-cell" data-bytes="${e.sizeBytes ?? 0}">${htmlEscape(humanizeBytes(e.sizeBytes ?? 0))}</td>
-  <td>${htmlEscape(e.modifiedAt ? e.modifiedAt.slice(0, 10) : "")}<div class="days-old">${orphan.daysOld != null ? `${orphan.daysOld}d ago` : ""}</div></td>
+  <td>${htmlEscape(e.modifiedAt ? e.modifiedAt.slice(0, 10) : "")}<div class="days-old">${orphan.daysOld !== null && orphan.daysOld !== undefined ? `${orphan.daysOld}d ago` : ""}</div></td>
   <td>${statusBadge(orphan.status)}</td>
   <td class="confidence-cell ${confClass}">${confidence}%</td>
   <td>${replacedByHtml}</td>

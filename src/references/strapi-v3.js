@@ -142,7 +142,7 @@ export function extractEntryUrls(entry, classifiedFields, restApiBase) {
 
   for (const { kind, fieldName } of classifiedFields) {
     const value = entry[fieldName];
-    if (value == null) continue;
+    if (value === null || value === undefined) continue;
 
     if (kind === "url-string" && typeof value === "string") {
       addCandidate(value);

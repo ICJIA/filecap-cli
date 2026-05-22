@@ -146,7 +146,7 @@ function renderFileErrorsSection(fileErrors) {
 `;
 }
 
-function renderDuplicatesSection(groups, duplicatesCsv) {
+function renderDuplicatesSection(groups, _duplicatesCsv) {
   if (!groups || groups.length === 0) return "";
 
   // v1.7.19: classify each duplicate group's filename so the on-page table
@@ -536,8 +536,6 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   // `||` (not `??`) so an empty-string siteFullName falls through to siteName.
   // Same rationale as commit 01c1d4e on the detail-page H1.
   const fullName = he(site.siteFullName || site.siteName || site.name || "");
-  const hostname = he(site.host ?? "");
-  const ip = he(sr.header?.metadata?.serverIp ?? site.host ?? "");
   const accessKind = site.accessKind && ACCESS_CHIP_LABEL[site.accessKind] ? site.accessKind : null;
   const accessLabel = accessKind ? ACCESS_CHIP_LABEL[accessKind] : "";
 
@@ -627,7 +625,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
     <p class="nickname">${nickname}</p>
     <h3 class="full-name">${fullName}</h3>
-    ${publicUrlBaseRaw ? `<p class="site-url"><span>${publicUrlBase}</span></p>` : ""}
+    ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
   </header>
   <div class="nums">
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
@@ -678,45 +676,16 @@ export function generateIndexHtml({
   // hasn't (git Nuxt sites, intranet pre-bearer-token) sit in refsUnknown.
   // The headline % is computed against the resolved denominator so we don't
   // penalise the coverage number for sites we haven't extended to yet.
-  // v1.9.0 audit-band totals
-  let fleetAuditedPdfCount = 0;
-  let fleetAuditScoreSum = 0;
-  let fleetAuditErrorCount = 0;
-  let fleetAuditPending = 0;
-
   for (const sr of siteResults) {
     const s = sr.summary ?? {};
     fleetTotalFiles += s.totalFiles ?? 0;
     fleetRemediable += s.remediable ?? 0;
-    fleetAuditedPdfCount += s.auditedPdfCount ?? 0;
-    fleetAuditScoreSum += s.auditScoreSum ?? 0;
-    fleetAuditErrorCount += s.auditErrorCount ?? 0;
-    fleetAuditPending += s.auditPending ?? 0;
     if (s.byCategory) {
       for (const [cat, n] of Object.entries(s.byCategory)) {
         fleetByCategory[cat] = (fleetByCategory[cat] ?? 0) + n;
       }
     }
   }
-
-  const fleetNonRemediable = fleetTotalFiles - fleetRemediable;
-
-  // v1.9.0 fleet-wide audit averages. Only PDFs are scored; the average
-  // is computed across PDFs that actually got a score (not pending /
-  // error). Grade letter is derived from the same brackets used per-file:
-  //   90-100 → A, 80-89 → B, 70-79 → C, 60-69 → D, < 60 → F.
-  const fleetAvgScore = fleetAuditedPdfCount > 0
-    ? Math.round(fleetAuditScoreSum / fleetAuditedPdfCount)
-    : null;
-  function gradeFor(score) {
-    if (score === null || typeof score !== "number") return null;
-    if (score >= 90) return "A";
-    if (score >= 80) return "B";
-    if (score >= 70) return "C";
-    if (score >= 60) return "D";
-    return "F";
-  }
-  const fleetAvgGrade = gradeFor(fleetAvgScore);
 
   // Manager-friendly categories for the by-type breakdown tables
   const remediableCategories = [
@@ -1488,9 +1457,10 @@ main {
    non-interactive descendant pointer-events:none so the click falls
    through to the link, then explicitly re-enable pointer-events on the
    real interactive elements (action buttons + tech-details disclosure
-   summary). The site-url anchor in the card-head intentionally stays
-   click-through so the whole card maps to one action — go to the detail
-   page. */
+   summary). v1.19.0: the site-url anchor is now a real link to the live
+   site, opened in a new tab — it's in the pointer-events:auto list below
+   and lifted above the overlay; every other card surface still routes the
+   click to the detail page. */
 .site-card > *:not(.card-stretched-link),
 .site-card > *:not(.card-stretched-link) * {
   pointer-events: none;
@@ -1499,6 +1469,7 @@ main {
 .site-card .tech-details summary,
 .site-card .tech-details .meta-copy,
 .site-card .tech-details .meta-value a,
+.site-card .site-url a,
 .site-card .access-chip {
   pointer-events: auto;
 }
@@ -1533,7 +1504,18 @@ main {
   font-size: 0.85em;
   color: var(--fc-text-muted, #9aa5b1);
 }
-.site-card .site-url span { color: var(--fc-accent, #4dabf7); }
+/* v1.19.0 — the site URL is a real link to the live site, opened in a new
+   tab. position + z-index lift the anchor above the card's stretched-link
+   overlay (z-index 0); pointer-events:auto (set in the rule above) re-enables
+   the click the card-wide pointer-events:none would otherwise swallow. */
+.site-card .site-url a {
+  position: relative;
+  z-index: 2;
+  color: var(--fc-accent, #4dabf7);
+  text-decoration: none;
+}
+.site-card .site-url a:hover,
+.site-card .site-url a:focus-visible { text-decoration: underline; }
 
 /* v1.7.6 — access-method chip in the card-head eyebrow position. Three
    variants (Strapi/GitHub/Server) with distinct hue so a manager can scan
@@ -2992,33 +2974,6 @@ dialog.access-modal .access-modal-cta a {
       else if (fleetPctInt <= 88)       fleetPhrase = "Most may need audit";
       else                              fleetPhrase = "Nearly all may need audit";
       const fleetAriaLabel = `${fleetRemediable.toLocaleString()} of ${fleetTotalFiles.toLocaleString()} files may need accessibility audit, ${fleetPctInt} percent.`;
-      // v1.9.0: accessibility-score band. Only rendered when at least one
-      // PDF has been audited; sites / fleets that haven't run the audits
-      // step show nothing extra.
-      const auditBandHtml = fleetAuditedPdfCount > 0 ? `
-      <div class="fleet-audit-band" role="region" aria-label="PDF accessibility scoring summary">
-        <p class="fleet-audit-eyebrow">PDF accessibility scoring</p>
-        <div class="fleet-audit-row">
-          <div class="fleet-audit-stat">
-            <span class="fleet-audit-grade fleet-audit-grade-${fleetAvgGrade ? fleetAvgGrade.toLowerCase() : "x"}">${he(fleetAvgGrade ?? "—")}</span>
-            <span class="fleet-audit-lbl">average score <strong>(${fleetAvgScore ?? "—"})</strong></span>
-          </div>
-          <div class="fleet-audit-stat">
-            <span class="fleet-audit-num">${he(fleetAuditedPdfCount.toLocaleString())}</span>
-            <span class="fleet-audit-lbl">PDFs audited</span>
-          </div>
-          ${fleetAuditPending > 0 ? `<div class="fleet-audit-stat">
-            <span class="fleet-audit-num fleet-audit-num-dim">${he(fleetAuditPending.toLocaleString())}</span>
-            <span class="fleet-audit-lbl">PDFs awaiting audit</span>
-          </div>` : ""}
-          ${fleetAuditErrorCount > 0 ? `<div class="fleet-audit-stat">
-            <span class="fleet-audit-num fleet-audit-num-dim">${he(fleetAuditErrorCount.toLocaleString())}</span>
-            <span class="fleet-audit-lbl">PDFs with audit errors</span>
-          </div>` : ""}
-        </div>
-        <p class="fleet-audit-context">Accessibility scores come from <a href="https://audit.icjia.app" target="_blank" rel="noopener">audit.icjia.app</a> — strict WCAG 2.1 AA + IITAA §E205.4 scoring. Click "Open report" on any PDF row for the per-file breakdown and remediation hints. Spreadsheets, Word docs, and PowerPoints are not scored here; use their authoring apps' built-in checkers.</p>
-      </div>
-      ` : "";
       return `<div class="fleet-hero" role="img" aria-label="${he(fleetAriaLabel)}">
       <div class="fleet-hero-num-block">
         <p class="fleet-hero-eyebrow">Files that may need accessibility audit</p>
@@ -3031,8 +2986,7 @@ dialog.access-modal .access-modal-cta a {
         </div>
         <p class="fleet-hero-phrase"><strong>${he(fleetPhrase)}</strong></p>
       </div>
-    </div>
-    ${auditBandHtml}`;
+    </div>`;
     })()}
   </section>
 

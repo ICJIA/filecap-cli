@@ -13,11 +13,16 @@ export function generateNetlifyToml() {
   for = "/*.html"
   [headers.values]
     Cache-Control = "public, max-age=300"
-    X-Robots-Tag = "noindex, nofollow"
 
+# v1.19.0 — X-Robots-Tag applies to /* (not just /*.html) so the CSVs, the
+# consolidated NDJSON, and the context .md are noindex too. This bundle is
+# internal-only; nothing in it should be indexed. robots.txt already
+# Disallows everything, but the header is the directive that search engines
+# ignoring robots.txt still honor.
 [[headers]]
   for = "/*"
   [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer"

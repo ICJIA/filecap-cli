@@ -117,7 +117,7 @@ describe("writeHtml", () => {
     // v1.12.0: the HTML table shows only the six columns a manager acts on.
     expect(html).toContain('<th data-col="filename">File name</th>');
     expect(html).toContain('<th data-col="category">File type</th>');
-    expect(html).toContain('<th data-col="auditScore">Audit Score</th>');
+    expect(html).toContain('<th data-col="auditScore">Audit Report</th>');
     expect(html).toContain('<th data-col="referenced">Page References</th>');
     expect(html).toContain('<th data-col="duplicateOf">Duplicate of</th>');
     expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
@@ -129,6 +129,27 @@ describe("writeHtml", () => {
     const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
     expect(theadMatch).not.toBeNull();
     expect((theadMatch[1].match(/<th /g) || []).length).toBe(6);
+  });
+
+  // v1.19.0 — the file table's Audit Report cell renders only an "Open
+  // report" link; the grade chip + numeric score were removed because the
+  // audit.icjia.app scoring heuristic is still being refined.
+  it("renders the Audit Report cell as an 'Open report' link with no grade chip or score", async () => {
+    const out = path.join(tmpDir, "auditcell.html");
+    const entries = [{ ...sampleEntries[0], audit: { score: 84, grade: "B", reportUrl: "https://audit.icjia.app/report/abc123" } }];
+    await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/<a class="audit-report-link" href="https:\/\/audit\.icjia\.app\/report\/abc123"[^>]*>Open report<\/a>/);
+    expect(html).not.toMatch(/<span class="audit-grade audit-grade-b"/);
+    expect(html).not.toContain('<span class="audit-score-num">(84)</span>');
+  });
+
+  it("renders the Audit Report cell as 'Unavailable' when the audit errored", async () => {
+    const out = path.join(tmpDir, "auditerr.html");
+    const entries = [{ ...sampleEntries[0], audit: { error: "HTTP 422" } }];
+    await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toContain("Unavailable");
   });
 
   it("flags image-only PDFs visually (e.g. row class or badge)", async () => {

@@ -30,22 +30,21 @@ export const CSV_COLUMNS = [
   //                          unresolved refs don't silently collide with the
   //                          "" / "not run" state.
   { name: "referenced",   label: "Page References" },
-  // v1.9.0+: PDF audit score + report link, combined into a single column
-  // (1.10.2) for symmetry with the Page References column — managers read
-  // the chip and the link as one signal, not two adjacent cells. Slot 6
-  // (immediately after Page References) so the file's referrers, score,
-  // and per-issue drill-down sit side-by-side.
+  // v1.9.0+: the per-PDF audit column. Slot 6 (immediately after Page
+  // References) so the file's referrers and its audit report sit side by
+  // side. v1.19.0: the column no longer prints the numeric score / letter
+  // grade — the audit.icjia.app scoring heuristic is still being refined,
+  // so the cell links to the report instead of asserting a grade — and
+  // the column is labelled "Audit Report" (it points at a report).
   //
   // Cell value semantics (CSV):
   //   undefined audit               → "" (audits step not run)
   //   audit.skipped (e.g. no URL)   → "" (we tried but couldn't)
   //   audit.error                   → "Unavailable"
-  //   audit.score is a number       → "<grade> (<score>)" on line 1, the
-  //                                    audit.icjia.app report URL on line 2
-  //                                    (multi-line cell; Excel + Sheets auto-
-  //                                    hyperlink the URL on open).
+  //   audited PDF with a report     → the audit.icjia.app report URL
+  //                                    (Excel + Sheets auto-hyperlink it)
   //   non-PDF entries               → "" (audits step doesn't touch them)
-  { name: "auditScore",   label: "Audit Score" },
+  { name: "auditScore",   label: "Audit Report" },
   { name: "modifiedAt",   label: "Date published" },
   { name: "scannedPath",  label: "Source folder on server" },
   { name: "path",         label: "File location (relative to source folder)" },
@@ -103,7 +102,6 @@ function formatValue(v) {
 }
 
 function formatReferenced(refs) {
-  if (refs == null) return "";
   if (!Array.isArray(refs)) return "";
   if (refs.length === 0) return "No";
   // 1.8.0-beta.5: emit one line per reference. When a reference lacks a
@@ -115,24 +113,24 @@ function formatReferenced(refs) {
     .join("\n");
 }
 
-// 1.9.0: format the audit.icjia.app score into a CSV cell.
-// 1.10.2: combined with the report URL so score + report drill-down read
-// as one signal (matches the multi-line Page References cell pattern).
-//   "<grade> (<score>)\n<reportUrl>"   — when both are present
-//   "<grade> (<score>)"                — when no reportUrl available
-//   "Unavailable"                      — audit.error set
-//   ""                                 — undefined / skipped / not a PDF
+// 1.9.0: format the audit.icjia.app audit into a CSV cell.
+// 1.19.0: the numeric score + letter grade are no longer written into the
+// cell — the audit.icjia.app scoring heuristic is still being refined, so
+// the spreadsheet links to the report rather than stating a grade. The
+// cell holds only the report URL (Excel + Sheets auto-hyperlink it on
+// open); the score lives in that report.
+//   "<reportUrl>"   — audited PDF that has a report
+//   "Unavailable"   — audit.error set
+//   ""              — undefined / skipped / not a PDF / audited but no report
 function formatAuditScore(audit) {
   if (!audit || typeof audit !== "object") return "";
   if (audit.skipped) return "";
   if (audit.error) return "Unavailable";
   if (typeof audit.score !== "number") return "";
-  const grade = typeof audit.grade === "string" ? audit.grade : "?";
-  const base = `${grade} (${audit.score})`;
   if (typeof audit.reportUrl === "string" && audit.reportUrl.length > 0) {
-    return `${base}\n${audit.reportUrl}`;
+    return audit.reportUrl;
   }
-  return base;
+  return "";
 }
 
 function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {

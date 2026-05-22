@@ -115,7 +115,7 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
   // v1.12.2: web-rollup passes the site's pathPrefix (from sites.json); the
   // scanned inventory header doesn't carry it. Inject it so buildPublicUrl
   // (csv.js + html.js) can prefix git-site URLs (e.g. the /static deploys).
-  if (pathPrefix != null && header.metadata) {
+  if (pathPrefix !== null && pathPrefix !== undefined && header.metadata) {
     header.metadata.pathPrefix = pathPrefix;
   }
 

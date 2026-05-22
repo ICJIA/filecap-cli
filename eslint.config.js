@@ -13,6 +13,7 @@ export default [
         setTimeout: "readonly",
         clearTimeout: "readonly",
         fetch: "readonly",
+        AbortSignal: "readonly",
         globalThis: "readonly",
       },
     },
