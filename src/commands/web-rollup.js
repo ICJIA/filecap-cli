@@ -20,7 +20,7 @@ import { generateAccessibilityPage } from "../web/accessibility-page.js";
 import { currentStatus, accessibilityLog } from "../web/accessibility-log.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
-import { generateNetlifyToml, generateNetlifyRedirects } from "../web/netlify-config.js";
+import { generateNetlifyToml, generateNetlifyRedirects, generateNetlifyHeaders } from "../web/netlify-config.js";
 import { darkModeCss } from "../web/styles.js";
 
 // FC-2026-007: Zod schema for sites.json validation
@@ -1251,12 +1251,14 @@ export async function runWebRollup({
   // 7. Generate robots.txt
   await fs.writeFile(path.join(output, "robots.txt"), generateRobotsTxt());
 
-  // 8. Generate netlify.toml + _redirects. The latter aliases lowercase
-  // and extension-less variants of each per-site report URL to the
-  // canonical Z.html file so a manager typing a URL by hand or pasting
-  // one that got case-mangled lands on the right page.
+  // 8. Generate netlify.toml + _redirects + _headers. _redirects aliases
+  // lowercase and extension-less variants of each per-site report URL to
+  // the canonical Z.html file. _headers carries the X-Robots-Tag +
+  // security headers — Netlify does NOT apply netlify.toml [[headers]] on
+  // a no-build manual `netlify deploy --dir`, only a _headers file.
   await fs.writeFile(path.join(output, "netlify.toml"), generateNetlifyToml());
   await fs.writeFile(path.join(output, "_redirects"), generateNetlifyRedirects(siteResults));
+  await fs.writeFile(path.join(output, "_headers"), generateNetlifyHeaders());
 
   // 9. Generate shared CSS
   await fs.writeFile(path.join(output, "assets", "style.css"), darkModeCss());

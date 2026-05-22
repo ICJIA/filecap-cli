@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.19.1] — 2026-05-22
+
+### Fixed
+
+- **Security + `X-Robots-Tag` headers now actually reach the deployed bundle.** v1.19.0 set them in `netlify.toml` `[[headers]]`, but Netlify does **not** apply `netlify.toml` header blocks on a no-build manual `netlify deploy --dir` — only a `_headers` *file* (the same file-based mechanism as `_redirects`) is honored. `web-rollup` now also emits a `_headers` file putting `X-Robots-Tag: noindex, nofollow`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: no-referrer` on `/*`, so they take effect on every file in the bundle. `robots.txt` (`Disallow: /`) was already live. New `generateNetlifyHeaders()` in `src/web/netlify-config.js`; `web-rollup` writes the file alongside `netlify.toml` and `_redirects`.
+
+### Tests
+
+766 passing (+2 — `generateNetlifyHeaders` content; the bundle emits a `_headers` file).
+
 ## [1.19.0] — 2026-05-22
 
 ### Changed

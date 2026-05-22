@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { computeHash, injectPasswordGate } from "../src/web/password-gate.js";
 import { generateRobotsTxt } from "../src/web/robots.js";
 import { darkModeCss, DESIGN_TOKENS } from "../src/web/styles.js";
-import { generateNetlifyToml } from "../src/web/netlify-config.js";
+import { generateNetlifyToml, generateNetlifyHeaders } from "../src/web/netlify-config.js";
 
 describe("computeHash", () => {
   it("returns a 64-character lowercase hex string", () => {
@@ -77,6 +77,21 @@ describe("generateRobotsTxt", () => {
   it("is a non-empty string", () => {
     expect(typeof generateRobotsTxt()).toBe("string");
     expect(generateRobotsTxt().length).toBeGreaterThan(0);
+  });
+});
+
+describe("generateNetlifyHeaders", () => {
+  it("emits a _headers file with X-Robots-Tag noindex on /*", () => {
+    const h = generateNetlifyHeaders();
+    expect(h).toContain("/*");
+    expect(h).toContain("X-Robots-Tag: noindex, nofollow");
+  });
+
+  it("includes the response-hardening security headers", () => {
+    const h = generateNetlifyHeaders();
+    expect(h).toContain("X-Frame-Options: DENY");
+    expect(h).toContain("X-Content-Type-Options: nosniff");
+    expect(h).toContain("Referrer-Policy: no-referrer");
   });
 });
 

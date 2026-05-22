@@ -178,6 +178,7 @@ describe("runWebRollup", () => {
     const files = await fs.readdir(outputDir);
     expect(files).toContain("index.html");
     expect(files).toContain("robots.txt");
+    expect(files).toContain("_headers");
     expect(files).toContain("assets");
 
     const assets = await fs.readdir(path.join(outputDir, "assets"));
