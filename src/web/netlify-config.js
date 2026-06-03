@@ -9,6 +9,14 @@ export function generateNetlifyToml() {
     Cache-Control = "public, max-age=3600"
     Content-Disposition = "attachment"
 
+# v1.20.0: downloadable reports moved from .csv to .xlsx (multi-sheet
+# workbooks). Same cache + force-download treatment.
+[[headers]]
+  for = "/*.xlsx"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+    Content-Disposition = "attachment"
+
 [[headers]]
   for = "/*.html"
   [headers.values]

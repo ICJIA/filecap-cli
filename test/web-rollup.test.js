@@ -195,18 +195,19 @@ describe("runWebRollup", () => {
     expect(html).toContain("<h1>Accessibility</h1>");
   });
 
-  it("emits a fleet file-errors report (audit-file-errors.html + .csv)", async () => {
+  it("emits a fleet file-errors report (audit-file-errors.html + .xlsx) — v1.20.0", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
 
     const files = await fs.readdir(outputDir);
     expect(files).toContain("audit-file-errors.html");
-    expect(files).toContain("audit-file-errors.csv");
+    expect(files).toContain("audit-file-errors.xlsx");
+    expect(files).not.toContain("audit-file-errors.csv");
     const html = await fs.readFile(path.join(outputDir, "audit-file-errors.html"), "utf8");
     expect(html).toContain("<h1>File errors</h1>");
   });
 
-  it("names per-site files as <slug>-<timestamp>.html and .csv", async () => {
+  it("names per-site files as <slug>-<timestamp>.html and .xlsx (v1.20.0: was .csv)", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture({
       siteName: "DVFR",
       scannedAt: "2026-05-09T16:05:04.000Z",
@@ -215,10 +216,11 @@ describe("runWebRollup", () => {
 
     const files = await fs.readdir(outputDir);
     expect(files.some((f) => f.match(/^dvfr-20260509-160504Z\.html$/))).toBe(true);
-    expect(files.some((f) => f.match(/^dvfr-20260509-160504Z\.csv$/))).toBe(true);
+    expect(files.some((f) => f.match(/^dvfr-20260509-160504Z\.xlsx$/))).toBe(true);
+    expect(files.some((f) => f.match(/^dvfr-20260509-160504Z\.csv$/))).toBe(false);
   });
 
-  it("index.html references the per-site HTML and CSV files", async () => {
+  it("index.html references the per-site HTML and XLSX files (v1.20.0)", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture({
       siteName: "DVFR",
       scannedAt: "2026-05-09T16:05:04.000Z",
@@ -227,7 +229,8 @@ describe("runWebRollup", () => {
 
     const index = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
     expect(index).toContain("dvfr-20260509-160504Z.html");
-    expect(index).toContain("dvfr-20260509-160504Z.csv");
+    expect(index).toContain("dvfr-20260509-160504Z.xlsx");
+    expect(index).not.toContain("dvfr-20260509-160504Z.csv");
   });
 
   it("robots.txt contains User-agent: * / Disallow: /", async () => {
@@ -503,29 +506,17 @@ describe("runWebRollup", () => {
     });
   });
 
-  describe("by-file-type detail pages + CSVs (v1.7.14)", () => {
-    it("emits one CSV per non-empty bucket (audit-pdfs.csv, audit-docx.csv, …)", async () => {
+  describe("by-file-type detail pages + audit.xlsx (v1.20.0)", () => {
+    it("emits per-type HTML and a single shared audit.xlsx (no per-bucket CSVs)", async () => {
       const { sitesFile, outputDir, auditsBase } = await buildFixture();
       await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
       const files = await fs.readdir(outputDir);
-      // The default fixture inserts PDFs, so at least audit-pdfs.csv should exist.
-      expect(files).toContain("audit-pdfs.csv");
+      // v1.20.0: per-type HTML stays; the per-bucket CSVs are gone, replaced by
+      // a single multi-sheet audit.xlsx covering all remediable buckets.
       expect(files).toContain("audit-pdfs.html");
-    });
-
-    it("the by-type CSV mirrors the master CSV's columns for entries of that category", async () => {
-      const { sitesFile, outputDir, auditsBase } = await buildFixture();
-      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
-      const masterCsv = await fs.readFile(path.join(outputDir, "audit-file-list-master.csv"), "utf8");
-      const pdfsCsv = await fs.readFile(path.join(outputDir, "audit-pdfs.csv"), "utf8");
-      // Same header row.
-      expect(pdfsCsv.split("\n")[0]).toBe(masterCsv.split("\n")[0]);
-      // Every data row in audit-pdfs.csv should also appear in the master CSV.
-      const pdfDataRows = pdfsCsv.split("\n").slice(1).filter(Boolean);
-      const masterDataRows = new Set(masterCsv.split("\n").slice(1).filter(Boolean));
-      for (const r of pdfDataRows) {
-        expect(masterDataRows.has(r)).toBe(true);
-      }
+      expect(files).toContain("audit.xlsx");
+      expect(files).not.toContain("audit-pdfs.csv");
+      expect(files).not.toContain("audit-docx.csv");
     });
 
     it("the by-type HTML detail page has the same dp-hero block as a per-site report", async () => {
@@ -536,22 +527,37 @@ describe("runWebRollup", () => {
       expect(html).toMatch(/<header class="dp-hero">/);
       // Title is the bucket label ("PDFs")
       expect(html).toMatch(/<h1 class="dp-title">PDFs<\/h1>/);
-      // CSV download link in the sticky bar points to the bucket's CSV
-      expect(html).toMatch(/<a class="report-csv-link" href="audit-pdfs\.csv" download>/);
+      // v1.20.0: download link in the sticky bar points to the shared workbook
+      expect(html).toMatch(/<a class="report-csv-link" href="audit\.xlsx" download>/);
       // Back link returns to the fleet index
       expect(html).toMatch(/<a class="report-back-link" href="index\.html">/);
       // Eyebrow says it's the across-the-fleet view, not a single site
       expect(html).toContain("Across the fleet");
     });
 
-    it("the index by-type table wraps each row label in a link to the detail page", async () => {
+    it("the index by-type table links labels to per-type HTML and counts to audit.xlsx", async () => {
       const { sitesFile, outputDir, auditsBase } = await buildFixture();
       await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
       const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-      // Label → HTML detail page
+      // Label → HTML detail page (unchanged)
       expect(html).toMatch(/<a class="by-type-link" href="audit-pdfs\.html"[^>]*>PDFs/);
-      // Count → CSV
-      expect(html).toMatch(/<a class="by-type-csv-link" href="audit-pdfs\.csv" download/);
+      // v1.20.0: count link points at the shared audit.xlsx for every
+      // remediable bucket. PDF row is the easiest to assert on.
+      expect(html).toMatch(/<a class="by-type-csv-link" href="audit\.xlsx" download/);
+    });
+
+    it("audit.xlsx is a real parseable workbook with one tab per non-empty remediable bucket", async () => {
+      const { sitesFile, outputDir, auditsBase } = await buildFixture();
+      await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.readFile(path.join(outputDir, "audit.xlsx"));
+      const sheetNames = wb.worksheets.map((w) => w.name);
+      // The default fixture seeds PDFs only, so the workbook should have a
+      // PDFs tab and no others.
+      expect(sheetNames).toContain("PDFs");
+      expect(sheetNames).not.toContain("DOCX");
+      expect(sheetNames).not.toContain("Images");
     });
 
     it("skips buckets that have zero matching files (no empty CSV/HTML pairs)", async () => {
@@ -1002,36 +1008,42 @@ describe("findCrossServerDuplicates", () => {
   });
 });
 
-describe("runWebRollup — master CSV + duplicates", () => {
-  it("writes audit-file-list-master.csv to the output dir", async () => {
+describe("runWebRollup — master XLSX + duplicates", () => {
+  it("writes audit-file-list-master.xlsx to the output dir (v1.20.0: was .csv)", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
     expect(result.exitCode).toBe(0);
-    const masterPath = path.join(outputDir, "audit-file-list-master.csv");
+    const masterPath = path.join(outputDir, "audit-file-list-master.xlsx");
     const stat = await fs.stat(masterPath);
     expect(stat.size).toBeGreaterThan(0);
   });
 
-  it("master CSV header matches the per-site header and includes site rows", async () => {
+  it("master XLSX has the CSV_COLUMNS header row and a remediable-only data area", async () => {
     const { sitesFile, outputDir, auditsBase, siteName } = await buildFixture({
       siteServerName: "dvfr-prod",
     });
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
-    const master = await fs.readFile(path.join(outputDir, "audit-file-list-master.csv"), "utf8");
-    expect(master).toContain("Server");
-    expect(master).toContain("File name");
-    // Body rows carry the server-name so manager can tell which site each row came from
-    expect(master).toContain("dvfr-prod");
-    // siteName (Website column) comes from sites.json fallback even when the
-    // NDJSON header didn't carry one
-    expect(master).toContain(siteName);
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(path.join(outputDir, "audit-file-list-master.xlsx"));
+    const sheet = wb.worksheets[0];
+    const headerLabels = [];
+    sheet.getRow(1).eachCell((cell) => headerLabels.push(String(cell.value)));
+    expect(headerLabels).toContain("Server");
+    expect(headerLabels).toContain("File name");
+    expect(headerLabels).toContain("Page Count");
+    // The first data row carries the server-name so manager can tell which site each row came from
+    const firstDataRow = [];
+    sheet.getRow(2).eachCell((cell) => firstDataRow.push(String(cell.value ?? "")));
+    expect(firstDataRow).toContain("dvfr-prod");
+    expect(firstDataRow).toContain(siteName);
   });
 
-  it("index.html links to the master CSV", async () => {
+  it("index.html links to the master XLSX", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).toMatch(/href="audit-file-list-master\.csv"/);
+    expect(html).toMatch(/href="audit-file-list-master\.xlsx"/);
     expect(html).toContain("Master spreadsheet");
   });
 
@@ -1159,8 +1171,8 @@ describe("writeDuplicatesCsv", () => {
   });
 });
 
-describe("runWebRollup — duplicates CSV", () => {
-  it("writes audit-file-duplicates.csv when cross-server duplicates exist (v1.7.17: file still emitted, link removed from index)", async () => {
+describe("runWebRollup — duplicates XLSX (v1.20.0: was CSV)", () => {
+  it("writes audit-file-duplicates.xlsx when cross-server duplicates exist", async () => {
     const auditsBase = path.join(tmpDir, "filecap-audits");
     for (const sn of ["dvfr", "archive"]) {
       const latestDir = path.join(auditsBase, sn, "latest");
@@ -1177,27 +1189,23 @@ describe("runWebRollup — duplicates CSV", () => {
     const outputDir = path.join(tmpDir, "output");
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
 
-    // The CSV is STILL written to disk (the audit lead can still retrieve it
-    // by direct URL or by inspecting the bundle directory) — v1.7.17 only
-    // removed the download button from the index page.
-    const dupCsvPath = path.join(outputDir, "audit-file-duplicates.csv");
-    const stat = await fs.stat(dupCsvPath);
+    const dupXlsxPath = path.join(outputDir, "audit-file-duplicates.xlsx");
+    const stat = await fs.stat(dupXlsxPath);
     expect(stat.size).toBeGreaterThan(0);
+    // v1.20.0: the old .csv file should NOT exist
+    await expect(fs.stat(path.join(outputDir, "audit-file-duplicates.csv"))).rejects.toThrow();
 
-    // The index page should NOT link to the CSV (no download button + no
-    // direct mention of the filename in a clickable context).
+    // The index page should NOT link to the duplicates download (callout-only).
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).not.toMatch(/href="audit-file-duplicates\.csv"/);
-    // And the new info-only callout should be present instead.
+    expect(html).not.toMatch(/href="audit-file-duplicates\.(csv|xlsx)"/);
     expect(html).toContain("For information only");
     expect(html).toContain("Don&#39;t treat this list as a delete-worksheet");
   });
 
-  it("does not write the duplicates CSV when no cross-server duplicates exist", async () => {
+  it("does not write the duplicates XLSX when no cross-server duplicates exist", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
-    const dupCsvPath = path.join(outputDir, "audit-file-duplicates.csv");
-    await expect(fs.stat(dupCsvPath)).rejects.toThrow();
+    await expect(fs.stat(path.join(outputDir, "audit-file-duplicates.xlsx"))).rejects.toThrow();
   });
 });
 

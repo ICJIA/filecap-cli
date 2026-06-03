@@ -1,5 +1,6 @@
 import { injectPasswordGate } from "./password-gate.js";
 import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
+import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 
 /**
  * Escape a value for safe insertion into HTML.
@@ -88,7 +89,7 @@ function renderLlmContextSection(llmContext) {
         <li><strong>Attach both files</strong> using the tool's file-upload button. Upload the <code>${he(llmContext.contextMdFilename)}</code> first so the AI reads the narrative + schema; then upload <code>${he(llmContext.ndjsonFilename)}</code> as the actual data.</li>
         <li><strong>Ask questions</strong> in plain English. Example starter prompts are inside <code>${he(llmContext.contextMdFilename)}</code>. The AI will read the data file and answer based on what's actually in your audit.</li>
       </ol>
-      <p class="llm-context-actionable-reminder"><strong>The CSVs are still the actionable files.</strong> If the AI suggests "let me mark these files for deletion," redirect it to the <code>audit-file-list-master.csv</code> file — that's where the <code>Delete?</code> and <code>Notes</code> columns live, and that's the file staff hands back to the audit team to actually remove flagged files. The AI files exist for asking and learning, not for changing.</p>
+      <p class="llm-context-actionable-reminder"><strong>The XLSX workbooks are still the actionable files.</strong> If the AI suggests "let me mark these files for deletion," redirect it to <code>audit-file-list-master.xlsx</code> — that's where the <code>Delete?</code> and <code>Notes</code> columns live, and that's the file staff hands back to the audit team to actually remove flagged files. The AI files exist for asking and learning, not for changing.</p>
     </details>
   </section>`;
 }
@@ -100,8 +101,8 @@ function renderMasterCsvSection(masterCsv) {
   const lastAudit = masterCsv.lastAuditAt ? fmtAuditDate(masterCsv.lastAuditAt) : "";
   return `
   <section class="section master-csv">
-    <h2>Master spreadsheet — every file across every server</h2>
-    <p>If you'd rather skim a single spreadsheet instead of per-site files, this combined CSV has every file from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from. The CSV also has two empty columns — <strong>Delete?</strong> and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit. Put <code>X</code>, <code>YES</code>, or anything non-blank in the Delete? cell for any file you want removed.</p>
+    <h2>Master spreadsheet — every remediable file across every server</h2>
+    <p>If you'd rather skim a single workbook instead of per-site files, this combined XLSX has every <em>remediable</em> file (PDFs, DOCX, XLSX, PPTX, legacy Office) from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from. The workbook also has two empty columns — <strong>Delete?</strong> and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit. Put <code>X</code>, <code>YES</code>, or anything non-blank in the Delete? cell for any file you want removed. Non-remediable file types (images, archives, text, web) are excluded from downloads — they show up only in the HTML tables for completeness.</p>
     <p class="master-csv-download">
       <a class="cta-button" href="${he(masterCsv.filename)}" download>
         Download <strong>${he(masterCsv.filename)}</strong>
@@ -120,7 +121,7 @@ function renderOrphansSection(orphans) {
     <p>${he(orphans.orphanCount)} files on the fleet had no detectable references after cross-resolution. ${he(orphans.staleRevisionCount)} look like upgrade-replaced stale revisions (a newer version of the same logical file is still attached). ${he(orphans.trulyUnreferencedCount)} are truly unreferenced — uploaded and never linked.</p>
     <ul class="action-list">
       <li><a href="${he(orphans.htmlFilename)}">Open orphan report (HTML)</a> — sortable table with per-site breakdown, confidence scores, fuzzy-match replacements, reason flags.</li>
-      <li><a href="${he(orphans.csvFilename)}" download>Download orphan report (CSV, ${humanBytes(orphans.csvByteCount ?? 0)})</a> — pivot in Excel/Sheets.</li>
+      <li><a href="${he(orphans.csvFilename)}" download>Download orphan report (XLSX, ${humanBytes(orphans.csvByteCount ?? 0)})</a> — opens in Excel/Numbers/Sheets.</li>
     </ul>
   </section>
 `;
@@ -140,7 +141,7 @@ function renderFileErrorsSection(fileErrors) {
     <p>${blurb}</p>
     <ul class="action-list">
       <li><a href="${he(fileErrors.htmlFilename)}">Open the file-errors report (HTML)</a> — every site, with the specific files, their type, the error, and the likely reason.</li>
-      <li><a href="${he(fileErrors.csvFilename)}" download>Download the file-errors report (CSV)</a> — pivot in Excel/Sheets.</li>
+      <li><a href="${he(fileErrors.csvFilename)}" download>Download the file-errors report (XLSX)</a> — opens in Excel/Numbers/Sheets.</li>
     </ul>
   </section>
 `;
@@ -182,7 +183,7 @@ function renderDuplicatesSection(groups, _duplicatesCsv) {
   const dupReferenceCount  = stats.reference.total;
 
   // One row per group — easier to scan than the per-item-row version. The
-  // per-occurrence detail lives in audit-file-duplicates.csv for pivot work.
+  // per-occurrence detail lives in audit-file-duplicates.xlsx for pivot work.
   const groupRows = groups.map((g) => {
     const items = g.items ?? [];
     // Each site is rendered as a link to its file's public URL (the canonical
@@ -201,7 +202,7 @@ function renderDuplicatesSection(groups, _duplicatesCsv) {
     const sitesText = items.map((i) => i.siteName || i.serverName || "").join(", ");
     const side = sideForFilename(g.normalizedFilename);
     // v1.12.1: HTML table trimmed to the essential columns; the full
-    // per-occurrence detail (dates, sizes) stays in audit-file-duplicates.csv.
+    // per-occurrence detail (dates, sizes) stays in audit-file-duplicates.xlsx.
     return `<tr data-dup-side="${he(side)}">
       <td title="${he(g.normalizedFilename)}">${he(g.normalizedFilename)}</td>
       <td>${matchBadge}</td>
@@ -547,6 +548,20 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   const remediable = summary?.remediable ?? 0;
   const totalBytes = summary?.totalBytes ?? 0;
   const byCategory = summary?.byCategory ?? {};
+  // v1.20.0: per-site approximate remediation pages. Inclusive estimate —
+  // measured PDF pages + per-format averages for DOCX / PPTX / XLSX /
+  // legacy Office. See [[fleet-hero-pages-tooltip]] for the fleet-wide
+  // version of the math.
+  const remediablePages = summary?.remediablePages ?? 0;
+  const sitePdfPagesMeasured = summary?.pdfPagesMeasured ?? 0;
+  const sitePerFmt = summary?.remediablePageCounts ?? {};
+  const sitePagesTooltip = `≈${remediablePages.toLocaleString()} potential remediation pages. `
+    + `${sitePdfPagesMeasured.toLocaleString()} measured PDF pages from pdfjs `
+    + `+ DOCX×${PAGE_ESTIMATES.docx} (${sitePerFmt.docxCount ?? 0}) `
+    + `+ PPTX×${PAGE_ESTIMATES.pptx} (${sitePerFmt.pptxCount ?? 0}) `
+    + `+ XLSX×${PAGE_ESTIMATES.xlsx} (${sitePerFmt.xlsxCount ?? 0}) `
+    + `+ legacy Office×${PAGE_ESTIMATES.legacyOffice} (${sitePerFmt.legacyOfficeCount ?? 0}). `
+    + `Subject to change as files are added, edited, or removed.`;
 
   const pdfCount = byCategory["pdf"] ?? 0;
   const officeCount =
@@ -629,7 +644,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   </header>
   <div class="nums">
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
-    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span></div>
+    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span>${remediablePages > 0 ? `<span class="lbl-sub" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} potential pages</span>` : ""}</div>
   </div>
   <div class="donut-row">
     <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>may need audit</small></div></div>
@@ -670,6 +685,16 @@ export function generateIndexHtml({
   // Fleet totals
   let fleetTotalFiles = 0;
   let fleetRemediable = 0;
+  // v1.20.0: fleet-wide inclusive page-count estimate. Each site's summary
+  // already carries `pdfPagesMeasured` + `remediablePages` (computed by
+  // computeSiteSummary), so the fleet number is just a sum. The chip on the
+  // hero advertises remediation workload in the units vendors quote against.
+  let fleetPdfPagesMeasured = 0;
+  let fleetRemediablePages = 0;
+  let fleetDocxCount = 0;
+  let fleetPptxCount = 0;
+  let fleetXlsxCount = 0;
+  let fleetLegacyOfficeCount = 0;
   const fleetByCategory = {};
   // v1.8.0-beta.6: references coverage rollup. Sites where the references
   // pipeline has run contribute to (withRefs + withoutRefs); sites where it
@@ -680,12 +705,37 @@ export function generateIndexHtml({
     const s = sr.summary ?? {};
     fleetTotalFiles += s.totalFiles ?? 0;
     fleetRemediable += s.remediable ?? 0;
+    fleetPdfPagesMeasured += s.pdfPagesMeasured ?? 0;
+    fleetRemediablePages += s.remediablePages ?? 0;
+    const c = s.remediablePageCounts ?? {};
+    fleetDocxCount += c.docxCount ?? 0;
+    fleetPptxCount += c.pptxCount ?? 0;
+    fleetXlsxCount += c.xlsxCount ?? 0;
+    fleetLegacyOfficeCount += c.legacyOfficeCount ?? 0;
     if (s.byCategory) {
       for (const [cat, n] of Object.entries(s.byCategory)) {
         fleetByCategory[cat] = (fleetByCategory[cat] ?? 0) + n;
       }
     }
   }
+  // Fall back to recomputing the fleet page estimate if any site summary
+  // pre-dates the field — keeps older bundles renderable.
+  if (fleetRemediablePages === 0 && fleetPdfPagesMeasured > 0) {
+    fleetRemediablePages = estimateRemediablePages({
+      pdfPagesMeasured: fleetPdfPagesMeasured,
+      docxCount: fleetDocxCount,
+      pptxCount: fleetPptxCount,
+      xlsxCount: fleetXlsxCount,
+      legacyOfficeCount: fleetLegacyOfficeCount,
+    });
+  }
+  const fleetPagesTooltip = `≈${fleetRemediablePages.toLocaleString()} estimated remediation pages. `
+    + `${fleetPdfPagesMeasured.toLocaleString()} measured PDF pages from pdfjs `
+    + `+ DOCX×${PAGE_ESTIMATES.docx} (${fleetDocxCount}) `
+    + `+ PPTX×${PAGE_ESTIMATES.pptx} (${fleetPptxCount}) `
+    + `+ XLSX×${PAGE_ESTIMATES.xlsx} (${fleetXlsxCount}) `
+    + `+ legacy Office×${PAGE_ESTIMATES.legacyOffice} (${fleetLegacyOfficeCount}). `
+    + `Vendors typically quote per page.`;
 
   // Manager-friendly categories for the by-type breakdown tables
   const remediableCategories = [
@@ -743,7 +793,7 @@ export function generateIndexHtml({
           ? `<a class="by-type-link" href="${he(bucket.htmlFilename)}" aria-label="Open ${he(label)} detail page (${he(n.toLocaleString())} files)">${he(label)}<svg class="by-type-link-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>`
           : he(label);
         const numHtml = bucket?.csvFilename
-          ? `<a class="by-type-csv-link" href="${he(bucket.csvFilename)}" download aria-label="Download ${he(label)} CSV (${he(n.toLocaleString())} files)" title="Download CSV — ${he(label)}">${he(n.toLocaleString())}</a>`
+          ? `<a class="by-type-csv-link" href="${he(bucket.csvFilename)}" download aria-label="Download spreadsheet of ${he(label)} (${he(n.toLocaleString())} files) — opens audit.xlsx" title="Download XLSX — ${he(label)} (tab in audit.xlsx)">${he(n.toLocaleString())}</a>`
           : he(n.toLocaleString());
         return `<tr><td>${labelHtml}</td><td class="num">${numHtml}</td></tr>`;
       })
@@ -761,6 +811,20 @@ export function generateIndexHtml({
 
   const generatedAt = fmtGeneratedAt(new Date());
   const siteCount = siteResults.length;
+
+  // v1.20.0 — the "snapshot as of" callout below the hero is keyed to the
+  // last time the FLEET WAS SCANNED, not when this bundle was rebuilt /
+  // deployed. Bundle regeneration with no fresh scan should not advance the
+  // snapshot date — managers reading the page need to know when the data
+  // was actually collected, not when the static site was last pushed.
+  const lastFleetScanIso = siteResults
+    .map((sr) => sr.scannedAt)
+    .filter(Boolean)
+    .sort()
+    .pop() || "";
+  const lastFleetScanLabel = lastFleetScanIso
+    ? fmtChicagoGeneratedAt(lastFleetScanIso)
+    : generatedAt;
 
   const pageTitle = he(title);
 
@@ -847,12 +911,27 @@ h2 {
   color: #ffffff;
   height: 38px;
   flex: none;
+  /* v1.20.0 — logo is now an <a href="#top"> that smooth-scrolls. Reset
+     anchor underline/color so the visual is unchanged, then add focus
+     visibility for keyboard users. */
+  text-decoration: none;
+  border-radius: 4px;
+  outline: none;
+  transition: opacity 140ms ease;
+}
+.site-header .icjia-logo:hover { opacity: 0.85; }
+.site-header .icjia-logo:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 4px;
 }
 .site-header .icjia-logo svg {
   height: 100%;
   width: auto;
   display: block;
 }
+/* v1.20.0 — smooth scroll for #top jumps. Disabled under reduced-motion. */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 .site-header .brand {
   font-weight: 700;
   font-size: 0.88rem;
@@ -1119,6 +1198,30 @@ main {
   font-variant-numeric: tabular-nums;
   margin: 0 0 0.6rem;
 }
+.fleet-hero-pages {
+  /* v1.20.0 — secondary metric beside the big file count. Pages are the
+     unit remediation vendors quote against, so the hero reports both
+     "files" (primary, what you have) and "pages" (estimated, what it
+     will cost to fix). Tooltip on hover shows the per-format breakdown. */
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #ffc888;
+  margin: 0 0 0.6rem;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+  letter-spacing: -0.01em;
+}
+.fleet-hero-pages strong { color: #ffe1b8; font-weight: 800; }
+.fleet-hero-pages-hint {
+  display: inline-block;
+  margin-left: 0.5em;
+  font-size: 0.65em;
+  font-weight: 600;
+  color: #9aa5b1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .fleet-hero-context {
   font-size: 1rem;
   color: #9aa5b1;
@@ -1127,6 +1230,34 @@ main {
   margin: 0;
 }
 .fleet-hero-context strong { color: #d4dae0; font-weight: 700; }
+
+/* v1.20.0 — "potential workload" callout below the fleet hero. Amber-tinted
+   note that hedges the page-count numbers so a manager doesn't quote them
+   as a fixed commitment. Sits between the hero and the per-site grid. */
+.potential-callout {
+  margin: 1.4rem 0 0;
+  padding: 0.95rem 1.1rem;
+  background: rgba(255, 168, 77, 0.08);
+  border-left: 3px solid #d97706;
+  border-radius: 4px;
+  color: #d8e0e8;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+.potential-callout p { margin: 0; }
+.potential-callout p + p { margin-top: 0.55em; }
+.potential-callout strong { color: #ffc888; }
+.potential-callout em { color: #ffd699; font-style: italic; }
+.potential-callout .potential-callout-eyebrow {
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffc888;
+  margin-bottom: 0.6em;
+}
+.potential-callout .potential-callout-eyebrow strong { color: #ffe1b8; text-transform: none; letter-spacing: 0.01em; }
+.potential-callout .potential-callout-eyebrow-suffix { font-weight: 600; color: #c9d1d9; opacity: 0.85; text-transform: none; letter-spacing: 0.02em; margin-left: 0.4em; }
 
 .fleet-hero-donut-block {
   display: flex;
@@ -1592,6 +1723,22 @@ main {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+/* v1.20.0 — secondary line under the "may need audit" tile showing the
+   inclusive approximate page count (potential remediation workload).
+   Tooltip on hover spells out the per-format breakdown + the hedging that
+   the figure shifts as content changes. */
+.site-card .tile .lbl-sub {
+  display: block;
+  margin-top: 0.55em;
+  padding-top: 0.55em;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: #ffc888;
+  letter-spacing: 0.01em;
+  cursor: help;
+  border-top: 1px dashed rgba(255,168,77,0.28);
+  font-variant-numeric: tabular-nums;
+}
 
 .site-card .donut-row {
   display: flex;
@@ -1961,12 +2108,36 @@ main {
 }
 
 /* ── master-csv download section ───────────────────────────────────────── */
+/* v1.20.0 — extra breathing room above the section so the "Master spreadsheet"
+   heading reads as a hard break from the per-site card grid above. Subtle
+   top border + amber accent strip help visually separate. */
+.section.master-csv {
+  margin-top: 3.5rem;
+  padding-top: 2.25rem;
+  border-top: 1px solid #21262d;
+  position: relative;
+}
+.section.master-csv::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 64px;
+  height: 3px;
+  background: #ffa84d;
+  border-radius: 0 0 2px 2px;
+}
+.section.master-csv > h2 {
+  margin-top: 0;
+  font-size: 1.75rem;
+  letter-spacing: -0.01em;
+}
 .master-csv .master-csv-download {
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-top: 0.75rem;
+  margin-top: 1.25rem;
 }
 .master-csv .cta-button {
   display: inline-block;
@@ -2917,7 +3088,7 @@ dialog.access-modal .access-modal-cta a {
 
 <header class="site-header">
   <div class="site-header-left">
-    <span class="icjia-logo" aria-hidden="true">${ICJIA_LOGO_SVG}</span>
+    <a class="icjia-logo" href="#top" aria-label="Scroll back to the top of the page" title="Scroll to top">${ICJIA_LOGO_SVG}</a>
     <span class="brand"><span>filecap</span> fleet audit snapshot</span>
   </div>
   <div class="site-header-right">
@@ -2973,11 +3144,13 @@ dialog.access-modal .access-modal-cta a {
       else if (fleetPctInt <= 72)       fleetPhrase = "Two-thirds may need audit";
       else if (fleetPctInt <= 88)       fleetPhrase = "Most may need audit";
       else                              fleetPhrase = "Nearly all may need audit";
-      const fleetAriaLabel = `${fleetRemediable.toLocaleString()} of ${fleetTotalFiles.toLocaleString()} files may need accessibility audit, ${fleetPctInt} percent.`;
+      const fleetAriaLabel = `${fleetRemediable.toLocaleString()} of ${fleetTotalFiles.toLocaleString()} files may need accessibility audit, ${fleetPctInt} percent.`
+        + (fleetRemediablePages > 0 ? ` Approximately ${fleetRemediablePages.toLocaleString()} potential pages of remediation workload. This is a snapshot — counts shift as sites are updated.` : "");
       return `<div class="fleet-hero" role="img" aria-label="${he(fleetAriaLabel)}">
       <div class="fleet-hero-num-block">
         <p class="fleet-hero-eyebrow">Files that may need accessibility audit</p>
-        <p class="fleet-hero-num">${he(fleetRemediable.toLocaleString())}</p>
+        <p class="fleet-hero-num">${he(fleetRemediable.toLocaleString())}</p>${fleetRemediablePages > 0 ? `
+        <p class="fleet-hero-pages" title="${he(fleetPagesTooltip)}">≈ <strong>${he(fleetRemediablePages.toLocaleString())}</strong> potential pages <span class="fleet-hero-pages-hint">(remediation workload)</span></p>` : ""}
         <p class="fleet-hero-context">out of <strong>${he(fleetTotalFiles.toLocaleString())}</strong> files scanned across ${he(String(siteCount))} ICJIA website${siteCount !== 1 ? "s" : ""}</p>
       </div>
       <div class="fleet-hero-donut-block">
@@ -2986,7 +3159,11 @@ dialog.access-modal .access-modal-cta a {
         </div>
         <p class="fleet-hero-phrase"><strong>${he(fleetPhrase)}</strong></p>
       </div>
-    </div>`;
+    </div>${fleetRemediablePages > 0 ? `
+    <aside class="potential-callout" role="note">
+      <p class="potential-callout-eyebrow">Snapshot as of <strong>${he(lastFleetScanLabel)}</strong> <span class="potential-callout-eyebrow-suffix">— last fleet audit</span></p>
+      <p><strong>Potential workload — not a fixed commitment.</strong> Both the <strong>file counts</strong> and the <strong>page counts</strong> shown here are a point-in-time view of the fleet. They <strong>will change</strong> as staff remove files, edit content, update sites, or publish new material. The fleet total (≈ ${he(fleetRemediablePages.toLocaleString())} pages across ${he(fleetRemediable.toLocaleString())} files) is an inclusive estimate of <em>what a vendor could be quoted against today</em>, not what staff have committed to remediate. Treat the fleet total and the per-site numbers below as order-of-magnitude figures for planning — re-run the fleet audit before locking in any scope or budget number.</p>
+    </aside>` : ""}`;
     })()}
   </section>
 

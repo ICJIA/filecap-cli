@@ -110,12 +110,14 @@ describe("writeHtml", () => {
     expect(html).toMatch(/2/);
   });
 
-  it("renders the trimmed 6-column manager HTML table with human-readable headers", async () => {
+  it("renders the trimmed 7-column manager HTML table with human-readable headers", async () => {
     const out = path.join(tmpDir, "labels.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    // v1.12.0: the HTML table shows only the six columns a manager acts on.
+    // v1.20.0: 7 columns — Pages added between File name and File type
+    // because vendors quote remediation per page. v1.12.0 used 6.
     expect(html).toContain('<th data-col="filename">File name</th>');
+    expect(html).toContain('<th data-col="pageCount">Pages</th>');
     expect(html).toContain('<th data-col="category">File type</th>');
     expect(html).toContain('<th data-col="auditScore">Audit Report</th>');
     expect(html).toContain('<th data-col="referenced">Page References</th>');
@@ -125,10 +127,10 @@ describe("writeHtml", () => {
     for (const col of ["serverName", "serverIp", "publicUrl", "scannedPath", "path", "absolutePath", "extension", "sizeBytes", "sha256"]) {
       expect(html).not.toMatch(new RegExp('<th data-col="' + col + '"'));
     }
-    // Exactly six header cells in the inventory table.
+    // Exactly seven header cells in the inventory table.
     const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
     expect(theadMatch).not.toBeNull();
-    expect((theadMatch[1].match(/<th /g) || []).length).toBe(6);
+    expect((theadMatch[1].match(/<th /g) || []).length).toBe(7);
   });
 
   // v1.19.0 — the file table's Audit Report cell renders only an "Open
@@ -218,7 +220,8 @@ describe("writeHtml", () => {
     expect(html).toContain('<th data-col="siteName">Website</th>');
     const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
     expect(theadMatch).not.toBeNull();
-    expect((theadMatch[1].match(/<th /g) || []).length).toBe(7);
+    // v1.20.0: 8 = Website + Filename + Pages + 5 other manager columns.
+    expect((theadMatch[1].match(/<th /g) || []).length).toBe(8);
   });
 
   it("renders Public URL as a clickable link when publicUrlBase is set in header", async () => {

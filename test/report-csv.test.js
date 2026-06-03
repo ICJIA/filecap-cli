@@ -99,8 +99,9 @@ describe("CSV_COLUMNS", () => {
 
   it("does not include format-specific introspection columns (dropped in 1.4.x)", () => {
     const names = CSV_COLUMNS.map((c) => c.name);
-    // PDF introspection columns dropped in 1.4.1
-    expect(names).not.toContain("pageCount");
+    // PDF introspection columns dropped in 1.4.1 — note: pageCount is back
+    // as of 1.20.0 because vendors quote remediation per page. Other PDF
+    // introspection fields remain in the inventory NDJSON only.
     expect(names).not.toContain("hasTextLayer");
     expect(names).not.toContain("isImageOnly");
     expect(names).not.toContain("hasTags");
@@ -136,6 +137,69 @@ describe("CSV_COLUMNS", () => {
     expect(names).not.toContain("flags");
     // 1.9.0 NOTE: auditScore + auditReport ARE present (added for the
     // audit.icjia.app integration). See the position assertions above.
+  });
+});
+
+describe("CSV_COLUMNS pageCount (v1.20.0)", () => {
+  it("includes a pageCount column", () => {
+    const names = CSV_COLUMNS.map((c) => c.name);
+    expect(names).toContain("pageCount");
+  });
+
+  it("places pageCount immediately after filename", () => {
+    const fi = colIndex("filename");
+    const pi = colIndex("pageCount");
+    expect(fi).toBeGreaterThanOrEqual(0);
+    expect(pi).toBe(fi + 1);
+  });
+
+  it("pageCount column label is 'Page Count'", () => {
+    const col = CSV_COLUMNS.find((c) => c.name === "pageCount");
+    expect(col.label).toBe("Page Count");
+  });
+});
+
+describe("writeCsv pageCount cell", () => {
+  it("emits the introspected page count for PDFs", () => {
+    const entry = {
+      ...baseEntry,
+      introspection: { kind: "pdf", pageCount: 42 },
+    };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const rows = csv.trim().split("\n");
+    const header = rows[0].split(",");
+    const data = rows[1].split(",");
+    const idx = header.findIndex((h) => h === "Page Count");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(data[idx]).toBe("42");
+  });
+
+  it("emits an empty cell when the entry is not a PDF", () => {
+    const entry = {
+      ...baseEntry,
+      category: "office-document",
+      extension: "docx",
+      filename: "case.docx",
+      path: "case.docx",
+      introspection: { kind: "docx", paragraphCount: 200 },
+    };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const rows = csv.trim().split("\n");
+    const header = rows[0].split(",");
+    const data = rows[1].split(",");
+    const idx = header.findIndex((h) => h === "Page Count");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(data[idx]).toBe("");
+  });
+
+  it("emits an empty cell when a PDF has no introspection data", () => {
+    const entry = { ...baseEntry };
+    const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
+    const rows = csv.trim().split("\n");
+    const header = rows[0].split(",");
+    const data = rows[1].split(",");
+    const idx = header.findIndex((h) => h === "Page Count");
+    expect(data[idx]).toBe("");
   });
 });
 
@@ -376,11 +440,10 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     const headerRow = csv.trim().split("\n")[0];
     expect(headerRow).toContain("Delete?");
     expect(headerRow).toContain("Notes");
-    // 1.10.2: 18 columns total (15 file-descriptor + Page References +
-    // Audit Score (combined chip + report link as of 1.10.2) + Delete?
-    // + Notes = 16 file-descriptor + 2 action). 1.9.0 was 19 with the
-    // separate Audit Report column.
-    expect(headerRow.split(",").length).toBe(18);
+    // 1.20.0: 19 columns total (was 18 in 1.10.2). Added Page Count after
+    // File name. 1.10.2 prior count: 15 file-descriptor + Page References +
+    // Audit Score + Delete? + Notes = 18. With Page Count: 19.
+    expect(headerRow.split(",").length).toBe(19);
   });
 
   it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {

@@ -10,6 +10,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.20.0] — 2026-06-03
+
+### Added
+
+- **Page count surfaced as the procurement unit across the fleet.** Vendors quote per page, not per file, so the deployed bundle now leads with "≈ N potential pages" alongside the file count on the fleet hero, every per-site card, and every per-site detail page. A new **`Page Count` column** is back in the schema (slotted right after `File name` in the XLSX, and after `filename` in the CSV) — it was dropped in 1.4.1 on the "open it in Acrobat" argument; restored because procurement workflows can't open 3,500 PDFs by hand. PDFs carry the measured pdfjs page count; non-PDFs leave the cell blank. The PDFs sheet of the master workbook has a bottom **`TOTAL` row with a real `SUM` formula** over Page Count so a vendor opening the workbook sees the procurement unit (≈88,286 measured PDF pages as of 2026-06-02) without writing a formula.
+- **Inclusive page estimate for non-PDF formats** so the hero doesn't undersell the workload. PDFs contribute their measured pdfjs page count; DOCX adds ×7 per file, PPTX ×20, XLSX ×1, legacy Office ×5 (averages chosen conservatively from real-world agency content). Fleet total currently **≈92,350 potential pages** across 4,759 remediable files. The per-format breakdown is exposed via a tooltip on every page-count cell. New `src/web/page-estimate.js` with `PAGE_ESTIMATES` and `estimateRemediablePages({pdfPagesMeasured, docxCount, pptxCount, xlsxCount, legacyOfficeCount})`.
+- **"Potential workload" framing** to keep the page-count numbers from being read as a fixed commitment. The fleet hero says "potential pages (REMEDIATION WORKLOAD)". An amber callout below the hero leads with `SNAPSHOT AS OF [last fleet audit time]` and explicitly tells the reader that *both* the file counts and the page counts will change as staff remove files, edit content, update sites, or publish new material. Per-site detail pages echo the framing with a smaller amber strip under the donut. Tooltip language updated everywhere from "vendors typically quote per page" to "subject to change as files are added, edited, or removed."
+- **Snapshot eyebrow keyed to the last fleet-audit time**, not the rollup-build time. Was previously using `generatedAt` (the moment `web-rollup` ran), which advanced on every rebuild even with no fresh scan. Now reads the most recent `sr.scannedAt` across `siteResults` and labels the timestamp explicitly as "— last fleet audit" so a manager can't mistake it for a rebuild date.
+- **ICJIA logo in the top nav is now a smooth-scroll "back to top" link** (`<a href="#top">`). Hover dip + focus-visible outline; respects `prefers-reduced-motion: reduce` (falls back to instant scroll for users who've requested reduced motion).
+
+### Changed
+
+- **All downloadable reports flipped from CSV to XLSX.** New dep: `exceljs`. New module `src/report/xlsx.js` (`writeXlsx`, `writeXlsxMultiSheet`, `writeXlsxFromRows`).
+  - The five per-type CSVs (`audit-pdfs.csv`, `audit-docx.csv`, `audit-xlsx.csv`, `audit-pptx.csv`, `audit-office-legacy.csv`) collapse into a **single multi-sheet `audit.xlsx`** with one tab per remediable file type. Empty buckets are skipped so the workbook only carries tabs that hold data.
+  - **Per-site `<site>.xlsx` is also multi-sheet by remediable file type**, scoped to that site. Replaces the per-site CSV.
+  - `audit-file-list-master.xlsx`, `audit-file-duplicates.xlsx`, `audit-orphaned-files.xlsx`, `audit-file-errors.xlsx` all converted.
+  - **Manager-friendly XLSX column order** (CSV layout unchanged for any external consumers): Date published (pre-sorted desc, newest first) → File name → Page Count → Public URL (clickable hyperlink) → Page References (clickable hyperlink to first URL) → File type → Size → Audit Report → Website → Server → IP → ... the rest.
+  - **`Public URL` is a clickable hyperlink in every XLSX** (master, per-site, per-type tabs, orphans, errors); the first URL in `Page References` is also hyperlinked. Cells use Excel's standard URL color (`#0563C1`, underlined).
+- **Non-remediable rows dropped from every downloadable report.** Vendors quote against PDFs / DOCX / XLSX / PPTX / legacy Office only; images / text / archives / web / audio-video / other were just noise. They stay in the HTML tables (the chip filter handles the view); they no longer appear in any download. The per-bucket HTML pages for non-remediable types still exist and are still linked from the index by-type table, but their row counts are no longer clickable to a CSV.
+- **"Download CSV" button text → "Download spreadsheet (XLSX)"** on every per-site / per-type detail page. Master-spreadsheet section header on the index reads "Master spreadsheet — every **remediable** file across every server" (the word *remediable* promoted into the heading so the filter is visible without reading the body copy).
+- **Master-spreadsheet section visually separated** from the per-site card grid above it: 3.5 rem top margin, a top border, a 64 × 3 px amber accent strip pinned to the border, and a larger `h2` so the section reads as a deliberate new chapter rather than another card. The download button row gains a small left-margin bump to match.
+- **LLM context (`audit-fleet-context.md`) schema description rewritten to match the NDJSON that's actually shipped.** Was 1.4-era; missed `remediable`, `references[]`, `audit`, `__auditUrl`, plus ~15 introspection fields the NDJSON carries. PDF intro list went from 9 → 21 fields (added `hasOutline`, `isLinearized`, `pdfVersion`, `approxWordCount`, the date / creator / title / subject fields). DOCX 6 → 13. XLSX 1 → 9. PPTX called out as "category `presentation`, no introspection yet." Sample LLM prompts updated with page-count queries and an `audit.score < 70` query. The "actionable files" callout switches from CSV to XLSX language.
+- **Netlify `netlify.toml`** gains a `/*.xlsx` rule mirroring the existing `/*.csv` rule — `Content-Disposition: attachment` so browsers force-download instead of trying to render the workbook inline.
+
+### Internal
+
+- **`.claude/workflows/fleet-rescan-v1.20.0.workflow.js`** — saved workflow that orchestrates a top-to-bottom fleet rescan as pre-flight + scan/audit/references + verify + rollup + deploy + purge, each phase a separate agent so the run is resumable on failure.
+- **`assets/fleet-pdf-pages-2026-05-22.{png,svg,md,py}`** — accessible page-count exhibit (SVG / PNG chart, accessible markdown text equivalent, Python generator) accompanying the v1.20.0 page-count rollout.
+
+### Tests
+
+796 passing (+30 — `page-estimate.test.js` × 9 covers the inclusive estimate; `report-xlsx.test.js` × 15 covers single-sheet / multi-sheet / from-rows + column order + sort + hyperlinks + the SUM total row; `report-csv.test.js` +6 for the Page Count column; `report-html.test.js` +1 / `web-rollup.test.js` updated for the layout shift).
+
 ## [1.19.1] — 2026-05-22
 
 ### Fixed

@@ -1,0 +1,265 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import ExcelJS from "exceljs";
+import { writeXlsx, writeXlsxMultiSheet } from "../src/report/xlsx.js";
+
+const baseHeader = {
+  schemaVersion: 1,
+  kind: "filecap-inventory-header",
+  metadata: {
+    serverName: "strapi-prod-01",
+    serverIp: "10.42.7.18",
+    scannedPath: "/var/strapi/uploads",
+    publicUrlBase: "https://cdn.example.com/uploads",
+  },
+};
+
+const pdfEntry = {
+  path: "report.pdf",
+  absolutePath: "/var/strapi/uploads/report.pdf",
+  filename: "report.pdf",
+  extension: "pdf",
+  category: "pdf",
+  remediable: true,
+  sizeBytes: 12345,
+  modifiedAt: "2026-01-15T10:00:00.000Z",
+  sha256: "deadbeef".repeat(8),
+  flags: [],
+  introspection: { kind: "pdf", pageCount: 42 },
+};
+
+const docxEntry = {
+  path: "policy.docx",
+  absolutePath: "/var/strapi/uploads/policy.docx",
+  filename: "policy.docx",
+  extension: "docx",
+  category: "office-document",
+  remediable: true,
+  sizeBytes: 56789,
+  modifiedAt: "2026-02-10T08:30:00.000Z",
+  sha256: "ab".repeat(32),
+  flags: [],
+};
+
+let tmpDir;
+beforeEach(async () => {
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "filecap-xlsx-"));
+});
+afterEach(async () => {
+  await fs.rm(tmpDir, { recursive: true, force: true });
+});
+
+async function load(file) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(file);
+  return wb;
+}
+
+describe("writeXlsx (single sheet)", () => {
+  it("writes a parseable xlsx file with one sheet", async () => {
+    const out = path.join(tmpDir, "out.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    expect(wb.worksheets.length).toBe(1);
+  });
+
+  it("header row uses the human-readable CSV_COLUMNS labels", async () => {
+    const out = path.join(tmpDir, "labels.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    const headerRow = sheet.getRow(1);
+    const labels = [];
+    headerRow.eachCell((cell) => labels.push(cell.value));
+    expect(labels).toContain("Page Count");
+    expect(labels).toContain("File name");
+    expect(labels).toContain("Public URL");
+  });
+
+  it("stores Page Count as a real number for PDFs", async () => {
+    const out = path.join(tmpDir, "pages.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    const header = sheet.getRow(1);
+    let pageCol = -1;
+    header.eachCell((cell, col) => { if (cell.value === "Page Count") pageCol = col; });
+    expect(pageCol).toBeGreaterThan(0);
+    const cell = sheet.getRow(2).getCell(pageCol);
+    expect(typeof cell.value).toBe("number");
+    expect(cell.value).toBe(42);
+  });
+
+  it("leaves Page Count blank for non-PDFs", async () => {
+    const out = path.join(tmpDir, "pages-blank.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [docxEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    const header = sheet.getRow(1);
+    let pageCol = -1;
+    header.eachCell((cell, col) => { if (cell.value === "Page Count") pageCol = col; });
+    const cell = sheet.getRow(2).getCell(pageCol);
+    expect(cell.value === null || cell.value === undefined || cell.value === "").toBe(true);
+  });
+
+  it("freezes the header row and sets autofilter", async () => {
+    const out = path.join(tmpDir, "filter.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry, docxEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    expect(sheet.views?.[0]?.state).toBe("frozen");
+    expect(sheet.views?.[0]?.ySplit).toBe(1);
+    expect(sheet.autoFilter).toBeTruthy();
+  });
+
+  it("uses the provided sheet name", async () => {
+    const out = path.join(tmpDir, "named.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out, sheetName: "PDFs" });
+    const wb = await load(out);
+    expect(wb.worksheets[0].name).toBe("PDFs");
+  });
+
+  it("stores SHA-256 as a plain string (no =\"...\" excel-formula wrapper)", async () => {
+    const out = path.join(tmpDir, "sha.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    const header = sheet.getRow(1);
+    let shaCol = -1;
+    header.eachCell((cell, col) => { if (cell.value === "Content hash (SHA-256)") shaCol = col; });
+    const cell = sheet.getRow(2).getCell(shaCol);
+    expect(typeof cell.value).toBe("string");
+    expect(cell.value).toBe(pdfEntry.sha256);
+    expect(cell.value).not.toMatch(/^="/);
+  });
+});
+
+describe("writeXlsx column order, sort, and hyperlinks (v1.20.0)", () => {
+  it("orders columns: Date published, File name, Page Count, Public URL, Page References, ...", async () => {
+    const out = path.join(tmpDir, "order.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const headerRow = wb.worksheets[0].getRow(1);
+    const labels = [];
+    headerRow.eachCell((cell) => labels.push(cell.value));
+    expect(labels[0]).toBe("Date published");
+    expect(labels[1]).toBe("File name");
+    expect(labels[2]).toBe("Page Count");
+    expect(labels[3]).toBe("Public URL");
+    expect(labels[4]).toBe("Page References");
+  });
+
+  it("sorts rows by Date published descending (newest first)", async () => {
+    const e2024 = { ...pdfEntry, path: "a.pdf", filename: "a.pdf", modifiedAt: "2024-01-01T00:00:00.000Z" };
+    const e2026 = { ...pdfEntry, path: "b.pdf", filename: "b.pdf", modifiedAt: "2026-02-15T00:00:00.000Z" };
+    const e2025 = { ...pdfEntry, path: "c.pdf", filename: "c.pdf", modifiedAt: "2025-06-01T00:00:00.000Z" };
+    const out = path.join(tmpDir, "sort.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [e2024, e2026, e2025], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    // File name is column 2 in the new order; rows 2..4 should be newest first
+    expect(sheet.getRow(2).getCell(2).value).toBe("b.pdf"); // 2026
+    expect(sheet.getRow(3).getCell(2).value).toBe("c.pdf"); // 2025
+    expect(sheet.getRow(4).getCell(2).value).toBe("a.pdf"); // 2024
+  });
+
+  it("places Page Count in column C (3rd) so vendors see it without scrolling", async () => {
+    const out = path.join(tmpDir, "pages-col-c.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    expect(sheet.getRow(1).getCell(3).value).toBe("Page Count");
+    expect(sheet.getRow(2).getCell(3).value).toBe(42);
+  });
+
+  it("makes the Public URL cell a clickable hyperlink", async () => {
+    const out = path.join(tmpDir, "linkify.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    const urlCell = sheet.getRow(2).getCell(4); // Public URL is col 4
+    expect(urlCell.value).toMatchObject({ hyperlink: expect.stringMatching(/^https?:\/\//) });
+    expect(urlCell.value.text).toMatch(/^https?:\/\//);
+  });
+
+  it("Total SUM row uses the new Page Count column position (C)", async () => {
+    const out = path.join(tmpDir, "sum-c.xlsx");
+    const entries = [
+      { ...pdfEntry, introspection: { kind: "pdf", pageCount: 10 } },
+      { ...pdfEntry, path: "b.pdf", filename: "b.pdf", introspection: { kind: "pdf", pageCount: 20 } },
+    ];
+    await writeXlsx({ sourceHeader: baseHeader, entries, sources: null, outputPath: out, sheetName: "PDFs" });
+    // Use writeXlsxMultiSheet path to exercise totals — single-sheet writeXlsx
+    // doesn't take totals; reuse same logic by routing through the multi-sheet helper
+    const outMulti = path.join(tmpDir, "sum-c-multi.xlsx");
+    await writeXlsxMultiSheet({
+      outputPath: outMulti,
+      sheets: [{ name: "PDFs", sourceHeader: baseHeader, entries, sources: null, totals: { pageCount: true } }],
+    });
+    const wb = await load(outMulti);
+    const sheet = wb.worksheets[0];
+    const totalRow = sheet.getRow(4); // header + 2 data + 1 total
+    expect(totalRow.getCell(1).value).toBe("TOTAL");
+    const sumCell = totalRow.getCell(3); // Page Count is col C
+    const resolved = typeof sumCell.value === "object" ? sumCell.value.result : sumCell.value;
+    expect(resolved).toBe(30);
+    expect(sumCell.value.formula).toMatch(/^SUM\(C2:C\d+\)$/);
+  });
+});
+
+describe("writeXlsxMultiSheet", () => {
+  it("writes one sheet per bucket and uses provided sheet names", async () => {
+    const out = path.join(tmpDir, "multi.xlsx");
+    await writeXlsxMultiSheet({
+      outputPath: out,
+      sheets: [
+        { name: "PDFs", sourceHeader: baseHeader, entries: [pdfEntry], sources: null },
+        { name: "DOCX", sourceHeader: baseHeader, entries: [docxEntry], sources: null },
+      ],
+    });
+    const wb = await load(out);
+    expect(wb.worksheets.length).toBe(2);
+    expect(wb.worksheets[0].name).toBe("PDFs");
+    expect(wb.worksheets[1].name).toBe("DOCX");
+  });
+
+  it("skips sheets with zero entries", async () => {
+    const out = path.join(tmpDir, "skip-empty.xlsx");
+    await writeXlsxMultiSheet({
+      outputPath: out,
+      sheets: [
+        { name: "PDFs", sourceHeader: baseHeader, entries: [pdfEntry], sources: null },
+        { name: "Empty bucket", sourceHeader: baseHeader, entries: [], sources: null },
+      ],
+    });
+    const wb = await load(out);
+    expect(wb.worksheets.length).toBe(1);
+    expect(wb.worksheets[0].name).toBe("PDFs");
+  });
+
+  it("appends a SUM total row when sheet has totals: { pageCount: true } and entries contain PDFs", async () => {
+    const out = path.join(tmpDir, "totals.xlsx");
+    const entries = [
+      { ...pdfEntry, introspection: { kind: "pdf", pageCount: 10 } },
+      { ...pdfEntry, path: "b.pdf", filename: "b.pdf", introspection: { kind: "pdf", pageCount: 20 } },
+      { ...pdfEntry, path: "c.pdf", filename: "c.pdf", introspection: { kind: "pdf", pageCount: 30 } },
+    ];
+    await writeXlsxMultiSheet({
+      outputPath: out,
+      sheets: [
+        { name: "PDFs", sourceHeader: baseHeader, entries, sources: null, totals: { pageCount: true } },
+      ],
+    });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    const totalRow = sheet.getRow(2 + entries.length); // header + N data rows + total row
+    let pageCol = -1;
+    sheet.getRow(1).eachCell((cell, col) => { if (cell.value === "Page Count") pageCol = col; });
+    const totalCell = totalRow.getCell(pageCol);
+    // exceljs may resolve the formula or store it; either way the result equals 60.
+    const value = typeof totalCell.value === "object" ? totalCell.value.result : totalCell.value;
+    expect(value).toBe(60);
+  });
+});

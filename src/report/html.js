@@ -1,9 +1,10 @@
 import fs from "node:fs/promises";
-import { CSV_COLUMNS } from "./csv.js";
+import { CSV_COLUMNS, formatPageCount } from "./csv.js";
 import { buildPageList } from "./pages.js";
 import { humanizeBytes } from "./format.js";
 import { FILECAP_VERSION } from "../version.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
+import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 
 function formatCellValue(v) {
   if (v === true) return "Yes";
@@ -381,6 +382,9 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.path,
     entry.absolutePath,
     entry.filename,
+    // v1.20.0: pageCount slotted between filename and extension to match
+    // CSV_COLUMNS. PDFs get a number; non-PDFs and unintrospected PDFs get "".
+    formatPageCount(entry),
     entry.extension,
     entry.category,
     entry.sizeBytes,
@@ -487,6 +491,28 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const legacyCount = categoryCounts["legacy-office"] ?? 0;
   const remediableCount = pdfCount + officeCount + spreadsheetCount + presentationCount + legacyCount;
   const nonRemediableCount = totalFiles - remediableCount;
+
+  // v1.20.0: inclusive page-count estimate for the hero. PDFs contribute
+  // their measured pdfjs page count; DOCX/PPTX/XLSX/legacy-office add
+  // per-format averages (see src/web/page-estimate.js). Vendors quote
+  // remediation per page, so the file count alone undersells the workload.
+  const pdfPagesMeasured = entries
+    .filter((e) => e.category === "pdf" && typeof e.introspection?.pageCount === "number")
+    .reduce((s, e) => s + e.introspection.pageCount, 0);
+  const remediablePages = estimateRemediablePages({
+    pdfPagesMeasured,
+    docxCount: officeCount,
+    pptxCount: presentationCount,
+    xlsxCount: spreadsheetCount,
+    legacyOfficeCount: legacyCount,
+  });
+  const pagesTooltip = `≈${remediablePages.toLocaleString()} potential remediation pages. `
+    + `${pdfPagesMeasured.toLocaleString()} measured PDF pages from pdfjs `
+    + `+ DOCX×${PAGE_ESTIMATES.docx} (${officeCount}) `
+    + `+ PPTX×${PAGE_ESTIMATES.pptx} (${presentationCount}) `
+    + `+ XLSX×${PAGE_ESTIMATES.xlsx} (${spreadsheetCount}) `
+    + `+ legacy Office×${PAGE_ESTIMATES.legacyOffice} (${legacyCount}). `
+    + `Subject to change as files are added, edited, or removed.`;
   const imageCount = categoryCounts["image"] ?? 0;
   const textCount = (categoryCounts["text"] ?? 0) + (categoryCounts["web"] ?? 0);
   const otherNonRemCount = nonRemediableCount - imageCount - textCount;
@@ -531,6 +557,9 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const HTML_TABLE_COLUMNS = [
     ...(isConsolidated ? [{ name: "siteName", label: "Website" }] : []),
     { name: "filename",    label: "File name" },
+    // v1.20.0: Pages column. Right-aligned in CSS via td.col-pages. PDFs
+    // render the integer; non-PDFs render blank.
+    { name: "pageCount",   label: "Pages" },
     { name: "category",    label: "File type" },
     { name: "auditScore",  label: "Audit Report" },
     { name: "referenced",  label: "Page References" },
@@ -572,6 +601,14 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
       }
       if (col.name === "category") {
         return `<td>${htmlEscape(formatCategory(v))}</td>`;
+      }
+      if (col.name === "pageCount") {
+        // Empty cell for non-PDFs and unintrospected PDFs; otherwise the
+        // raw integer, right-aligned. data-num so the sort comparator
+        // (already in the table JS) treats it numerically.
+        const numStr = v === "" || v === null || v === undefined ? "" : String(v);
+        const data = numStr ? ` data-num="${numStr}"` : "";
+        return `<td class="col-pages num"${data}>${htmlEscape(numStr)}</td>`;
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
@@ -1034,6 +1071,17 @@ a.page-audit-chip:hover {
 }
 .dp-hero .dp-tile.dp-total .dp-num { color: #4dabf7; }
 .dp-hero .dp-tile.dp-audit .dp-num { color: #ffa84d; }
+.dp-hero .dp-tile .dp-sub {
+  display: block;
+  margin-top: 0.4em;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #ffc888;
+  letter-spacing: 0.02em;
+  cursor: help;
+  border-top: 1px dashed rgba(255,168,77,0.28);
+  padding-top: 0.5em;
+}
 .dp-hero .dp-tile .dp-lbl {
   display: block;
   margin-top: 8px;
@@ -1088,6 +1136,21 @@ a.page-audit-chip:hover {
   font-size: 1em;
 }
 .dp-hero .dp-donut-caption strong { color: #ffffff; }
+
+/* v1.20.0 — snapshot hedge underneath the donut. Subtle amber-left strip
+   reminding remediators that page + file counts are a moment-in-time
+   estimate, not a contractual figure. */
+.dp-hero .dp-snapshot-note {
+  margin: 1.4rem 0 0;
+  padding: 0.7rem 0.9rem;
+  background: rgba(255, 168, 77, 0.06);
+  border-left: 3px solid #d97706;
+  border-radius: 4px;
+  color: #c9d1d9;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+.dp-hero .dp-snapshot-note strong { color: #ffc888; font-weight: 700; }
 
 @media (max-width: 720px) {
   .dp-hero .dp-nums { grid-template-columns: 1fr; }
@@ -1242,6 +1305,12 @@ a.page-audit-chip:hover {
 .cat-table { border-collapse: collapse; font-size: 13px; margin-bottom: 1rem; color: #e5e5e5; }
 .cat-table td { padding: 0.2rem 0.75rem 0.2rem 0; }
 .cat-table td:last-child { text-align: right; font-weight: 600; color: #60a5fa; }
+
+/* ── v1.20.0: PDF page-count column. Right-aligned, tabular-nums so the
+   digits line up across rows. Non-PDFs render a blank cell, so the column
+   reads as a sparse stripe of numbers next to the filename. */
+td.col-pages { text-align: right; font-variant-numeric: tabular-nums; color: #c0cdda; padding-right: 0.6em; }
+th[data-col="pageCount"] { text-align: right; }
 
 /* ── filter bar / chips ────────────────────────────────────── */
 .filter-bar {
@@ -1802,7 +1871,7 @@ ${(() => {
     </a>
     ${csvHref ? `<div class="report-csv-block">
       <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
-        <span aria-hidden="true">&#x2913;</span> Download spreadsheet (CSV)
+        <span aria-hidden="true">&#x2913;</span> Download spreadsheet (XLSX)
       </a>
       ${lastAuditFmt ? `<p class="report-csv-date">Last audit: <strong>${htmlEscape(lastAuditFmt)}</strong></p>` : ""}
     </div>` : ""}
@@ -1814,12 +1883,13 @@ ${(() => {
   <h1 class="dp-title">${heroTitle}</h1>
   <div class="dp-nums">
     <div class="dp-tile dp-total"><span class="dp-num">${heroTotal.toLocaleString()}</span><span class="dp-lbl">total files</span></div>
-    <div class="dp-tile dp-audit"><span class="dp-num">${heroAudit.toLocaleString()}</span><span class="dp-lbl">may need audit</span></div>
+    <div class="dp-tile dp-audit"><span class="dp-num">${heroAudit.toLocaleString()}</span><span class="dp-lbl">may need audit</span>${remediablePages > 0 ? `<span class="dp-sub" title="${htmlEscape(pagesTooltip)}">≈ ${remediablePages.toLocaleString()} potential pages</span>` : ""}</div>
   </div>
   <div class="dp-donut-row">
     <div class="dp-donut" style="--pct:${heroPct}%"><div class="dp-pct">${heroPctInt}%<small>may need audit</small></div></div>
     <p class="dp-donut-caption"><strong>${heroPhrase}</strong> &middot; ${heroAudit.toLocaleString()} of ${heroTotal.toLocaleString()} files</p>
   </div>
+  ${remediablePages > 0 ? `<p class="dp-snapshot-note"><strong>Snapshot as of ${htmlEscape(fmtChicagoDate(scannedAt) || "the latest scan")}.</strong> These counts are a point-in-time view — they may change as files are added, edited, or removed from the site.</p>` : ""}
 </header>
 
 ${accessPanelHtml}

@@ -1,0 +1,116 @@
+<svg width="760" height="1190" viewBox="0 0 760 1190" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="chart-title chart-desc">
+<title id="chart-title">Fleet PDF page count — 88,211 pages across 13 sites (May 22, 2026)</title>
+<desc id="chart-desc">As-is snapshot of every PDF currently in the ICJIA fleet. Measured page count is 88,211, approximately 5.9 times the prior estimated ceiling of 15,000. archive-prod alone holds 51,010 pages (58% of the total) across 1,200 PDFs averaging 42.5 pages each. After culling agendas, old meeting minutes, and superseded R&amp;A publications, the remediation target is roughly 55,000 to 65,000 pages. PDF-only count; excludes 421 DOCX, 17 PPTX, and 777 XLSX. Coverage is 99.7% (3,528 of 3,537 PDFs introspected). A text-equivalent version with all per-site numbers is at assets/fleet-pdf-pages-2026-05-22.md.</desc>
+<style>
+.title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 24px; fill: #0f172a; }
+.subtitle { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; fill: #64748b; }
+.sect { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 13px; fill: #0f172a; letter-spacing: 0.7px; }
+.label { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 600; font-size: 14px; fill: #334155; }
+.num-in { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 16px; fill: #ffffff; }
+.num-out { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 16px; fill: #0f172a; }
+.delta { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 14px; fill: #b45309; }
+.colhead { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 10px; fill: #64748b; letter-spacing: 0.6px; }
+.site { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 500; font-size: 12px; fill: #1e293b; }
+.pages { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 13px; fill: #0f172a; }
+.avg { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 500; font-size: 12px; fill: #475569; }
+.threshlbl { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 10px; fill: #b45309; letter-spacing: 0.4px; }
+.bannerhead { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 800; font-size: 13px; fill: #92400e; letter-spacing: 0.6px; }
+.bannertext { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 12.5px; fill: #1e293b; }
+.bannerguess { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 12.5px; fill: #92400e; }
+.cavhead { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 13px; fill: #0f172a; letter-spacing: 0.7px; }
+.cavlbl { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 12px; fill: #b45309; }
+.cavtext { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 12px; fill: #334155; }
+.foot { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11px; fill: #64748b; }
+</style>
+<rect width="760" height="1190" fill="#ffffff"/>
+<text x="36" y="44" class="title">Fleet PDF page count</text>
+<text x="36" y="64" class="subtitle">filecap fleet audit — May 22, 2026 · 3,528 of 3,537 PDFs introspected (99.7% coverage)</text>
+<rect x="36" y="80" width="688" height="96" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" rx="4"/>
+<text x="52" y="102" class="bannerhead">AS-IS SNAPSHOT — PAGES THAT EXIST NOW</text>
+<text x="52" y="122" class="bannertext">These are the pages currently in the fleet (May 22, 2026). After culling agendas,</text>
+<text x="52" y="138" class="bannertext">old meeting minutes, and superseded R&amp;A publications, the remediation target drops:</text>
+<text x="52" y="162" class="bannerguess">Rough guess: ~55,000–65,000 pages (pending triage)</text>
+<text x="36" y="220" class="sect">ESTIMATE vs MEASURED</text>
+<text x="36" y="244" class="label">Estimated ceiling</text>
+<rect x="36" y="252" width="91.8" height="34" fill="#cbd5e1"/>
+<text x="139.8" y="275" class="num-out">15,000 pages</text>
+<text x="36" y="314" class="label">Measured (PDFs only)</text>
+<rect x="36" y="322" width="540" height="34" fill="#0f766e"/>
+<text x="48" y="345" class="num-in">88,211 pages</text>
+<text x="590" y="345" class="delta">≈5.9× higher</text>
+<line x1="36" y1="385" x2="724" y2="385" stroke="#e2e8f0" stroke-width="1"/>
+<text x="36" y="415" class="sect">PER-SITE BREAKDOWN</text>
+<text x="36" y="440" class="colhead">SITE</text>
+<text x="200" y="440" class="colhead">PAGES (bar)</text>
+<text x="580" y="440" class="colhead" text-anchor="end">TOTAL</text>
+<text x="695" y="440" class="colhead" text-anchor="end">AVG PAGES/PDF</text>
+<line x1="300.0" y1="452" x2="300.0" y2="800" stroke="#b45309" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="304.0" y="450" class="threshlbl">15K LINE</text>
+<text x="36" y="477.0" class="site">archive-prod</text>
+<rect x="200" y="465.0" width="340.0" height="16" fill="#0f766e"/>
+<text x="580" y="477.0" class="pages" text-anchor="end">51,010</text>
+<text x="695" y="477.0" class="avg" text-anchor="end">42.5</text>
+<text x="36" y="503.0" class="site">icjia-agency-prod</text>
+<rect x="200" y="491.0" width="114.8" height="16" fill="#0f766e"/>
+<text x="580" y="503.0" class="pages" text-anchor="end">17,219</text>
+<text x="695" y="503.0" class="avg" text-anchor="end">19.6</text>
+<text x="36" y="529.0" class="site">researchhub-prod</text>
+<rect x="200" y="517.0" width="56.7" height="16" fill="#0f766e"/>
+<text x="580" y="529.0" class="pages" text-anchor="end">8,502</text>
+<text x="695" y="529.0" class="avg" text-anchor="end">37.3</text>
+<text x="36" y="555.0" class="site">spac-prod</text>
+<rect x="200" y="543.0" width="27.5" height="16" fill="#0f766e"/>
+<text x="580" y="555.0" class="pages" text-anchor="end">4,125</text>
+<text x="695" y="555.0" class="avg" text-anchor="end">9.7</text>
+<text x="36" y="581.0" class="site">ari-api-prod</text>
+<rect x="200" y="569.0" width="15.8" height="16" fill="#0f766e"/>
+<text x="580" y="581.0" class="pages" text-anchor="end">2,365</text>
+<text x="695" y="581.0" class="avg" text-anchor="end">7.9</text>
+<text x="36" y="607.0" class="site">ilfvcc-api-prod</text>
+<rect x="200" y="595.0" width="10.0" height="16" fill="#0f766e"/>
+<text x="580" y="607.0" class="pages" text-anchor="end">1,496</text>
+<text x="695" y="607.0" class="avg" text-anchor="end">17.2</text>
+<text x="36" y="633.0" class="site">intranet-api-prod</text>
+<rect x="200" y="621.0" width="8.7" height="16" fill="#0f766e"/>
+<text x="580" y="633.0" class="pages" text-anchor="end">1,300</text>
+<text x="695" y="633.0" class="avg" text-anchor="end">5.3</text>
+<text x="36" y="659.0" class="site">r3-strapi-prod</text>
+<rect x="200" y="647.0" width="8.4" height="16" fill="#0f766e"/>
+<text x="580" y="659.0" class="pages" text-anchor="end">1,257</text>
+<text x="695" y="659.0" class="avg" text-anchor="end">14.6</text>
+<text x="36" y="685.0" class="site">dvfr-strapi-prod</text>
+<rect x="200" y="673.0" width="3.2" height="16" fill="#0f766e"/>
+<text x="580" y="685.0" class="pages" text-anchor="end">484</text>
+<text x="695" y="685.0" class="avg" text-anchor="end">7.7</text>
+<text x="36" y="711.0" class="site">infonet-strapi-prod</text>
+<rect x="200" y="699.0" width="2.1" height="16" fill="#0f766e"/>
+<text x="580" y="711.0" class="pages" text-anchor="end">319</text>
+<text x="695" y="711.0" class="avg" text-anchor="end">39.9</text>
+<text x="36" y="737.0" class="site">vpp-git</text>
+<rect x="200" y="725.0" width="2.0" height="16" fill="#0f766e"/>
+<text x="580" y="737.0" class="pages" text-anchor="end">69</text>
+<text x="695" y="737.0" class="avg" text-anchor="end">34.5</text>
+<text x="36" y="763.0" class="site">i2i-strapi-prod</text>
+<rect x="200" y="751.0" width="2.0" height="16" fill="#0f766e"/>
+<text x="580" y="763.0" class="pages" text-anchor="end">37</text>
+<text x="695" y="763.0" class="avg" text-anchor="end">37.0</text>
+<text x="36" y="789.0" class="site">sfs-git</text>
+<rect x="200" y="777.0" width="2.0" height="16" fill="#0f766e"/>
+<text x="580" y="789.0" class="pages" text-anchor="end">28</text>
+<text x="695" y="789.0" class="avg" text-anchor="end">28.0</text>
+<line x1="36" y1="806" x2="724" y2="806" stroke="#cbd5e1" stroke-width="1"/>
+<text x="36" y="828" class="label">FLEET TOTAL</text>
+<text x="580" y="828" class="num-out" text-anchor="end">88,211</text>
+<text x="695" y="828" class="avg" text-anchor="end">25.0</text>
+<rect x="36" y="862" width="688" height="204" fill="#fffbeb" stroke="#fde68a" stroke-width="1" rx="4"/>
+<text x="54" y="892" class="cavhead">CAVEATS</text>
+<text x="54" y="918" class="cavlbl">PDFs only.</text>
+<text x="54" y="934" class="cavtext">Excludes 421 DOCX, 17 PPTX, and 777 XLSX. Rough estimates (~7 pages/DOCX, ~20 slides/PPTX) push the true total to ~92,000+.</text>
+<text x="54" y="956" class="cavlbl">99.7% PDF coverage.</text>
+<text x="54" y="972" class="cavtext">9 of 3,537 PDFs failed introspection (encrypted or corrupt). Their page counts are not in the 88,211 figure.</text>
+<text x="54" y="994" class="cavlbl">Pages = volume, not work effort.</text>
+<text x="54" y="1010" class="cavtext">PDFs already tagged with a text layer need less remediation than image-only or scanned PDFs.</text>
+<text x="54" y="1032" class="cavlbl">Skewed distribution.</text>
+<text x="54" y="1048" class="cavtext">archive-prod alone is 58% of pages — 51,010 across 1,200 reports averaging 42.5 pages each.</text>
+<text x="36" y="1088" class="foot">Source: ~/filecap-audits/_web-rollup/2026-05-22T13-34-09Z/audit-fleet.ndjson · filecap v1.19.1</text>
+</svg>

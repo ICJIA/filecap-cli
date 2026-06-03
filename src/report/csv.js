@@ -50,6 +50,12 @@ export const CSV_COLUMNS = [
   { name: "path",         label: "File location (relative to source folder)" },
   { name: "absolutePath", label: "Full file path on server" },
   { name: "filename",     label: "File name" },
+  // v1.20.0 — page count is back. Vendors quote remediation per page, so
+  // the spreadsheet needs the number. PDFs get the measured pdfjs count;
+  // other formats leave the cell blank (no page count extracted by scan).
+  // Dropped in 1.4.1 on the "open it in Acrobat to see" argument; restored
+  // here because procurement workflows can't open 3,500+ PDFs by hand.
+  { name: "pageCount",    label: "Page Count" },
   { name: "extension",    label: "File extension" },
   { name: "category",     label: "File type" },
   { name: "sizeBytes",    label: "Size (bytes)" },
@@ -122,6 +128,17 @@ function formatReferenced(refs) {
 //   "<reportUrl>"   — audited PDF that has a report
 //   "Unavailable"   — audit.error set
 //   ""              — undefined / skipped / not a PDF / audited but no report
+// v1.20.0: Page Count cell. PDFs get the integer measured by pdfjs during
+// scan (entry.introspection.pageCount). Non-PDFs and PDFs whose introspection
+// failed leave the cell empty. The value is returned as a real number so the
+// XLSX writer can store it as numeric (SUM/sort/filter); CSV cell formatting
+// stringifies via csvCell() naturally.
+export function formatPageCount(entry) {
+  if (!entry || entry.category !== "pdf") return "";
+  const pc = entry.introspection?.pageCount;
+  return typeof pc === "number" && pc >= 0 ? pc : "";
+}
+
 function formatAuditScore(audit) {
   if (!audit || typeof audit !== "object") return "";
   if (audit.skipped) return "";
@@ -191,7 +208,7 @@ function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   return "";
 }
 
-function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
+export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
   let serverName, siteName, serverIp, scannedPath;
   if (isConsolidated) {
     serverName = entry.serverName;
@@ -215,6 +232,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const referenced = formatReferenced(entry.references);
   const auditScore = formatAuditScore(entry.audit);
+  const pageCount = formatPageCount(entry);
 
   return [
     serverName,
@@ -228,6 +246,7 @@ function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.path,
     entry.absolutePath,
     entry.filename,
+    pageCount,
     entry.extension,
     entry.category,
     entry.sizeBytes,

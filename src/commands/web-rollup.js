@@ -8,6 +8,7 @@ import { z } from "zod";
 import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeCsv } from "../report/csv.js";
+import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows } from "../report/xlsx.js";
 import { writeHtml } from "../report/html.js";
 import { parseCmsPageList } from "../report/pages.js";
 import { classifyOrphans } from "../report/orphans.js";
@@ -21,6 +22,7 @@ import { currentStatus, accessibilityLog } from "../web/accessibility-log.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
 import { generateNetlifyToml, generateNetlifyRedirects, generateNetlifyHeaders } from "../web/netlify-config.js";
+import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
 
 // FC-2026-007: Zod schema for sites.json validation
@@ -333,6 +335,29 @@ export function writeDuplicatesCsv(groups) {
  * @param {string} filePath
  * @returns {Promise<object|null>}
  */
+// v1.20.0 — stream a per-site inventory NDJSON in full, returning the parsed
+// header object plus every entry record. Used for per-site XLSX generation
+// where we need both the header (for the consolidated-vs-single dispatch) and
+// the entries (to bucket by file type and emit a multi-sheet workbook).
+async function readInventoryNdjson(filePath) {
+  let siteHeader = null;
+  const entries = [];
+  const stream = createReadStream(filePath, { encoding: "utf8" });
+  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  let isFirst = true;
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    let obj;
+    try { obj = JSON.parse(line); } catch { continue; }
+    if (isFirst) { siteHeader = obj; isFirst = false; continue; }
+    const kind = obj?.kind ?? "";
+    if (kind === "filecap-inventory-footer" || kind === "filecap-consolidated-footer") continue;
+    if (kind === "filecap-inventory-header" || kind === "filecap-consolidated-header") continue;
+    entries.push(obj);
+  }
+  return { siteHeader, entries };
+}
+
 async function readNdjsonHeader(filePath) {
   const stream = createReadStream(filePath, { encoding: "utf8" });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
@@ -397,12 +422,14 @@ function slug(s) {
 // filtering by hand. `keys` is plural so the legacy-office synonyms can be
 // merged into one bucket (and likewise for any future category fan-out).
 export const TYPE_BUCKETS = [
-  // Files that may need accessibility remediation
-  { side: "remediable", keys: ["pdf"],              label: "PDFs",                                       slug: "pdfs" },
-  { side: "remediable", keys: ["office-document"],  label: "Word documents (.docx)",                     slug: "docx" },
-  { side: "remediable", keys: ["spreadsheet"],      label: "Excel spreadsheets (.xlsx)",                 slug: "xlsx" },
-  { side: "remediable", keys: ["presentation"],     label: "PowerPoint (.pptx)",                         slug: "pptx" },
-  { side: "remediable", keys: ["office-legacy", "legacy-office"], label: "Legacy Office (.doc, .xls, .ppt)", slug: "office-legacy" },
+  // Files that may need accessibility remediation. `sheetName` is the
+  // tab name inside the multi-sheet audit.xlsx (Excel's 31-char limit
+  // and ban on `:\/?*[]` enforced by xlsx.js).
+  { side: "remediable", keys: ["pdf"],              label: "PDFs",                                       slug: "pdfs",          sheetName: "PDFs" },
+  { side: "remediable", keys: ["office-document"],  label: "Word documents (.docx)",                     slug: "docx",          sheetName: "DOCX" },
+  { side: "remediable", keys: ["spreadsheet"],      label: "Excel spreadsheets (.xlsx)",                 slug: "xlsx",          sheetName: "XLSX" },
+  { side: "remediable", keys: ["presentation"],     label: "PowerPoint (.pptx)",                         slug: "pptx",          sheetName: "PPTX" },
+  { side: "remediable", keys: ["office-legacy", "legacy-office"], label: "Legacy Office (.doc, .xls, .ppt)", slug: "office-legacy", sheetName: "Legacy Office" },
   // Files that may not need remediation (reference / handled-elsewhere)
   { side: "reference",  keys: ["image"],            label: "Images (.jpg, .png, .gif, .webp, .svg)",     slug: "images" },
   { side: "reference",  keys: ["text"],             label: "Text files (.txt, .md)",                     slug: "text-files" },
@@ -411,6 +438,19 @@ export const TYPE_BUCKETS = [
   { side: "reference",  keys: ["web"],              label: "Web pages (.html, .css, .js)",               slug: "web-files" },
   { side: "reference",  keys: ["other"],            label: "Other (placeholders, unrecognized)",         slug: "other" },
 ];
+
+// v1.20.0: categories considered "remediable" for the purpose of filtering
+// downloadable reports. Mirrors REMEDIABLE_CATS inside computeSiteSummary but
+// hoisted here so the master / duplicates / orphans CSV→XLSX conversions can
+// filter at write time without recomputing.
+const REMEDIABLE_CATEGORIES = new Set([
+  "pdf", "office-document", "spreadsheet", "presentation",
+  "legacy-office", "office-legacy",
+]);
+
+function isRemediableEntry(entry) {
+  return REMEDIABLE_CATEGORIES.has(entry?.category);
+}
 
 /**
  * Build the audit-fleet-context.md companion file that ships alongside the
@@ -471,19 +511,20 @@ function buildFleetContextMarkdown({ allEntries, siteResults, duplicateGroupsCou
 > (Claude, ChatGPT, Gemini, etc.). The LLM uses this narrative for context;
 > it uses the NDJSON to answer specific queries.
 
-## ⚠️ The CSVs are the actionable files — this is read-only context
+## ⚠️ The XLSX workbooks are the actionable files — this is read-only context
 
-The bundle this lives in includes several CSV files (\`audit-file-list-master.csv\`,
-\`audit-pdfs.csv\`, \`audit-docx.csv\`, and a CSV per per-site report). Those
-CSVs carry two staff-fill columns — **Delete?** (default empty; staff
-writes \`X\`, \`YES\`, or anything non-blank to flag a file for removal) and
-**Notes** — that staff edit and send back so the audit team can remove
-flagged files before the next scan. **This NDJSON + markdown pair is
-explicitly NOT for editing.** It exists so an LLM agent (or anyone wanting
-read-only query access) can answer questions about the fleet without
-loading 9 MB of CSV into a spreadsheet and hand-filtering. If you're an LLM
-reading this: when a user asks "should I edit this NDJSON to mark files for
-deletion?", point them at \`audit-file-list-master.csv\` instead.
+The bundle this lives in includes several XLSX workbooks (\`audit-file-list-master.xlsx\`,
+\`audit.xlsx\` with PDFs/DOCX/XLSX/PPTX tabs, and one per per-site report —
+\`<site>.xlsx\`, also multi-sheet by file type). Those workbooks carry two
+staff-fill columns — **Delete?** (default empty; staff writes \`X\`, \`YES\`, or
+anything non-blank to flag a file for removal) and **Notes** — that staff edit
+and send back so the audit team can remove flagged files before the next scan.
+**This NDJSON + markdown pair is explicitly NOT for editing.** It exists so
+an LLM agent (or anyone wanting read-only query access) can answer questions
+about the fleet without loading megabytes of inventory into a spreadsheet and
+hand-filtering. If you're an LLM reading this: when a user asks "should I
+edit this NDJSON to mark files for deletion?", point them at
+\`audit-file-list-master.xlsx\` instead.
 
 ## Audit scope
 
@@ -518,32 +559,53 @@ The \`${ndjsonFilename}\` file is line-delimited JSON. First line is a
 last line is a \`filecap-consolidated-footer\`; lines in between are one
 file entry each. Each entry has:
 
+### Core fields (every entry)
+
 - \`path\` — file location relative to the scanned directory
 - \`absolutePath\` — full path on the source server (Strapi) or GitHub URL (git-type)
 - \`filename\` — basename
 - \`extension\` — lowercase, no dot (e.g. \`pdf\`, \`docx\`)
-- \`category\` — \`pdf\` | \`office-document\` | \`spreadsheet\` | \`presentation\` | \`office-legacy\` | \`image\` | \`text\` | \`archive\` | \`web\` | \`audio-video\` | \`other\`
+- \`category\` — \`pdf\` | \`office-document\` | \`spreadsheet\` | \`presentation\` | \`office-legacy\` | \`image\` | \`text\` | \`archive\` | \`audio-video\` | \`web\` | \`other\`
+- \`remediable\` — boolean. True for \`pdf\`, \`office-document\`, \`spreadsheet\`, \`presentation\`, \`office-legacy\`; false for everything else. This is what the deployed bundle's downloadable XLSX workbooks filter on.
 - \`sizeBytes\` — file size in bytes
 - \`modifiedAt\` — ISO 8601 last-modified timestamp
 - \`sha256\` — 64-char hex content hash (cross-server duplicate detection)
 - \`serverName\` — which site this file came from (matches a \`sources[].serverName\` in the header)
-- \`flags\` — array of heuristic flags (\`scanned-name-pattern\`, \`filename-has-spaces\`, \`filename-non-ascii\`, \`filename-long\`, \`content-type-mismatch\` — the extension implies one format, the file's bytes are another)
-- \`introspection\` — format-specific structure (present when applicable):
-  - **PDF:** \`pageCount\`, \`hasTextLayer\`, \`textLayerCoverage\` (0–1), \`isImageOnly\` (true = needs OCR), \`hasTags\`, \`hasFormFields\`, \`hasSignatures\`, \`encrypted\`, \`documentLanguage\`
-  - **DOCX:** \`hasHeadings\`, \`imageCount\`, \`altTextCoverage\` (0–1), \`tableCount\`, \`tablesHaveHeaders\`, \`vagueLinkCount\` ("click here" / "read more" anti-patterns)
-  - **XLSX:** \`sheetCount\`
-  - **office-legacy** (\`.doc\`/\`.xls\`/\`.ppt\`): \`kind: "office-legacy"\`, \`format\` (the specific extension)
-- \`duplicateOf\` — \`{ serverName, path }\` pointing at the canonical copy when this entry is a cross-server duplicate (null on canonicals)
+- \`flags\` — array of heuristic flag strings: \`scanned-name-pattern\`, \`filename-has-spaces\`, \`filename-non-ascii\`, \`content-type-mismatch\` (the extension implies one format, the file's bytes are another)
+- \`references\` — array of \`{ pageUrl, anchorText?, contentType?, entryId?, siteName?, source }\` objects pointing at every CMS page or HTML/Vue template that links to this file (v1.8.0+). Empty array means "we ran reference extraction and found nothing" (orphan). Field present but unpopulated (\`[]\`) on every entry in this bundle because reference resolution runs at rollup time.
+
+### Conditional fields (present when applicable)
+
+- \`duplicateOf\` — \`{ serverName, path }\` pointing at the canonical copy when this entry is a cross-server duplicate (omitted on canonicals)
+- \`__auditUrl\` — string. Public URL the audit.icjia.app PDF-scoring service was asked to score (PDFs only; v1.9.0+).
+- \`audit\` — object on PDFs that went through the audit step:
+  - \`audited\`: bool (true if the score request completed)
+  - \`cached\`: bool (true if we read the result from the local audit cache instead of calling the service)
+  - \`checkedAt\`: ISO timestamp of the score
+  - \`score\`: 0–100 numeric score (omitted on errors)
+  - \`grade\`: letter grade A–F derived from score (omitted on errors)
+  - \`reportId\`, \`reportUrl\`, \`reportExpiresAt\`: pointer to the human-readable report on audit.icjia.app
+  - \`error\`: string when the score request failed (mutually exclusive with score/grade)
+
+### Introspection — format-specific (\`entry.introspection.kind\` carries the format tag)
+
+- **\`pdf\`:** \`pageCount\`, \`hasTextLayer\`, \`textLayerCoverage\` (0–1), \`isImageOnly\` (true = needs OCR), \`hasTags\`, \`hasFormFields\`, \`hasSignatures\`, \`hasOutline\`, \`encrypted\`, \`isLinearized\`, \`documentLanguage\`, \`pdfVersion\`, \`approxWordCount\`, \`creationDate\`, \`modificationDate\`, \`creator\`, \`producer\`, \`title\`, \`subject\`, \`keywords\`. \`author\` and \`lastModifiedBy\` are stripped from this NDJSON for PII reasons; everything else from pdfjs-dist is included.
+- **\`docx\`:** \`hasHeadings\`, \`headingLevelsUsed\` (array), \`paragraphCount\`, \`wordCount\`, \`imageCount\`, \`altTextCoverage\` (0–1), \`tableCount\`, \`tablesHaveHeaders\`, \`hyperlinkCount\`, \`vagueLinkCount\` ("click here" / "read more" anti-patterns), \`documentLanguage\`, \`title\`.
+- **\`xlsx\`:** \`sheetCount\`, \`sheetNames\` (array), \`totalCells\`, \`mergedCellCount\`, \`hasHeaderRows\`, \`hasImages\`, \`hasCharts\`, \`defaultSheetNameCount\` (count of sheets still named Sheet1/Sheet2/…), \`title\`.
+- **\`pptx\`:** the inventory carries the file's category as \`presentation\` but the introspection step does not currently crack \`.pptx\` files. Page/slide count must be inferred from filename or estimated. Treat as \`pageCount ≈ 20\` per slide-deck for procurement estimates (the deployed hero's "≈ pages" line uses this constant).
+- **\`office-legacy\`** (\`.doc\`/\`.xls\`/\`.ppt\`): \`kind: "office-legacy"\`, \`format\` (the specific extension). No structural introspection — legacy binary formats can't be cracked with pdfjs/officedocs.
 
 ## Sample LLM prompts
 
 Once you've uploaded both files to your LLM tool:
 
+> "What's the total PDF page count across the fleet, broken down by site? Sort sites high to low. (PDF entries carry \`introspection.pageCount\`.)"
+
 > "Which PDFs across the fleet are image-only (no text layer) AND larger than 5 MB? Group by site and show me the largest ones first."
 
-> "List all DOCX files across the fleet where \`hasHeadings\` is false — those are the ones likely to need heading-structure remediation. Sort by site, then by file size descending."
+> "Find every PDF whose \`audit.score\` is below 70 (poor accessibility audit result). Show me filename, site, score, and the \`audit.reportUrl\`."
 
-> "Which sites have the highest share of legacy Office files (.doc/.xls/.ppt)? Those are the ones that may need format conversion before remediation."
+> "List all DOCX files across the fleet where \`hasHeadings\` is false — those are the ones likely to need heading-structure remediation. Sort by site, then by file size descending."
 
 > "Find all files flagged with \`scanned-name-pattern\` AND classified as PDF — those are likely scanned-from-paper documents that will need OCR. Group by site."
 
@@ -551,9 +613,11 @@ Once you've uploaded both files to your LLM tool:
 
 > "Are there any DOCX files with \`imageCount > 5\` and \`altTextCoverage < 0.5\`? Those have lots of images missing alt text — high-effort remediation."
 
+> "Show me every entry with \`references\` length 0 AND \`remediable: true\` — these are unreferenced remediable files that may be candidates for deletion."
+
 ## What this is NOT
 
-- **Not a vendor work-order.** Use \`audit-file-list-master.csv\` for that — it has the 14 columns vendors expect plus the \`Delete?\` and \`Notes\` columns for staff prep.
+- **Not a vendor work-order.** Use \`audit-file-list-master.xlsx\` for that — it has the columns vendors expect (including \`Page Count\` for per-page quoting) plus the \`Delete?\` and \`Notes\` columns for staff prep.
 - **Not authoritative on access.** This file is generated from a snapshot — if it was generated more than a few days ago, re-run \`filecap web-rollup\` before relying on the numbers.
 - **Not a substitute for opening the file.** "May need remediation" means "likely needs a closer look by a human or vendor." Some files flagged here will not actually need work; some files not flagged here might. The introspection is a heuristic, not a verdict.
 
@@ -622,6 +686,15 @@ async function computeSiteSummary(inventoryPath) {
   let auditScoreSum = 0;
   let auditErrorCount = 0;
   let auditPending = 0;
+  // v1.20.0: inclusive page-count estimate so the hero can advertise
+  // remediation workload in the units vendors actually quote against (pages).
+  // PDFs use the measured pdfjs page count; the four office formats use
+  // averages from src/web/page-estimate.js because scan doesn't crack them.
+  let pdfPagesMeasured = 0;
+  let docxCount = 0;
+  let pptxCount = 0;
+  let xlsxCount = 0;
+  let legacyOfficeCount = 0;
 
   const REMEDIABLE_CATS = new Set(["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"]);
 
@@ -677,13 +750,29 @@ async function computeSiteSummary(inventoryPath) {
       } else {
         auditPending++;
       }
+      const pc = obj.introspection?.pageCount;
+      if (typeof pc === "number" && pc >= 0) pdfPagesMeasured += pc;
+    } else if (cat === "office-document") {
+      docxCount++;
+    } else if (cat === "presentation") {
+      pptxCount++;
+    } else if (cat === "spreadsheet") {
+      xlsxCount++;
+    } else if (cat === "legacy-office") {
+      legacyOfficeCount++;
     }
   }
+
+  const remediablePages = estimateRemediablePages({
+    pdfPagesMeasured, docxCount, pptxCount, xlsxCount, legacyOfficeCount,
+  });
 
   return {
     totalFiles, totalBytes, remediable, byCategory,
     withRefs, withoutRefs, refsUnknown,
     auditedPdfCount, auditScoreSum, auditErrorCount, auditPending,
+    pdfPagesMeasured, remediablePages,
+    remediablePageCounts: { docxCount, pptxCount, xlsxCount, legacyOfficeCount },
   };
 }
 
@@ -866,7 +955,7 @@ export async function runWebRollup({
       outputDir: tempDir,
       html: true,
       backHref: "index.html",
-      csvHref: `${baseName}.csv`,
+      csvHref: `${baseName}.xlsx`,
       siteUrl: site.siteUrl ?? null,
       siteFullName: site.siteFullName ?? null,
       accessKind,
@@ -880,13 +969,34 @@ export async function runWebRollup({
       continue;
     }
 
-    // 5. Copy CSV and HTML to bundle dir, renamed
-    const srcCsv = path.join(tempDir, "audit-file-list.csv");
+    // 5. v1.20.0 — per-site XLSX replaces the per-site CSV. Multi-sheet
+    // workbook with one tab per remediable file type, scoped to this site.
+    // Reference categories (images / text / archives / web / audio-video /
+    // other) are dropped so the download holds only what vendors quote
+    // against. HTML is unchanged (still shows everything, chip filter
+    // available).
     const srcHtml = path.join(tempDir, "audit-file-list.html");
-    const dstCsv = path.join(output, `${baseName}.csv`);
+    const dstXlsx = path.join(output, `${baseName}.xlsx`);
     const dstHtml = path.join(output, `${baseName}.html`);
 
-    await fs.copyFile(srcCsv, dstCsv);
+    // Stream the per-site inventory + build sheets per remediable bucket.
+    const { siteHeader: perSiteHeader, entries: perSiteEntries } = await readInventoryNdjson(latestInv);
+    const perSiteSheetConfigs = [];
+    for (const bucket of TYPE_BUCKETS) {
+      if (bucket.side !== "remediable") continue;
+      const bucketEntries = perSiteEntries.filter((e) => bucket.keys.includes(e?.category));
+      if (bucketEntries.length === 0) continue;
+      perSiteSheetConfigs.push({
+        name: bucket.sheetName,
+        sourceHeader: perSiteHeader,
+        entries: bucketEntries,
+        sources: null,
+        totals: bucket.slug === "pdfs" ? { pageCount: true } : undefined,
+      });
+    }
+    if (perSiteSheetConfigs.length > 0) {
+      await writeXlsxMultiSheet({ outputPath: dstXlsx, sheets: perSiteSheetConfigs });
+    }
 
     const useClientGate = !noClientGate && password !== null;
     let htmlContent = await fs.readFile(srcHtml, "utf8");
@@ -950,7 +1060,8 @@ export async function runWebRollup({
       header,
       summary,
       htmlFile: `${baseName}.html`,
-      csvFile: `${baseName}.csv`,
+      // v1.20.0: per-site download is the multi-sheet .xlsx workbook now.
+      csvFile: `${baseName}.xlsx`,
       scannedAt: header.metadata?.scannedAt ?? null,
     });
   }
@@ -959,11 +1070,11 @@ export async function runWebRollup({
     return { exitCode: 2, error: "no sites had scans available — nothing to bundle" };
   }
 
-  // 6a. Build the master CSV (every file across every site).
-  //     We synthesise a consolidated header so writeCsv() picks the
-  //     consolidated branch, which reads serverName off each entry and uses
-  //     the sources array to look up per-site metadata.
-  const masterCsvFilename = "audit-file-list-master.csv";
+  // 6a. Build the master XLSX (every REMEDIABLE file across every site).
+  //     v1.20.0: was .csv with every file; downloads are now .xlsx and
+  //     filtered to remediable categories only — vendors don't quote
+  //     against images/text/archives so they're just noise in a worksheet.
+  const masterCsvFilename = "audit-file-list-master.xlsx";
   let masterCsvMeta = null;
   if (allEntries.length > 0) {
     const masterHeader = {
@@ -975,17 +1086,21 @@ export async function runWebRollup({
         sources: consolidatedSources,
       },
     };
-    const masterCsvText = writeCsv({
-      sourceHeader: masterHeader,
-      entries: allEntries.map((it) => it.entry),
-      sources: consolidatedSources,
-    });
+    const masterEntries = allEntries
+      .map((it) => it.entry)
+      .filter(isRemediableEntry);
     const masterCsvPath = path.join(output, masterCsvFilename);
-    await fs.writeFile(masterCsvPath, masterCsvText);
+    await writeXlsx({
+      sourceHeader: masterHeader,
+      entries: masterEntries,
+      sources: consolidatedSources,
+      outputPath: masterCsvPath,
+      sheetName: "All remediable files",
+    });
     const masterStat = await fs.stat(masterCsvPath);
     masterCsvMeta = {
       filename: masterCsvFilename,
-      fileCount: allEntries.length,
+      fileCount: masterEntries.length,
       byteCount: masterStat.size,
       // v1.7.16: the master CSV is "as of right now" — its lastAuditAt is the
       // moment we built this rollup. Surface it under the download button so
@@ -997,18 +1112,17 @@ export async function runWebRollup({
   // (LLM-context files are emitted AFTER duplicate detection — see 6c below.)
   let llmContextMeta = null;
 
-  // 6a-bis. v1.7.14 — per-file-type CSV + HTML detail pages.
-  //   For every non-empty bucket in TYPE_BUCKETS, write:
-  //     audit-<slug>.csv  — filtered master CSV containing only files of this
-  //                         type, with the same Server/Website/IP/Public URL
-  //                         columns (consolidated header path).
-  //     audit-<slug>.html — same dp-hero + sortable file table as a per-site
-  //                         detail page, but pre-filtered to this category
-  //                         across every server. Lets a manager click "PDFs"
-  //                         on the index page's "By file type" table and get
-  //                         a full table of every PDF across the fleet
-  //                         without filtering by hand.
+  // 6a-bis. v1.7.14 → v1.20.0 — per-file-type HTML detail pages + single
+  // multi-sheet audit.xlsx for the remediable formats.
+  //   For every non-empty REMEDIABLE bucket, collect the entries for an
+  //   audit.xlsx tab; ALL non-empty buckets still get audit-<slug>.html for
+  //   the website (the HTML can filter to remediable/reference, but the
+  //   per-type pages are still useful as "show me every image" links).
+  //   No per-type CSVs (they're noise now that downloads are a single
+  //   multi-tab XLSX) — reference buckets (images / text / archives / ...)
+  //   ship with HTML only, no download.
   const byTypeCsvs = [];
+  const remediableSheetConfigs = [];
   if (allEntries.length > 0) {
     for (const bucket of TYPE_BUCKETS) {
       const filtered = allEntries.filter((it) => bucket.keys.includes(it.entry?.category));
@@ -1028,15 +1142,7 @@ export async function runWebRollup({
         },
       };
       const filteredEntries = filtered.map((it) => it.entry);
-
-      const csvFilename = `audit-${bucket.slug}.csv`;
-      const csvText = writeCsv({
-        sourceHeader: byTypeHeader,
-        entries: filteredEntries,
-        sources: consolidatedSources,
-      });
-      await fs.writeFile(path.join(output, csvFilename), csvText);
-      const csvStat = await fs.stat(path.join(output, csvFilename));
+      const isRemediableBucket = bucket.side === "remediable";
 
       const htmlFilename = `audit-${bucket.slug}.html`;
       let htmlOk = false;
@@ -1047,14 +1153,15 @@ export async function runWebRollup({
           sources: consolidatedSources,
           outputPath: path.join(output, htmlFilename),
           backHref: "index.html",
-          csvHref: csvFilename,
+          // v1.20.0: only remediable per-type pages get a download link,
+          // and the link goes to the shared multi-sheet audit.xlsx (the
+          // browser opens the workbook; the user clicks the right tab).
+          csvHref: isRemediableBucket ? "audit.xlsx" : null,
           siteUrl: null,
           siteFullName: bucket.label,
           accessKind: null,
         });
         htmlOk = true;
-        // v1.7.14: inject the client-side password gate into per-type pages
-        // the same way the per-site detail pages get gated above.
         if (!noClientGate && password !== null) {
           const hexHash = computeHash(password);
           const html = await fs.readFile(path.join(output, htmlFilename), "utf8");
@@ -1064,28 +1171,106 @@ export async function runWebRollup({
         process.stderr.write(`WARN: failed to write ${htmlFilename}: ${err.message}\n`);
       }
 
+      if (isRemediableBucket) {
+        remediableSheetConfigs.push({
+          name: bucket.sheetName,
+          sourceHeader: byTypeHeader,
+          entries: filteredEntries,
+          sources: consolidatedSources,
+          // v1.20.0: the PDFs tab gets a bottom SUM row over Page Count so a
+          // vendor can read "how many pages do I need to quote against" at a
+          // glance without writing a formula.
+          totals: bucket.slug === "pdfs" ? { pageCount: true } : undefined,
+        });
+      }
+
       byTypeCsvs.push({
         slug: bucket.slug,
         side: bucket.side,
         label: bucket.label,
         keys: bucket.keys,
-        csvFilename,
+        // v1.20.0: csvFilename is now the multi-sheet audit.xlsx for all
+        // remediable buckets, null for reference buckets (no download).
+        csvFilename: isRemediableBucket ? "audit.xlsx" : null,
+        xlsxFilename: isRemediableBucket ? "audit.xlsx" : null,
+        sheetName: bucket.sheetName ?? null,
         htmlFilename: htmlOk ? htmlFilename : null,
         fileCount: filtered.length,
-        byteCount: csvStat.size,
+        byteCount: 0,
       });
     }
   }
 
+  // 6a-ter. v1.20.0 — write the single multi-sheet audit.xlsx that the index
+  // by-type table now links to (one workbook, one tab per remediable file
+  // type, no images / text / archives noise). Filled by the loop above.
+  let auditXlsxMeta = null;
+  if (remediableSheetConfigs.length > 0) {
+    const auditXlsxPath = path.join(output, "audit.xlsx");
+    await writeXlsxMultiSheet({ outputPath: auditXlsxPath, sheets: remediableSheetConfigs });
+    const auditXlsxStat = await fs.stat(auditXlsxPath);
+    const totalFileCount = remediableSheetConfigs.reduce((s, c) => s + c.entries.length, 0);
+    auditXlsxMeta = {
+      filename: "audit.xlsx",
+      byteCount: auditXlsxStat.size,
+      fileCount: totalFileCount,
+      sheetCount: remediableSheetConfigs.length,
+    };
+    // Backfill byteCount on the byTypeCsvs entries that pointed at audit.xlsx
+    // so callers that report sizes have a non-zero figure to show.
+    for (const meta of byTypeCsvs) {
+      if (meta.xlsxFilename === "audit.xlsx") meta.byteCount = auditXlsxStat.size;
+    }
+  }
+
   // 6b. Detect cross-server duplicates by normalised filename, then write the
-  //     per-occurrence duplicates CSV alongside the master CSV.
-  const duplicateGroups = findCrossServerDuplicates(allEntries);
-  const duplicatesCsvFilename = "audit-file-duplicates.csv";
+  //     per-occurrence duplicates XLSX alongside the master XLSX. v1.20.0: was
+  //     .csv with every entry; now filtered to remediable categories only and
+  //     emitted as a real workbook (one row per file occurrence within each
+  //     duplicate group). Reference-side duplicates (e.g. images shared
+  //     across sites) are dropped — vendors don't quote against them.
+  // Filter remediable BEFORE running the duplicate detector — the detector
+  // flattens its items and drops .category, so a post-filter wouldn't have
+  // anything to match against.
+  const remediableAllEntries = allEntries.filter((it) => isRemediableEntry(it.entry));
+  const duplicateGroups = findCrossServerDuplicates(remediableAllEntries);
+  const duplicatesCsvFilename = "audit-file-duplicates.xlsx";
   let duplicatesCsvMeta = null;
   if (duplicateGroups.length > 0) {
-    const dupCsv = writeDuplicatesCsv(duplicateGroups);
     const dupPath = path.join(output, duplicatesCsvFilename);
-    await fs.writeFile(dupPath, dupCsv);
+    const dupRows = [];
+    for (const g of duplicateGroups) {
+      const matchType = g.isExactDuplicate ? "exact copy" : "different content";
+      for (const item of g.items) {
+        dupRows.push({
+          normalisedFilename: g.normalizedFilename,
+          matchType,
+          groupSize: g.items.length,
+          siteName: item.siteName ?? "",
+          serverName: item.serverName ?? "",
+          modifiedAt: item.modifiedAt ?? "",
+          sizeBytes: item.sizeBytes ?? 0,
+          path: item.path ?? "",
+          shaPrefix: item.sha256 ? item.sha256.slice(0, 12) : "",
+        });
+      }
+    }
+    await writeXlsxFromRows({
+      outputPath: dupPath,
+      sheetName: "Duplicates",
+      columns: [
+        { key: "normalisedFilename", label: "Normalised filename" },
+        { key: "matchType",          label: "Match type" },
+        { key: "groupSize",          label: "Group size", type: "number" },
+        { key: "siteName",           label: "Website" },
+        { key: "serverName",         label: "Server" },
+        { key: "modifiedAt",         label: "Date published" },
+        { key: "sizeBytes",          label: "Size (bytes)", type: "number" },
+        { key: "path",               label: "Path" },
+        { key: "shaPrefix",          label: "Content hash (SHA-256, first 12)" },
+      ],
+      rows: dupRows,
+    });
     const dupStat = await fs.stat(dupPath);
     const occurrenceCount = duplicateGroups.reduce((s, g) => s + g.items.length, 0);
     duplicatesCsvMeta = {
@@ -1097,7 +1282,7 @@ export async function runWebRollup({
   }
 
   // 6b-iii. v1.11.0 — orphaned-files report.
-  //   audit-orphaned-files.csv : every file with `references: []` after
+  //   audit-orphaned-files.xlsx: every remediable file with `references: []` after
   //                              cross-resolution, plus its fuzzy-matched
   //                              upgrade-replacement (if any) and a
   //                              confidence score (0-95).
@@ -1110,17 +1295,63 @@ export async function runWebRollup({
     const resolvableEntries = allEntries
       .map((it) => it.entry)
       .filter((e) => Array.isArray(e?.references));
-    const orphans = classifyOrphans(resolvableEntries);
+    // v1.20.0: orphans are filtered to remediable formats only. Reference
+    // files (images, etc.) that are unreferenced are noise — vendors don't
+    // care about them and the report wasn't actionable for them anyway.
+    const remediableOrphans = classifyOrphans(resolvableEntries.filter(isRemediableEntry));
+    const orphans = remediableOrphans;
     if (orphans.length > 0) {
       const siteTotals = new Map();
-      for (const e of resolvableEntries) {
+      for (const e of resolvableEntries.filter(isRemediableEntry)) {
         const k = e.serverName ?? "";
         siteTotals.set(k, (siteTotals.get(k) ?? 0) + 1);
       }
-      const orphansCsvFilename = "audit-orphaned-files.csv";
+      const orphansCsvFilename = "audit-orphaned-files.xlsx";
       const orphansHtmlFilename = "audit-orphaned-files.html";
-      const csvText = writeOrphansCsv({ orphans, sources: consolidatedSources });
-      await fs.writeFile(path.join(output, orphansCsvFilename), csvText);
+      const sourcesByServer = new Map();
+      for (const s of consolidatedSources) {
+        if (s.serverName) sourcesByServer.set(s.serverName, s);
+      }
+      const orphanRows = orphans.map((o) => {
+        const e = o.entry;
+        const source = sourcesByServer.get(e.serverName ?? "");
+        const siteLabel = source?.siteName ?? e.serverName ?? "";
+        const base = (source?.publicUrlBase ?? "").replace(/\/+$/, "");
+        const prefix = source?.pathPrefix ? `/${String(source.pathPrefix).replace(/^\/+|\/+$/g, "")}` : "";
+        const relPath = (e.path ?? e.filename ?? "").replace(/^\/+/, "");
+        const publicUrl = base ? `${base}${prefix}/${relPath}` : "";
+        return {
+          siteLabel, path: e.path ?? "", filename: e.filename ?? "",
+          extension: e.extension ?? "", sizeBytes: e.sizeBytes ?? "",
+          modifiedAt: e.modifiedAt ?? "", daysOld: o.daysOld ?? "",
+          status: o.status, confidence: o.replaceabilityConfidence,
+          replacedBy: o.replacedBy ?? "", replacedOn: o.replacedOn ?? "",
+          daysBetween: o.daysBetween ?? "", reasons: (o.reasons ?? []).join("|"),
+          groupSize: o.groupSize, publicUrl,
+        };
+      });
+      await writeXlsxFromRows({
+        outputPath: path.join(output, orphansCsvFilename),
+        sheetName: "Orphaned files",
+        columns: [
+          { key: "siteLabel",   label: "Site" },
+          { key: "path",        label: "Path" },
+          { key: "filename",    label: "Filename" },
+          { key: "extension",   label: "Type" },
+          { key: "sizeBytes",   label: "Size (bytes)", type: "number" },
+          { key: "modifiedAt",  label: "Modified" },
+          { key: "daysOld",     label: "Days old", type: "number" },
+          { key: "status",      label: "Status" },
+          { key: "confidence",  label: "Confidence %", type: "number" },
+          { key: "replacedBy",  label: "Replaced by" },
+          { key: "replacedOn",  label: "Replaced on" },
+          { key: "daysBetween", label: "Days between", type: "number" },
+          { key: "reasons",     label: "Reasons" },
+          { key: "groupSize",   label: "Group size", type: "number" },
+          { key: "publicUrl",   label: "Public URL", type: "url" },
+        ],
+        rows: orphanRows,
+      });
       const csvStat = await fs.stat(path.join(output, orphansCsvFilename));
       const htmlText = writeOrphansHtml({
         orphans,
@@ -1207,9 +1438,36 @@ export async function runWebRollup({
   let fileErrorsMeta = null;
   if (allEntries.length > 0) {
     const errorGroups = collectAuditErrors(allEntries);
-    const errorsCsvFilename = "audit-file-errors.csv";
+    const errorsCsvFilename = "audit-file-errors.xlsx";
     const errorsHtmlFilename = "audit-file-errors.html";
-    await fs.writeFile(path.join(output, errorsCsvFilename), writeAuditErrorsCsv(errorGroups));
+    const errorRows = [];
+    for (const g of errorGroups ?? []) {
+      for (const e of g.errors ?? []) {
+        errorRows.push({
+          siteName: g.siteName,
+          filename: e.filename,
+          extension: e.extension,
+          sizeBytes: e.sizeBytes,
+          publicUrl: e.publicUrl,
+          errorText: e.error,
+          reason: e.reason,
+        });
+      }
+    }
+    await writeXlsxFromRows({
+      outputPath: path.join(output, errorsCsvFilename),
+      sheetName: "Audit errors",
+      columns: [
+        { key: "siteName",  label: "Website" },
+        { key: "filename",  label: "File" },
+        { key: "extension", label: "File type" },
+        { key: "sizeBytes", label: "Size (bytes)", type: "number" },
+        { key: "publicUrl", label: "Public URL", type: "url" },
+        { key: "errorText", label: "Error" },
+        { key: "reason",    label: "Likely reason" },
+      ],
+      rows: errorRows,
+    });
     let errorsHtml = generateAuditErrorsPage({ groups: errorGroups, backHref: "index.html" });
     if (!noClientGate && password !== null) {
       errorsHtml = injectPasswordGate(errorsHtml, computeHash(password));
