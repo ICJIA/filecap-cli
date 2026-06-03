@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.20.1] — 2026-06-03
+
+### Changed
+
+- **Page Audit Score column removed from the per-site detail pages' Page view.** The column showed each page's own A–F accessibility grade plus an "Open report" link to `audit.icjia.app/page-report/…`, but that per-page report route consistently 404s, so the link was an annoyance rather than a useful indicator. Removed the column (header + cell), the now-orphaned `buildPageAuditCell()` helper, and the supporting copy in the "Pages on this site" note and the File/Page-view toggle blurb; the `#page-table` layout rebalances from four columns to three (Page / Content type / Files). The per-page `pageAudit` data is still computed upstream in `src/report/pages.js` — it is simply no longer rendered, so the column is a one-line re-add if the report route is ever fixed. The File view's small per-page grade chip next to each linking page is unchanged. (`src/report/html.js`.)
+
+### Tests
+
+796 passing (no net change — `report-html.test.js`'s Page-view row test now asserts the "Page Audit Score" header is gone instead of asserting the grade chip renders).
+
 ## [1.20.0] — 2026-06-03
 
 ### Added

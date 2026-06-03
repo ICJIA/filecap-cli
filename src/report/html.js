@@ -246,20 +246,6 @@ function buildAuditScoreCell(audit) {
 // these helpers render the page table. `ctx` = { sourceHeader, sourceMap,
 // isConsolidated } so buildPublicUrl can resolve each attached file's URL.
 
-function buildPageAuditCell(pageAudit) {
-  if (!pageAudit || typeof pageAudit.score !== "number") {
-    return `<td data-score="-1"><span class="no-refs">No score</span></td>`;
-  }
-  const grade = String(pageAudit.grade ?? "").toUpperCase();
-  const gradeClass = grade ? `audit-grade-${grade.toLowerCase()}` : "audit-grade-error";
-  const chip = `<span class="audit-grade ${gradeClass}">${htmlEscape(grade || "?")}</span> <span class="audit-score-num">(${pageAudit.score})</span>`;
-  const safe = safeUrl(pageAudit.reportUrl);
-  const link = safe
-    ? ` <a class="audit-report-link" href="${htmlEscape(safe)}" target="_blank" rel="noopener noreferrer">Open report</a>`
-    : "";
-  return `<td data-score="${pageAudit.score}">${chip}${link}</td>`;
-}
-
 function buildPageFilesCell(page, ctx) {
   const files = page.files ?? [];
   if (files.length === 0) {
@@ -295,7 +281,7 @@ function buildPageRow(page, ctx) {
     ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${urlText}</a>${tag}</td>`
     : `<td>${urlText}${tag}</td>`;
   const typeCell = `<td>${htmlEscape(page.contentType || "—")}</td>`;
-  return `<tr>${pageCell}${typeCell}${buildPageAuditCell(page.pageAudit)}${buildPageFilesCell(page, ctx)}</tr>`;
+  return `<tr>${pageCell}${typeCell}${buildPageFilesCell(page, ctx)}</tr>`;
 }
 
 function buildPageViewSection(pages, ctx) {
@@ -308,7 +294,7 @@ function buildPageViewSection(pages, ctx) {
   const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
   return `<div id="page-view" hidden>
   <h2>Pages on this site</h2>
-  <p class="page-view-note">One row per page. <strong>Page Audit Score</strong> is that page's own accessibility grade; <strong>Files</strong> are the documents the page links to. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively.</p>
+  <p class="page-view-note">One row per page. <strong>Files</strong> are the documents the page links to. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively.</p>
   <nav class="paginator" aria-label="Page table pagination">
     <span class="pag-info" id="pv-page-info"></span>
     <span class="pag-controls">
@@ -329,7 +315,6 @@ function buildPageViewSection(pages, ctx) {
       <thead><tr>
         <th data-sort="page">Page</th>
         <th data-sort="type">Content type</th>
-        <th data-sort="score">Page Audit Score</th>
         <th data-sort="files">Files</th>
       </tr></thead>
       <tbody id="page-body">
@@ -637,7 +622,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     <button type="button" class="view-toggle-btn is-active" data-view="file" aria-pressed="true">File view</button>
     <button type="button" class="view-toggle-btn" data-view="page" aria-pressed="false">Page view</button>
   </div>
-  <p class="view-toggle-blurb"><strong>File view</strong> (shown) lists every file and the pages that link to it. <strong>Page view</strong> flips it around — one row per page on the site, with that page's accessibility score and the files it links to.</p>
+  <p class="view-toggle-blurb"><strong>File view</strong> (shown) lists every file and the pages that link to it. <strong>Page view</strong> flips it around — one row per page on the site, with the files it links to.</p>
 </div>`;
 
   // ── server/scan metadata display ─────────────────────────────────────────────
@@ -1456,10 +1441,9 @@ table {
    it needs; overflow-wrap lets long URLs and file names wrap inside their
    cells instead of forcing the column wider. */
 #page-table { table-layout: fixed; }
-#page-table th:nth-child(1), #page-table td:nth-child(1) { width: 46%; }
-#page-table th:nth-child(2), #page-table td:nth-child(2) { width: 11%; }
-#page-table th:nth-child(3), #page-table td:nth-child(3) { width: 19%; }
-#page-table th:nth-child(4), #page-table td:nth-child(4) { width: 24%; }
+#page-table th:nth-child(1), #page-table td:nth-child(1) { width: 52%; }
+#page-table th:nth-child(2), #page-table td:nth-child(2) { width: 12%; }
+#page-table th:nth-child(3), #page-table td:nth-child(3) { width: 36%; }
 #page-table td { overflow-wrap: anywhere; vertical-align: top; }
 /* The shared .ref-link chip is nowrap — right for the short "Page N" chips in
    the File view, but in the Page view the chips carry long file names. Let

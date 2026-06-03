@@ -1131,7 +1131,7 @@ describe("writeHtml", () => {
       expect((bodyMatch[1].match(/<tr>/g) || []).length).toBe(2);
     });
 
-    it("page rows show the page URL as the link text, plus the audit grade", async () => {
+    it("page rows show the page URL as the link text", async () => {
       const out = path.join(tmpDir, "pagerow.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: entriesWithPages, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
@@ -1142,7 +1142,10 @@ describe("writeHtml", () => {
         /<a href="https:\/\/icjia\.illinois\.gov\/news\/meetings\/m1\/"[^>]*>https:\/\/icjia\.illinois\.gov\/news\/meetings\/m1\/<\/a>/,
       );
       expect(html).not.toContain("Meeting One");
-      expect(html).toMatch(/audit-grade audit-grade-a/);
+      // v1.20.x: the Page Audit Score column was removed — its "Open report"
+      // links 404'd — so the page table no longer renders that header or the
+      // per-page grade chip.
+      expect(html).not.toContain("Page Audit Score");
     });
 
     it("shows the static-site empty-state when no entry has references", async () => {
