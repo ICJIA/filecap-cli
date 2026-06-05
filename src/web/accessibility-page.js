@@ -135,6 +135,8 @@ ${rows}
   <a href="https://github.com/ICJIA/filecap-cli" target="_blank" rel="noopener noreferrer">filecap on GitHub</a>
   &nbsp;·&nbsp;
   <a href="index.html">Fleet index</a>
+  &nbsp;·&nbsp;
+  <a href="sites.html">Sites</a>
 </footer>
 </body>
 </html>

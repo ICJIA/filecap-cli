@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderCard, generateIndexHtml } from "../src/web/index-page.js";
+import { renderCard, generateIndexHtml, renderToolCard, renderToolingSection } from "../src/web/index-page.js";
 
 const baseSr = {
   site: {
@@ -405,5 +405,61 @@ describe("index page — PDF scoring panel removed (v1.19.0)", () => {
     expect(html).not.toContain('aria-label="PDF accessibility scoring summary"');
     expect(html).not.toContain("PDFs audited");
     expect(html).not.toContain("Accessibility scores come from");
+  });
+});
+
+describe("renderToolCard (v1.21.0)", () => {
+  const tool = {
+    name: "squish", siteName: "Squish", siteFullName: "Squish — image compression",
+    siteUrl: "https://squish.icjia.app", image: "assets/og/squish.png",
+    description: "Bulk image compression", stack: "Nuxt 3",
+  };
+  it("renders title, URL, description, stack, Tooling badge and og image", () => {
+    const html = renderToolCard(tool);
+    expect(html).toContain("Squish — image compression");
+    expect(html).toContain("squish.icjia.app");
+    expect(html).toContain("Bulk image compression");
+    expect(html).toContain("Nuxt 3");
+    expect(html).toContain(">Tooling<");
+    expect(html).toContain('src="assets/og/squish.png"');
+    expect(html).toContain('target="_blank"');
+  });
+  it("uses the ICJIA-logo fallback when there is no image", () => {
+    expect(renderToolCard({ ...tool, image: null })).toContain("card-img-fallback");
+  });
+});
+
+describe("renderToolingSection (v1.21.0)", () => {
+  it("returns an empty string when there are no tools", () => {
+    expect(renderToolingSection([])).toBe("");
+    expect(renderToolingSection(undefined)).toBe("");
+  });
+  it("renders a banded section with a card per tool", () => {
+    const html = renderToolingSection([
+      { name: "a", siteFullName: "Tool A", siteUrl: "https://a.example" },
+      { name: "b", siteFullName: "Tool B", siteUrl: "https://b.example" },
+    ]);
+    expect(html).toContain("Tooling sites");
+    expect(html).toContain("Tool A");
+    expect(html).toContain("Tool B");
+  });
+});
+
+describe("generateIndexHtml tooling band + /sites nav (v1.21.0)", () => {
+  it("includes the tooling band when tools are provided", () => {
+    const html = generateIndexHtml({
+      siteResults: [],
+      tools: [{ name: "squish", siteFullName: "Squish", siteUrl: "https://squish.icjia.app" }],
+    });
+    expect(html).toContain("Squish");
+    expect(html).toContain("Tooling sites");
+  });
+  it("renders the /sites link in the top nav + footer", () => {
+    const html = generateIndexHtml({ siteResults: [] });
+    expect(html).toContain('href="sites.html"');
+  });
+  it("omits the Agency tooling headline when no tools are provided", () => {
+    const html = generateIndexHtml({ siteResults: [] });
+    expect(html).not.toContain("Agency tooling");
   });
 });

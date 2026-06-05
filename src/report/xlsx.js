@@ -76,6 +76,36 @@ export async function writeXlsxFromRows({ outputPath, sheetName = "Sheet1", colu
   const wb = new ExcelJS.Workbook();
   wb.creator = "filecap";
   const sheet = wb.addWorksheet(safeSheetName(sheetName));
+  writeRowsSheet(sheet, columns, rows);
+  await wb.xlsx.writeFile(outputPath);
+}
+
+/**
+ * Multi-sheet variant of writeXlsxFromRows — one tab per
+ * `{ sheetName, columns, rows }` entry. Used by the /sites roster workbook
+ * (a "Content sites" tab + a "Tooling sites" tab). Unlike writeXlsxMultiSheet
+ * (which is inventory/entry shaped), this takes the same plain
+ * `columns`/`rows` shape as writeXlsxFromRows. Sheets with no rows still get a
+ * header-only tab so the workbook structure is predictable.
+ *
+ * @param {object} args
+ * @param {string} args.outputPath
+ * @param {Array<{ sheetName: string, columns: Array, rows: Array }>} args.sheets
+ * @returns {Promise<void>}
+ */
+export async function writeXlsxRowsMultiSheet({ outputPath, sheets }) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "filecap";
+  for (const s of sheets) {
+    const ws = wb.addWorksheet(safeSheetName(s.sheetName ?? "Sheet"));
+    writeRowsSheet(ws, s.columns, s.rows ?? []);
+  }
+  await wb.xlsx.writeFile(outputPath);
+}
+
+// Shared body for the plain columns/rows writers above. One sheet: bold frozen
+// header, optional URL-typed hyperlink cells, autofilter, autofit widths.
+function writeRowsSheet(sheet, columns, rows) {
   sheet.getRow(1).values = columns.map((c) => c.label);
   sheet.getRow(1).font = { bold: true };
   sheet.views = [{ state: "frozen", ySplit: 1 }];
@@ -103,12 +133,15 @@ export async function writeXlsxFromRows({ outputPath, sheetName = "Sheet1", colu
     let max = String(columns[c - 1].label).length;
     for (let r = 2; r <= lastDataRow; r++) {
       const v = sheet.getRow(r).getCell(c).value;
-      const s = v == null ? "" : String(v);
+      // URL cells hold a { text, hyperlink } object — size by the visible text.
+      let s = "";
+      if (v === null || v === undefined) s = "";
+      else if (typeof v === "object" && typeof v.text === "string") s = v.text;
+      else s = String(v);
       if (s.length > max) max = s.length;
     }
     col.width = Math.min(60, Math.max(10, max + 2));
   }
-  await wb.xlsx.writeFile(outputPath);
 }
 
 function normalizeCellValue(v, type) {
@@ -275,7 +308,7 @@ function writeSheetContents({ sheet, sourceHeader, entries, sources, totals }) {
     let maxLen = String(XLSX_COLUMNS[c - 1].label).length;
     for (let r = 2; r <= lastDataRow; r++) {
       const v = sheet.getRow(r).getCell(c).value;
-      if (v == null) continue;
+      if (v === null || v === undefined) continue;
       let s = "";
       if (typeof v === "object" && v !== null) {
         if (v.formula) s = String(v.result ?? "");

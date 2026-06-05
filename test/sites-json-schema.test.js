@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { siteEntrySchema } from "../src/commands/web-rollup.js";
+import { siteEntrySchema, toolEntrySchema } from "../src/commands/web-rollup.js";
 
 // FC-2026-030 (1.8.0-beta.3): the `references.graphqlEndpoint` and
 // `references.restApiBase` fields must be http(s) URLs. Anything else is
@@ -72,5 +72,37 @@ describe("siteEntrySchema references endpoint URL validation (FC-2026-030)", () 
     expect(() =>
       siteEntrySchema.parse(validSite({ strategy: "strapi-v3" })),
     ).not.toThrow();
+  });
+});
+
+describe("siteEntrySchema v1.21.0 — optional description + image", () => {
+  it("accepts optional description and image overrides", () => {
+    expect(() => siteEntrySchema.parse({ name: "s", description: "A site.", image: "https://x/og.png" })).not.toThrow();
+  });
+});
+
+describe("toolEntrySchema (v1.21.0)", () => {
+  const valid = (o = {}) => ({ name: "squish", siteUrl: "https://squish.icjia.app", ...o });
+
+  it("accepts a minimal tool (name + http siteUrl)", () => {
+    expect(() => toolEntrySchema.parse(valid())).not.toThrow();
+  });
+  it("accepts optional siteName / siteFullName / description / stack / image", () => {
+    expect(() => toolEntrySchema.parse(valid({
+      siteName: "Squish", siteFullName: "Squish — image compression",
+      description: "Bulk image compression", stack: "Nuxt 3", image: "https://x/og.png",
+    }))).not.toThrow();
+  });
+  it("requires siteUrl", () => {
+    expect(() => toolEntrySchema.parse({ name: "squish" })).toThrow();
+  });
+  it("rejects a non-http(s) siteUrl", () => {
+    expect(() => toolEntrySchema.parse(valid({ siteUrl: "ftp://x" }))).toThrow(/siteUrl/);
+  });
+  it("rejects a bad name slug", () => {
+    expect(() => toolEntrySchema.parse(valid({ name: "Bad Name" }))).toThrow(/slug/);
+  });
+  it("rejects unknown keys (strict)", () => {
+    expect(() => toolEntrySchema.parse(valid({ bogus: 1 }))).toThrow();
   });
 });

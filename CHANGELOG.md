@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.21.0] — 2026-06-05
+
+### Added
+
+- **`/sites` — a registered-site directory** for managers who want the roster, not the audit ("never mind the PDFs — how many sites do we have?"). Lists **every** site in `sites.json` (scanned or not) plus the agency's **tooling apps**, split into **Content sites** and **Tooling sites**. Each card shows an og:image thumbnail, title, live URL, a one-line description, and — for content sites — the same collapsed "Technical details" block as the home page, but **no per-file / per-page audit numbers**. Leads with a bold, count-first hero ("N content sites · M tooling sites", broken down by access kind). New `src/web/sites-page.js` (`generateSitesHtml`). Served at `/sites` via Netlify clean URLs (no redirect needed, same as `/accessibility`).
+- **Tooling sites — a `tools[]` array in `sites.json`.** Active ICJIA web apps with no document files to audit (markdown editor, Squish, MetaPeek, Ipsumify, the QR generator, and the fleet-audit bundle itself). They never enter the scan/audit pipeline and never affect fleet counts. New strict `toolEntrySchema` (`name` slug + required http `siteUrl`; optional `siteName` / `siteFullName` / `description` / `stack` / `image`). A **"Tooling sites" band** also appears on the home page below the fleet cards.
+- **OG metadata per site + tool** — `og:image` / `og:title` / `og:description` are fetched and shown on the roster/tooling cards. og:images are **downloaded into `assets/og/`** for a self-contained bundle; the card description defaults to the site's own `og:description` (a config `description` overrides). When a site has no og:image (e.g. an SPA), the card falls back to the **ICJIA logo** tile. New `src/references/og-meta.js` (`fetchOgMeta`, `fetchImageBytes`) — best-effort, concurrency-limited, fully injectable so tests never touch the network. New **`--no-og`** flag (and `noOg` option) skips fetching for offline / fast rebuilds.
+- **`/sites` in the top nav and footer** of the home page (and the other generated pages' footers), and a "Home" link back from `/sites`.
+- **`sites-list.xlsx`** — a one-click directory export on `/sites`: a two-sheet workbook (**Content sites** + **Tooling sites**) with names, descriptions, URLs, and the content sites' tech details. New `writeXlsxRowsMultiSheet` in `src/report/xlsx.js`.
+- **Optional `description` + `image` on audit sites** (`siteEntrySchema`) so a content site can carry a hand-written one-liner / thumbnail override; both fall back to the fetched OG data.
+
+### Changed
+
+- **The home page's ~2,200-line inline stylesheet was extracted to `src/web/index-css.js`** (`INDEX_CSS`) so `/sites` reuses the *exact* same CSS with zero drift. The home page renders byte-for-byte identically; the new `/sites` / tooling / card-image rules are appended in that one file. Card primitives (`he`, `copyableValue`, `renderTechDetails`, `renderCardImage`, `renderToolCard`, the access-chip label map, the ICJIA logo) are now exported from `index-page.js` and shared by both pages; the per-card "Technical details" block is factored into `renderTechDetails()` used by both `renderCard` and the roster card.
+- **Housekeeping:** removed three now-unused CSV imports (`writeCsv`, `writeOrphansCsv`, `writeAuditErrorsCsv`) and a dead `auditXlsxMeta` object in `web-rollup.js`, and tightened several `== null` checks to `===` so `eslint src test bin` is clean (`AbortController` added to the globals list alongside `fetch` / `AbortSignal`).
+
+### Tests
+
+840 passing (45 new this release). New `test/og-meta.test.js` (meta-tag parsing, entity decoding, OG + image fetch with stubbed network) and `test/sites-page.test.js` (roster cards carry title / URL / description / tech details and **omit** audit numbers; ICJIA-logo fallback; unscanned-site rows; tooling section; count-first hero; XLSX download; nav). Extended `sites-json-schema.test.js` (`tools[]` + optional `description` / `image`), `index-page.test.js` (tool card + tooling band + `/sites` nav), and `web-rollup.test.js` (writes `sites.html` + `sites-list.xlsx`, downloads og images, lists a registered-but-unscanned site, password-gates `sites.html`).
+
 ## [1.20.1] — 2026-06-03
 
 ### Changed

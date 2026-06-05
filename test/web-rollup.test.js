@@ -1381,3 +1381,75 @@ describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
     expect(detailHtml).toContain("ICJIA organization access");
   });
 });
+
+describe("/sites roster + tooling sites (v1.21.0)", () => {
+  it("writes sites.html + sites-list.xlsx, downloads og images, and a home tooling band", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    await fs.mkdir(path.join(auditsBase, "dvfr", "latest"), { recursive: true });
+    await writeInventory(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), { serverName: "dvfr", serverIp: "10.0.0.1" });
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await fs.writeFile(sitesFile, JSON.stringify({
+      version: 1,
+      sites: [{ name: "dvfr", siteName: "DVFR", siteFullName: "Domestic Violence Fatality Review", siteUrl: "https://dvfr.illinois.gov", host: "10.0.0.1", user: "forge", remotePath: "/uploads" }],
+      tools: [{ name: "squish", siteName: "Squish", siteFullName: "Squish", siteUrl: "https://squish.icjia.app" }],
+    }));
+    const outputDir = path.join(tmpDir, "out");
+    const _ogFetch = async (url) => ({ image: url.replace(/\/+$/, "") + "/og.png", title: "T", description: "Desc for " + url });
+    const _imageFetch = async () => ({ ext: "png", buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]) });
+
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, _ogFetch, _imageFetch });
+    expect(result.exitCode).toBe(0);
+
+    const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
+    expect(sitesHtml).toContain("Domestic Violence Fatality Review");
+    expect(sitesHtml).toContain("Squish");
+    expect(sitesHtml).toContain("Content sites");
+    expect(sitesHtml).toContain("Tooling sites");
+    expect(sitesHtml).toContain("Desc for https://dvfr.illinois.gov");
+    expect(sitesHtml).toContain('src="assets/og/dvfr.png"');
+
+    expect((await fs.stat(path.join(outputDir, "assets", "og", "dvfr.png"))).isFile()).toBe(true);
+    expect((await fs.stat(path.join(outputDir, "assets", "og", "squish.png"))).isFile()).toBe(true);
+    expect((await fs.stat(path.join(outputDir, "sites-list.xlsx"))).isFile()).toBe(true);
+
+    const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(indexHtml).toContain("Squish");
+    expect(indexHtml).toContain("Tooling sites");
+    expect(indexHtml).toContain('href="sites.html"');
+  });
+
+  it("lists a registered-but-unscanned site in the roster (no scan required)", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    await fs.mkdir(path.join(auditsBase, "dvfr", "latest"), { recursive: true });
+    await writeInventory(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), { serverName: "dvfr" });
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await fs.writeFile(sitesFile, JSON.stringify({
+      version: 1,
+      sites: [
+        { name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" },
+        { name: "newsite", siteName: "NewSite", siteFullName: "Brand New Site", siteUrl: "https://new.example.gov" },
+      ],
+    }));
+    const outputDir = path.join(tmpDir, "out");
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    expect(result.exitCode).toBe(0);
+    const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
+    expect(sitesHtml).toContain("Brand New Site");
+    expect(sitesHtml).toContain("DVFR");
+  });
+
+  it("password-gates sites.html when a password is set", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, password: "secret", noOg: true });
+    const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
+    expect(sitesHtml).toContain("sessionStorage");
+  });
+
+  it("emits sites-list.xlsx as a real workbook", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    const buf = await fs.readFile(path.join(outputDir, "sites-list.xlsx"));
+    expect(buf.length).toBeGreaterThan(0);
+    expect(buf.slice(0, 2).toString("latin1")).toBe("PK"); // ZIP/XLSX magic
+  });
+});

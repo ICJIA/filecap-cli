@@ -138,6 +138,7 @@ program
   .option("--include-site <name...>", "Only bundle these site nicknames")
   .option("--exclude-site <name...>", "Skip these site nicknames")
   .option("--sites-file <path>", "Override saved-sites JSON path")
+  .option("--no-og", "Skip fetching og:image / og:description for the /sites roster (offline or fast rebuilds; cards fall back to the ICJIA logo)")
   .action(async (opts) => {
     const output = opts.output ?? path.join(
       os.homedir(),
@@ -175,6 +176,8 @@ program
         includeSite: opts.includeSite ?? [],
         excludeSite: opts.excludeSite ?? [],
         sitesFile: opts.sitesFile ?? null,
+        // Commander sets opts.og = false when --no-og is passed.
+        noOg: opts.og === false,
       });
       if (result.exitCode !== 0) {
         process.stderr.write(`web-rollup error: ${result.error}\n`);

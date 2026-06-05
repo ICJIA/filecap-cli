@@ -7,14 +7,12 @@ import { spawn } from "node:child_process";
 import { z } from "zod";
 import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
-import { writeCsv } from "../report/csv.js";
-import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows } from "../report/xlsx.js";
+import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows, writeXlsxRowsMultiSheet } from "../report/xlsx.js";
 import { writeHtml } from "../report/html.js";
 import { parseCmsPageList } from "../report/pages.js";
 import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
-import { writeOrphansCsv } from "../report/orphans-csv.js";
-import { collectAuditErrors, writeAuditErrorsCsv } from "../report/audit-errors.js";
+import { collectAuditErrors } from "../report/audit-errors.js";
 import { generateAuditErrorsPage } from "../report/audit-errors-page.js";
 import { generateIndexHtml } from "../web/index-page.js";
 import { generateAccessibilityPage } from "../web/accessibility-page.js";
@@ -24,6 +22,10 @@ import { generateRobotsTxt } from "../web/robots.js";
 import { generateNetlifyToml, generateNetlifyRedirects, generateNetlifyHeaders } from "../web/netlify-config.js";
 import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
+import { generateSitesHtml } from "../web/sites-page.js";
+import { fetchOgMeta, fetchImageBytes } from "../references/og-meta.js";
+import { fmtChicagoGeneratedAt } from "../util/time.js";
+import pLimit from "p-limit";
 
 // FC-2026-007: Zod schema for sites.json validation
 // 1.7.36 — `name` is interpolated into filesystem paths
@@ -85,6 +87,13 @@ export const siteEntrySchema = z
     // "DVFR"). Used as the per-site report's <h1> heading; falls back to
     // siteName when omitted. Optional.
     siteFullName: z.string().optional(),
+    // v1.21.0 — optional manager-facing one-line description for the /sites
+    // roster card. When omitted, the card falls back to the site's fetched
+    // og:description. Pure presentation; never used in audit logic.
+    description: z.string().optional(),
+    // v1.21.0 — optional override for the /sites card thumbnail. When omitted,
+    // web-rollup uses the site's fetched og:image, then the ICJIA logo tile.
+    image: z.string().optional(),
     // Informational hint — when true, the public URL requires an Authorization
     // header; the audit script looks for the token in ~/.filecap/secrets.json or
     // a FILECAP_BEARER_TOKEN_<SERVER_NAME> env var. The token itself never lives
@@ -135,9 +144,30 @@ export const siteEntrySchema = z
     },
   );
 
+// v1.21.0 — Tooling apps (markdown editor, image compressor, etc.) are active
+// ICJIA web apps with no document files to audit. They live in a dedicated
+// `tools[]` array so they never enter the scan/audit pipeline and never affect
+// fleet counts. `siteUrl` is required (a tool with no link is pointless);
+// `name` is a kebab slug like the audit sites. description / stack / image are
+// optional — description falls back to the fetched og:description, image to the
+// fetched og:image, then the ICJIA logo tile.
+export const toolEntrySchema = z
+  .object({
+    name: z.string().regex(SITE_NAME_SLUG, "name must be a kebab-case slug ([a-z0-9-], no leading/trailing hyphen)"),
+    siteName: z.string().optional(),
+    siteFullName: z.string().optional(),
+    siteUrl: httpUrlSchema("siteUrl"),
+    description: z.string().optional(),
+    stack: z.string().optional(),
+    image: z.string().optional(),
+  })
+  .strict();
+
 const sitesFileSchema = z.object({
   version: z.number().optional(),
   sites: z.array(siteEntrySchema),
+  // v1.21.0 — optional roster of agency tooling apps (see toolEntrySchema).
+  tools: z.array(toolEntrySchema).optional(),
 });
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -356,6 +386,26 @@ async function readInventoryNdjson(filePath) {
     entries.push(obj);
   }
   return { siteHeader, entries };
+}
+
+// v1.21.0 — best-effort read of a site's latest scan header (any of the three
+// augmented inventory files), for /sites roster entries whose site didn't make
+// it into siteResults but may still have a scan on disk. Returns null when no
+// readable header exists.
+async function readLatestHeaderBestEffort(siteKey, auditsBase) {
+  if (!siteKey) return null;
+  const dir = path.join(auditsBase, siteKey, "latest");
+  for (const name of ["inventory.audited.ndjson", "inventory.cross-ref.ndjson", "inventory.ndjson"]) {
+    const p = path.join(dir, name);
+    try {
+      await fs.stat(p);
+    } catch {
+      continue;
+    }
+    const header = await readNdjsonHeader(p);
+    if (header) return header;
+  }
+  return null;
 }
 
 async function readNdjsonHeader(filePath) {
@@ -805,6 +855,12 @@ export async function runWebRollup({
   excludeSite = [],
   sitesFile = null,
   _auditsBase = null,
+  // v1.21.0 — OG enrichment is injectable + skippable so tests never hit the
+  // network. noOg skips fetching entirely (config description + ICJIA-logo
+  // fallback); _ogFetch / _imageFetch let tests stub the network calls.
+  noOg = false,
+  _ogFetch = fetchOgMeta,
+  _imageFetch = fetchImageBytes,
 }) {
   // 1. Load sites.json
   const sitesPath = sitesFile
@@ -838,6 +894,8 @@ export async function runWebRollup({
   }
 
   const allSites = sitesData?.sites ?? [];
+  // v1.21.0 — tooling apps (no audit pipeline). Optional; defaults to [].
+  const tools = sitesData?.tools ?? [];
   const sites = allSites.filter((s) => {
     const nameOrNick = s.siteName ?? s.name ?? "";
     const name = s.name ?? "";
@@ -855,6 +913,7 @@ export async function runWebRollup({
   // 2. Create output directory
   await fs.mkdir(output, { recursive: true });
   await fs.mkdir(path.join(output, "assets"), { recursive: true });
+  await fs.mkdir(path.join(output, "assets", "og"), { recursive: true });
 
   // 3. For each site, locate the latest inventory and generate outputs.
   //    We also accumulate every entry across every site (with its serverName
@@ -1070,6 +1129,82 @@ export async function runWebRollup({
     return { exitCode: 2, error: "no sites had scans available — nothing to bundle" };
   }
 
+  // ── v1.21.0: /sites roster + OG enrichment ─────────────────────────────
+  // Build a directory entry for EVERY filtered site (scanned or not), then
+  // enrich each content site and tooling app with its og:image /
+  // og:description and download thumbnails into assets/og/. Best-effort and
+  // concurrency-limited; skipped under noOg (tests). A registered-but-unscanned
+  // site contributes whatever sites.json knows (its scan header is null).
+  const auditsBaseForRoster = _auditsBase ?? path.join(os.homedir(), "filecap-audits");
+  const scannedByServerName = new Map(siteResults.map((sr) => [sr.site.name, sr]));
+  const contentRoster = [];
+  for (const site of sites) {
+    const scanned = scannedByServerName.get(site.name);
+    const accessKind = scanned?.site?.accessKind ?? deriveAccessKind(site);
+    if (scanned) {
+      contentRoster.push({ site: scanned.site, header: scanned.header, accessKind });
+    } else {
+      const header = await readLatestHeaderBestEffort(site.name, auditsBaseForRoster);
+      contentRoster.push({ site: { ...site, accessKind }, header, accessKind });
+    }
+  }
+
+  const ogLimit = pLimit(5);
+  // Resolve description (config → og:description → "") and a local thumbnail
+  // path (downloaded og:image → null → ICJIA-logo tile at render time). A
+  // non-URL config `image` is treated as an already-in-bundle path.
+  async function enrichOg({ url, slug: slugName, configImage, configDescription }) {
+    let description = configDescription || "";
+    let image = null;
+    if (!noOg) {
+      let og = { image: null, title: null, description: null };
+      try { og = await _ogFetch(url); } catch { /* best-effort */ }
+      if (!description) description = og.description || "";
+      const imgSrc = configImage || og.image;
+      if (imgSrc && /^https?:\/\//i.test(imgSrc)) {
+        let bytes = null;
+        try { bytes = await _imageFetch(imgSrc); } catch { bytes = null; }
+        if (bytes) {
+          const rel = `assets/og/${slugName}.${bytes.ext}`;
+          try {
+            await fs.writeFile(path.join(output, rel), bytes.buffer);
+            image = rel;
+          } catch { image = null; }
+        }
+      } else if (imgSrc) {
+        image = imgSrc;
+      }
+    } else if (configImage && !/^https?:\/\//i.test(configImage)) {
+      image = configImage;
+    }
+    return { description, image };
+  }
+
+  await Promise.all(contentRoster.map((entry) => ogLimit(async () => {
+    const s = entry.site;
+    const url = s.siteUrl ?? s.publicUrlBase ?? entry.header?.metadata?.publicUrlBase ?? "";
+    const { description, image } = await enrichOg({
+      url,
+      slug: slug(s.name ?? s.siteName ?? "site"),
+      configImage: s.image,
+      configDescription: s.description,
+    });
+    entry.description = description;
+    entry.image = image;
+  })));
+
+  const toolsEnriched = tools.map((t) => ({ ...t }));
+  await Promise.all(toolsEnriched.map((t) => ogLimit(async () => {
+    const { description, image } = await enrichOg({
+      url: t.siteUrl,
+      slug: slug(t.name ?? t.siteName ?? "tool"),
+      configImage: t.image,
+      configDescription: t.description,
+    });
+    t.description = description;
+    t.image = image;
+  })));
+
   // 6a. Build the master XLSX (every REMEDIABLE file across every site).
   //     v1.20.0: was .csv with every file; downloads are now .xlsx and
   //     filtered to remediable categories only — vendors don't quote
@@ -1204,18 +1339,13 @@ export async function runWebRollup({
   // 6a-ter. v1.20.0 — write the single multi-sheet audit.xlsx that the index
   // by-type table now links to (one workbook, one tab per remediable file
   // type, no images / text / archives noise). Filled by the loop above.
-  let auditXlsxMeta = null;
+  // v1.21.0 — the audit.xlsx metadata object here was dead (assigned, never
+  // read); dropped so lint stays clean. The workbook write + the byteCount
+  // backfill onto byTypeCsvs remain.
   if (remediableSheetConfigs.length > 0) {
     const auditXlsxPath = path.join(output, "audit.xlsx");
     await writeXlsxMultiSheet({ outputPath: auditXlsxPath, sheets: remediableSheetConfigs });
     const auditXlsxStat = await fs.stat(auditXlsxPath);
-    const totalFileCount = remediableSheetConfigs.reduce((s, c) => s + c.entries.length, 0);
-    auditXlsxMeta = {
-      filename: "audit.xlsx",
-      byteCount: auditXlsxStat.size,
-      fileCount: totalFileCount,
-      sheetCount: remediableSheetConfigs.length,
-    };
     // Backfill byteCount on the byTypeCsvs entries that pointed at audit.xlsx
     // so callers that report sizes have a non-zero figure to show.
     for (const meta of byTypeCsvs) {
@@ -1496,6 +1626,7 @@ export async function runWebRollup({
     llmContext: llmContextMeta,
     orphans: orphansMeta,
     fileErrors: fileErrorsMeta,
+    tools: toolsEnriched,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 
@@ -1505,6 +1636,75 @@ export async function runWebRollup({
     accessibilityHtml = injectPasswordGate(accessibilityHtml, passwordHash);
   }
   await fs.writeFile(path.join(output, "accessibility.html"), accessibilityHtml);
+
+  // 6e. v1.21.0 — /sites roster page + the sites-list.xlsx directory workbook
+  // (Content sites + Tooling sites tabs). Roster only — names, descriptions,
+  // URLs, and the sites' tech details; no per-file/per-page data.
+  const sitesListXlsxFilename = "sites-list.xlsx";
+  const siteRows = contentRoster.map((e) => {
+    const s = e.site;
+    return {
+      site: s.siteFullName || s.siteName || s.name || "",
+      nickname: s.siteName || "",
+      description: e.description || "",
+      url: s.siteUrl || s.publicUrlBase || e.header?.metadata?.publicUrlBase || "",
+      type: s.type || "strapi",
+      access: e.accessKind || "",
+      hostname: e.header?.metadata?.hostname || s.host || "",
+      ip: e.header?.metadata?.serverIp || "",
+      scannedPath: e.header?.metadata?.scannedPath || "",
+    };
+  });
+  const toolRows = toolsEnriched.map((t) => ({
+    tool: t.siteFullName || t.siteName || t.name || "",
+    nickname: t.siteName || "",
+    description: t.description || "",
+    url: t.siteUrl || "",
+    stack: t.stack || "",
+  }));
+  await writeXlsxRowsMultiSheet({
+    outputPath: path.join(output, sitesListXlsxFilename),
+    sheets: [
+      {
+        sheetName: "Content sites",
+        columns: [
+          { key: "site", label: "Site" },
+          { key: "nickname", label: "Nickname" },
+          { key: "description", label: "Description" },
+          { key: "url", label: "URL", type: "url" },
+          { key: "type", label: "Type" },
+          { key: "access", label: "Access" },
+          { key: "hostname", label: "Hostname" },
+          { key: "ip", label: "IP" },
+          { key: "scannedPath", label: "Scanned path" },
+        ],
+        rows: siteRows,
+      },
+      {
+        sheetName: "Tooling sites",
+        columns: [
+          { key: "tool", label: "Tool" },
+          { key: "nickname", label: "Nickname" },
+          { key: "description", label: "Description" },
+          { key: "url", label: "URL", type: "url" },
+          { key: "stack", label: "Stack" },
+        ],
+        rows: toolRows,
+      },
+    ],
+  });
+
+  let sitesHtml = generateSitesHtml({
+    contentRoster,
+    tools: toolsEnriched,
+    sitesListXlsx: sitesListXlsxFilename,
+    title: "ICJIA site directory",
+    generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
+  });
+  if (passwordHash) {
+    sitesHtml = injectPasswordGate(sitesHtml, passwordHash);
+  }
+  await fs.writeFile(path.join(output, "sites.html"), sitesHtml);
 
   // 7. Generate robots.txt
   await fs.writeFile(path.join(output, "robots.txt"), generateRobotsTxt());

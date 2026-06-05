@@ -1,6 +1,6 @@
 {
   "name": "@icjia/filecap",
-  "version": "1.20.1",
+  "version": "1.21.0",
   "description": "File inventory CLI for accessibility audit scoping",
   "keywords": [
     "accessibility",
