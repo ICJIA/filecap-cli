@@ -2253,6 +2253,10 @@ dialog.access-modal .access-modal-cta a {
 .site-card.tool-card,
 .site-card.roster-card { min-height: 0; }
 
+/* v1.22.1 — breathing room between the tool description/stack and the
+   "Open tool" button (the cards are short, so margin-top:auto collapses). */
+.tool-card .actions { padding-top: 14px; }
+
 /* "Tooling" badge */
 .tool-card .tool-badge {
   align-self: center;
@@ -2290,34 +2294,54 @@ dialog.access-modal .access-modal-cta a {
 .roster-card .access-chip { cursor: default; pointer-events: none; }
 .tooling-section { margin: 0 0 1.5rem; }
 
-/* v1.22.0 — footer "uptime checked HH:MM" stamp; hidden until the on-demand
-   client fills it (so it never shows an empty separator on a static open). */
-.site-footer .uptime-stamp:empty { display: none; }
-
-/* v1.21.5 — live/down status line under each card's title: a dot glyph + a
-   visible "Site live" / "Site unreachable" label. The text (not colour alone)
-   carries the meaning — WCAG 1.4.1 — and tells managers what the dot means.
-   Solid green = live; hollow red ring = unreachable. Flows in the card so the
-   card grows to fit it. */
+/* v1.22.1 — live/unreachable status as a compact pill pinned to each card's
+   upper-right corner: a dot glyph + label, plus a muted "checked <Chicago time>"
+   line the on-demand client fills. Text (not colour alone) carries the meaning
+   (WCAG 1.4.1). Absolute, with a translucent backdrop so it's legible over the
+   card image; pointer-events:none so it never blocks the card's click target. */
 .site-card .status-dot {
-  margin: 0 0 4px;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(13, 17, 23, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  text-align: right;
+  pointer-events: none;
+}
+.site-card .status-dot .status-line {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 .site-card .status-dot .status-glyph {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex: none;
 }
-.site-card .status-dot.status-live { color: #56d364; }
+.site-card .status-dot .status-checked {
+  font-size: 0.64rem;
+  font-weight: 500;
+  color: #9aa5b1;
+  white-space: nowrap;
+}
+.site-card .status-dot .status-checked:empty { display: none; }
+.site-card .status-dot.status-live .status-line { color: #56d364; }
 .site-card .status-dot.status-live .status-glyph { background: #3fb950; box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.16); }
-.site-card .status-dot.status-down { color: #ff7b72; }
+.site-card .status-dot.status-down .status-line { color: #ff7b72; }
 .site-card .status-dot.status-down .status-glyph { background: transparent; border: 2px solid #f85149; box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.13); }
 
 /* Header "Sites" nav link — internal, so a green accent distinct from the

@@ -32,8 +32,10 @@ export function uptimeClientScript({
   ${shouldRefresh.toString()}
   function readCache(){try{return JSON.parse(localStorage.getItem(KEY));}catch(e){return null;}}
   function writeCache(c){try{localStorage.setItem(KEY,JSON.stringify(c));}catch(e){}}
+  function fmtChecked(ms){try{return "checked "+new Date(ms).toLocaleString("en-US",{timeZone:"America/Chicago",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZoneName:"short"});}catch(e){return "";}}
   function apply(data){
     if(!data||!data.sites)return;
+    var when=data.checkedAtMs?fmtChecked(data.checkedAtMs):"";
     var nodes=document.querySelectorAll("[data-uptime-key]");
     for(var i=0;i<nodes.length;i++){
       var el=nodes[i],st=data.sites[el.getAttribute("data-uptime-key")];
@@ -42,10 +44,10 @@ export function uptimeClientScript({
       el.classList.add(st==="live"?"status-live":"status-down");
       var lab=el.querySelector(".status-label");
       if(lab)lab.textContent=(st==="live"?"Site live":"Site unreachable");
+      var chk=el.querySelector(".status-checked");
+      if(chk&&when)chk.textContent=when;
       el.setAttribute("title",st==="live"?"This site responded at the last check":"This site was unreachable at the last check");
     }
-    var stamp=document.querySelector("[data-uptime-stamp]");
-    if(stamp&&data.checkedAtMs){stamp.textContent="Uptime checked "+new Date(data.checkedAtMs).toLocaleString();}
   }
   var cache=readCache();
   if(cache)apply(cache);

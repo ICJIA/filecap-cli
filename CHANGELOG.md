@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.22.1] — 2026-06-06
+
+### Changed
+
+- **Status indicator moved to a compact upper-right corner pill** on every card (landing page + `/sites`), with cleaner spacing: a dot + "Site live" / "Site unreachable", plus a muted **"checked &lt;Chicago time&gt;"** line (time, no seconds) that the on-demand client fills. Replaces the centered status line.
+- **Removed the footer "uptime checked" stamp** (folks won't see it down there) in favour of the per-card, at-a-glance "checked" time on the pill.
+- **Added breathing room** between a tooling card's description and its "Open tool" button.
+
 ## [1.22.0] — 2026-06-06
 
 ### Added
