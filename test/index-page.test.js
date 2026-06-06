@@ -480,15 +480,15 @@ describe("generateIndexHtml tooling band + /sites nav (v1.21.0)", () => {
 });
 
 describe("renderStatusDot (v1.21.2)", () => {
-  it("renders a solid live dot with an aria-label", () => {
+  it("renders the live status line with the visible 'Site live' label", () => {
     const html = renderStatusDot("live");
     expect(html).toContain("status-dot status-live");
-    expect(html).toMatch(/aria-label="Live[^"]*"/);
+    expect(html).toContain("Site live");
   });
-  it("renders a down dot with an aria-label", () => {
+  it("renders the unreachable status line with the visible label", () => {
     const html = renderStatusDot("down");
     expect(html).toContain("status-dot status-down");
-    expect(html).toMatch(/aria-label="Down[^"]*"/);
+    expect(html).toContain("Site unreachable");
   });
   it("renders nothing for an unknown / null status", () => {
     expect(renderStatusDot(null)).toBe("");

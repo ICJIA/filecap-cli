@@ -45,7 +45,6 @@ function renderRosterCard(entry) {
   const accessKind = entry.accessKind && ACCESS_KIND_LABEL[entry.accessKind] ? entry.accessKind : null;
   return `<article class="site-card roster-card">
   <a class="card-stretched-link" href="${he(url)}" target="_blank" rel="noopener noreferrer" aria-label="Visit ${fullName} (opens in a new tab)"></a>
-  ${renderStatusDot(entry.status)}
   ${renderCardImage({ image: entry.image, alt: fullName })}
   <header class="card-head">
     ${accessKind ? `<span class="access-chip access-${accessKind}" title="${he(ACCESS_KIND_LABEL[accessKind])}"><span class="access-dot" aria-hidden="true"></span>${he(ACCESS_KIND_LABEL[accessKind])}</span>` : ""}
@@ -53,6 +52,7 @@ function renderRosterCard(entry) {
     <h3 class="full-name">${fullName}</h3>
     ${url ? `<p class="site-url"><a href="${he(url)}" target="_blank" rel="noopener noreferrer">${he(displayUrl(url))}</a></p>` : ""}
   </header>
+  ${renderStatusDot(entry.status)}
   ${desc ? `<p class="card-desc">${he(desc)}</p>` : ""}
   ${renderTechDetails({ site, header: entry.header })}
 </article>`;

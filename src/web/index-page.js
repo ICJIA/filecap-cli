@@ -576,16 +576,18 @@ export function renderCardImage({ image, alt }) {
   return `<div class="card-img card-img-fallback" role="img" aria-label="${he(alt || "ICJIA")}">${ICJIA_LOGO_SVG}</div>`;
 }
 
-// v1.21.2 — a subtle live/down indicator. "Live" = the site's server answered
-// at the last rollup; "Down" = it was unreachable. Distinguished by FILL
-// (solid dot vs hollow ring), not colour alone, so it satisfies WCAG 1.4.1;
-// the aria-label carries the text. Renders nothing for an unknown status.
+// v1.21.2 — a live/down status line shown under each card's title. "Site live"
+// = the server answered at the last rollup; "Site unreachable" = it didn't.
+// v1.21.5: a visible text label (not colour alone) carries the meaning for
+// WCAG 1.4.1 and so managers know what the dot means; the dot is a decorative
+// glyph (solid green / hollow red ring). Renders nothing for an unknown status.
 export function renderStatusDot(status) {
   if (status !== "live" && status !== "down") return "";
-  const label = status === "live"
-    ? "Live — site responded at the last build"
-    : "Down — site was unreachable at the last build";
-  return `<span class="status-dot status-${status}" role="img" aria-label="${he(label)}" title="${status === "live" ? "Live" : "Down"}"></span>`;
+  const label = status === "live" ? "Site live" : "Site unreachable";
+  const title = status === "live"
+    ? "This site responded at the last rollup"
+    : "This site was unreachable at the last rollup";
+  return `<p class="status-dot status-${status}" title="${he(title)}"><span class="status-glyph" aria-hidden="true"></span><span class="status-label">${label}</span></p>`;
 }
 
 // v1.21.0 — a tooling-app card (active site, no document files to audit).
@@ -601,7 +603,6 @@ export function renderToolCard(tool, { showStatus = false } = {}) {
   const stack = tool.stack ?? "";
   return `<article class="site-card tool-card">
   <a class="card-stretched-link" href="${he(url)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${fullName} in a new tab"></a>
-  ${showStatus ? renderStatusDot(tool.status) : ""}
   ${renderCardImage({ image: tool.image, alt: fullName })}
   <header class="card-head">
     <span class="tool-badge">Tooling</span>
@@ -609,6 +610,7 @@ export function renderToolCard(tool, { showStatus = false } = {}) {
     <h3 class="full-name">${fullName}</h3>
     ${url ? `<p class="site-url"><a href="${he(url)}" target="_blank" rel="noopener noreferrer">${he(displayUrl(url))}</a></p>` : ""}
   </header>
+  ${showStatus ? renderStatusDot(tool.status) : ""}
   ${desc ? `<p class="card-desc">${he(desc)}</p>` : ""}
   ${stack ? `<p class="card-stack"><span class="stack-label">Stack</span> ${he(stack)}</p>` : ""}
   <div class="actions">
@@ -720,13 +722,13 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   const sortAzKey = (site.siteFullName || site.siteName || site.name || "").toLowerCase();
   return `<article class="site-card" data-sort-az="${he(sortAzKey)}" data-sort-added="${sortIndex}" data-sort-files="${totalFiles}">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
-  ${renderStatusDot(sr.status)}
   <header class="card-head">
     ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
     <p class="nickname">${nickname}</p>
     <h3 class="full-name">${fullName}</h3>
     ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
   </header>
+  ${renderStatusDot(sr.status)}
   <div class="nums">
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
     <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span>${remediablePages > 0 ? `<span class="lbl-sub" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} potential pages</span>` : ""}</div>

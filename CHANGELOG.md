@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.21.5] — 2026-06-06
+
+### Changed
+
+- **The live/down status dot is now a labeled status line.** Each card (landing page + `/sites`) shows a visible **"Site live"** / **"Site unreachable"** label beside the dot, under the title, so the meaning no longer depends on colour (reinforces WCAG 1.4.1) and managers don't have to ask what the green dot means. The line flows in the card body — cards grow to fit it — instead of overlaying the corner. The dot itself stays a non-colour cue (solid green vs hollow red ring).
+
 ## [1.21.4] — 2026-06-06
 
 ### Security

@@ -1,6 +1,40 @@
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg" alt="Node 20 or newer">
+  <img src="https://img.shields.io/badge/tests-passing-success.svg" alt="Tests passing">
+  <img src="https://img.shields.io/badge/WCAG-2.1%20AA-blueviolet.svg" alt="WCAG 2.1 AA">
+  <img src="https://img.shields.io/badge/status-internal%20ICJIA%20tooling-orange.svg" alt="Internal ICJIA tooling">
+</p>
+
+<p align="center">
   <img src="assets/filecap-cli-banner.png" alt="filecap-cli — file inventory CLI for accessibility audit scoping" width="820">
 </p>
+
+## Table of contents
+
+- [Are you a...](#are-you-a)
+  - [TL;DR for managers](#tldr-for-managers)
+  - [TL;DR for developers](#tldr-for-developers)
+  - [TL;DR for vendors and auditors](#tldr-for-vendors-and-auditors)
+  - [TL;DR for the curious](#tldr-for-the-curious)
+- ["All I want is a file count for the remediators..."](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-filecap-is-more-than-wc--l)
+- [Status](#status)
+- [Quick start](#quick-start)
+- [Quick start for managers](#quick-start-for-managers)
+- [CLI reference](#cli-reference)
+- [Multi-server workflow](#multi-server-workflow)
+- [NDJSON output format](#ndjson-output-format)
+- [What gets introspected](#what-gets-introspected)
+- [Filename flags](#filename-flags-phase-4)
+- [Rollup workflow](#rollup-workflow-phase-5)
+- [Report workflow](#report-workflow-phase-6)
+- [MCP server](#mcp-server-phase-7)
+- [For auditors: self-contained audit scripts](#for-auditors-self-contained-audit-scripts)
+- [Publishing a fleet snapshot](#publishing-a-fleet-snapshot)
+- [What filecap does not do](#what-filecap-does-not-do)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Related tools](#related-icjia-tools)
 
 # @icjia/filecap
 
@@ -14,6 +48,8 @@
 > for transparency, not for distribution.
 
 `filecap` walks a directory tree, introspects each file (PDFs, DOCX, XLSX), and produces a structured NDJSON inventory suitable for accessibility remediation scoping. The primary use case is generating per-server inventories of file stores (Strapi `/uploads` directories, general file servers) to hand to remediation vendors so they can produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
+
+**Every current ICJIA site is now part of the accessibility audit.** Alongside the dense, data-rich fleet report, filecap also publishes a simpler, less-dense **[site directory](https://icjia-fleet-audit.netlify.app/sites)** (`/sites`) that lists just the sites — split into **content sites** and **agency tooling sites** — in a count-first layout for managers who only need to know "how many sites do we run?". Every card carries an at-a-glance **uptime status** (a green "Site live" / red "Site unreachable" indicator) so the whole fleet's health reads in a single scroll.
 
 ## Are you a...
 
@@ -52,7 +88,7 @@ The deployed page reads like an infographic, not a spreadsheet. Five major areas
 
 **3. PII reassurance banner.** *"Zero Personally Identifying Information (PII) in this audit"* with side-by-side IN / NOT-IN lists. The companion `audit-fleet.ndjson` carries no PDF/DOCX `author` or `lastModifiedBy` fields, so the claim is strictly accurate.
 
-**4. Site cards.** One per ICJIA site, alphabetised by title. Each card has a coloured "For bulk file access" chip that opens an instructions modal with a 3-step numbered workflow and a direct contact line to **`christopher.schweda@illinois.gov`**; big two-up tiles (total files / may need audit) with a CSS-only donut; a `Download spreadsheet` button with `Last audit: <date>` caption; and a `Technical details` disclosure (Website / IP / Hostname / Path / URL with copy-to-clipboard buttons). The whole card is one click target to the per-site detail page.
+**4. Site cards.** One per ICJIA site, alphabetised by title. Each card has a coloured "For bulk file access" chip that opens an instructions modal with a 3-step numbered workflow and a direct contact line to **`christopher.schweda@illinois.gov`**; big two-up tiles (total files / may need audit) with a CSS-only donut; a live/unreachable **status line** under the title; a `Download spreadsheet` button with `Last audit: <date>` caption; and a `Technical details` disclosure (Website / Hostname when it differs from the IP / public URL, with copy-to-clipboard buttons — the origin IP and scan path were dropped in v1.21.2). The whole card is one click target to the per-site detail page.
 
 **5. By-file-type drill-down.** Click "PDFs" → full detail page listing every PDF across the fleet plus a filtered CSV. Same for Word, Excel, PowerPoint, images, text, archives, web files, and other.
 
@@ -257,34 +293,6 @@ npx vitest run test/report-html.test.js
 npx vitest run test/mcp-tools.test.js
 npx vitest run test/web-rollup.test.js
 ```
-
----
-
-## Table of contents
-
-- [Are you a...](#are-you-a)
-  - [TL;DR for managers](#tldr-for-managers)
-  - [TL;DR for developers](#tldr-for-developers)
-  - [TL;DR for vendors and auditors](#tldr-for-vendors-and-auditors)
-  - [TL;DR for the curious](#tldr-for-the-curious)
-- ["All I want is a file count for the remediators..."](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-filecap-is-more-than-wc--l)
-- [Status](#status)
-- [Quick start](#quick-start)
-- [Quick start for managers](#quick-start-for-managers)
-- [CLI reference](#cli-reference)
-- [Multi-server workflow](#multi-server-workflow)
-- [NDJSON output format](#ndjson-output-format)
-- [What gets introspected](#what-gets-introspected)
-- [Filename flags](#filename-flags-phase-4)
-- [Rollup workflow](#rollup-workflow-phase-5)
-- [Report workflow](#report-workflow-phase-6)
-- [MCP server](#mcp-server-phase-7)
-- [For auditors: self-contained audit scripts](#for-auditors-self-contained-audit-scripts)
-- [Publishing a fleet snapshot](#publishing-a-fleet-snapshot)
-- [What filecap does not do](#what-filecap-does-not-do)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
-- [Related tools](#related-icjia-tools)
 
 ---
 
