@@ -93,6 +93,14 @@ describe("generateNetlifyHeaders", () => {
     expect(h).toContain("X-Content-Type-Options: nosniff");
     expect(h).toContain("Referrer-Policy: no-referrer");
   });
+
+  it("emits a strict Content-Security-Policy (FC-2026-034, v1.21.4)", () => {
+    const h = generateNetlifyHeaders();
+    expect(h).toContain("Content-Security-Policy: default-src 'self'");
+    expect(h).toContain("frame-ancestors 'none'");
+    expect(h).toContain("object-src 'none'");
+    expect(h).toContain("connect-src 'self'");
+  });
 });
 
 describe("darkModeCss", () => {

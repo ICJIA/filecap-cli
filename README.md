@@ -181,7 +181,7 @@ inline-JS additions). The summary below is for managers and auditors.
 - **The audit script** verifies its own SHA-256 against the GitHub `main` branch on every run (`--no-version-check` to skip).
 - **The published npm package** uses `npm pack` + explicit-tarball publish with 2FA-required publishes.
 - **Network transit** is HTTPS for the audit-remote.sh download (raw.githubusercontent.com), npm package install, and Netlify deployment.
-- **Bundle privacy** uses Netlify's server-side Site Password (Pro plan) — gates **every** file in the bundle including the master CSV (verified HTTP 401 on both the index and `audit-file-list-master.csv` for the production deployment).
+- **Bundle privacy** uses Netlify's server-side Site Password (Pro plan) — gates **every** file in the bundle including the master spreadsheet (verified HTTP 401 on both the index and `audit-file-list-master.xlsx` for the production deployment). As of v1.21.2, origin-server identity (IPs, Forge scan paths, hostnames) is also **removed from the output at source**, not merely gated (FC-2026-033).
 - **Output directory** `~/filecap-audits/<server-name>/` is created with mode 700 (user-only readable).
 - **Configuration files** at `~/.filecap/config.json` (autoDeploy + deploySite) and `~/.filecap/secrets.json` (bearer tokens) — schema-validated on load via Zod (strict mode rejects unknown fields, catches typos). Both files mode-0600.
 - **MCP scan path restriction.** Set `FILECAP_MCP_ALLOWED_PATHS` (colon-separated absolute paths) to restrict which directories an AI agent can scan.
@@ -196,7 +196,17 @@ inline-JS additions). The summary below is for managers and auditors.
 
 ### Live deployment posture
 
-The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master CSV — verified HTTP 401 on `/`, the master CSV, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`. The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline.
+The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master spreadsheet — verified HTTP 401 on `/`, the master `audit.xlsx`, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`, and a strict **`Content-Security-Policy`** (`default-src 'self'`; no external script/connect/frame; `frame-ancestors 'none'`; `object-src 'none'` — FC-2026-034, v1.21.4). The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline; v1.21.2 additionally **removes** origin-server identity (IPs, Forge scan paths, hostnames) from the bundle at source rather than relying on the gate alone (FC-2026-033).
+
+### 2026-06-06 red/blue team audit of the 1.21.x /sites + tooling line (fixed in v1.21.2 / v1.21.4)
+
+Adversarial pass against the v1.21.0–v1.21.3 changes — the `/sites` roster, the agency `tools[]`, the OG-metadata fetch/download pipeline, and the live/down status dot — plus a re-review of origin-infrastructure exposure and the response-header baseline. **Zero Critical findings.** Two findings (one Low, one Moderate) fixed; one tracked residual. 0 production CVEs, 849/849 tests green. Full detail in [`docs/security/audit-2026-06-06.md`](docs/security/audit-2026-06-06.md).
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| FC-2026-033 | Low | Gated bundle exposed origin-server identity (DigitalOcean origin IPs, Laravel-Forge scan paths, internal hostnames) that isn't in the public Netlify frontends' DNS | Fixed in v1.21.2 — stripped from the cards, `sites-list.xlsx`, `audit.xlsx` columns, per-site reports, the NDJSON header, and `context.md` (verified 0 origin-IP / 0 `/home/forge` hits). Upgrades FC-2026-027 from *mitigated-by-gate* to *removed-at-source* |
+| FC-2026-034 | Moderate | Deployed bundle shipped no `Content-Security-Policy` header | Fixed in v1.21.4 — strict CSP in `_headers` + `netlify.toml` (`default-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`, no external script/connect/frame) |
+| FC-2026-035 | Note | Per-file `absolutePath` still carries the Forge path for strapi files in `audit.xlsx` + `audit-fleet.ndjson` (git's `absolutePath` is the functional GitHub URL, so it can't be blanket-dropped) | Open — tracked for a git-vs-strapi-aware follow-up; behind the Site Password meanwhile |
 
 ### 2026-05-19 red/blue team audit of the 1.8.0 references pipeline (1.8.0-beta.2 → fixed in 1.8.0-beta.3)
 
@@ -218,7 +228,7 @@ Fresh adversarial pass against `@icjia/filecap@1.7.35`. **Zero Critical findings
 | FC-2026-024 | Moderate | `<a href>` without URL-scheme validation | Fixed in 1.7.36 (`safeUrl()` gates http/https) |
 | FC-2026-025 | Moderate | `sites.json` `name` lacks slug shape → path traversal | Fixed in 1.7.36 (`z.string().regex(/^[a-z0-9-]+$/i)`) |
 | FC-2026-026 | Low | `secrets.json` file-mode not enforced | Fixed in 1.7.36 (warn on load) |
-| FC-2026-027 | Low | Deploy bundle exposes server filesystem paths | Mitigated by Netlify Pro Site Password |
+| FC-2026-027 | Low | Deploy bundle exposes server filesystem paths | Mitigated by Netlify Pro Site Password; **removed at source in v1.21.2** (FC-2026-033) |
 | FC-2026-028 | Low | `webRollup.autoDeploy` silently pushes to prod | Fixed in 1.7.36 (loud banner + `FILECAP_NO_DEPLOY=1`) |
 | FC-2026-029 | Info | Bundle artefacts not signed | Deferred (TLS covers transit-layer threat) |
 

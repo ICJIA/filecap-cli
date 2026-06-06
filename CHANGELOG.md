@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.21.4] — 2026-06-06
+
+### Security
+
+- **2026-06-06 red/blue team audit** of the v1.21.x `/sites` + tooling line — detail in [`docs/security/audit-2026-06-06.md`](docs/security/audit-2026-06-06.md); appended to the running audit log in the README so it's visible that this bundle is regularly reviewed. Two findings fixed, one tracked residual, 0 CVEs, 849/849 tests green:
+  - **FC-2026-033 (Low) — origin-server identity exposed in the gated bundle.** The cards + downloads surfaced the DigitalOcean **origin** IPs, Laravel-Forge scan paths, and internal hostnames — none of which are in the public Netlify frontends' DNS, so this was origin recon a gated roster doesn't need. **Fixed in v1.21.2** (stripped from cards / `sites-list.xlsx` / `audit.xlsx` columns / per-site reports / NDJSON header / `context.md`; verified 0 origin-IP + 0 `/home/forge` hits). Upgrades FC-2026-027 from *mitigated-by-gate* to *removed-at-source*.
+  - **FC-2026-034 (Moderate) — no `Content-Security-Policy` header.** **Fixed here:** a strict CSP is emitted in `_headers` + `netlify.toml` — `default-src 'self'; frame-ancestors 'none'; object-src 'none'; script-src/style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; upgrade-insecure-requests`. Verified the bundle loads only `self` assets + a `data:` favicon, so the page renders unchanged while external script injection, framing, plugins, base-tag hijack, and outbound exfiltration are all blocked.
+  - **FC-2026-035 (Note, open) — per-file `absolutePath`** still carries the Forge path for strapi files in `audit.xlsx` + `audit-fleet.ndjson` (git's `absolutePath` is the functional GitHub URL, so it can't be blanket-dropped). Deferred to a focused follow-up; behind the Site Password meanwhile.
+
+### Tests
+
+849 passing (+1 — a CSP-header assertion).
+
 ## [1.21.3] — 2026-06-06
 
 ### Added
