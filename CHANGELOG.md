@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.21.3] — 2026-06-06
+
+### Added
+
+- **Live/down status dot now on the landing-page cards too.** The indicator added to `/sites` in v1.21.2 is propagated onto the home page's per-site **fleet cards** and the **"Agency tooling"** band, so it's consistent everywhere a site card appears. Reachability is computed once during the rollup and stamped onto `siteResults` (and the tooling entries), so there's no extra fetch. a11y unchanged (the dot carries an `aria-label` and uses fill, not colour alone).
+
 ## [1.21.2] — 2026-06-06
 
 ### Added

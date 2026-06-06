@@ -623,7 +623,7 @@ export function renderToolCard(tool, { showStatus = false } = {}) {
 export function renderToolingSection(tools) {
   const list = Array.isArray(tools) ? tools : [];
   if (list.length === 0) return "";
-  const cards = list.map((t) => renderToolCard(t)).join("\n");
+  const cards = list.map((t) => renderToolCard(t, { showStatus: true })).join("\n");
   const n = list.length;
   return `
   <div class="fleet-section-banner" role="presentation">
@@ -720,6 +720,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   const sortAzKey = (site.siteFullName || site.siteName || site.name || "").toLowerCase();
   return `<article class="site-card" data-sort-az="${he(sortAzKey)}" data-sort-added="${sortIndex}" data-sort-files="${totalFiles}">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
+  ${renderStatusDot(sr.status)}
   <header class="card-head">
     ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
     <p class="nickname">${nickname}</p>

@@ -498,8 +498,26 @@ describe("renderStatusDot (v1.21.2)", () => {
 
 describe("renderToolCard status dot (v1.21.2)", () => {
   const tool = { name: "squish", siteFullName: "Squish", siteUrl: "https://squish.icjia.app", status: "live" };
-  it("shows the dot only when showStatus is set (on /sites, not the home band)", () => {
+  it("shows the dot only when showStatus is set", () => {
     expect(renderToolCard(tool, { showStatus: true })).toContain("status-dot status-live");
     expect(renderToolCard(tool)).not.toContain("status-dot");
+  });
+});
+
+describe("renderCard status dot (v1.21.3)", () => {
+  const sr = {
+    site: { name: "x", siteName: "X", siteFullName: "Site X", siteUrl: "https://x.gov" },
+    summary: { totalFiles: 1, remediable: 0, totalBytes: 1, byCategory: {} },
+    htmlFile: "x.html", csvFile: "x.xlsx", scannedAt: "2026-05-01T00:00:00.000Z",
+    header: { metadata: {} },
+  };
+  it("renders the live dot on the fleet card when sr.status is live", () => {
+    expect(renderCard({ ...sr, status: "live" })).toContain("status-dot status-live");
+  });
+  it("renders the down dot when sr.status is down", () => {
+    expect(renderCard({ ...sr, status: "down" })).toContain("status-dot status-down");
+  });
+  it("renders no dot when status is absent", () => {
+    expect(renderCard(sr)).not.toContain("status-dot");
   });
 });

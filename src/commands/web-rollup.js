@@ -1216,6 +1216,11 @@ export async function runWebRollup({
     t.status = status;
   })));
 
+  // v1.21.3 — propagate the live/down status onto siteResults so the landing
+  // page's fleet cards show the same dot as /sites (matched by server name).
+  const statusByServerName = new Map(contentRoster.map((e) => [e.site.name, e.status]));
+  for (const sr of siteResults) sr.status = statusByServerName.get(sr.site.name) ?? null;
+
   // 6a. Build the master XLSX (every REMEDIABLE file across every site).
   //     v1.20.0: was .csv with every file; downloads are now .xlsx and
   //     filtered to remediable categories only — vendors don't quote
