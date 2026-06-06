@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderCard, generateIndexHtml, renderToolCard, renderToolingSection } from "../src/web/index-page.js";
+import { renderCard, generateIndexHtml, renderToolCard, renderToolingSection, renderStatusDot } from "../src/web/index-page.js";
 
 const baseSr = {
   site: {
@@ -156,17 +156,20 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
     },
   };
 
-  it("renders a tech-grid with all five label/value pairs", () => {
+  it("renders a tech-grid with Website, Hostname, URL — no IP, no Path (v1.21.2)", () => {
     const html = renderCard(sr);
     expect(html).toContain('<div class="tech-grid">');
     expect(html).toMatch(/<span class="tech-label">Website:<\/span>/);
-    expect(html).toMatch(/<span class="tech-label">IP:<\/span>/);
     expect(html).toMatch(/<span class="tech-label">Hostname:<\/span>/);
-    expect(html).toMatch(/<span class="tech-label">Path:<\/span>/);
     expect(html).toMatch(/<span class="tech-label">URL:<\/span>/);
+    expect(html).not.toMatch(/<span class="tech-label">IP:<\/span>/);
+    expect(html).not.toMatch(/<span class="tech-label">Path:<\/span>/);
+    // the origin IP + Forge scanned path must not leak anywhere on the card
+    expect(html).not.toContain("192.241.146.85");
+    expect(html).not.toContain("/home/forge/");
   });
 
-  it("emits exactly five copy buttons inside tech-details, one per row", () => {
+  it("emits three copy buttons inside tech-details (Website, Hostname, URL)", () => {
     const html = renderCard(sr);
     const techStart = html.indexOf('<details class="tech-details">');
     const techEnd = html.indexOf('</details>', techStart);
@@ -174,16 +177,29 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
     expect(techEnd).toBeGreaterThan(techStart);
     const techBlock = html.slice(techStart, techEnd);
     const buttons = techBlock.match(/<button[^>]*class="meta-copy"/g) || [];
-    expect(buttons.length).toBe(5);
+    expect(buttons.length).toBe(3);
   });
 
   it("each copy button carries the raw value in data-copy", () => {
     const html = renderCard(sr);
     expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="DVFR"/);
-    expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="192\.241\.146\.85"/);
     expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="dvfr\.example\.com"/);
-    expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="\/home\/forge\/dvfr\.icjia-api\.cloud\/dvfr-api\/public\/uploads"/);
     expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="https:\/\/dvfr\.illinois\.gov\/"/);
+  });
+
+  it("hides the Hostname row when it equals the IP (v1.21.2)", () => {
+    const srHostEqIp = {
+      ...sr,
+      site: { ...sr.site, host: "192.241.146.85" },
+      header: { metadata: { serverIp: "192.241.146.85", hostname: "192.241.146.85" } },
+    };
+    const html = renderCard(srHostEqIp);
+    expect(html).not.toMatch(/<span class="tech-label">Hostname:<\/span>/);
+    const techStart = html.indexOf('<details class="tech-details">');
+    const techEnd = html.indexOf('</details>', techStart);
+    const techBlock = html.slice(techStart, techEnd);
+    const buttons = techBlock.match(/<button[^>]*class="meta-copy"/g) || [];
+    expect(buttons.length).toBe(2); // Website + URL only
   });
 
   it("the URL row renders a clickable <a target=_blank> alongside the copy button", () => {
@@ -191,7 +207,7 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
     expect(html).toMatch(/<span class="tech-label">URL:<\/span><span class="meta-value"><a href="https:\/\/dvfr\.illinois\.gov\/" target="_blank" rel="noopener noreferrer">https:\/\/dvfr\.illinois\.gov\/<\/a><button[^>]*class="meta-copy"[^>]*data-copy="https:\/\/dvfr\.illinois\.gov\/"/);
   });
 
-  it("omits rows whose value is empty (e.g. no hostname recorded)", () => {
+  it("omits the Hostname row when no hostname recorded (Website + URL only)", () => {
     const srNoHostname = {
       ...sr,
       site: { ...sr.site, host: "" },
@@ -199,12 +215,11 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
     };
     const html = renderCard(srNoHostname);
     expect(html).not.toMatch(/<span class="tech-label">Hostname:<\/span>/);
-    // Should still have 4 buttons (Website, IP, Path, URL)
     const techStart = html.indexOf('<details class="tech-details">');
     const techEnd = html.indexOf('</details>', techStart);
     const techBlock = html.slice(techStart, techEnd);
     const buttons = techBlock.match(/<button[^>]*class="meta-copy"/g) || [];
-    expect(buttons.length).toBe(4);
+    expect(buttons.length).toBe(2);
   });
 
   it("omits the entire tech-details section when no fields populated", () => {
@@ -461,5 +476,30 @@ describe("generateIndexHtml tooling band + /sites nav (v1.21.0)", () => {
   it("omits the Agency tooling headline when no tools are provided", () => {
     const html = generateIndexHtml({ siteResults: [] });
     expect(html).not.toContain("Agency tooling");
+  });
+});
+
+describe("renderStatusDot (v1.21.2)", () => {
+  it("renders a solid live dot with an aria-label", () => {
+    const html = renderStatusDot("live");
+    expect(html).toContain("status-dot status-live");
+    expect(html).toMatch(/aria-label="Live[^"]*"/);
+  });
+  it("renders a down dot with an aria-label", () => {
+    const html = renderStatusDot("down");
+    expect(html).toContain("status-dot status-down");
+    expect(html).toMatch(/aria-label="Down[^"]*"/);
+  });
+  it("renders nothing for an unknown / null status", () => {
+    expect(renderStatusDot(null)).toBe("");
+    expect(renderStatusDot("unknown")).toBe("");
+  });
+});
+
+describe("renderToolCard status dot (v1.21.2)", () => {
+  const tool = { name: "squish", siteFullName: "Squish", siteUrl: "https://squish.icjia.app", status: "live" };
+  it("shows the dot only when showStatus is set (on /sites, not the home band)", () => {
+    expect(renderToolCard(tool, { showStatus: true })).toContain("status-dot status-live");
+    expect(renderToolCard(tool)).not.toContain("status-dot");
   });
 });

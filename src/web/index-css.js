@@ -2290,6 +2290,29 @@ dialog.access-modal .access-modal-cta a {
 .roster-card .access-chip { cursor: default; pointer-events: none; }
 .tooling-section { margin: 0 0 1.5rem; }
 
+/* v1.21.2 — live/down status dot (top-right of each /sites card). Solid green
+   = live; hollow red ring = down — the fill difference is a non-colour cue so
+   it satisfies WCAG 1.4.1 (the aria-label carries the text too). */
+.site-card .status-dot {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.site-card .status-dot.status-live {
+  background: #3fb950;
+  box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.18);
+}
+.site-card .status-dot.status-down {
+  background: transparent;
+  border: 2.5px solid #f85149;
+  box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.15);
+}
+
 /* Header "Sites" nav link — internal, so a green accent distinct from the
    blue external-tool buttons. */
 .audit-tool-link.nav-sites {

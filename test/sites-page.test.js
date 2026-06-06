@@ -40,11 +40,11 @@ describe("generateSitesHtml", () => {
     expect(html).toContain('src="assets/og/dvfr.png"');
   });
 
-  it("includes a scanned site's tech details (IP / hostname / path)", () => {
+  it("shows a scanned site's hostname (distinct from IP); drops IP + path (v1.21.2)", () => {
     const html = generateSitesHtml({ contentRoster: [scannedEntry], tools: [] });
-    expect(html).toContain("10.0.0.1");
-    expect(html).toContain("cms-01");
-    expect(html).toContain("/uploads");
+    expect(html).toContain("cms-01");        // hostname (!= IP) shown
+    expect(html).not.toContain("10.0.0.1");  // origin IP dropped
+    expect(html).not.toContain("/uploads");  // scanned path dropped
   });
 
   it("renders no audit numbers in the page body (no donut / 'may need audit' / total files)", () => {

@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.21.2] — 2026-06-06
+
+### Added
+
+- **Live/down status dot on the `/sites` cards.** A subtle indicator at the top-right of each content + tooling card showing whether the site responded at the last rollup — **solid green = live, hollow red ring = down** (the fill difference is a non-colour cue, so it satisfies WCAG 1.4.1; an `aria-label` carries the text). Derived for free from the existing OG fetch (`fetchOgMeta` now returns `reachable`); a gated `401` counts as live. The home-page tooling band is unchanged (the dot is `/sites`-only).
+
+### Changed / Security
+
+- **Trimmed the card "Technical details" to what a roster needs.** Dropped the **scanned filesystem Path** and the **server IP**; the **Hostname** row shows only when it's a real name *different from the IP* (for strapi sites the scan records the IP as the hostname, so the row was redundant). Shared block — affects the home cards and `/sites`.
+- **Scrubbed origin-server identity from the downloads + reports.** `serverIp` and `scannedPath` (the Forge scan root, e.g. `/home/forge/<site>.icjia-api.cloud/…`) no longer ship in: the `sites-list.xlsx` roster (Hostname/IP/Scanned-path columns removed), the master / per-site / by-type `audit.xlsx` (columns dropped from the layout), the per-site report meta-grid + table cells, the `audit-fleet.ndjson` header sources, and `audit-fleet-context.md`. Rationale: the exposed IPs are the **DigitalOcean origin** servers (the public frontends are on Netlify, so these IPs aren't in public DNS), and one box hosts several sites — origin recon a gated manager roster doesn't need. **Residual (deliberately not in this pass):** the per-file `absolutePath` column still carries the server path for strapi files, and the per-site report keeps the now-empty Server-IP / Source-folder column *headers* — fully removing those is a column-schema change left for a focused follow-up.
+
+### Tests
+
+845 passing (+4). Updated the tech-details / report-meta-grid / og-meta assertions for the new shape; added status-dot tests (live / down / unknown + the `showStatus` gating).
+
 ## [1.21.1] — 2026-06-06
 
 ### Fixed

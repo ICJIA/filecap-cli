@@ -15,6 +15,7 @@ import {
   renderTechDetails,
   renderCardImage,
   renderToolCard,
+  renderStatusDot,
   ICJIA_LOGO_SVG,
 } from "./index-page.js";
 
@@ -44,6 +45,7 @@ function renderRosterCard(entry) {
   const accessKind = entry.accessKind && ACCESS_KIND_LABEL[entry.accessKind] ? entry.accessKind : null;
   return `<article class="site-card roster-card">
   <a class="card-stretched-link" href="${he(url)}" target="_blank" rel="noopener noreferrer" aria-label="Visit ${fullName} (opens in a new tab)"></a>
+  ${renderStatusDot(entry.status)}
   ${renderCardImage({ image: entry.image, alt: fullName })}
   <header class="card-head">
     ${accessKind ? `<span class="access-chip access-${accessKind}" title="${he(ACCESS_KIND_LABEL[accessKind])}"><span class="access-dot" aria-hidden="true"></span>${he(ACCESS_KIND_LABEL[accessKind])}</span>` : ""}
@@ -129,7 +131,7 @@ export function generateSitesHtml({
   const total = content.length + toolList.length;
 
   const contentCards = content.map((e) => renderRosterCard(e)).join("\n");
-  const toolCards = toolList.map((t) => renderToolCard(t)).join("\n");
+  const toolCards = toolList.map((t) => renderToolCard(t, { showStatus: true })).join("\n");
   const breakdown = renderBreakdown(content);
 
   const downloadHtml = sitesListXlsx

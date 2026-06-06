@@ -47,6 +47,7 @@ describe("fetchOgMeta", () => {
     expect(r.image).toBe("https://site.example/img/og.png");
     expect(r.title).toBe("T & T");
     expect(r.description).toBe("D");
+    expect(r.reachable).toBe(true);
   });
 
   it("falls back to twitter:image when there is no og:image", async () => {
@@ -56,14 +57,14 @@ describe("fetchOgMeta", () => {
     expect(r.image).toBe("https://s.example/t.png");
   });
 
-  it("returns empty on a non-ok response", async () => {
+  it("marks reachable=true (no metadata) on a non-ok response, e.g. a gated 401", async () => {
     const r = await fetchOgMeta("https://s.example", { fetchImpl: stub("x", false) });
-    expect(r).toEqual({ image: null, title: null, description: null });
+    expect(r).toEqual({ image: null, title: null, description: null, reachable: true });
   });
 
-  it("returns empty (never throws) on a fetch error", async () => {
+  it("returns reachable=false (never throws) on a fetch error / timeout", async () => {
     const r = await fetchOgMeta("https://s.example", { fetchImpl: async () => { throw new Error("net down"); } });
-    expect(r).toEqual({ image: null, title: null, description: null });
+    expect(r).toEqual({ image: null, title: null, description: null, reachable: false });
   });
 
   it("rejects a non-http(s) URL without calling fetch", async () => {

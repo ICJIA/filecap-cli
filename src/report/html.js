@@ -326,19 +326,17 @@ ${rows}
 }
 
 function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
-  let serverName, siteName, serverIp, scannedPath;
+  // v1.21.2 — serverIp + scannedPath are no longer surfaced (origin recon), so
+  // their table cells render blank below. serverName + siteName stay.
+  let serverName, siteName;
   if (isConsolidated) {
     serverName = entry.serverName;
     const src = sourceMap.get(entry.serverName);
     siteName = src?.siteName ?? "";
-    serverIp = src?.serverIp ?? "";
-    scannedPath = src?.scannedPath ?? "";
   } else {
     const m = sourceHeader.metadata;
     serverName = m.serverName;
     siteName = m.siteName ?? "";
-    serverIp = m.serverIp;
-    scannedPath = m.scannedPath;
   }
 
   const publicUrl = buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -350,7 +348,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
   const raw = [
     serverName,
     siteName,
-    serverIp,
+    "",
     publicUrl,
     // v1.8.0: placeholder for the Referenced column. The cell loop in
     // writeHtml() bypasses this value and renders entry.references[] as
@@ -363,7 +361,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     // this and renders entry.audit directly.
     "",
     entry.modifiedAt,
-    scannedPath,
+    "",
     entry.path,
     entry.absolutePath,
     entry.filename,
@@ -631,9 +629,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // and the top-level fields are absent. Branch the meta-grid render on that.
   const serverName = meta?.serverName ?? "";
   const siteName = meta?.siteName ?? "";
-  const serverIp = meta?.serverIp ?? "";
-  const hostname = meta?.hostname ?? "";
-  const scannedPath = meta?.scannedPath ?? "";
+  // v1.21.2 — serverIp / hostname / scannedPath are no longer shown in the
+  // meta-grid (origin-server recon a reader doesn't need); only the timestamp.
   const scannedAt = meta?.scannedAt ?? "";
   // Prefer the siteUrl param (passed by web-rollup from sites.json), then
   // anything carried in the NDJSON header (scan / future writers may add it),
@@ -666,9 +663,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     metaGridHtml = `
   ${siteName !== "" ? `<span class="meta-label">Website:</span>      <span>${htmlEscape(siteName)}</span>` : ""}
   <span class="meta-label">Server:</span>      <span>${htmlEscape(serverName)}</span>
-  <span class="meta-label">IP:</span>           ${copyableMetaCell(serverIp, null, "IP address")}
-  <span class="meta-label">Hostname:</span>     ${copyableMetaCell(hostname, null, "hostname")}
-  <span class="meta-label">Scanned path:</span> ${copyableMetaCell(scannedPath, null, "scanned path")}
   <span class="meta-label">Scanned at:</span>   ${copyableMetaCell(fmtChicagoGeneratedAt(scannedAt) || scannedAt, null, "scan timestamp")}
   ${publicUrlBase !== "" ? (() => {
     // Gate the meta-grid Public URL row through safeUrl so a malicious

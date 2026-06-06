@@ -549,7 +549,7 @@ function buildFleetContextMarkdown({ allEntries, siteResults, duplicateGroupsCou
     const total = s.totalFiles ?? 0;
     const audit = s.remediable ?? 0;
     const auditPct = total > 0 ? Math.round((audit / total) * 100) : 0;
-    return `- **${sr.site.siteFullName || sr.site.siteName || sr.site.name}** (${sr.site.siteName || "—"}, ${sr.site.host || "github"}): ${total.toLocaleString()} total, ${audit.toLocaleString()} may need audit (${auditPct}%), scanned ${sr.scannedAt || "unknown"}`;
+    return `- **${sr.site.siteFullName || sr.site.siteName || sr.site.name}** (${sr.site.siteName || "—"}): ${total.toLocaleString()} total, ${audit.toLocaleString()} may need audit (${auditPct}%), scanned ${sr.scannedAt || "unknown"}`;
   }).join("\n");
 
   return `# ICJIA accessibility fleet audit — LLM context
@@ -1103,8 +1103,14 @@ export async function runWebRollup({
     // current sites.json has corrected (e.g. a domain rename). v1.7.2: also
     // override publicUrlBase / remotePath / host so an edit to sites.json
     // takes effect on the next rollup without forcing a full re-scan.
+    // v1.21.2 — strip server-identity fields (serverIp, scannedPath, hostname)
+    // before they land in the consolidated sources, which ship in the
+    // audit-fleet.ndjson header. Pure origin-server recon with no per-file
+    // value; the public URL + relative path are what consumers actually need.
+    // eslint-disable-next-line no-unused-vars
+    const { serverIp: _ip, scannedPath: _sp, hostname: _hn, ...metaScrubbed } = header.metadata ?? {};
     consolidatedSources.push({
-      ...header.metadata,
+      ...metaScrubbed,
       siteName: site.siteName ?? header.metadata?.siteName ?? "",
       serverName: header.metadata?.serverName ?? siteServerName,
       publicUrlBase: sitePublicUrlBase || header.metadata?.publicUrlBase || "",
@@ -1156,9 +1162,12 @@ export async function runWebRollup({
   async function enrichOg({ url, slug: slugName, configImage, configDescription }) {
     let description = configDescription || "";
     let image = null;
-    if (!noOg) {
-      let og = { image: null, title: null, description: null };
+    let status = null;
+    if (!noOg && url) {
+      let og = { image: null, title: null, description: null, reachable: false };
       try { og = await _ogFetch(url); } catch { /* best-effort */ }
+      // live = the server answered at build time; down = unreachable.
+      status = og.reachable ? "live" : "down";
       if (!description) description = og.description || "";
       const imgSrc = configImage || og.image;
       if (imgSrc && /^https?:\/\//i.test(imgSrc)) {
@@ -1177,13 +1186,13 @@ export async function runWebRollup({
     } else if (configImage && !/^https?:\/\//i.test(configImage)) {
       image = configImage;
     }
-    return { description, image };
+    return { description, image, status };
   }
 
   await Promise.all(contentRoster.map((entry) => ogLimit(async () => {
     const s = entry.site;
     const url = s.siteUrl ?? s.publicUrlBase ?? entry.header?.metadata?.publicUrlBase ?? "";
-    const { description, image } = await enrichOg({
+    const { description, image, status } = await enrichOg({
       url,
       slug: slug(s.name ?? s.siteName ?? "site"),
       configImage: s.image,
@@ -1191,11 +1200,12 @@ export async function runWebRollup({
     });
     entry.description = description;
     entry.image = image;
+    entry.status = status;
   })));
 
   const toolsEnriched = tools.map((t) => ({ ...t }));
   await Promise.all(toolsEnriched.map((t) => ogLimit(async () => {
-    const { description, image } = await enrichOg({
+    const { description, image, status } = await enrichOg({
       url: t.siteUrl,
       slug: slug(t.name ?? t.siteName ?? "tool"),
       configImage: t.image,
@@ -1203,6 +1213,7 @@ export async function runWebRollup({
     });
     t.description = description;
     t.image = image;
+    t.status = status;
   })));
 
   // 6a. Build the master XLSX (every REMEDIABLE file across every site).
@@ -1650,9 +1661,6 @@ export async function runWebRollup({
       url: s.siteUrl || s.publicUrlBase || e.header?.metadata?.publicUrlBase || "",
       type: s.type || "strapi",
       access: e.accessKind || "",
-      hostname: e.header?.metadata?.hostname || s.host || "",
-      ip: e.header?.metadata?.serverIp || "",
-      scannedPath: e.header?.metadata?.scannedPath || "",
     };
   });
   const toolRows = toolsEnriched.map((t) => ({
@@ -1674,9 +1682,6 @@ export async function runWebRollup({
           { key: "url", label: "URL", type: "url" },
           { key: "type", label: "Type" },
           { key: "access", label: "Access" },
-          { key: "hostname", label: "Hostname" },
-          { key: "ip", label: "IP" },
-          { key: "scannedPath", label: "Scanned path" },
         ],
         rows: siteRows,
       },

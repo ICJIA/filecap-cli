@@ -26,7 +26,7 @@ const USER_AGENT = "filecap-og/1.0 (+https://github.com/ICJIA/filecap-cli)";
  *   Relative `og:image` URLs are resolved against `url`. Never throws.
  */
 export async function fetchOgMeta(url, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch } = {}) {
-  const empty = { image: null, title: null, description: null };
+  const empty = { image: null, title: null, description: null, reachable: false };
   let base;
   try {
     base = new URL(url);
@@ -38,20 +38,24 @@ export async function fetchOgMeta(url, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchIm
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let html;
+  let reachable = false;
   try {
     const res = await fetchImpl(url, {
       signal: controller.signal,
       redirect: "follow",
       headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml,*/*" },
     });
-    if (!res || !res.ok) return empty;
+    if (!res) return empty;
+    // The server answered (any status, incl. a gated 401) — the site is up.
+    reachable = true;
+    if (!res.ok) return { image: null, title: null, description: null, reachable };
     html = await res.text();
   } catch {
     return empty;
   } finally {
     clearTimeout(timer);
   }
-  if (!html || typeof html !== "string") return empty;
+  if (!html || typeof html !== "string") return { image: null, title: null, description: null, reachable };
 
   const meta = parseMetaTags(html);
   const rawImage = meta["og:image"] || meta["og:image:url"] || meta["twitter:image"] || null;
@@ -65,7 +69,7 @@ export async function fetchOgMeta(url, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchIm
   }
   const title = meta["og:title"] ? decodeEntities(meta["og:title"]) : null;
   const description = meta["og:description"] ? decodeEntities(meta["og:description"]) : null;
-  return { image, title, description };
+  return { image, title, description, reachable };
 }
 
 /**

@@ -1394,7 +1394,7 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
       tools: [{ name: "squish", siteName: "Squish", siteFullName: "Squish", siteUrl: "https://squish.icjia.app" }],
     }));
     const outputDir = path.join(tmpDir, "out");
-    const _ogFetch = async (url) => ({ image: url.replace(/\/+$/, "") + "/og.png", title: "T", description: "Desc for " + url });
+    const _ogFetch = async (url) => ({ image: url.replace(/\/+$/, "") + "/og.png", title: "T", description: "Desc for " + url, reachable: true });
     const _imageFetch = async () => ({ ext: "png", buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]) });
 
     const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, _ogFetch, _imageFetch });
@@ -1407,6 +1407,10 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     expect(sitesHtml).toContain("Tooling sites");
     expect(sitesHtml).toContain("Desc for https://dvfr.illinois.gov");
     expect(sitesHtml).toContain('src="assets/og/dvfr.png"');
+    // v1.21.2 — live/down dot present (the og stub reports reachable: true)
+    expect(sitesHtml).toContain("status-dot status-live");
+    // server identity scrubbed from the roster: the origin IP must not appear
+    expect(sitesHtml).not.toContain("10.0.0.1");
 
     expect((await fs.stat(path.join(outputDir, "assets", "og", "dvfr.png"))).isFile()).toBe(true);
     expect((await fs.stat(path.join(outputDir, "assets", "og", "squish.png"))).isFile()).toBe(true);

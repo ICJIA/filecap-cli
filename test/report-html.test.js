@@ -67,13 +67,13 @@ describe("writeHtml", () => {
     expect(html).toMatch(/<\/html>\s*$/);
   });
 
-  it("includes server metadata in the header section", async () => {
+  it("includes the server name in the header (IP + scanned path scrubbed — v1.21.2)", async () => {
     const out = path.join(tmpDir, "files.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
     expect(html).toContain("test-server");
-    expect(html).toContain("10.0.0.1");
-    expect(html).toContain("/uploads");
+    // origin server IP is no longer surfaced anywhere in the report
+    expect(html).not.toContain("10.0.0.1");
   });
 
   it("renders one row per entry with filename and path visible", async () => {
@@ -451,7 +451,7 @@ describe("writeHtml", () => {
     expect(html).toMatch(/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   });
 
-  it("escapes XSS payload in hostname metadata (FC-2026-008)", async () => {
+  it("a malicious hostname cannot inject — hostname no longer rendered (FC-2026-008 / v1.21.2)", async () => {
     const xssPayload = "<img src=x onerror=alert(1)>";
     const headerWithXss = {
       ...sampleHeader,
@@ -460,9 +460,9 @@ describe("writeHtml", () => {
     const out = path.join(tmpDir, "xss-hostname.html");
     await writeHtml({ sourceHeader: headerWithXss, entries: [], sources: [headerWithXss], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    // The angle brackets must be escaped so <img> tag cannot execute
+    // v1.21.2 — hostname is no longer surfaced, so the raw payload can't appear
+    // and the injection vector is removed entirely.
     expect(html).not.toContain("<img src=x onerror=alert(1)>");
-    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
 
   it("escapes XSS payload in entry filename and path in HTML table cells (FC-2026-008)", async () => {
@@ -851,7 +851,7 @@ describe("writeHtml", () => {
   });
 
   describe("meta-grid copy-to-clipboard (v1.7.7)", () => {
-    it("renders a .meta-copy button next to IP, Hostname, Scanned path, Scanned at, and Public URL", async () => {
+    it("renders a .meta-copy button next to the copyable meta-grid rows (Scanned at + Public URL)", async () => {
       const outputPath = path.join(tmpDir, "out.html");
       const headerWithUrl = {
         ...sampleHeader,
@@ -864,9 +864,10 @@ describe("writeHtml", () => {
         outputPath,
       });
       const html = await fs.readFile(outputPath, "utf8");
-      // Exactly 5 copy buttons — one per copyable meta-grid row.
+      // v1.21.2 — IP/Hostname/Scanned-path rows removed; only Scanned at +
+      // Public URL remain copyable.
       const buttons = html.match(/<button[^>]*class="meta-copy"/g) || [];
-      expect(buttons.length).toBe(5);
+      expect(buttons.length).toBe(2);
     });
 
     it("the copy button carries the raw value in data-copy (not HTML-escaped display text)", async () => {
@@ -878,10 +879,10 @@ describe("writeHtml", () => {
         outputPath,
       });
       const html = await fs.readFile(outputPath, "utf8");
-      // data-copy="10.0.0.1" should be the literal serverIp value.
-      expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="10\.0\.0\.1"/);
-      // Scanned path /uploads
-      expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="\/uploads"/);
+      // v1.21.2 — IP + scanned path are no longer copyable; the scanned-at
+      // timestamp still carries its raw value in a copy button.
+      expect(html).not.toMatch(/data-copy="10\.0\.0\.1"/);
+      expect(html).toMatch(/<button[^>]*class="meta-copy"[^>]*data-copy="[^"]+"/);
     });
 
     it("does NOT render copy buttons next to Website or Server (per user spec)", async () => {

@@ -548,17 +548,19 @@ export function renderTechDetails({ site, header }) {
   const techWebsiteRaw = site.siteName ?? site.name ?? "";
   const techIpRaw = header?.metadata?.serverIp ?? "";
   const techHostnameRaw = header?.metadata?.hostname ?? site.host ?? "";
-  const techScannedPathRaw = header?.metadata?.scannedPath ?? "";
   const techUrlRaw = site.siteUrl ?? site.publicUrlBase ?? header?.metadata?.publicUrlBase ?? "";
-  const populated = [techWebsiteRaw, techIpRaw, techHostnameRaw, techScannedPathRaw, techUrlRaw].filter(Boolean).length;
+  // v1.21.2 — privacy/security trim: the scanned filesystem Path and the origin
+  // server IP are dropped (origin recon a manager roster doesn't need), and the
+  // Hostname shows only when it's a real name distinct from the IP (for strapi
+  // sites the scan records the IP as the hostname, so the row was redundant).
+  const showHostname = techHostnameRaw && techHostnameRaw !== techIpRaw;
+  const populated = [techWebsiteRaw, showHostname ? techHostnameRaw : "", techUrlRaw].filter(Boolean).length;
   if (populated === 0) return "";
   return `<details class="tech-details">
     <summary>Technical details</summary>
     <div class="tech-grid">
       ${techWebsiteRaw ? `<span class="tech-label">Website:</span>${copyableValue(techWebsiteRaw, null, "site nickname")}` : ""}
-      ${techIpRaw ? `<span class="tech-label">IP:</span>${copyableValue(techIpRaw, null, "IP address")}` : ""}
-      ${techHostnameRaw ? `<span class="tech-label">Hostname:</span>${copyableValue(techHostnameRaw, null, "hostname")}` : ""}
-      ${techScannedPathRaw ? `<span class="tech-label">Path:</span>${copyableValue(techScannedPathRaw, null, "scanned path")}` : ""}
+      ${showHostname ? `<span class="tech-label">Hostname:</span>${copyableValue(techHostnameRaw, null, "hostname")}` : ""}
       ${techUrlRaw ? `<span class="tech-label">URL:</span>${copyableValue(techUrlRaw, `<a href="${he(techUrlRaw)}" target="_blank" rel="noopener noreferrer">${he(techUrlRaw)}</a>`, "public URL")}` : ""}
     </div>
   </details>`;
@@ -574,11 +576,24 @@ export function renderCardImage({ image, alt }) {
   return `<div class="card-img card-img-fallback" role="img" aria-label="${he(alt || "ICJIA")}">${ICJIA_LOGO_SVG}</div>`;
 }
 
+// v1.21.2 — a subtle live/down indicator. "Live" = the site's server answered
+// at the last rollup; "Down" = it was unreachable. Distinguished by FILL
+// (solid dot vs hollow ring), not colour alone, so it satisfies WCAG 1.4.1;
+// the aria-label carries the text. Renders nothing for an unknown status.
+export function renderStatusDot(status) {
+  if (status !== "live" && status !== "down") return "";
+  const label = status === "live"
+    ? "Live — site responded at the last build"
+    : "Down — site was unreachable at the last build";
+  return `<span class="status-dot status-${status}" role="img" aria-label="${he(label)}" title="${status === "live" ? "Live" : "Down"}"></span>`;
+}
+
 // v1.21.0 — a tooling-app card (active site, no document files to audit).
 // Shared by the home-page "Tooling sites" band and the /sites Tooling
 // section. `tool` is a tools[] entry enriched by web-rollup with `image`
-// (local og:image path or null) and a resolved `description`.
-export function renderToolCard(tool) {
+// (local og:image path or null) and a resolved `description`. v1.21.2:
+// `showStatus` adds the live/down dot (on /sites only, not the home band).
+export function renderToolCard(tool, { showStatus = false } = {}) {
   const nickname = he(tool.siteName ?? tool.name ?? "");
   const fullName = he(tool.siteFullName || tool.siteName || tool.name || "");
   const url = tool.siteUrl ?? "";
@@ -586,6 +601,7 @@ export function renderToolCard(tool) {
   const stack = tool.stack ?? "";
   return `<article class="site-card tool-card">
   <a class="card-stretched-link" href="${he(url)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${fullName} in a new tab"></a>
+  ${showStatus ? renderStatusDot(tool.status) : ""}
   ${renderCardImage({ image: tool.image, alt: fullName })}
   <header class="card-head">
     <span class="tool-badge">Tooling</span>
