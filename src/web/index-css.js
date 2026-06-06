@@ -789,6 +789,10 @@ main {
   z-index: 2;
   color: var(--fc-accent, #4dabf7);
   text-decoration: none;
+  /* v1.21.1 — WCAG 2.5.8 (AA) target size: the URL is a distinct tap target
+     (opens the live site in a new tab), so give the link a >=24px box. */
+  display: inline-block;
+  padding: 5px 9px;
 }
 .site-card .site-url a:hover,
 .site-card .site-url a:focus-visible { text-decoration: underline; }

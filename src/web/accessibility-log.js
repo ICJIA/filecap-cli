@@ -10,7 +10,7 @@
 
 /** Current verified accessibility standing — shown in the page's status panel. */
 export const currentStatus = {
-  asOf: "2026-05-21",
+  asOf: "2026-06-06",
   lighthouse: 100,
   axeCore: "0 violations (WCAG A + AA)",
   axeDevTools: "0 serious — pending live re-verification",
@@ -32,6 +32,17 @@ export const currentStatus = {
  *   notes    optional, e.g. the version it shipped in
  */
 export const accessibilityLog = [
+  {
+    date: "2026-06-06",
+    source: "backend",
+    tool: "axecap (axe-core 4.11) + Lighthouse",
+    scope: "new /sites directory + fleet index (desktop + mobile)",
+    viewport: "desktop + mobile",
+    status: "fixed",
+    result:
+      "Found one WCAG 2.5.8 (AA) target-size issue on the per-card site-URL links and fixed it (>=24px tap target). After the fix: 0 axe-core violations; Lighthouse accessibility 100 and best-practices 100 (desktop + mobile); mobile performance 94-99. SEO is intentionally low (noindex) and out of scope for this protected bundle.",
+    notes: "v1.21.1",
+  },
   {
     date: "2026-05-21",
     source: "backend",

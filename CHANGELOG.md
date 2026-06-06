@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.21.1] — 2026-06-06
+
+### Fixed
+
+- **Card site-URL links now meet WCAG 2.5.8 (AA) target size.** An axecap (axe-core 4.11) + Lighthouse pass on the v1.21.0 bundle — desktop **and mobile** — surfaced exactly one accessibility finding: the small `.site-url` link under each card title (home page **and** the new `/sites` roster) was a sub-24 px tap target. Gave the link an `inline-block` ≥24 px box (padding). After the fix: **0 axe-core violations**; Lighthouse **accessibility 100** and **best-practices 100** on both viewports; **mobile performance 94–99**. SEO is intentionally low (the bundle is `noindex` + visitor-access gated) and out of scope for a protected internal tool. (`src/web/index-css.js`; the `/accessibility` log gains a timestamped entry.)
+
 ## [1.21.0] — 2026-06-05
 
 ### Added
