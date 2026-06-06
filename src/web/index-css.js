@@ -2290,6 +2290,10 @@ dialog.access-modal .access-modal-cta a {
 .roster-card .access-chip { cursor: default; pointer-events: none; }
 .tooling-section { margin: 0 0 1.5rem; }
 
+/* v1.22.0 — footer "uptime checked HH:MM" stamp; hidden until the on-demand
+   client fills it (so it never shows an empty separator on a static open). */
+.site-footer .uptime-stamp:empty { display: none; }
+
 /* v1.21.5 — live/down status line under each card's title: a dot glyph + a
    visible "Site live" / "Site unreachable" label. The text (not colour alone)
    carries the meaning — WCAG 1.4.1 — and tells managers what the dot means.

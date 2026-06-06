@@ -49,6 +49,10 @@
 
 `filecap` walks a directory tree, introspects each file (PDFs, DOCX, XLSX), and produces a structured NDJSON inventory suitable for accessibility remediation scoping. The primary use case is generating per-server inventories of file stores (Strapi `/uploads` directories, general file servers) to hand to remediation vendors so they can produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
 
+**Why this matters.** The 2024 ADA Title II rule — and, in Illinois, the IITAA — require state and local government web content, *including the documents agencies publish*, to meet WCAG 2.1 AA. Most government sites have accumulated thousands of uploaded PDFs, Word files, and spreadsheets over the years, and a large share are inaccessible: scanned images with no text layer, untagged PDFs, tables with no header rows, documents with no reading order. To someone using a screen reader, an inaccessible PDF of a grant notice or a set of meeting minutes is simply a locked door — the information is published, but not actually available to them.
+
+**Why a tool like this has to exist.** You can't remediate — or budget to remediate — what you haven't measured, and no agency can hand-audit tens of thousands of files. There's no "accessibility status" sitting in a file store; it's just a folder of bytes. `filecap` exists to turn that opaque pile into a precise, repeatable inventory — what's there, what is likely to need work, and roughly how much — so the remediation can be scoped, competitively bid, tracked quarter over quarter, and demonstrated to regulators. It is the measurement layer that makes the legal obligation actionable instead of aspirational, which is also why the snapshot is published where the whole team (and any auditor) can see it.
+
 **Every current ICJIA site is now part of the accessibility audit.** Alongside the dense, data-rich fleet report, filecap also publishes a simpler, less-dense **[site directory](https://icjia-fleet-audit.netlify.app/sites)** (`/sites`) that lists just the sites — split into **content sites** and **agency tooling sites** — in a count-first layout for managers who only need to know "how many sites do we run?". Every card carries an at-a-glance **uptime status** (a green "Site live" / red "Site unreachable" indicator) so the whole fleet's health reads in a single scroll.
 
 ## Are you a...
@@ -233,6 +237,18 @@ inline-JS additions). The summary below is for managers and auditors.
 ### Live deployment posture
 
 The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master spreadsheet — verified HTTP 401 on `/`, the master `audit.xlsx`, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`, and a strict **`Content-Security-Policy`** (`default-src 'self'`; no external script/connect/frame; `frame-ancestors 'none'`; `object-src 'none'` — FC-2026-034, v1.21.4). The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline; v1.21.2 additionally **removes** origin-server identity (IPs, Forge scan paths, hostnames) from the bundle at source rather than relying on the gate alone (FC-2026-033).
+
+### 2026-06-06 — on-demand uptime function (v1.22.0) security review
+
+v1.22.0 adds the live/unreachable indicator's freshness via an on-demand Netlify Function (`netlify/functions/uptime.mjs`) that probes the fleet server-side; the page polls it **at most once per 6 hours** (a client-side `localStorage` gate). Adversarial review of that new endpoint — **no exploitable findings; two proactive hardenings.**
+
+| # | Severity | Finding / check | Status |
+|---|---|---|---|
+| FC-2026-036 | Low | **Redirect-SSRF** — a compromised fleet site could `302` the probe toward an internal / cloud-metadata IP (`169.254.169.254`) from the Lambda | **Hardened** — the probe uses `redirect: "manual"`; a 3xx already proves the origin answered (→ "live"), so a `Location` is never followed |
+| FC-2026-037 | Moderate | **Cost / serverless-budget DoS** — hammering the endpoint could run up invocations + outbound probes (relevant if the visitor-password gate does not cover `/.netlify/functions/*`) | **Capped** — the response carries `Netlify-CDN-Cache-Control: public, durable, s-maxage=21600`, so repeats are served from the edge cache and the function + its probes actually run **≤ ~once per 6 h regardless of request volume**; reinforced by the unit-tested client cache gate, a GET-only guard, and an 8 s per-probe timeout |
+| — | Info | **Input-SSRF** (arbitrary-URL fetch), **XSS** (response → DOM), **code injection** (targets → generated source) | **Checked — clean**: the handler takes **no caller-supplied target** (it probes only the URLs baked in at build time from the validated `sites.json`); the client writes to the DOM via `textContent` + a `live`/`down` allow-list (no `innerHTML`/`eval`); targets are `JSON.stringify`-serialized so they can't break out into code |
+
+CSP is unchanged — the page calls the function **same-origin**, which `connect-src 'self'` already allows. The budget gate is unit-tested (`shouldRefresh` plus a simulation proving *N* page loads → bounded fetches: 100 loads in a 6 h window → 1 fetch; a year of constant polling → 4/day), so a client regression **cannot silently blow the serverless budget**. *Open item to confirm on first deploy:* whether Netlify's visitor-password gate also covers function routes — if it does, the endpoint is doubly protected; if not, FC-2026-037's durable edge cache still bounds the cost.
 
 ### 2026-06-06 red/blue team audit of the 1.21.x /sites + tooling line (fixed in v1.21.2 / v1.21.4)
 

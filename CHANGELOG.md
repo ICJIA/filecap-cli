@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.22.0] — 2026-06-06
+
+### Added
+
+- **On-demand uptime for the status indicators.** The live/unreachable dots are now refreshed from a server-side **Netlify Function** (`netlify/functions/uptime.mjs`) that probes the fleet (no CORS) and returns `{ checkedAtMs, sites }`; the page applies it to the dots and shows a "Uptime checked HH:MM" footer stamp. To protect the serverless budget, the page calls the function **only when its `localStorage` cache is older than 6 hours** — so 100 page-loads in a window = **1** call, and a year of constant polling = **4/day** — and the response also carries a durable edge-cache header so even direct hits run the probes ≤ ~once/6h. Same-origin, so the CSP (`connect-src 'self'`) and the password gate are unchanged. Tested: `shouldRefresh` plus a simulation that proves the fetch count is bounded, so a client regression can't silently blow the budget.
+
+### Security
+
+- **Adversarial review of the new uptime endpoint** (running log in the README § Security audit). No exploitable findings; two proactive hardenings:
+  - **FC-2026-036 (Low) — redirect-SSRF.** The probe uses `redirect: "manual"`, so a compromised fleet site can't bounce it toward an internal / cloud-metadata IP.
+  - **FC-2026-037 (Moderate) — cost / budget DoS.** A durable edge-cache header (`Netlify-CDN-Cache-Control: durable, s-maxage=21600`) + the unit-tested client gate + a GET-only guard + an 8s per-probe timeout bound invocations regardless of request volume.
+  - Input-SSRF / XSS / code-injection: checked, clean (no caller-supplied target; `textContent` + live/down allow-list; `JSON.stringify`-serialized targets).
+
+### Tests
+
+868 passing (+19 — the uptime client cache gate, the budget simulation, and the function generator/probe).
+
 ## [1.21.5] — 2026-06-06
 
 ### Changed

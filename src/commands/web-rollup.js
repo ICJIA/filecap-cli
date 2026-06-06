@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import os from "node:os";
@@ -20,6 +20,7 @@ import { currentStatus, accessibilityLog } from "../web/accessibility-log.js";
 import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
 import { generateNetlifyToml, generateNetlifyRedirects, generateNetlifyHeaders } from "../web/netlify-config.js";
+import { generateUptimeFunction } from "../web/uptime-function.js";
 import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
 import { generateSitesHtml } from "../web/sites-page.js";
@@ -1221,6 +1222,18 @@ export async function runWebRollup({
   const statusByServerName = new Map(contentRoster.map((e) => [e.site.name, e.status]));
   for (const sr of siteResults) sr.status = statusByServerName.get(sr.site.name) ?? null;
 
+  // v1.22.0 — collect the on-demand uptime targets (the same sites that get a
+  // status dot, keyed by the same data-uptime-key) so the generated Netlify
+  // function probes exactly them — never anything attacker-supplied.
+  const uptimeTargets = [];
+  for (const e of contentRoster) {
+    const u = e.site?.siteUrl ?? e.site?.publicUrlBase ?? e.header?.metadata?.publicUrlBase;
+    if (e.site?.name && u) uptimeTargets.push({ key: e.site.name, url: u });
+  }
+  for (const t of toolsEnriched) {
+    if (t.name && t.siteUrl) uptimeTargets.push({ key: t.name, url: t.siteUrl });
+  }
+
   // 6a. Build the master XLSX (every REMEDIABLE file across every site).
   //     v1.20.0: was .csv with every file; downloads are now .xlsx and
   //     filtered to remediable categories only — vendors don't quote
@@ -1728,6 +1741,17 @@ export async function runWebRollup({
   await fs.writeFile(path.join(output, "_redirects"), generateNetlifyRedirects(siteResults));
   await fs.writeFile(path.join(output, "_headers"), generateNetlifyHeaders());
 
+  // 8a. On-demand uptime probe (Netlify Functions v2). Checks the fleet
+  // server-side; the page polls it at most once per 6h (client localStorage
+  // gate in uptime-client.js). Emitted only when there are targets to check.
+  if (uptimeTargets.length) {
+    await fs.mkdir(path.join(output, "netlify", "functions"), { recursive: true });
+    await fs.writeFile(
+      path.join(output, "netlify", "functions", "uptime.mjs"),
+      generateUptimeFunction(uptimeTargets),
+    );
+  }
+
   // 9. Generate shared CSS
   await fs.writeFile(path.join(output, "assets", "style.css"), darkModeCss());
 
@@ -1782,6 +1806,11 @@ async function runNetlifyDeploy({ output, deploySite }) {
   );
 
   const args = ["deploy", "--prod", "--dir", output];
+  // v1.22.0 — include the uptime function (when the bundle emitted one) so the
+  // manual --dir deploy carries it.
+  if (existsSync(path.join(output, "netlify", "functions"))) {
+    args.push("--functions", path.join(output, "netlify", "functions"));
+  }
   if (deploySite) {
     args.push("--site", deploySite);
   }
