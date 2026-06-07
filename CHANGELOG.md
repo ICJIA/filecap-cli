@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.25.3] — 2026-06-07
+
+### Changed
+
+- **Replaced the ICJIA Research Hub card image.** Like the agency card, the `/researchhub/` subpath inherited the main site's logo-on-blue og:image; swapped for a viewcap screenshot of the live Research Hub page (`assets/og-overrides/researchhub-prod.png`) via the local-file override.
+
 ## [1.25.2] — 2026-06-07
 
 ### Added
