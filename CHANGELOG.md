@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.23.0] — 2026-06-07
+
+### Added
+
+- **One-command full audit: `run-full-audit.sh`.** A single repo-root entry point that runs the whole fleet pipeline end to end — pre-flight (`expect` / `netlify` login / `sites.json` / free disk) → scan every content site (SSH + rsync) → enrich (`references` → `cross-references` → per-PDF **and** per-page `audits`) → `web-rollup` (content sites + the tooling-site roster) → deploy to Netlify → purge old runs → a parsed summary (file/page totals + the live URL). It **wraps** the proven `examples/audit-fleet-auto.sh` rather than reimplementing the `expect`-driven SSH/rsync scan, so the heavy lifting is unchanged; the wrapper only adds friendly pre-flight, cleanup, and the summary. Flags: `--no-deploy` (build the bundle locally, don't push), `--no-purge` (keep old runs), `--help`. A full transcript is tee'd to `~/filecap-audits/_runs/full-audit-<UTC-timestamp>.log`. Documented in a new README section, **"One-command full audit"**.
+
+### Removed
+
+- **Stale `fleet-rescan-v1.20.0` workflow** (`.claude/workflows/fleet-rescan-v1.20.0.workflow.js`). It was a one-shot **post-mortem** hardcoded to re-read the 2026-06-02 run — it never actually re-scanned — and its rollup phase predated the v1.21–v1.22 UI (status pill, `/sites`, the on-demand uptime function), so running it would have produced stale results and risked reverting the UI. `run-full-audit.sh` replaces it as the canonical "run everything" entry point.
+
+### Notes
+
+- **Page-scoring resilience.** A full fleet run on 2026-06-06 showed elevated per-page audit errors on four sites (researchhub-prod, intranet-api-prod, ari-api-prod, spac-prod) caused by transient `audit.icjia.app` throttling under burst. Because audit errors are **never cached**, a serial re-run of `filecap audits` on those sites retried only the failures and cleared all of them (626 → 0). One residual on researchhub-prod is a single **structurally malformed PDF** (`VAP FINAL REPORT … with covers-220721T19491890.pdf`) that pdfjs introspection and the audit service both fail to parse — a content-side fix, tracked separately.
+
 ## [1.22.1] — 2026-06-06
 
 ### Changed
