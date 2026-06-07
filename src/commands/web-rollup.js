@@ -1254,11 +1254,15 @@ export async function runWebRollup({
   // v1.21.3 — propagate the live/down status onto siteResults so the landing
   // page's fleet cards show the same dot as /sites (matched by server name).
   // v1.24.0 — likewise carry each site's og:description onto the fleet card.
+  // v1.26.0 — and the bundled og:image (assets/og/<slug>) so the home-page
+  // content cards show the exact same thumbnail as the /sites roster cards.
   const statusByServerName = new Map(contentRoster.map((e) => [e.site.name, e.status]));
   const descByServerName = new Map(contentRoster.map((e) => [e.site.name, e.description]));
+  const imageByServerName = new Map(contentRoster.map((e) => [e.site.name, e.image]));
   for (const sr of siteResults) {
     sr.status = statusByServerName.get(sr.site.name) ?? null;
     sr.description = descByServerName.get(sr.site.name) ?? "";
+    sr.image = imageByServerName.get(sr.site.name) ?? null;
   }
 
   // v1.22.0 — collect the on-demand uptime targets (the same sites that get a

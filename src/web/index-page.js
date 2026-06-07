@@ -727,6 +727,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   const sortAzKey = (site.siteFullName || site.siteName || site.name || "").toLowerCase();
   return `<article class="site-card" data-sort-az="${he(sortAzKey)}" data-sort-added="${sortIndex}" data-sort-files="${totalFiles}">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
+  ${renderCardImage({ image: sr.image, alt: fullName })}
   <header class="card-head">
     ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
     <p class="nickname">${nickname}</p>

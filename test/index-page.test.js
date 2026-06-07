@@ -40,6 +40,21 @@ describe("renderCard", () => {
     expect(html).toContain("A &amp; B &lt;em&gt;x&lt;/em&gt;");
   });
 
+  // v1.26.0 — the home-page content (audit) card now carries the same og:image
+  // thumbnail the /sites roster card does, using the identical renderCardImage
+  // algorithm (downloaded og:image → ICJIA-logo tile fallback).
+  it("renders the og:image card thumbnail when web-rollup propagates one", () => {
+    const html = renderCard({ ...baseSr, image: "assets/og/dvfr.png" });
+    expect(html).toContain('<div class="card-img">');
+    expect(html).toContain('src="assets/og/dvfr.png"');
+    expect(html).toContain('alt="Domestic Violence Fatality Review"');
+  });
+
+  it("falls back to the ICJIA-logo tile when no card image is available", () => {
+    expect(renderCard(baseSr)).toContain("card-img-fallback");
+    expect(renderCard({ ...baseSr, image: null })).toContain("card-img-fallback");
+  });
+
   it("renders the nickname as a small uppercase label", () => {
     const html = renderCard(baseSr);
     expect(html).toMatch(/class="[^"]*\bnickname\b[^"]*"[^>]*>DVFR</);

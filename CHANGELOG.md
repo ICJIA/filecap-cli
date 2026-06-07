@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.26.0] — 2026-06-07
+
+### Added
+
+- **Card images on the landing-page content cards.** The home-page fleet cards (the donut / "may need audit" content cards) now carry the same header thumbnail as the `/sites` roster cards, using the **identical** image algorithm — a local `image` override screenshot if set, else the scraped `og:image`, else the ICJIA-logo tile (`renderCardImage`). The image is the exact same bundled `assets/og/<slug>` file referenced on `/sites`, so the two pages never diverge. With this, both the content cards **and** the tooling band on `index.html` show images, matching `/sites`. Managers landing on the snapshot now see each site's image without having to open the directory. Reverses the deliberate "audit content cards stay image-less for now" choice in the v1.21.0 `/sites` design.
+
+### Changed
+
+- **`web-rollup` now propagates the bundled `image` onto `siteResults`** alongside the live/down status (v1.21.3) and `og:description` (v1.24.0) it already carried, so the landing-page content cards resolve to the same thumbnail as the roster. No re-scan required — a `web-rollup` rebuild picks it up.
+
 ## [1.25.5] — 2026-06-07
 
 ### Added

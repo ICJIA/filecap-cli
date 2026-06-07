@@ -1420,6 +1420,9 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     expect(indexHtml).toContain("Squish");
     expect(indexHtml).toContain("Tooling sites");
     expect(indexHtml).toContain('href="sites.html"');
+    // v1.26.0 — the scraped og:image is propagated onto the home page's content
+    // (audit) card too, not just the /sites roster card.
+    expect(indexHtml).toContain('src="assets/og/dvfr.png"');
     // v1.25.0 — no self og:image meta when no icjia-fleet-audit tool carries an image
     expect(indexHtml).not.toContain('property="og:image"');
     expect(sitesHtml).not.toContain('property="og:image"');
