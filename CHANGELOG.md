@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.25.4] — 2026-06-07
+
+### Changed
+
+- **Replaced the placeholder og:image on the last two `icjia.illinois.gov` subpath cards** — Adult Redeploy Illinois (`/adultredeploy/`) and Illinois Family Violence Coordinating Council (`/ifvcc/`) inherited the main site's logo-on-blue og:image; both now use viewcap screenshots of their live pages (`assets/og-overrides/ari-api-prod.png`, `assets/og-overrides/ilfvcc-api-prod.png`). Every `/sites` card now shows a real per-site image.
+
 ## [1.25.3] — 2026-06-07
 
 ### Changed
