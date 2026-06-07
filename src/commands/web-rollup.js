@@ -1157,11 +1157,14 @@ export async function runWebRollup({
   }
 
   const ogLimit = pLimit(5);
-  // Resolve description (config → og:description → "") and a local thumbnail
-  // path (downloaded og:image → null → ICJIA-logo tile at render time). A
-  // non-URL config `image` is treated as an already-in-bundle path.
-  async function enrichOg({ url, slug: slugName, configImage, configDescription }) {
-    let description = configDescription || "";
+  // Resolve description and a local thumbnail path. v1.24.0 — the card
+  // description is the site's own og:description (blank when the site exposes
+  // none; an operator fills it in later); the curated sites.json `description`
+  // is no longer used for display. Image: downloaded og:image → null →
+  // ICJIA-logo tile at render time. A non-URL config `image` is an
+  // already-in-bundle path.
+  async function enrichOg({ url, slug: slugName, configImage }) {
+    let description = "";
     let image = null;
     let status = null;
     if (!noOg && url) {
@@ -1169,7 +1172,7 @@ export async function runWebRollup({
       try { og = await _ogFetch(url); } catch { /* best-effort */ }
       // live = the server answered at build time; down = unreachable.
       status = og.reachable ? "live" : "down";
-      if (!description) description = og.description || "";
+      description = og.description || "";
       const imgSrc = configImage || og.image;
       if (imgSrc && /^https?:\/\//i.test(imgSrc)) {
         let bytes = null;
@@ -1197,7 +1200,6 @@ export async function runWebRollup({
       url,
       slug: slug(s.name ?? s.siteName ?? "site"),
       configImage: s.image,
-      configDescription: s.description,
     });
     entry.description = description;
     entry.image = image;
@@ -1210,7 +1212,6 @@ export async function runWebRollup({
       url: t.siteUrl,
       slug: slug(t.name ?? t.siteName ?? "tool"),
       configImage: t.image,
-      configDescription: t.description,
     });
     t.description = description;
     t.image = image;
@@ -1219,8 +1220,13 @@ export async function runWebRollup({
 
   // v1.21.3 — propagate the live/down status onto siteResults so the landing
   // page's fleet cards show the same dot as /sites (matched by server name).
+  // v1.24.0 — likewise carry each site's og:description onto the fleet card.
   const statusByServerName = new Map(contentRoster.map((e) => [e.site.name, e.status]));
-  for (const sr of siteResults) sr.status = statusByServerName.get(sr.site.name) ?? null;
+  const descByServerName = new Map(contentRoster.map((e) => [e.site.name, e.description]));
+  for (const sr of siteResults) {
+    sr.status = statusByServerName.get(sr.site.name) ?? null;
+    sr.description = descByServerName.get(sr.site.name) ?? "";
+  }
 
   // v1.22.0 — collect the on-demand uptime targets (the same sites that get a
   // status dot, keyed by the same data-uptime-key) so the generated Netlify

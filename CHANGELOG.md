@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.24.0] — 2026-06-07
+
+### Changed
+
+- **Every site card now shows the site's own `og:description`.** Both the landing-page fleet cards and the `/sites` roster (content sites *and* the agency-tooling band) display the description fetched from each site's `og:description` meta tag, blank when the site doesn't expose one. The landing-page fleet cards previously carried no blurb at all; they now show the same description line `/sites` already had. Under the hood, `enrichOg` resolves the card description straight from `og:description` (the curated `sites.json` / `tools[]` description is no longer used for display), and the value is propagated onto `siteResults` alongside the live/down status so the fleet card can render it (HTML-escaped).
+  - **Currently blank (no upstream `og:description`):** *ICJIA Document Archive*, *ICJIA Staff Intranet*, and *Sentencing Policy Advisory Council* (their frontends expose no `og:description`), plus *ICJIA Accessibility Fleet Audit* (the bundle sits behind the Netlify visitor gate, so its own meta can't be fetched). Add an `og:description` to those frontends to fill them in.
+  - The downloadable `sites-list.xlsx` roster follows the same source — tooling rows now carry `og:description` rather than the curated text.
+
+### Tests
+
+871 passing (+3 — fleet-card `og:description` rendering, blank-when-absent, and HTML-escaping).
+
 ## [1.23.0] — 2026-06-07
 
 ### Added

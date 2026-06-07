@@ -733,6 +733,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     <h3 class="full-name">${fullName}</h3>
     ${publicUrlBaseRaw ? `<p class="site-url"><a href="${publicUrlBase}" target="_blank" rel="noopener noreferrer">${publicUrlBase}</a></p>` : ""}
   </header>
+  ${sr.description ? `<p class="card-desc">${he(sr.description)}</p>` : ""}
   ${renderStatusDot(sr.status, sr.site?.name)}
   <div class="nums">
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>

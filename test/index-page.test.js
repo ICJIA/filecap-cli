@@ -25,6 +25,21 @@ describe("renderCard", () => {
     expect(html).toContain("Domestic Violence Fatality Review");
   });
 
+  it("renders the og:description as a card-desc paragraph when present", () => {
+    const html = renderCard({ ...baseSr, description: "Statewide fatality review resource." });
+    expect(html).toMatch(/<p class="card-desc">Statewide fatality review resource\.<\/p>/);
+  });
+
+  it("omits the description paragraph when there is no og:description", () => {
+    expect(renderCard({ ...baseSr, description: "" })).not.toContain("card-desc");
+    expect(renderCard(baseSr)).not.toContain("card-desc");
+  });
+
+  it("escapes HTML in the og:description", () => {
+    const html = renderCard({ ...baseSr, description: "A & B <em>x</em>" });
+    expect(html).toContain("A &amp; B &lt;em&gt;x&lt;/em&gt;");
+  });
+
   it("renders the nickname as a small uppercase label", () => {
     const html = renderCard(baseSr);
     expect(html).toMatch(/class="[^"]*\bnickname\b[^"]*"[^>]*>DVFR</);
