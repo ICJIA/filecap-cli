@@ -29,6 +29,7 @@
 - [Rollup workflow](#rollup-workflow-phase-5)
 - [Report workflow](#report-workflow-phase-6)
 - [MCP server](#mcp-server-phase-7)
+- [One-command full audit](#one-command-full-audit-run-full-auditsh)
 - [For auditors: self-contained audit scripts](#for-auditors-self-contained-audit-scripts)
 - [Publishing a fleet snapshot](#publishing-a-fleet-snapshot)
 - [What filecap does not do](#what-filecap-does-not-do)
@@ -355,7 +356,7 @@ The ICJIA fleet snapshot is deployed at:
 
 The site is **password-protected** (Netlify Pro Site Password — server-side enforcement, gates every file including the CSVs). The current password is held by ICJIA's IDS (Innovation and Digital Services) team — request access by emailing IDS at ICJIA. The password is rotated periodically; if a previously-shared password stops working, ask IDS for the current one.
 
-Deploy mechanics: `filecap web-rollup` automatically pushes to this Netlify site whenever `webRollup.autoDeploy: true` is set in `~/.filecap/config.json` (with `deploySite: "icjia-fleet-audit"`). To force a fresh deploy after a new audit, run `./examples/audit-fleet.sh && filecap web-rollup`. No `--deploy` flag needed.
+Deploy mechanics: `filecap web-rollup` automatically pushes to this Netlify site whenever `webRollup.autoDeploy: true` is set in `~/.filecap/config.json` (with `deploySite` set to the `icjia-fleet-audit` site id). The simplest way to run a fresh audit and publish it in one step is **[`./run-full-audit.sh`](#one-command-full-audit-run-full-auditsh)**; to republish from an already-completed scan, run `filecap web-rollup` on its own. No `--deploy` flag needed.
 
 #### "Wait — if it's password-protected, why can I still 'view source' on the gate page?"
 
@@ -1001,6 +1002,71 @@ After wiring up your client, ask the AI agent:
 - "Generate a report from /tmp/consolidated.ndjson into /tmp/report-2026-Q2/"
 
 If the tools are registered correctly, the agent will call them directly rather than suggesting you run the CLI manually.
+
+## One-command full audit (`run-full-audit.sh`)
+
+For maintainers, **`./run-full-audit.sh`** (repo root) is the single entry point that runs the entire fleet pipeline end to end and publishes the result. It wraps the lower-level scripts documented in the rest of this section, so there is exactly one thing to run:
+
+```bash
+./run-full-audit.sh              # pre-flight -> scan -> enrich -> rollup -> deploy -> purge -> summary
+./run-full-audit.sh --no-deploy  # build the bundle locally, do NOT push to Netlify
+./run-full-audit.sh --no-purge   # keep every old run dir (skip the cleanup step)
+./run-full-audit.sh --help
+```
+
+Reach for this when the ask is *"run a full audit and push it."* It is **developer-facing** — it SSHes into production content servers and deploys to Netlify — and is *not* the script to hand to a non-technical auditor or remediator (for that, see the self-contained auditor scripts below).
+
+### What it does
+
+Seven phases, in order:
+
+| # | Phase | Detail |
+|---|-------|--------|
+| 1 | **Pre-flight** | Hard-aborts unless `expect`, a logged-in `netlify` CLI, and `~/.filecap/sites.json` are all present and no other scan is running; warns (does not abort) when `$HOME` has under ~10 GB free. Fails fast instead of 15 minutes in. |
+| 2 | **Scan** | Inventories every file on all content sites over SSH + rsync. Delegated to `examples/audit-fleet-auto.sh`, which drives `audit-fleet.sh` / `audit-remote.sh` under `expect`. |
+| 3 | **Enrich** | `filecap references` (CMS page references) -> `filecap cross-references` -> `filecap audits` (per-PDF **and** per-page accessibility scores from `audit.icjia.app`). |
+| 4 | **Web rollup** | `filecap web-rollup` builds the deployable bundle: every content site, plus the tooling-site roster shown on `/sites`. |
+| 5 | **Deploy** | Pushes the bundle to the `icjia-fleet-audit` Netlify site. Driven by `webRollup.autoDeploy: true` in `~/.filecap/config.json`; `--no-deploy` exports `FILECAP_NO_DEPLOY=1` to suppress it. |
+| 6 | **Purge** | Keeps only the newest run dir per site and the newest rollup bundle. Never touches `latest/` symlinks, `mirror/` rsync caches, or `_fleet/` consolidated dirs. Skip with `--no-purge`. |
+| 7 | **Summary** | Prints total files, remediable count, the deployed URL, and the transcript path. |
+
+Phases 2–5 are delegated to `examples/audit-fleet-auto.sh` rather than reimplemented, so the proven `expect`-driven SSH/rsync flow is left untouched; the wrapper only adds the friendly pre-flight, cleanup, and summary.
+
+### Prerequisites
+
+| Need | Why | Optional? |
+|------|-----|-----------|
+| `expect` | Answers the SSH / confirm prompts in `audit-fleet.sh` non-interactively (`brew install expect`) | Required |
+| `netlify` CLI, logged in | Deploy target comes from `~/.filecap/config.json` -> `webRollup.deploySite`; run `netlify login` once | Skip with `--no-deploy` |
+| `~/.filecap/sites.json` | The fleet roster — `sites[]` get scanned, `tools[]` are roster-only and never scanned | Required |
+| SSH keys per content server | Passwordless / agent-loaded keys for each host | Required |
+| `rsync`, `python3`, `jq`, Node >= 20 | Mirroring, JSON parsing, and the CLI itself | Required |
+
+### Output and logs
+
+- A full transcript is tee'd to **`~/filecap-audits/_runs/full-audit-<UTC-timestamp>.log`** — `tail -f` it to watch a run in progress.
+- Per-site inventories land in `~/filecap-audits/<site>/latest/`; `inventory.audited.ndjson` is the most-enriched form (cross-referenced + scored).
+- The deployable bundle is written to `~/filecap-audits/_web-rollup/<timestamp>/` before it is pushed.
+
+### The deployed site is gated — `401` is healthy
+
+The bundle deploys to **https://icjia-fleet-audit.netlify.app**, behind **Netlify visitor access**. Unauthenticated requests return **HTTP 401** on *every* path, including `/sites/` and `/.netlify/functions/uptime`. A `401` from `curl` is the *healthy* "deploy is live and gated" signal, not an error. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot) for the gate details.
+
+### Targeted re-runs (e.g. re-scoring one site)
+
+`run-full-audit.sh` always does a full scan. When you only need to redo *part* of the pipeline — most commonly re-scoring the PDF/page audits for a site whose scoring requests timed out — skip the wrapper and run the underlying commands against the inventories already on disk. Audit errors are **never cached**, so a re-run retries only the pages that failed; successful pages are served from `~/.filecap/page-audit-cache.json`:
+
+```bash
+# Re-score one site (retries only the failures), then rebuild + republish:
+node bin/filecap.js audits ~/filecap-audits/researchhub-prod/latest/inventory.cross-ref.ndjson -o ~/filecap-audits/researchhub-prod/latest/inventory.audited.ndjson
+node bin/filecap.js web-rollup
+```
+
+Pass `--force` to `filecap audits` only if you also want to re-fetch already-cached *successes* (rarely needed — it re-hammers the scoring endpoint). Re-score sites **serially, not in parallel**: parallel runs re-trigger the endpoint throttling that usually caused the errors in the first place.
+
+### Runtime and exit status
+
+A cache-warm run is roughly **15–20 minutes** (a cold first run, or one after large content changes, takes longer — per-PDF/page scoring is the slow part). On a hard scan failure the pipeline stops *before* deploying and exits non-zero; the transcript path is printed either way.
 
 ## For auditors: self-contained audit scripts
 
