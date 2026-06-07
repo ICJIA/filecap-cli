@@ -2272,7 +2272,7 @@ dialog.access-modal .access-modal-cta a {
   margin-bottom: 0.6rem;
 }
 
-/* One-line card description (config or og:description) + optional stack line */
+/* Card description (og:description) + optional stack line */
 .site-card .card-desc {
   margin: 0.2rem 0 0;
   color: #c9d1d9;
@@ -2280,6 +2280,9 @@ dialog.access-modal .access-modal-cta a {
   line-height: 1.5;
   text-align: center;
 }
+/* v1.24.1 — extra breathing room under the fleet-card description before the
+   file-count tiles (landing page). Tooling/roster cards (no .nums) are unaffected. */
+.site-card:not(.tool-card):not(.roster-card) .card-desc { margin-bottom: 0.9rem; }
 .site-card .card-stack { margin: 0.7rem 0 0; text-align: center; font-size: 0.8rem; color: #8b949e; }
 .site-card .card-stack .stack-label {
   font-weight: 700;

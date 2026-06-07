@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.24.1] — 2026-06-07
+
+### Changed
+
+- **More breathing room under the landing-page fleet-card description.** The `og:description` blurb added in v1.24.0 sat flush against the file-count tiles; it now carries a bottom margin so the description and the "Total files / May need audit" tiles aren't cramped. Scoped to the fleet cards (`.site-card:not(.tool-card):not(.roster-card)`, the only cards with the tiles) — the tooling band and `/sites` roster cards are unchanged.
+
 ## [1.24.0] — 2026-06-07
 
 ### Changed
