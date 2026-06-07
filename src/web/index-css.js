@@ -1091,7 +1091,10 @@ main {
 .site-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 22px;
+  /* Roomy gutters so the image-heavy cards have breathing space and the
+     two-across grid doesn't read as dense. At the 1200px container this
+     only trims each card by a few px while opening up the whitespace. */
+  gap: 48px 40px;
 }
 @media (max-width: 820px) {
   .site-grid { grid-template-columns: 1fr; }

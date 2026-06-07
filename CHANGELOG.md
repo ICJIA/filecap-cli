@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.26.1] — 2026-06-07
+
+### Changed
+
+- **Roomier spacing between the two-across cards** on both the landing page (`index.html`) and the `/sites` roster. The shared `.site-grid` gutter went from a flat `22px` to `48px 40px` (48px between rows, 40px between the two columns) — roughly double — so the image-heavy cards have room to breathe and the grid no longer reads as dense. Because the grid lives in a `max-width: 1200px` container, the wider gap trims each card by only ~2% (≈589px → ≈580px); the change is almost entirely added whitespace. Both pages inline the same `INDEX_CSS` and use the one `.site-grid` rule, so a single change covers them together. Still two across; the ≤820px single-column breakpoint is unchanged.
+
 ## [1.26.0] — 2026-06-07
 
 ### Added
