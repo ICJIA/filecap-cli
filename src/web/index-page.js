@@ -775,6 +775,7 @@ export function generateIndexHtml({
   orphans = null, // v1.11.0: { csvFilename, htmlFilename, orphanCount, staleRevisionCount, trulyUnreferencedCount, csvByteCount, htmlByteCount } | null
   fileErrors = null, // { htmlFilename, csvFilename, errorCount, siteCount, sitesWithErrors } | null
   tools = [], // v1.21.0: agency tooling apps → the "Tooling sites" band
+  ogImage = null, // v1.25.0: absolute URL for the bundle's own og:image/twitter:image meta
 }) {
   // Fleet totals
   let fleetTotalFiles = 0;
@@ -949,7 +950,12 @@ export function generateIndexHtml({
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>${pageTitle}</title>
+${ogImage ? `<meta property="og:type" content="website">
+<meta property="og:title" content="${pageTitle}">
+<meta property="og:image" content="${he(ogImage)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${he(ogImage)}">
+` : ""}<title>${pageTitle}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
 <style>${INDEX_CSS}</style>
 </head>

@@ -1420,6 +1420,36 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     expect(indexHtml).toContain("Squish");
     expect(indexHtml).toContain("Tooling sites");
     expect(indexHtml).toContain('href="sites.html"');
+    // v1.25.0 — no self og:image meta when no icjia-fleet-audit tool carries an image
+    expect(indexHtml).not.toContain('property="og:image"');
+    expect(sitesHtml).not.toContain('property="og:image"');
+  });
+
+  it("v1.25.0 — copies a local `image` file into the bundle + adds the bundle og:image (works under noOg / behind auth)", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    await fs.mkdir(path.join(auditsBase, "dvfr", "latest"), { recursive: true });
+    await writeInventory(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), { serverName: "dvfr" });
+    const localImg = path.join(tmpDir, "fleet-card.png");
+    await fs.writeFile(localImg, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await fs.writeFile(sitesFile, JSON.stringify({
+      version: 1,
+      sites: [{ name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" }],
+      tools: [{ name: "icjia-fleet-audit", siteName: "Fleet Audit", siteUrl: "https://icjia-fleet-audit.netlify.app", image: localImg }],
+    }));
+    const outputDir = path.join(tmpDir, "out");
+    // noOg: true → no network at all; the local file must still be copied in.
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    expect(result.exitCode).toBe(0);
+    // the local file was copied into the bundle under the tool's slug
+    expect((await fs.stat(path.join(outputDir, "assets", "og", "icjia-fleet-audit.png"))).isFile()).toBe(true);
+    const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
+    expect(sitesHtml).toContain('src="assets/og/icjia-fleet-audit.png"');
+    // the bundle's own og:image meta points at it (absolute URL)
+    expect(sitesHtml).toContain('<meta property="og:image" content="https://icjia-fleet-audit.netlify.app/assets/og/icjia-fleet-audit.png">');
+    const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(indexHtml).toContain('<meta property="og:image" content="https://icjia-fleet-audit.netlify.app/assets/og/icjia-fleet-audit.png">');
+    expect(indexHtml).toContain('name="twitter:image"');
   });
 
   it("lists a registered-but-unscanned site in the roster (no scan required)", async () => {

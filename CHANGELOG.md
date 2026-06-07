@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.25.0] — 2026-06-07
+
+### Added
+
+- **Per-site image override (URL or local file) for cards whose `og:image` can't be fetched.** The `image` field on `sites[]` and `tools[]` is now a full image source, used in place of the scraped `og:image` when set: an **http(s) URL** is downloaded (point it at any reachable image — e.g. a GitHub README raw image — when the site's own `og:image` is unreachable) and a **local file path** is copied into the bundle (new — for images only available behind an auth wall). Local paths resolve against the sites.json dir, the package root, then cwd; absolute paths are used as-is. Precedence: `image` → scraped og:image → ICJIA-logo tile. Applies to the landing-page tooling band and the `/sites` roster.
+- **The gated fleet-audit bundle now carries its own og:image.** Because it sits behind the Netlify visitor gate it can't fetch its own `og:image`, so its `tools[]` entry points `image` at a committed asset (`assets/og-overrides/icjia-fleet-audit.png`, a snapshot of its `/sites` directory) via the new local-file override. The bundle's `<head>` now emits `og:image` / `og:title` / `twitter:*` meta (absolute URL) on both the landing and `/sites` pages.
+
+### Notes
+
+- After this change, 3 content-site cards still fall back to the default ICJIA tile because their frontends expose no `og:image`: **ICJIA Document Archive**, **ICJIA Staff Intranet**, and **Sentencing Policy Advisory Council**. Set each one's `image` (URL or local file) to give it its own card.
+
+### Tests
+
+872 passing (+1 — a local-file `image` is copied into the bundle under `noOg` and the bundle emits the og:image/twitter meta; plus a no-self-image negative assertion).
+
 ## [1.24.1] — 2026-06-07
 
 ### Changed

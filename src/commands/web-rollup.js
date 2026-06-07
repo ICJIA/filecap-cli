@@ -4,6 +4,7 @@ import path from "node:path";
 import readline from "node:readline";
 import os from "node:os";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
@@ -27,6 +28,13 @@ import { generateSitesHtml } from "../web/sites-page.js";
 import { fetchOgMeta, fetchImageBytes } from "../references/og-meta.js";
 import { fmtChicagoGeneratedAt } from "../util/time.js";
 import pLimit from "p-limit";
+
+// v1.25.0 — deployed bundle URL, used to build the absolute og:image in the
+// page <head>. (Single known deploy target for the fleet-audit bundle.)
+const FLEET_PUBLIC_URL = "https://icjia-fleet-audit.netlify.app";
+// Package root (…/filecap-cli), to resolve local `image` override paths
+// independent of the current working directory.
+const PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 // FC-2026-007: Zod schema for sites.json validation
 // 1.7.36 — `name` is interpolated into filesystem paths
@@ -92,7 +100,11 @@ export const siteEntrySchema = z
     // roster card. When omitted, the card falls back to the site's fetched
     // og:description. Pure presentation; never used in audit logic.
     description: z.string().optional(),
-    // v1.21.0 — optional override for the /sites card thumbnail. When omitted,
+    // v1.21.0 — optional override for the card thumbnail (landing + /sites).
+    // v1.25.0 — may be an http(s) URL (downloaded) OR a local file path
+    // (copied into the bundle), so a site whose og:image is unreachable (e.g.
+    // behind an auth wall) can still carry its own image. Local paths resolve
+    // against the sites.json dir, the package root, then cwd. When omitted,
     // web-rollup uses the site's fetched og:image, then the ICJIA logo tile.
     image: z.string().optional(),
     // Informational hint — when true, the public URL requires an Authorization
@@ -150,7 +162,8 @@ export const siteEntrySchema = z
 // `tools[]` array so they never enter the scan/audit pipeline and never affect
 // fleet counts. `siteUrl` is required (a tool with no link is pointless);
 // `name` is a kebab slug like the audit sites. description / stack / image are
-// optional — description falls back to the fetched og:description, image to the
+// optional — description falls back to the fetched og:description; `image` may
+// be an http(s) URL or a local file path (v1.25.0), else falls back to the
 // fetched og:image, then the ICJIA logo tile.
 export const toolEntrySchema = z
   .object({
@@ -1157,39 +1170,59 @@ export async function runWebRollup({
   }
 
   const ogLimit = pLimit(5);
-  // Resolve description and a local thumbnail path. v1.24.0 — the card
-  // description is the site's own og:description (blank when the site exposes
-  // none; an operator fills it in later); the curated sites.json `description`
-  // is no longer used for display. Image: downloaded og:image → null →
-  // ICJIA-logo tile at render time. A non-URL config `image` is an
-  // already-in-bundle path.
+  const sitesDir = path.dirname(sitesPath);
+
+  // Resolve a local `image` path to an on-disk file. Relative paths are tried
+  // against the sites.json dir, then the package root, then cwd; absolute paths
+  // are used as-is. Returns the resolved path or null.
+  async function resolveLocalImage(src) {
+    const candidates = path.isAbsolute(src)
+      ? [src]
+      : [path.resolve(sitesDir, src), path.resolve(PKG_ROOT, src), path.resolve(process.cwd(), src)];
+    for (const c of candidates) {
+      try { if ((await fs.stat(c)).isFile()) return c; } catch { /* try next */ }
+    }
+    return null;
+  }
+
+  // Bring an image SOURCE into the bundle and return its bundle-relative path
+  // (or null). v1.25.0 — a config `image` may be an http(s) URL (downloaded)
+  // OR a local file path (copied), so a site whose og:image is unreachable —
+  // e.g. behind an auth wall, like the gated fleet-audit bundle — can still
+  // carry its own card image. A non-URL path matching no file is treated as an
+  // already-in-bundle path (legacy). URLs are skipped under noOg (no network).
+  async function bundleImage(src, slugName) {
+    if (!src) return null;
+    if (/^https?:\/\//i.test(src)) {
+      if (noOg) return null;
+      let bytes = null;
+      try { bytes = await _imageFetch(src); } catch { bytes = null; }
+      if (!bytes) return null;
+      const rel = `assets/og/${slugName}.${bytes.ext}`;
+      try { await fs.writeFile(path.join(output, rel), bytes.buffer); return rel; }
+      catch { return null; }
+    }
+    const local = await resolveLocalImage(src);
+    if (local) {
+      const ext = (path.extname(local).slice(1) || "png").toLowerCase();
+      const rel = `assets/og/${slugName}.${ext}`;
+      try { await fs.copyFile(local, path.join(output, rel)); return rel; }
+      catch { return null; }
+    }
+    return src; // legacy: assume an already-in-bundle path
+  }
+
+  // Description + live/down status from the og scrape; the card image prefers
+  // an explicit config `image` (URL or local file), else the scraped og:image.
   async function enrichOg({ url, slug: slugName, configImage }) {
-    let description = "";
-    let image = null;
+    let og = { image: null, title: null, description: null, reachable: false };
     let status = null;
     if (!noOg && url) {
-      let og = { image: null, title: null, description: null, reachable: false };
       try { og = await _ogFetch(url); } catch { /* best-effort */ }
-      // live = the server answered at build time; down = unreachable.
       status = og.reachable ? "live" : "down";
-      description = og.description || "";
-      const imgSrc = configImage || og.image;
-      if (imgSrc && /^https?:\/\//i.test(imgSrc)) {
-        let bytes = null;
-        try { bytes = await _imageFetch(imgSrc); } catch { bytes = null; }
-        if (bytes) {
-          const rel = `assets/og/${slugName}.${bytes.ext}`;
-          try {
-            await fs.writeFile(path.join(output, rel), bytes.buffer);
-            image = rel;
-          } catch { image = null; }
-        }
-      } else if (imgSrc) {
-        image = imgSrc;
-      }
-    } else if (configImage && !/^https?:\/\//i.test(configImage)) {
-      image = configImage;
     }
+    const description = !noOg && url ? og.description || "" : "";
+    const image = await bundleImage(configImage || og.image, slugName);
     return { description, image, status };
   }
 
@@ -1650,6 +1683,12 @@ export async function runWebRollup({
   // 6c. Generate index.html with master-CSV link + duplicates section
   const useClientGateForIndex = !noClientGate && password !== null;
   const passwordHash = useClientGateForIndex ? computeHash(password) : null;
+  // v1.25.0 — the fleet-audit bundle's own og:image is its tooling-card image
+  // (gated, so it can't fetch its own; supplied via the tools[] `image`
+  // override). Absolute URL for the <head> meta on the landing + /sites pages.
+  const fleetSelfTool = toolsEnriched.find((t) => t.name === "icjia-fleet-audit");
+  const ogImageUrl = fleetSelfTool?.image ? `${FLEET_PUBLIC_URL}/${fleetSelfTool.image}` : null;
+
   const indexHtml = generateIndexHtml({
     siteResults,
     password: passwordHash,
@@ -1662,6 +1701,7 @@ export async function runWebRollup({
     orphans: orphansMeta,
     fileErrors: fileErrorsMeta,
     tools: toolsEnriched,
+    ogImage: ogImageUrl,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
 
@@ -1729,6 +1769,7 @@ export async function runWebRollup({
     sitesListXlsx: sitesListXlsxFilename,
     title: "ICJIA site directory",
     generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
+    ogImage: ogImageUrl,
   });
   if (passwordHash) {
     sitesHtml = injectPasswordGate(sitesHtml, passwordHash);
