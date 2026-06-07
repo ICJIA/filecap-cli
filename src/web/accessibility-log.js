@@ -10,7 +10,7 @@
 
 /** Current verified accessibility standing — shown in the page's status panel. */
 export const currentStatus = {
-  asOf: "2026-06-06",
+  asOf: "2026-06-07",
   lighthouse: 100,
   axeCore: "0 violations (WCAG A + AA)",
   axeDevTools: "0 serious — pending live re-verification",
@@ -32,6 +32,17 @@ export const currentStatus = {
  *   notes    optional, e.g. the version it shipped in
  */
 export const accessibilityLog = [
+  {
+    date: "2026-06-07",
+    source: "backend",
+    tool: "axecap (axe-core 4.11) + lightcap (Lighthouse)",
+    scope: "every bundle page — landing, /sites, all 13 per-site detail reports, 11 by-file-type pages, /accessibility (27 in all, desktop)",
+    viewport: "desktop",
+    status: "fixed",
+    result:
+      "Full-bundle sweep after adding the Community Engagement roster card. Found and fixed two issues. (1) WCAG 1.4.3 (AA) contrast: image-only PDF filename links rendered in #60a5fa on the lighter first-column amber row tint (#4d3a0c) measured ~4.3:1 — under the 4.5:1 floor — on the Archive and ILFVCC reports; brightened those links to #93c5fd (>=6:1 on the first column, ~7.5:1 elsewhere). (2) WCAG 1.4.1 (A) use-of-color: the access-panel \"Email Chris Schweda\" contact link was set apart from body copy by colour alone; restored its underline. After the fixes: 0 axe-core violations across all 27 pages; Lighthouse accessibility 100 on the landing, /sites, both remediated reports, and representative detail/by-type pages.",
+    notes: "v1.26.0",
+  },
   {
     date: "2026-06-06",
     source: "backend",

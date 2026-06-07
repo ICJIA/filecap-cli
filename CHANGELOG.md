@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.25.5] — 2026-06-07
+
+### Added
+
+- **ICJIA Community Engagement on the `/sites` roster (coming-soon).** Added `https://community-engagement.netlify.app/` as a content site so it shows on the `/sites` directory only. It is intentionally kept off the landing-page fleet snapshot because it is an unscanned scaffold — the backend-less entry is skipped by the scan's server-list parser, and `web-rollup` omits unscanned sites from `index.html` while still listing them on `/sites`. Its card image is a viewcap screenshot of the live scaffold with a bold, unmissable **COMING SOON / EARLY DRAFT — FULL SITE LAUNCHING SOON** hazard banner draped diagonally across it (`assets/og-overrides/community-engagement.png`), so a manager browsing the roster sees at a glance that the site is in development rather than broken.
+
+### Fixed
+
+- **WCAG 1.4.3 (AA) contrast on image-only PDF rows.** Filename links (`#60a5fa`) on the lighter first-column amber tint (`#4d3a0c`) of image-only / needs-OCR rows measured ~4.3:1 — under the 4.5:1 floor — on the Document Archive and ILFVCC detail reports. Links inside image-only rows are now brightened to `#93c5fd` (≥6:1 on the first column, ~7.5:1 on the rest).
+- **WCAG 1.4.1 (A) use-of-color in the access panel.** The "Email Chris Schweda" contact link in each per-site report's access panel was set apart from the surrounding paragraph by colour alone; its underline is restored so it is distinguished by more than colour.
+- Full axe-core + Lighthouse sweep across all 27 bundle pages (landing, `/sites`, 13 per-site reports, 11 by-file-type pages, `/accessibility`): **0 axe-core violations and Lighthouse accessibility 100** after the two fixes. Recorded on the deployed `/accessibility` log.
+
 ## [1.25.4] — 2026-06-07
 
 ### Changed

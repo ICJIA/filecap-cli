@@ -1184,6 +1184,12 @@ a.page-audit-chip:hover {
   color: #d4dae0;
 }
 .access-panel .access-panel-credential strong { color: #ffffff; }
+/* Inline prose links (e.g. the "Email Chris Schweda" contact) keep an
+   underline so they are distinguished from the surrounding paragraph text by
+   more than color alone — WCAG 1.4.1 (Use of Color). The global report link
+   rule sets text-decoration:none for the chip/button-styled links, so this
+   scoped rule restores it for links that sit inside body copy. */
+.access-panel a { text-decoration: underline; }
 /* Per-variant accent. The text inside the panel stays neutral light grey
    for AA contrast; only the heading + left border use the brand color. */
 .access-panel.access-strapi { color: #7dd3fc; }
@@ -1612,6 +1618,11 @@ td a:hover { color: #93c5fd; text-decoration: underline; }
    beats both the striping and the per-row backgrounds. */
 tbody tr.image-only td { background: #3a2c08; }
 tbody tr.image-only td:first-child { background: #4d3a0c; }
+/* The default link blue (#60a5fa) only reaches ~4.3:1 on the lighter
+   first-column amber tint (#4d3a0c) — under the 4.5:1 AA floor. Brighten
+   filename links inside image-only rows to the hover blue, which clears
+   6:1 on the first column and 7.5:1 on the rest. WCAG 1.4.3. */
+tbody tr.image-only td a { color: #93c5fd; }
 tr.flagged { border-left: 3px solid #fbbf24; }
 tr.flagged td { /* let row bg show through; border is the indicator */ }
 
