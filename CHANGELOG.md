@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.27.0] — 2026-06-08
+
+### Changed
+
+- **Tooling sites are no longer listed on the landing page (`index.html`).** The "Agency tooling" band — the row of ICJIA web-app cards (Squish, the markdown editor, etc.) — has been removed from the fleet snapshot. Tooling sites now appear **only** on the `/sites` roster, which keeps its dedicated "Tooling sites" section. The landing page is now strictly the audited content fleet plus the audit artifacts, matching the existing split where `/sites` is the full directory and `index.html` is the audit-focused snapshot (the same rationale that already keeps unscanned scaffolds off the home page, v1.25.5). `web-rollup` still enriches and ships the `tools[]` entries — their og images, live/down status, and the sites-list workbook's "Tooling sites" tab are unchanged; they are simply omitted from `index.html`. The now-orphaned `renderToolingSection` home-page helper and the unused `tools` parameter on `generateIndexHtml` were removed.
+
 ## [1.26.1] — 2026-06-07
 
 ### Changed

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderCard, generateIndexHtml, renderToolCard, renderToolingSection, renderStatusDot } from "../src/web/index-page.js";
+import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot } from "../src/web/index-page.js";
 
 const baseSr = {
   site: {
@@ -474,38 +474,19 @@ describe("renderToolCard (v1.21.0)", () => {
   });
 });
 
-describe("renderToolingSection (v1.21.0)", () => {
-  it("returns an empty string when there are no tools", () => {
-    expect(renderToolingSection([])).toBe("");
-    expect(renderToolingSection(undefined)).toBe("");
-  });
-  it("renders a banded section with a card per tool", () => {
-    const html = renderToolingSection([
-      { name: "a", siteFullName: "Tool A", siteUrl: "https://a.example" },
-      { name: "b", siteFullName: "Tool B", siteUrl: "https://b.example" },
-    ]);
-    expect(html).toContain("Tooling sites");
-    expect(html).toContain("Tool A");
-    expect(html).toContain("Tool B");
-  });
-});
-
-describe("generateIndexHtml tooling band + /sites nav (v1.21.0)", () => {
-  it("includes the tooling band when tools are provided", () => {
+describe("generateIndexHtml — tooling lives only on /sites (v1.27.0)", () => {
+  it("never renders a tooling band on the landing page, even if tools are passed", () => {
     const html = generateIndexHtml({
       siteResults: [],
       tools: [{ name: "squish", siteFullName: "Squish", siteUrl: "https://squish.icjia.app" }],
     });
-    expect(html).toContain("Squish");
-    expect(html).toContain("Tooling sites");
+    expect(html).not.toContain("Agency tooling");
+    expect(html).not.toContain("Tooling sites");
+    expect(html).not.toContain("Squish");
   });
   it("renders the /sites link in the top nav + footer", () => {
     const html = generateIndexHtml({ siteResults: [] });
     expect(html).toContain('href="sites.html"');
-  });
-  it("omits the Agency tooling headline when no tools are provided", () => {
-    const html = generateIndexHtml({ siteResults: [] });
-    expect(html).not.toContain("Agency tooling");
   });
 });
 

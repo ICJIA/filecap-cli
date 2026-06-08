@@ -624,27 +624,6 @@ export function renderToolCard(tool, { showStatus = false } = {}) {
 </article>`;
 }
 
-// v1.21.0 — the home-page "Tooling sites" band (active ICJIA web apps with no
-// files to audit). Renders nothing when there are no tools. Mirrors the
-// fleet-section-banner grammar used elsewhere on the page.
-export function renderToolingSection(tools) {
-  const list = Array.isArray(tools) ? tools : [];
-  if (list.length === 0) return "";
-  const cards = list.map((t) => renderToolCard(t, { showStatus: true })).join("\n");
-  const n = list.length;
-  return `
-  <div class="fleet-section-banner" role="presentation">
-    <p class="fleet-section-eyebrow">Section · Tooling sites</p>
-    <h2 class="fleet-section-headline">Agency tooling</h2>
-    <p class="fleet-section-lede">Active ICJIA web apps — utilities with no document files to audit. ${he(String(n))} tool${n !== 1 ? "s" : ""}. See the <a href="sites.html">full site directory</a>.</p>
-  </div>
-  <section class="tooling-section" aria-label="Agency tooling sites">
-    <div class="site-grid">
-${cards}
-    </div>
-  </section>`;
-}
-
 export function renderCard(sr, { sortIndex = 0 } = {}) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const nickname = he(site.siteName ?? site.name ?? "");
@@ -775,7 +754,6 @@ export function generateIndexHtml({
   llmContext = null, // v1.7.21: { ndjsonFilename, ndjsonByteCount, contextMdFilename, contextMdByteCount, lastAuditAt } | null
   orphans = null, // v1.11.0: { csvFilename, htmlFilename, orphanCount, staleRevisionCount, trulyUnreferencedCount, csvByteCount, htmlByteCount } | null
   fileErrors = null, // { htmlFilename, csvFilename, errorCount, siteCount, sitesWithErrors } | null
-  tools = [], // v1.21.0: agency tooling apps → the "Tooling sites" band
   ogImage = null, // v1.25.0: absolute URL for the bundle's own og:image/twitter:image meta
 }) {
   // Fleet totals
@@ -1209,7 +1187,6 @@ ${cardsHtml}
     </div>
   </section>
 
-${renderToolingSection(tools)}
 ${renderMasterCsvSection(masterCsv)}
 ${renderOrphansSection(orphans)}
 ${renderFileErrorsSection(fileErrors)}

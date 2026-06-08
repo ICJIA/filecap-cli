@@ -1383,7 +1383,7 @@ describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
 });
 
 describe("/sites roster + tooling sites (v1.21.0)", () => {
-  it("writes sites.html + sites-list.xlsx, downloads og images, and a home tooling band", async () => {
+  it("writes sites.html + sites-list.xlsx, downloads og images, and keeps tooling off the home page", async () => {
     const auditsBase = path.join(tmpDir, "filecap-audits");
     await fs.mkdir(path.join(auditsBase, "dvfr", "latest"), { recursive: true });
     await writeInventory(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), { serverName: "dvfr", serverIp: "10.0.0.1" });
@@ -1417,8 +1417,9 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     expect((await fs.stat(path.join(outputDir, "sites-list.xlsx"))).isFile()).toBe(true);
 
     const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(indexHtml).toContain("Squish");
-    expect(indexHtml).toContain("Tooling sites");
+    // v1.27.0 — tooling sites were removed from the landing page; they live only on /sites
+    expect(indexHtml).not.toContain("Squish");
+    expect(indexHtml).not.toContain("Tooling sites");
     expect(indexHtml).toContain('href="sites.html"');
     // v1.26.0 — the scraped og:image is propagated onto the home page's content
     // (audit) card too, not just the /sites roster card.

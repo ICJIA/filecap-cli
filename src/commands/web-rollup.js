@@ -1704,7 +1704,6 @@ export async function runWebRollup({
     llmContext: llmContextMeta,
     orphans: orphansMeta,
     fileErrors: fileErrorsMeta,
-    tools: toolsEnriched,
     ogImage: ogImageUrl,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
