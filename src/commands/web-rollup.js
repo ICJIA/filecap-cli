@@ -100,6 +100,10 @@ export const siteEntrySchema = z
     // roster card. When omitted, the card falls back to the site's fetched
     // og:description. Pure presentation; never used in audit logic.
     description: z.string().optional(),
+    // v1.28.0 — optional owner (the person or unit responsible for the site).
+    // Surfaces as the "Owner" column in the /sites downloadable workbooks;
+    // blank when unset. Pure presentation; never used in audit logic.
+    owner: z.string().optional(),
     // v1.21.0 — optional override for the card thumbnail (landing + /sites).
     // v1.25.0 — may be an http(s) URL (downloaded) OR a local file path
     // (copied into the bundle), so a site whose og:image is unreachable (e.g.
@@ -174,6 +178,8 @@ export const toolEntrySchema = z
     description: z.string().optional(),
     stack: z.string().optional(),
     image: z.string().optional(),
+    // v1.28.0 — optional owner, same semantics as the site entry's `owner`.
+    owner: z.string().optional(),
   })
   .strict();
 
@@ -1716,14 +1722,20 @@ export async function runWebRollup({
   await fs.writeFile(path.join(output, "accessibility.html"), accessibilityHtml);
 
   // 6e. v1.21.0 — /sites roster page + the sites-list.xlsx directory workbook
-  // (Content sites + Tooling sites tabs). Roster only — names, descriptions,
-  // URLs, and the sites' tech details; no per-file/per-page data.
+  // (Content sites + Tooling sites tabs). Roster only — names, owners,
+  // descriptions, URLs, and the sites' tech details; no per-file/per-page data.
+  // v1.28.0 — two additional single-audience workbooks (content-only and
+  // tooling-only) alongside the combined one, and an Owner column (from the
+  // optional sites.json `owner` field, blank when unset) on every sheet.
   const sitesListXlsxFilename = "sites-list.xlsx";
+  const contentSitesXlsxFilename = "sites-list-content.xlsx";
+  const toolingSitesXlsxFilename = "sites-list-tools.xlsx";
   const siteRows = contentRoster.map((e) => {
     const s = e.site;
     return {
       site: s.siteFullName || s.siteName || s.name || "",
       nickname: s.siteName || "",
+      owner: s.owner || "",
       description: e.description || "",
       url: s.siteUrl || s.publicUrlBase || e.header?.metadata?.publicUrlBase || "",
       type: s.type || "strapi",
@@ -1733,43 +1745,54 @@ export async function runWebRollup({
   const toolRows = toolsEnriched.map((t) => ({
     tool: t.siteFullName || t.siteName || t.name || "",
     nickname: t.siteName || "",
+    owner: t.owner || "",
     description: t.description || "",
     url: t.siteUrl || "",
     stack: t.stack || "",
   }));
+  const contentSiteColumns = [
+    { key: "site", label: "Site" },
+    { key: "nickname", label: "Nickname" },
+    { key: "owner", label: "Owner" },
+    { key: "description", label: "Description" },
+    { key: "url", label: "URL", type: "url" },
+    { key: "type", label: "Type" },
+    { key: "access", label: "Access" },
+  ];
+  const toolColumns = [
+    { key: "tool", label: "Tool" },
+    { key: "nickname", label: "Nickname" },
+    { key: "owner", label: "Owner" },
+    { key: "description", label: "Description" },
+    { key: "url", label: "URL", type: "url" },
+    { key: "stack", label: "Stack" },
+  ];
   await writeXlsxRowsMultiSheet({
     outputPath: path.join(output, sitesListXlsxFilename),
     sheets: [
-      {
-        sheetName: "Content sites",
-        columns: [
-          { key: "site", label: "Site" },
-          { key: "nickname", label: "Nickname" },
-          { key: "description", label: "Description" },
-          { key: "url", label: "URL", type: "url" },
-          { key: "type", label: "Type" },
-          { key: "access", label: "Access" },
-        ],
-        rows: siteRows,
-      },
-      {
-        sheetName: "Tooling sites",
-        columns: [
-          { key: "tool", label: "Tool" },
-          { key: "nickname", label: "Nickname" },
-          { key: "description", label: "Description" },
-          { key: "url", label: "URL", type: "url" },
-          { key: "stack", label: "Stack" },
-        ],
-        rows: toolRows,
-      },
+      { sheetName: "Content sites", columns: contentSiteColumns, rows: siteRows },
+      { sheetName: "Tooling sites", columns: toolColumns, rows: toolRows },
     ],
+  });
+  await writeXlsxFromRows({
+    outputPath: path.join(output, contentSitesXlsxFilename),
+    sheetName: "Content sites",
+    columns: contentSiteColumns,
+    rows: siteRows,
+  });
+  await writeXlsxFromRows({
+    outputPath: path.join(output, toolingSitesXlsxFilename),
+    sheetName: "Tooling sites",
+    columns: toolColumns,
+    rows: toolRows,
   });
 
   let sitesHtml = generateSitesHtml({
     contentRoster,
     tools: toolsEnriched,
     sitesListXlsx: sitesListXlsxFilename,
+    contentSitesXlsx: contentSitesXlsxFilename,
+    toolingSitesXlsx: toolingSitesXlsxFilename,
     title: "ICJIA site directory",
     generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
     ogImage: ogImageUrl,

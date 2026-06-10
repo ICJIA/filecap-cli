@@ -2387,6 +2387,9 @@ dialog.access-modal .access-modal-cta a {
 }
 .roster-breakdown .grp:first-child .dot { margin-left: 0; }
 .roster-download { margin-top: 1.6rem; }
+/* v1.28.0 — the three workbook buttons (combined / content-only / tooling-only)
+   sit in one wrapping row. */
+.roster-download-btns { display: flex; flex-wrap: wrap; gap: 0.7rem; }
 .roster-download-btn {
   display: inline-flex;
   align-items: center;

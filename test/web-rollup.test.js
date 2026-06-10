@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import ExcelJS from "exceljs";
 import {
   runWebRollup,
   normalizeStrapiFilename,
@@ -1489,5 +1490,54 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     const buf = await fs.readFile(path.join(outputDir, "sites-list.xlsx"));
     expect(buf.length).toBeGreaterThan(0);
     expect(buf.slice(0, 2).toString("latin1")).toBe("PK"); // ZIP/XLSX magic
+  });
+
+  it("v1.28.0 — emits content-only + tooling-only workbooks and an Owner column in all three", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    await fs.mkdir(path.join(auditsBase, "dvfr", "latest"), { recursive: true });
+    await writeInventory(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), { serverName: "dvfr" });
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await fs.writeFile(sitesFile, JSON.stringify({
+      version: 1,
+      sites: [{ name: "dvfr", siteName: "DVFR", siteUrl: "https://dvfr.illinois.gov", host: "10.0.0.1", user: "forge", remotePath: "/uploads", owner: "Jane Manager" }],
+      tools: [{ name: "squish", siteName: "Squish", siteUrl: "https://squish.icjia.app", owner: "Web Team" }],
+    }));
+    const outputDir = path.join(tmpDir, "out");
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    expect(result.exitCode).toBe(0);
+
+    // All three workbooks exist and are real zip containers.
+    for (const f of ["sites-list.xlsx", "sites-list-content.xlsx", "sites-list-tools.xlsx"]) {
+      const buf = await fs.readFile(path.join(outputDir, f));
+      expect(buf.slice(0, 2).toString("latin1")).toBe("PK");
+    }
+
+    // Combined workbook: Owner column on both tabs with the configured values.
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await fs.readFile(path.join(outputDir, "sites-list.xlsx")));
+    const contentSheet = wb.getWorksheet("Content sites");
+    const contentHeader = contentSheet.getRow(1).values.slice(1);
+    expect(contentHeader).toContain("Owner");
+    expect(contentSheet.getRow(2).getCell(contentHeader.indexOf("Owner") + 1).value).toBe("Jane Manager");
+    const toolSheet = wb.getWorksheet("Tooling sites");
+    const toolHeader = toolSheet.getRow(1).values.slice(1);
+    expect(toolHeader).toContain("Owner");
+    expect(toolSheet.getRow(2).getCell(toolHeader.indexOf("Owner") + 1).value).toBe("Web Team");
+
+    // Single-audience workbooks carry exactly their one sheet, with Owner.
+    const wbContent = new ExcelJS.Workbook();
+    await wbContent.xlsx.load(await fs.readFile(path.join(outputDir, "sites-list-content.xlsx")));
+    expect(wbContent.worksheets.map((w) => w.name)).toEqual(["Content sites"]);
+    expect(wbContent.getWorksheet("Content sites").getRow(1).values.slice(1)).toContain("Owner");
+    const wbTools = new ExcelJS.Workbook();
+    await wbTools.xlsx.load(await fs.readFile(path.join(outputDir, "sites-list-tools.xlsx")));
+    expect(wbTools.worksheets.map((w) => w.name)).toEqual(["Tooling sites"]);
+    expect(wbTools.getWorksheet("Tooling sites").getRow(1).values.slice(1)).toContain("Owner");
+
+    // /sites renders all three download buttons.
+    const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
+    expect(sitesHtml).toContain("All content and tooling sites");
+    expect(sitesHtml).toContain('href="sites-list-content.xlsx"');
+    expect(sitesHtml).toContain('href="sites-list-tools.xlsx"');
   });
 });

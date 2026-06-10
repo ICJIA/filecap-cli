@@ -115,7 +115,12 @@ const CLIPBOARD_SCRIPT = `<script>
  * @param {Array}  args.contentRoster - [{ site, header, accessKind, image, description }, …]
  *   for every registered (filtered) site, scanned or not.
  * @param {Array}  args.tools         - enriched tools[] entries ({ …tool, image, description }).
- * @param {string|null} args.sitesListXlsx - filename of the roster workbook, or null.
+ * @param {string|null} args.sitesListXlsx - filename of the combined roster
+ *   workbook (Content + Tooling tabs), or null to omit its button.
+ * @param {string|null} args.contentSitesXlsx - v1.28.0: filename of the
+ *   content-sites-only workbook, or null to omit its button.
+ * @param {string|null} args.toolingSitesXlsx - v1.28.0: filename of the
+ *   tooling-sites-only workbook, or null to omit its button.
  * @param {string} args.title         - page <title>.
  * @param {string} args.generatedAt   - preformatted "generated at" string (optional).
  * @returns {string} full HTML document
@@ -124,6 +129,8 @@ export function generateSitesHtml({
   contentRoster = [],
   tools = [],
   sitesListXlsx = null,
+  contentSitesXlsx = null, // v1.28.0
+  toolingSitesXlsx = null, // v1.28.0
   title = "ICJIA site directory",
   generatedAt = "",
   ogImage = null, // v1.25.0: absolute URL for the bundle's own og:image meta
@@ -136,10 +143,20 @@ export function generateSitesHtml({
   const toolCards = toolList.map((t) => renderToolCard(t, { showStatus: true })).join("\n");
   const breakdown = renderBreakdown(content);
 
-  const downloadHtml = sitesListXlsx
+  // v1.28.0 — three workbook downloads: the combined roster (Content + Tooling
+  // tabs) plus one single-audience workbook each for content sites and tooling
+  // sites. Buttons render only for the filenames the rollup actually wrote.
+  const downloadLinks = [
+    sitesListXlsx ? { href: sitesListXlsx, label: "All content and tooling sites (.xlsx)" } : null,
+    contentSitesXlsx ? { href: contentSitesXlsx, label: "Content sites only (.xlsx)" } : null,
+    toolingSitesXlsx ? { href: toolingSitesXlsx, label: "Tooling sites only (.xlsx)" } : null,
+  ].filter(Boolean);
+  const downloadHtml = downloadLinks.length
     ? `<div class="roster-download">
-      <a class="roster-download-btn" href="${he(sitesListXlsx)}" download>${DOWNLOAD_ICON}<span>Download sites list (.xlsx)</span></a>
-      <p class="roster-download-note">One workbook · Content sites + Tooling sites tabs · names, descriptions &amp; URLs</p>
+      <div class="roster-download-btns">
+${downloadLinks.map((l) => `        <a class="roster-download-btn" href="${he(l.href)}" download>${DOWNLOAD_ICON}<span>${he(l.label)}</span></a>`).join("\n")}
+      </div>
+      <p class="roster-download-note">Names, nicknames, owners, descriptions &amp; URLs · the combined workbook has Content sites + Tooling sites tabs</p>
     </div>`
     : "";
 

@@ -87,9 +87,33 @@ describe("generateSitesHtml", () => {
   it("shows the XLSX download when provided and omits it otherwise", () => {
     const withX = generateSitesHtml({ contentRoster: [scannedEntry], tools: [], sitesListXlsx: "sites-list.xlsx" });
     expect(withX).toContain('href="sites-list.xlsx"');
-    expect(withX).toContain("Download sites list");
+    expect(withX).toContain("All content and tooling sites");
     const without = generateSitesHtml({ contentRoster: [scannedEntry], tools: [] });
-    expect(without).not.toContain("Download sites list");
+    expect(without).not.toContain("All content and tooling sites");
+    expect(body(without)).not.toContain("roster-download-btn");
+  });
+
+  it("v1.28.0 — renders all three workbook download buttons when filenames are provided", () => {
+    const html = generateSitesHtml({
+      contentRoster: [scannedEntry],
+      tools: [tool],
+      sitesListXlsx: "sites-list.xlsx",
+      contentSitesXlsx: "sites-list-content.xlsx",
+      toolingSitesXlsx: "sites-list-tools.xlsx",
+    });
+    expect(html).toContain('href="sites-list.xlsx"');
+    expect(html).toContain("All content and tooling sites");
+    expect(html).toContain('href="sites-list-content.xlsx"');
+    expect(html).toContain("Content sites only");
+    expect(html).toContain('href="sites-list-tools.xlsx"');
+    expect(html).toContain("Tooling sites only");
+  });
+
+  it("v1.28.0 — omits the content-only / tooling-only buttons when their filenames are absent", () => {
+    const html = generateSitesHtml({ contentRoster: [scannedEntry], tools: [], sitesListXlsx: "sites-list.xlsx" });
+    expect(html).toContain("All content and tooling sites");
+    expect(html).not.toContain("Content sites only");
+    expect(html).not.toContain("Tooling sites only");
   });
 
   it("relabels access chips by kind (Strapi CMS / GitHub)", () => {

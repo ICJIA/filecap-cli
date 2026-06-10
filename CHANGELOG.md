@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.28.0] — 2026-06-10
+
+### Added
+
+- **Content-only and tooling-only workbook downloads on `/sites`, and an Owner column in all three.** The `/sites` roster now offers three XLSX downloads instead of one: the existing combined workbook (relabeled **"All content and tooling sites (.xlsx)"**, still `sites-list.xlsx` with its Content sites + Tooling sites tabs), plus two new single-audience workbooks — **"Content sites only (.xlsx)"** (`sites-list-content.xlsx`) and **"Tooling sites only (.xlsx)"** (`sites-list-tools.xlsx`). Every sheet in all three workbooks gains an **Owner** column (between Nickname and Description), populated from a new optional `owner` string field on both `sites[]` and `tools[]` entries in `sites.json`; the column is blank for entries with no `owner` set. Like `description`, `owner` is pure presentation — it never enters audit logic. The three buttons share the existing `.roster-download-btn` styling in a wrapping flex row.
+
 ## [1.27.0] — 2026-06-08
 
 ### Changed
