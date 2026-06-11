@@ -13,6 +13,7 @@
 import { canonicalizeUrl } from "./url-canonical.js";
 import { extractFileUrls } from "./extract-urls.js";
 import { classifyField } from "./field-classifier.js";
+import { collectComponentFileUrls } from "./component-walk.js";
 
 // Auth/plugin query field names that aren't content types we want to
 // enumerate. Files are excluded because the file inventory comes from
@@ -74,11 +75,14 @@ export async function introspectContentTypes(graphqlEndpoint, fetcher) {
   return result;
 }
 
-export async function introspectTypeFields(graphqlEndpoint, typeName, fetcher) {
+export async function introspectTypeFields(graphqlEndpoint, typeName, fetcher, options = {}) {
   // GraphQL type names are pascal-case ("Grant"), query field names are
   // camel-case ("grant"). Caller passes whichever convention they prefer; we
   // pascal-case the first letter here defensively in case a query-field-name
   // was handed in (cheap; no harm if already pascal).
+  //
+  // v1.29.0 — options.contentTypeNames (Set of pascal-case discovered type
+  // names) lets the classifier tell relations (skip) from components (walk).
   const pascalName = typeName.charAt(0).toUpperCase() + typeName.slice(1);
   const response = await fetcher(graphqlEndpoint, {
     method: "POST",
@@ -86,7 +90,7 @@ export async function introspectTypeFields(graphqlEndpoint, typeName, fetcher) {
     body: JSON.stringify({ query: INTROSPECT_TYPE_QUERY(pascalName) }),
   });
   const fields = response?.data?.__type?.fields ?? [];
-  return fields.map(classifyField);
+  return fields.map((f) => classifyField(f, options));
 }
 
 export async function fetchAllEntries(restApiBase, contentType, fetcher, options = {}) {
@@ -147,7 +151,9 @@ export function extractEntryUrls(entry, classifiedFields, restApiBase) {
     if (kind === "url-string" && typeof value === "string") {
       addCandidate(value);
     } else if (kind === "body-string" && typeof value === "string") {
-      for (const u of extractFileUrls(value)) addCandidate(u);
+      // v1.29.0 — baseUrl resolves root-relative "/uploads/x.pdf" body links
+      // against the API host, where Strapi serves uploads.
+      for (const u of extractFileUrls(value, { baseUrl: restApiBase })) addCandidate(u);
     } else if (kind === "upload-file" && typeof value === "object") {
       addCandidate(resolveUploadUrl(value.url, restApiBase));
     } else if (kind === "upload-file-list" && Array.isArray(value)) {
@@ -156,6 +162,15 @@ export function extractEntryUrls(entry, classifiedFields, restApiBase) {
           addCandidate(resolveUploadUrl(item.url, restApiBase));
         }
       }
+    } else if (kind === "component" || kind === "component-list") {
+      // v1.29.0 — walk the embedded component value for nested upload files
+      // (SPAC's mediaMaterial.file / meetingMaterial[].file[]) and markdown
+      // links inside component strings.
+      const urls = collectComponentFileUrls(value, {
+        resolveUploadUrl: (raw) => resolveUploadUrl(raw, restApiBase),
+        extractText: (text) => extractFileUrls(text, { baseUrl: restApiBase }),
+      });
+      for (const u of urls) addCandidate(u);
     }
     // relation, other → skipped
   }

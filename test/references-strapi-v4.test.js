@@ -192,6 +192,68 @@ describe("extractEntryUrls (v4)", () => {
       extractEntryUrls(entry, classified, "https://dvfr.icjia-api.cloud"),
     ).toEqual([]);
   });
+
+  // v1.29.0 — components under attributes. v4 media inside a component uses
+  // the data/attributes envelope; the walker peels it by shape.
+  it("collects files nested in a component under attributes", () => {
+    const entry = {
+      id: 1,
+      attributes: {
+        download: {
+          id: 3,
+          title: "Annual report",
+          file: {
+            data: {
+              id: 9,
+              attributes: {
+                url: "/uploads/annual_report.pdf",
+                mime: "application/pdf",
+                name: "annual_report.pdf",
+              },
+            },
+          },
+        },
+      },
+    };
+    const classified = [{ kind: "component", fieldName: "download" }];
+    expect(extractEntryUrls(entry, classified, "https://dvfr.icjia-api.cloud")).toEqual([
+      "https://dvfr.icjia-api.cloud/uploads/annual_report.pdf",
+    ]);
+  });
+
+  it("collects files from a component list / dynamic zone under attributes", () => {
+    const entry = {
+      id: 2,
+      attributes: {
+        sections: [
+          {
+            __component: "shared.download-block",
+            file: { data: { id: 1, attributes: { url: "/uploads/a.pdf", ext: ".pdf" } } },
+          },
+          {
+            __component: "shared.rich-text",
+            body: "See [the form](https://dvfr.icjia-api.cloud/uploads/b.docx).",
+          },
+        ],
+      },
+    };
+    const classified = [{ kind: "component-list", fieldName: "sections" }];
+    expect(extractEntryUrls(entry, classified, "https://dvfr.icjia-api.cloud")).toEqual([
+      "https://dvfr.icjia-api.cloud/uploads/a.pdf",
+      "https://dvfr.icjia-api.cloud/uploads/b.docx",
+    ]);
+  });
+
+  it("resolves root-relative links in v4 body fields against restApiBase (v1.29.0)", () => {
+    const entry = {
+      id: 3,
+      attributes: { body: "Download [here](/uploads/guide.pdf)." },
+    };
+    const classified = [{ kind: "body-string", fieldName: "body" }];
+    expect(extractEntryUrls(entry, classified, "https://dvfr.icjia-api.cloud")).toEqual([
+      "https://dvfr.icjia-api.cloud/uploads/guide.pdf",
+    ]);
+  });
 });
 
 // --- introspectContentTypes (v4) ---
@@ -357,6 +419,28 @@ describe("fetchAllEntries (v4)", () => {
     expect(calls[2]).toContain("pagination%5Bstart%5D=4");
     // populate=* so media + relations come back in the response
     expect(calls[0]).toContain("populate=%2A");
+  });
+
+  it("v1.29.0 — deep-populates component fields so their nested media is present", async () => {
+    // populate=* only populates ONE level: a component comes back without
+    // its inner media. When the classifier found component fields, the
+    // fetch must ask for populate[<field>][populate]=* per component (and
+    // keep plain media fields populated too).
+    const calls = [];
+    const fetcher = async (url) => {
+      calls.push(url);
+      return { data: [], meta: { pagination: { total: 0 } } };
+    };
+    await fetchAllEntries("https://dvfr.icjia-api.cloud", "posts", fetcher, {
+      limit: 10,
+      componentFields: ["download", "sections"],
+      mediaFields: ["splash"],
+    });
+    const url = calls[0];
+    expect(url).toContain("populate%5Bdownload%5D%5Bpopulate%5D=%2A");
+    expect(url).toContain("populate%5Bsections%5D%5Bpopulate%5D=%2A");
+    expect(url).toContain("populate%5Bsplash%5D=%2A");
+    expect(url).not.toContain("populate=%2A");
   });
 
   it("stops when response has fewer entries than the page limit", async () => {

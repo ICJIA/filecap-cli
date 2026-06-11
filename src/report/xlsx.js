@@ -36,10 +36,16 @@ export async function writeXlsx({ sourceHeader, entries, sources, outputPath, sh
  * Empty buckets are skipped so the workbook only contains tabs that hold
  * data — vendors don't have to click through empty sheets.
  *
+ * v1.29.0 — a sheet config may instead carry the writeXlsxFromRows shape
+ * ({ name, columns, rows }) so one workbook can mix inventory-entry tabs
+ * with plain rows tabs (the per-site Pages tab). Rows-based sheets with
+ * zero rows are skipped like empty buckets.
+ *
  * @param {object} args
  * @param {string} args.outputPath
  * @param {Array<object>} args.sheets - one entry per tab:
- *   { name, sourceHeader, entries, sources, totals? }
+ *   { name, sourceHeader, entries, sources, totals? }  (inventory entries)
+ *   { name, columns, rows }                            (plain rows)
  *   totals.pageCount = true appends a bottom SUM row over the Page Count column.
  * @returns {Promise<void>}
  */
@@ -47,6 +53,12 @@ export async function writeXlsxMultiSheet({ outputPath, sheets }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "filecap";
   for (const s of sheets) {
+    if (Array.isArray(s.columns)) {
+      if (!s.rows || s.rows.length === 0) continue;
+      const ws = wb.addWorksheet(safeSheetName(s.name));
+      writeRowsSheet(ws, s.columns, s.rows);
+      continue;
+    }
     if (!s.entries || s.entries.length === 0) continue;
     const ws = wb.addWorksheet(safeSheetName(s.name));
     writeSheetContents({

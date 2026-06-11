@@ -150,7 +150,7 @@ function formatAuditScore(audit) {
   return "";
 }
 
-function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
+export function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   // v1.7.40 — Always build the Public URL from publicUrlBase + entry.path
   // so every link lands on the deployed public site, regardless of site
   // type. For git-type sites this supersedes the v1.7.20 behaviour, which

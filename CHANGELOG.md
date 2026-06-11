@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.29.0] — 2026-06-11
+
+### Fixed
+
+- **The Page view's missing file associations — three reference-extraction gaps closed.** On several sites the detail report's Page view listed pages (from the sitemap/CMS) with **"No files"** even though those pages plainly link documents. The page→file inversion itself was fine; the references step never saw the files:
+  1. **Strapi components were skipped entirely.** The field classifier treated every non-UploadFile object as a relation ("enumerated separately") — but components (v3 `Group*`, modern `Component*`, dynamic zones) embed their data *inside* the parent entry, so their files exist nowhere else. SPAC alone lost ~360 page→file links this way: every publication's PDF lives in `mediaMaterial.file`, every meeting's agenda/materials/minutes in `meetingMaterial[].file[]`. The classifier now receives the discovered content-type names and walks anything else (new `component-walk.js`, bounded recursive collection of upload-shaped objects + embedded text). SPAC's sidecar went from **25 → 252** pages with files (62 → 424 file refs). For Strapi v4, `populate=*` reaches one level only, so the fetcher now deep-populates classified component fields (`populate[<field>][populate]=*`).
+  2. **Only absolute URLs were extracted from text.** Root-relative links (`/files/x.pdf`, `/uploads/x.pdf`) — the natural way same-site content links its own files — were invisible. `extractFileUrls` gains a `baseUrl` option (markdown resolves against the site frontend, Strapi bodies against the API host) with a guard so an absolute URL's path can't re-match as relative. VPP's `/download` page now links the statewide plan PDF it has always carried.
+  3. **The git walker was Nuxt-only.** SFS is Astro — content at `src/content/pages/`, file links in `src/pages/research.astro` — so its sidecar was empty (0 records). The walker now understands `src/content/` (with the `pages` collection routing to the site root) **and** page templates (`src/pages/*.astro`, `pages/*.vue`, `app/pages/*.vue`) via file-based routing; dynamic `[slug]` templates are skipped, and template records are kept only when they carry fleet file refs.
+- **Page rows split by URL variants.** The Page view's inversion keyed pages by raw `pageUrl`, so `/About/` and `/about` became two rows with half the files each; it now keys by the normalized URL (same rule the sitemap/CMS merge already used).
+
+### Added
+
+- **A "Pages" tab in every per-site XLSX download.** The per-site workbook (the "Download XLSX" on each detail report) now ends with a **Pages** sheet mirroring the HTML Page view: one row per page — hyperlinked page URL, content type, source (`links files` / `cms` / `sitemap`), file count, file names, and file URLs — file-linking pages first. `writeXlsxMultiSheet` accepts rows-based sheet configs (`{ name, columns, rows }`) so one workbook mixes inventory-entry tabs with plain-rows tabs.
+
 ## [1.28.0] — 2026-06-10
 
 ### Added

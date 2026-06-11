@@ -262,4 +262,45 @@ describe("writeXlsxMultiSheet", () => {
     const value = typeof totalCell.value === "object" ? totalCell.value.result : totalCell.value;
     expect(value).toBe(60);
   });
+
+  // v1.29.0 — a sheet config may instead carry { name, columns, rows } (the
+  // writeXlsxFromRows shape) so one workbook can mix entry-based file tabs
+  // with a rows-based Pages tab.
+  it("v1.29.0 — mixes entry-based sheets with rows-based sheets in one workbook", async () => {
+    const out = path.join(tmpDir, "mixed.xlsx");
+    await writeXlsxMultiSheet({
+      outputPath: out,
+      sheets: [
+        { name: "PDFs", sourceHeader: baseHeader, entries: [pdfEntry], sources: null },
+        {
+          name: "Pages",
+          columns: [
+            { key: "pageUrl", label: "Page", type: "url" },
+            { key: "files", label: "Files" },
+          ],
+          rows: [{ pageUrl: "https://x.gov/about", files: "report.pdf" }],
+        },
+      ],
+    });
+    const wb = await load(out);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["PDFs", "Pages"]);
+    const pages = wb.worksheets[1];
+    expect(pages.getRow(1).values.slice(1)).toEqual(["Page", "Files"]);
+    const urlCell = pages.getRow(2).getCell(1);
+    expect(urlCell.value).toEqual({ text: "https://x.gov/about", hyperlink: "https://x.gov/about" });
+    expect(pages.getRow(2).getCell(2).value).toBe("report.pdf");
+  });
+
+  it("v1.29.0 — skips rows-based sheets with zero rows", async () => {
+    const out = path.join(tmpDir, "mixed-empty.xlsx");
+    await writeXlsxMultiSheet({
+      outputPath: out,
+      sheets: [
+        { name: "PDFs", sourceHeader: baseHeader, entries: [pdfEntry], sources: null },
+        { name: "Pages", columns: [{ key: "a", label: "A" }], rows: [] },
+      ],
+    });
+    const wb = await load(out);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["PDFs"]);
+  });
 });

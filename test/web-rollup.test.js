@@ -1541,3 +1541,98 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     expect(sitesHtml).toContain('href="sites-list-tools.xlsx"');
   });
 });
+
+// v1.29.0 — the per-site workbook gains a "Pages" tab mirroring the HTML
+// Page view: one row per page with the files it links (names + URLs), plus
+// CMS-only pages with no files. The user-visible gap this closes: detail
+// reports listed pages with no way to see their files in the download.
+describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
+  it("writes a Pages tab with page URL, linked file names/URLs, and cms rows", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    const latestDir = path.join(auditsBase, "dvfr", "latest");
+    await fs.mkdir(latestDir, { recursive: true });
+
+    // Cross-ref'd inventory (preferred over raw): doc.pdf is referenced
+    // from /about; orphan.pdf links nowhere.
+    const header = JSON.stringify({
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        serverName: "dvfr",
+        hostname: "cms-01",
+        serverIp: "10.0.0.1",
+        scannedPath: "/uploads",
+        scannedAt: "2026-05-09T16:05:04.000Z",
+        publicUrlBase: "https://files.example.gov/uploads",
+        filecapVersion: "1.1.1",
+        nodeVersion: "v20.18.0",
+        options: { hash: true, introspect: false, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    });
+    const refEntry = JSON.stringify({
+      path: "doc.pdf", absolutePath: "/uploads/doc.pdf", filename: "doc.pdf",
+      extension: "pdf", category: "pdf", remediable: true, sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z", sha256: "a1b2c3", flags: [],
+      references: [{ siteName: "dvfr", contentType: "page", entryId: 1, pageUrl: "https://dvfr.example.gov/about" }],
+    });
+    const orphanEntry = JSON.stringify({
+      path: "orphan.pdf", absolutePath: "/uploads/orphan.pdf", filename: "orphan.pdf",
+      extension: "pdf", category: "pdf", remediable: true, sizeBytes: 2048,
+      modifiedAt: "2024-02-01T00:00:00.000Z", sha256: "d4e5f6", flags: [],
+      references: [],
+    });
+    const footer = JSON.stringify({ kind: "filecap-inventory-footer", entryCount: 2, scannedAt: "2026-05-09T16:05:04.000Z" });
+    await fs.writeFile(path.join(latestDir, "inventory.cross-ref.ndjson"), [header, refEntry, orphanEntry, footer].join("\n") + "\n");
+    // Raw inventory must exist too (web-rollup requires a scan to bundle the site).
+    await fs.writeFile(path.join(latestDir, "inventory.ndjson"), [header, refEntry, orphanEntry, footer].join("\n") + "\n");
+    // Retained sidecar: the /about page (already in refs) + a no-files cms page.
+    await fs.writeFile(
+      path.join(latestDir, "references-sidecar.ndjson"),
+      [
+        JSON.stringify({ siteName: "dvfr", contentType: "page", entryId: 1, slug: "about", pageUrl: "https://dvfr.example.gov/about", referencedFiles: ["https://files.example.gov/uploads/doc.pdf"] }),
+        JSON.stringify({ siteName: "dvfr", contentType: "faq", entryId: 2, slug: "faq-1", pageUrl: "https://dvfr.example.gov/faqs/faq-1", referencedFiles: [] }),
+      ].join("\n") + "\n",
+    );
+
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await writeSitesJson(sitesFile, [
+      { name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" },
+    ]);
+    const outputDir = path.join(tmpDir, "out");
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    expect(result.exitCode).toBe(0);
+
+    const files = await fs.readdir(outputDir);
+    const wbName = files.find((f) => /^dvfr-.*\.xlsx$/.test(f));
+    expect(wbName).toBeTruthy();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await fs.readFile(path.join(outputDir, wbName)));
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["PDFs", "Pages"]);
+
+    const pages = wb.getWorksheet("Pages");
+    const headerRow = pages.getRow(1).values.slice(1);
+    expect(headerRow).toEqual(["Page", "Content type", "Source", "Files", "File names", "File URLs"]);
+
+    // Row 2: the file-linking page (sorted first).
+    const aboutRow = pages.getRow(2);
+    expect(aboutRow.getCell(1).value).toEqual({
+      text: "https://dvfr.example.gov/about",
+      hyperlink: "https://dvfr.example.gov/about",
+    });
+    expect(aboutRow.getCell(2).value).toBe("page");
+    expect(aboutRow.getCell(3).value).toBe("links files");
+    expect(aboutRow.getCell(4).value).toBe(1);
+    expect(aboutRow.getCell(5).value).toBe("doc.pdf");
+    expect(aboutRow.getCell(6).value).toBe("https://files.example.gov/uploads/doc.pdf");
+
+    // Row 3: the cms page with no files.
+    const faqRow = pages.getRow(3);
+    expect(faqRow.getCell(1).value).toEqual({
+      text: "https://dvfr.example.gov/faqs/faq-1",
+      hyperlink: "https://dvfr.example.gov/faqs/faq-1",
+    });
+    expect(faqRow.getCell(3).value).toBe("cms");
+    expect(faqRow.getCell(4).value).toBe(0);
+    expect(faqRow.getCell(5).value).toBeNull();
+  });
+});

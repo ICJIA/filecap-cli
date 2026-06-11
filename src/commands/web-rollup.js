@@ -10,7 +10,8 @@ import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows, writeXlsxRowsMultiSheet } from "../report/xlsx.js";
 import { writeHtml } from "../report/html.js";
-import { parseCmsPageList } from "../report/pages.js";
+import { parseCmsPageList, buildPageList } from "../report/pages.js";
+import { buildPublicUrl } from "../report/csv.js";
 import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
 import { collectAuditErrors } from "../report/audit-errors.js";
@@ -1071,6 +1072,45 @@ export async function runWebRollup({
         entries: bucketEntries,
         sources: null,
         totals: bucket.slug === "pdfs" ? { pageCount: true } : undefined,
+      });
+    }
+    // v1.29.0 — "Pages" tab, the workbook twin of the HTML Page view: one
+    // row per page with the files it links (file-linking pages first), then
+    // cms/sitemap pages that link nothing. Same inputs as the HTML report.
+    const pageList = buildPageList(perSiteEntries, sitemapUrls, cmsPages);
+    // pathPrefix mirrors what runReport injects into the header for URL
+    // building (git sites deployed under a sub-path).
+    const pagesHeader = site.pathPrefix
+      ? { ...perSiteHeader, metadata: { ...perSiteHeader.metadata, pathPrefix: site.pathPrefix } }
+      : perSiteHeader;
+    const pageRows = pageList
+      .map((p) => {
+        const files = p.files ?? [];
+        return {
+          pageUrl: p.pageUrl,
+          contentType: p.contentType || "",
+          source: files.length > 0 ? "links files" : (p.fromSitemap ? "sitemap" : "cms"),
+          fileCount: files.length,
+          fileNames: files.map((f) => f.filename ?? f.path ?? "").join("; "),
+          fileUrls: files
+            .map((f) => buildPublicUrl({ entry: f, sourceHeader: pagesHeader, sourceMap: null, isConsolidated: false }))
+            .filter(Boolean)
+            .join("; "),
+        };
+      })
+      .sort((a, b) => (b.fileCount - a.fileCount) || a.pageUrl.localeCompare(b.pageUrl));
+    if (pageRows.length > 0) {
+      perSiteSheetConfigs.push({
+        name: "Pages",
+        columns: [
+          { key: "pageUrl", label: "Page", type: "url" },
+          { key: "contentType", label: "Content type" },
+          { key: "source", label: "Source" },
+          { key: "fileCount", label: "Files", type: "number" },
+          { key: "fileNames", label: "File names" },
+          { key: "fileUrls", label: "File URLs" },
+        ],
+        rows: pageRows,
       });
     }
     if (perSiteSheetConfigs.length > 0) {

@@ -21,22 +21,44 @@ import { canonicalizeUrl } from "./url-canonical.js";
 import { extractFileUrls } from "./extract-urls.js";
 import { buildFleetDomainSet, isFleetUrl } from "./domain-filter.js";
 
-// Map a content-relative markdown file path to its deployed URL using Nuxt
-// Content's default routing convention. Files outside content/, non-markdown
-// files, and files under any _-prefixed directory (Nuxt Content's "hidden"
-// marker) return null.
+// Content roots the walker understands, in lookup order:
+//   content/      — Nuxt Content convention (VPP, ILHEALS)
+//   src/content/  — Astro content collections (SFS)
+// For the Astro root, a leading "pages/" collection segment is stripped —
+// the convention observed on the ICJIA Astro sites is src/pages/[slug].astro
+// rendering getCollection("pages") at the site root. Other collections keep
+// their segment (src/content/docs/x.md → /docs/x).
+const CONTENT_ROOTS = [
+  { prefix: "content/", stripPagesSegment: false },
+  { prefix: "src/content/", stripPagesSegment: true },
+];
+
+// v1.29.0 — page-template roots (.astro / .vue), routed by file path the
+// same way frameworks do: src/pages/research.astro → /research. SFS's only
+// real file links live in template hrefs, not markdown. Dynamic-segment
+// templates ([slug].astro) have no concrete URL and are skipped.
+const TEMPLATE_ROOTS = ["src/pages/", "app/pages/", "pages/"];
+const TEMPLATE_EXT_RE = /\.(?:astro|vue)$/;
+
+// Map a content-relative markdown file path to its deployed URL using the
+// routing convention of whichever content root it lives under. Files outside
+// a known root, non-markdown files, and files under any _-prefixed directory
+// (Nuxt Content's "hidden" marker) return null.
 export function deriveContentUrl(filePath, siteFrontendUrl) {
   if (typeof filePath !== "string" || typeof siteFrontendUrl !== "string") {
     return null;
   }
   // Normalise Windows-style backslashes
   const norm = filePath.replace(/\\/g, "/");
-  // Must live under content/
-  if (!norm.startsWith("content/")) return null;
+  const root = CONTENT_ROOTS.find((r) => norm.startsWith(r.prefix));
+  if (!root) return null;
   // Must be a markdown file
   if (!norm.endsWith(".md")) return null;
-  // Strip content/ prefix + .md suffix
-  let rel = norm.slice("content/".length, -".md".length);
+  // Strip root prefix + .md suffix
+  let rel = norm.slice(root.prefix.length, -".md".length);
+  if (root.stripPagesSegment && (rel === "pages" || rel.startsWith("pages/"))) {
+    rel = rel === "pages" ? "" : rel.slice("pages/".length);
+  }
   // index → empty (root)
   if (rel === "index") rel = "";
   if (rel.endsWith("/index")) rel = rel.slice(0, -"/index".length);
@@ -48,28 +70,73 @@ export function deriveContentUrl(filePath, siteFrontendUrl) {
   return `${base}/${rel}`;
 }
 
-// Recursively yield every .md file under <dir>/content/. Returns absolute
-// paths plus the repo-relative path (content/foo/bar.md form) so the URL
-// derivation can use a stable identifier.
-async function* walkMarkdown(repoDir) {
-  const contentDir = path.join(repoDir, "content");
-  let stat;
-  try { stat = await fs.stat(contentDir); } catch { stat = null; }
-  if (!stat || !stat.isDirectory()) return;
+// Map a page-template path (src/pages/research.astro, pages/about.vue) to
+// its deployed URL via file-based routing. Returns null for non-template
+// paths, dynamic segments ("[slug]"), and _-prefixed (hidden) segments.
+export function deriveTemplateUrl(filePath, siteFrontendUrl) {
+  if (typeof filePath !== "string" || typeof siteFrontendUrl !== "string") {
+    return null;
+  }
+  const norm = filePath.replace(/\\/g, "/");
+  const root = TEMPLATE_ROOTS.find((r) => norm.startsWith(r));
+  if (!root) return null;
+  if (!TEMPLATE_EXT_RE.test(norm)) return null;
+  let rel = norm.slice(root.length).replace(TEMPLATE_EXT_RE, "");
+  if (rel === "index") rel = "";
+  if (rel.endsWith("/index")) rel = rel.slice(0, -"/index".length);
+  const segments = rel === "" ? [] : rel.split("/");
+  if (segments.some((seg) => seg.startsWith("_") || seg.includes("["))) return null;
 
-  async function* recurse(dir) {
+  const base = siteFrontendUrl.replace(/\/+$/, "");
+  if (rel === "") return `${base}/`;
+  return `${base}/${rel}`;
+}
+
+// Recursively yield every content file the adapter understands: .md under
+// each content root, .astro/.vue under each template root. Returns absolute
+// paths plus the repo-relative path (content/foo/bar.md form) and the file
+// kind so extraction can branch. Repos usually have exactly one root of
+// each kind; walking all keeps the adapter framework-agnostic.
+async function* walkContentFiles(repoDir) {
+  async function* recurse(dir, matchFn) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const ent of entries) {
       const abs = path.join(dir, ent.name);
       if (ent.isDirectory()) {
-        yield* recurse(abs);
-      } else if (ent.isFile() && ent.name.endsWith(".md")) {
+        yield* recurse(abs, matchFn);
+      } else if (ent.isFile() && matchFn(ent.name)) {
         const rel = path.relative(repoDir, abs).replace(/\\/g, "/");
         yield { abs, rel };
       }
     }
   }
-  yield* recurse(contentDir);
+  async function statDir(prefix) {
+    const dir = path.join(repoDir, ...prefix.replace(/\/$/, "").split("/"));
+    try {
+      const stat = await fs.stat(dir);
+      return stat.isDirectory() ? dir : null;
+    } catch {
+      return null;
+    }
+  }
+  for (const root of CONTENT_ROOTS) {
+    const dir = await statDir(root.prefix);
+    if (!dir) continue;
+    for await (const f of recurse(dir, (n) => n.endsWith(".md"))) {
+      yield { ...f, kind: "markdown" };
+    }
+  }
+  // "pages/" is a prefix of nothing else here, but "src/pages/" must not be
+  // walked twice when both spellings resolve — track visited dirs.
+  const seenDirs = new Set();
+  for (const root of TEMPLATE_ROOTS) {
+    const dir = await statDir(root);
+    if (!dir || seenDirs.has(dir)) continue;
+    seenDirs.add(dir);
+    for await (const f of recurse(dir, (n) => TEMPLATE_EXT_RE.test(n))) {
+      yield { ...f, kind: "template" };
+    }
+  }
 }
 
 // Walk repoDir/content/, extract file URLs from each markdown file, return
@@ -129,14 +196,18 @@ export async function runGitRepoReferences({
     log(`[references] walking content/ markdown in ${cloneDir}`);
     const entries = await extractMarkdownEntries(cloneDir, frontendUrl);
     log(`[references] ${entries.length} markdown files; filtering URLs by fleet domain set`);
-    records = entries.map((e) => ({
-      siteName: siteConfig.name,
-      contentType: e.contentType,
-      entryId: e.entryId,
-      slug: e.slug,
-      pageUrl: e.pageUrl,
-      referencedFiles: e.referencedFiles.filter((u) => isFleetUrl(u, fleetDomainSet)),
-    }));
+    records = entries
+      .map((e) => ({
+        siteName: siteConfig.name,
+        contentType: e.contentType,
+        entryId: e.entryId,
+        slug: e.slug,
+        pageUrl: e.pageUrl,
+        referencedFiles: e.referencedFiles.filter((u) => isFleetUrl(u, fleetDomainSet)),
+      }))
+      // Template records exist only to carry refs; one whose links were all
+      // off-fleet (external PDFs) is dropped (see extractMarkdownEntries).
+      .filter((r) => r.contentType !== "template" || r.referencedFiles.length > 0);
   } finally {
     // Best-effort cleanup. If git left a partial clone we still want to
     // remove the tempdir to avoid leaking tmp space across runs.
@@ -156,9 +227,11 @@ export async function runGitRepoReferences({
 
 export async function extractMarkdownEntries(repoDir, siteFrontendUrl) {
   const out = [];
-  for await (const { abs, rel } of walkMarkdown(repoDir)) {
+  for await (const { abs, rel, kind } of walkContentFiles(repoDir)) {
     const body = await fs.readFile(abs, "utf8");
-    const rawUrls = extractFileUrls(body);
+    // v1.29.0 — baseUrl resolves root-relative links ("/files/x.pdf") against
+    // the deployed site, where public/ files are served from the root.
+    const rawUrls = extractFileUrls(body, { baseUrl: siteFrontendUrl });
     const seen = new Set();
     const refs = [];
     for (const u of rawUrls) {
@@ -167,6 +240,22 @@ export async function extractMarkdownEntries(repoDir, siteFrontendUrl) {
         seen.add(canonical);
         refs.push(canonical);
       }
+    }
+    if (kind === "template") {
+      // Templates exist here only to carry file references — every page
+      // also reaches the Page view via the sitemap, so a no-files template
+      // record would be pure noise (404.astro, search pages, …).
+      if (refs.length === 0) continue;
+      const pageUrl = deriveTemplateUrl(rel, siteFrontendUrl);
+      if (!pageUrl) continue; // dynamic [slug] templates have no concrete URL
+      out.push({
+        contentType: "template",
+        entryId: rel,
+        slug: rel,
+        pageUrl,
+        referencedFiles: refs,
+      });
+      continue;
     }
     out.push({
       contentType: "markdown",

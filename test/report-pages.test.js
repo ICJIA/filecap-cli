@@ -63,6 +63,18 @@ describe("buildPageList", () => {
     ]);
     expect(pages).toHaveLength(1);
   });
+
+  it("v1.29.0 — merges raw URL variants of the same page into one row", () => {
+    // Two files referenced from the same page, one ref recorded with a
+    // trailing slash and different case. Keying the inversion by raw URL
+    // split the page into two rows, each showing only half its files.
+    const pages = buildPageList([
+      fileEntry("a.pdf", [ref("https://x/About/")]),
+      fileEntry("b.pdf", [ref("https://x/about")]),
+    ]);
+    expect(pages).toHaveLength(1);
+    expect(pages[0].files.map((f) => f.path).sort()).toEqual(["a.pdf", "b.pdf"]);
+  });
 });
 
 describe("buildPageList — sitemap merge (1.14.0)", () => {

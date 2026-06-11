@@ -27,6 +27,10 @@ function normPageUrl(u) {
  * @returns {Array<{pageUrl,pageTitle,contentType,siteName,pageAudit,files,fromSitemap?,fromCms?}>}
  */
 export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
+  // v1.29.0 — key the inversion by the NORMALIZED URL (same rule as the
+  // sitemap/CMS merge below) so raw variants of one page ("/About/" vs
+  // "/about") fold into a single row instead of splitting its files across
+  // two. The first-seen raw URL stays as the display URL.
   const byUrl = new Map();
   const seenByUrl = new Map();
   for (const entry of entries ?? []) {
@@ -34,8 +38,9 @@ export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
     for (const ref of refs) {
       const pageUrl = ref?.pageUrl;
       if (!pageUrl) continue;
-      if (!byUrl.has(pageUrl)) {
-        byUrl.set(pageUrl, {
+      const key = normPageUrl(pageUrl);
+      if (!byUrl.has(key)) {
+        byUrl.set(key, {
           pageUrl,
           pageTitle: ref.pageAudit?.pageTitle ?? "",
           contentType: ref.contentType ?? "",
@@ -43,15 +48,15 @@ export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
           pageAudit: ref.pageAudit ?? null,
           files: [],
         });
-        seenByUrl.set(pageUrl, new Set());
+        seenByUrl.set(key, new Set());
       }
       // A file usually references a page once, but guard against a file
       // listed twice in one page's references producing a duplicate row.
       const fileKey = entry?.path ?? entry?.filename ?? "";
-      const seen = seenByUrl.get(pageUrl);
+      const seen = seenByUrl.get(key);
       if (seen.has(fileKey)) continue;
       seen.add(fileKey);
-      byUrl.get(pageUrl).files.push(entry);
+      byUrl.get(key).files.push(entry);
     }
   }
   const pages = [...byUrl.values()];

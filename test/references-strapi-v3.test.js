@@ -146,6 +146,58 @@ Questions posted [here](https://archive.icjia-api.cloud/files/icjia/gata/materia
       extractEntryUrls(entry, classified, "https://agency.icjia-api.cloud"),
     ).toEqual([]);
   });
+
+  // v1.29.0 — components. SPAC's publication PDFs live in
+  // mediaMaterial.file.url; meetings carry agenda/materials/minutes in
+  // meetingMaterial[].file[].url. Both shapes verified against the live
+  // spac.icjia-api.cloud API 2026-06-11.
+  it("collects files nested in a single component (SPAC publication shape)", () => {
+    const entry = {
+      id: 1,
+      slug: "projections-2019",
+      mediaMaterial: {
+        _id: "m1",
+        name: "2019 Projections",
+        file: {
+          name: "2019_Baseline_IDOC_Population_Projection_FINAL.pdf",
+          ext: ".pdf",
+          mime: "application/pdf",
+          url: "/uploads/2019_Baseline_IDOC_Population_Projection_FINAL-20191029T21514462.pdf",
+        },
+      },
+    };
+    const classified = [{ kind: "component", fieldName: "mediaMaterial" }];
+    expect(extractEntryUrls(entry, classified, "https://spac.icjia-api.cloud")).toEqual([
+      "https://spac.icjia-api.cloud/uploads/2019_Baseline_IDOC_Population_Projection_FINAL-20191029T21514462.pdf",
+    ]);
+  });
+
+  it("collects files from a repeatable component list (SPAC meeting shape)", () => {
+    const entry = {
+      id: 2,
+      slug: "sept-2017",
+      meetingMaterial: [
+        { name: "Agenda", file: [{ url: "/uploads/09 15 17 Agenda.pdf", ext: ".pdf" }] },
+        { name: "Minutes", file: [{ url: "/uploads/09 15 17 Minutes.pdf", ext: ".pdf" }] },
+      ],
+    };
+    const classified = [{ kind: "component-list", fieldName: "meetingMaterial" }];
+    expect(extractEntryUrls(entry, classified, "https://spac.icjia-api.cloud")).toEqual([
+      "https://spac.icjia-api.cloud/uploads/09%2015%2017%20Agenda.pdf",
+      "https://spac.icjia-api.cloud/uploads/09%2015%2017%20Minutes.pdf",
+    ]);
+  });
+
+  it("resolves root-relative links in body fields against restApiBase (v1.29.0)", () => {
+    const entry = {
+      id: 3,
+      body: "Download [the form](/uploads/intake_form.docx) before the meeting.",
+    };
+    const classified = [{ kind: "body-string", fieldName: "body" }];
+    expect(extractEntryUrls(entry, classified, "https://spac.icjia-api.cloud")).toEqual([
+      "https://spac.icjia-api.cloud/uploads/intake_form.docx",
+    ]);
+  });
 });
 
 // --- introspectContentTypes ---
@@ -273,6 +325,31 @@ describe("introspectTypeFields", () => {
       { kind: "body-string", fieldName: "body" },
       { kind: "url-string", fieldName: "fileURL" },
       { kind: "upload-file-list", fieldName: "attachments" },
+      { kind: "relation", fieldName: "tags" },
+    ]);
+  });
+
+  it("v1.29.0 — classifies Group*/Component* objects as components when contentTypeNames is passed", async () => {
+    // SPAC's real Publication type: mediaMaterial is GroupMediaMaterial
+    // (verified live 2026-06-11); tags stay a relation because Tag is a
+    // discovered content type.
+    const fetcher = async () => ({
+      data: {
+        __type: {
+          fields: [
+            { name: "mediaMaterial", type: { name: "GroupMediaMaterial", kind: "OBJECT", ofType: null } },
+            { name: "meetingMaterial", type: { name: null, kind: "LIST", ofType: { name: "GroupMeetingMaterial", kind: "OBJECT" } } },
+            { name: "tags", type: { name: null, kind: "LIST", ofType: { name: "Tag", kind: "OBJECT" } } },
+          ],
+        },
+      },
+    });
+    const fields = await introspectTypeFields("x", "Publication", fetcher, {
+      contentTypeNames: new Set(["Publication", "Tag", "Meeting"]),
+    });
+    expect(fields).toEqual([
+      { kind: "component", fieldName: "mediaMaterial" },
+      { kind: "component-list", fieldName: "meetingMaterial" },
       { kind: "relation", fieldName: "tags" },
     ]);
   });

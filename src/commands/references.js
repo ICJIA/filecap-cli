@@ -170,6 +170,14 @@ export async function runReferences({
 
   const sidecarRecords = [];
 
+  // v1.29.0 — the classifier needs the discovered content-type names to tell
+  // relations (skip — enumerated independently) from embedded components
+  // (walk — their files exist nowhere else). Pascal-case to match GraphQL
+  // type naming.
+  const contentTypeNames = new Set(
+    contentTypes.map(({ singular }) => singular.charAt(0).toUpperCase() + singular.slice(1)),
+  );
+
   for (const { singular, plural } of contentTypes) {
     const pascalCt = singular.charAt(0).toUpperCase() + singular.slice(1);
     let classifiedFields;
@@ -178,6 +186,7 @@ export async function runReferences({
         refsCfg.graphqlEndpoint,
         pascalCt,
         fetcher,
+        { contentTypeNames },
       );
     } catch (err) {
       log(`[references] WARN: failed to introspect ${pascalCt}: ${err.message}`);
@@ -190,9 +199,21 @@ export async function runReferences({
     const restPath = isV4
       ? plural
       : plural.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+    // v1.29.0 — v4's populate=* doesn't reach media INSIDE components; tell
+    // fetchAllEntries which fields need deep population. v3 embeds
+    // everything in the REST payload and ignores these options.
+    const componentFields = classifiedFields
+      .filter((f) => f.kind === "component" || f.kind === "component-list")
+      .map((f) => f.fieldName);
+    const mediaFields = classifiedFields
+      .filter((f) => f.kind === "upload-file" || f.kind === "upload-file-list")
+      .map((f) => f.fieldName);
     let entries;
     try {
-      entries = await adapter.fetchAllEntries(refsCfg.restApiBase, restPath, fetcher);
+      entries = await adapter.fetchAllEntries(refsCfg.restApiBase, restPath, fetcher, {
+        componentFields,
+        mediaFields,
+      });
     } catch (err) {
       log(`[references] WARN: failed to fetch ${restPath}: ${err.message}`);
       continue;

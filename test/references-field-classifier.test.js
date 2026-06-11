@@ -188,4 +188,78 @@ describe("classifyField", () => {
       expect(classifyField(undefined).kind).toBe("other");
     });
   });
+
+  // v1.29.0 — Strapi components (v3 "Group*", modern "Component*") embed
+  // their data INSIDE the parent entry; they are not enumerated as content
+  // types, so classifying them as relations silently dropped every file
+  // they carry (SPAC's publication PDFs and meeting agendas/minutes all
+  // live in components). With the discovered content-type names passed in,
+  // any non-content-type object is a component to walk; without them
+  // (legacy call shape) the old relation behavior is preserved.
+  describe("components vs relations (v1.29.0, with contentTypeNames)", () => {
+    const union = (name) => ({ name, kind: "UNION", ofType: null });
+    const opts = { contentTypeNames: new Set(["Publication", "Tag", "Meeting"]) };
+
+    it("classifies a known content-type OBJECT as relation", () => {
+      expect(classifyField(field("post", obj("Publication")), opts).kind).toBe("relation");
+      expect(classifyField(field("tags", list(obj("Tag"))), opts).kind).toBe("relation");
+    });
+
+    it("classifies a v3 Group* OBJECT as component", () => {
+      expect(classifyField(field("mediaMaterial", obj("GroupMediaMaterial")), opts)).toEqual({
+        kind: "component",
+        fieldName: "mediaMaterial",
+      });
+    });
+
+    it("classifies a LIST of v3 Group* as component-list", () => {
+      expect(
+        classifyField(field("meetingMaterial", list(obj("GroupMeetingMaterial"))), opts),
+      ).toEqual({ kind: "component-list", fieldName: "meetingMaterial" });
+    });
+
+    it("classifies a modern Component* OBJECT as component", () => {
+      expect(
+        classifyField(field("hero", obj("ComponentSharedMediaBlock")), opts).kind,
+      ).toBe("component");
+    });
+
+    it("classifies a dynamic-zone UNION as component-list", () => {
+      expect(
+        classifyField(field("zone", list(union("PageZoneDynamicZone"))), opts).kind,
+      ).toBe("component-list");
+      expect(classifyField(field("zone", union("PageZoneDynamicZone")), opts).kind).toBe(
+        "component",
+      );
+    });
+
+    it("still classifies v4 relation envelopes as relation", () => {
+      expect(
+        classifyField(field("author", obj("AuthorEntityResponse")), opts).kind,
+      ).toBe("relation");
+      expect(
+        classifyField(field("tags", obj("TagRelationResponseCollection")), opts).kind,
+      ).toBe("relation");
+    });
+
+    it("classifies system/admin objects as other, not component", () => {
+      expect(classifyField(field("created_by", obj("AdminUser")), opts).kind).toBe("other");
+      expect(
+        classifyField(field("role", obj("UsersPermissionsRole")), opts).kind,
+      ).toBe("other");
+    });
+
+    it("upload-file classification is unaffected by opts", () => {
+      expect(classifyField(field("splash", obj("UploadFile")), opts).kind).toBe("upload-file");
+      expect(
+        classifyField(field("files", list(obj("UploadFile"))), opts).kind,
+      ).toBe("upload-file-list");
+    });
+
+    it("without contentTypeNames, unknown OBJECTs stay relation (legacy shape)", () => {
+      expect(classifyField(field("mediaMaterial", obj("GroupMediaMaterial"))).kind).toBe(
+        "relation",
+      );
+    });
+  });
 });
