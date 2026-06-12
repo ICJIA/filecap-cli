@@ -1611,7 +1611,9 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
 
     const pages = wb.getWorksheet("Pages");
     const headerRow = pages.getRow(1).values.slice(1);
-    expect(headerRow).toEqual(["Page", "Content type", "Source", "Files", "File names", "File URLs"]);
+    // v1.31.0 — "Files listed elsewhere" counts a page's linked files that
+    // are listed under an earlier page (each file appears once per workbook).
+    expect(headerRow).toEqual(["Page", "Content type", "Source", "Files", "Files listed elsewhere", "File names", "File URLs"]);
 
     // Row 2: the file-linking page (sorted first).
     const aboutRow = pages.getRow(2);
@@ -1622,8 +1624,9 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
     expect(aboutRow.getCell(2).value).toBe("page");
     expect(aboutRow.getCell(3).value).toBe("links files");
     expect(aboutRow.getCell(4).value).toBe(1);
-    expect(aboutRow.getCell(5).value).toBe("doc.pdf");
-    expect(aboutRow.getCell(6).value).toBe("https://files.example.gov/uploads/doc.pdf");
+    expect(aboutRow.getCell(5).value).toBe(0);
+    expect(aboutRow.getCell(6).value).toBe("doc.pdf");
+    expect(aboutRow.getCell(7).value).toBe("https://files.example.gov/uploads/doc.pdf");
 
     // Row 3: the cms page with no files.
     const faqRow = pages.getRow(3);
@@ -1633,6 +1636,7 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
     });
     expect(faqRow.getCell(3).value).toBe("cms");
     expect(faqRow.getCell(4).value).toBe(0);
-    expect(faqRow.getCell(5).value).toBeNull();
+    expect(faqRow.getCell(5).value).toBe(0);
+    expect(faqRow.getCell(6).value).toBeNull();
   });
 });

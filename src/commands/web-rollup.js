@@ -1085,12 +1085,17 @@ export async function runWebRollup({
       : perSiteHeader;
     const pageRows = pageList
       .map((p) => {
+        // v1.31.0 — mirrors the HTML Page view: a file is listed once, under
+        // the first page that links it; repeat mentions on later pages roll
+        // up into "Files listed elsewhere" so no filename appears twice.
         const files = p.files ?? [];
+        const filesElsewhere = p.dupeFileCount ?? 0;
         return {
           pageUrl: p.pageUrl,
           contentType: p.contentType || "",
-          source: files.length > 0 ? "links files" : (p.fromSitemap ? "sitemap" : "cms"),
+          source: files.length > 0 || filesElsewhere > 0 ? "links files" : (p.fromSitemap ? "sitemap" : "cms"),
           fileCount: files.length,
+          filesElsewhere,
           fileNames: files.map((f) => f.filename ?? f.path ?? "").join("; "),
           fileUrls: files
             .map((f) => buildPublicUrl({ entry: f, sourceHeader: pagesHeader, sourceMap: null, isConsolidated: false }))
@@ -1107,6 +1112,7 @@ export async function runWebRollup({
           { key: "contentType", label: "Content type" },
           { key: "source", label: "Source" },
           { key: "fileCount", label: "Files", type: "number" },
+          { key: "filesElsewhere", label: "Files listed elsewhere", type: "number" },
           { key: "fileNames", label: "File names" },
           { key: "fileUrls", label: "File URLs" },
         ],

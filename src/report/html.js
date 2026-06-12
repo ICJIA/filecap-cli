@@ -249,8 +249,15 @@ function buildAuditScoreCell(audit) {
 
 function buildPageFilesCell(page, ctx) {
   const files = page.files ?? [];
+  // v1.31.0 — a file is listed once in the whole Page view, under the first
+  // page that links it (see buildPageList). Repeat mentions on later pages
+  // collapse into this muted count so the same filename never appears twice.
+  const dupes = page.dupeFileCount ?? 0;
+  const dupeNote = dupes > 0
+    ? `<span class="no-refs">${files.length > 0 ? "+" : ""}${dupes} ${dupes === 1 ? "file" : "files"} listed under other pages</span>`
+    : "";
   if (files.length === 0) {
-    return `<td data-count="0"><span class="no-refs">No files</span></td>`;
+    return `<td data-count="0">${dupeNote || `<span class="no-refs">No files</span>`}</td>`;
   }
   const chips = files
     .map((entry) => {
@@ -262,7 +269,7 @@ function buildPageFilesCell(page, ctx) {
         : `<span class="ref-link-bad">${name}</span>`;
     })
     .join(" ");
-  return `<td data-count="${files.length}"><span class="page-file-count">${files.length}</span> ${chips}</td>`;
+  return `<td data-count="${files.length}"><span class="page-file-count">${files.length}</span> ${chips}${dupeNote ? ` ${dupeNote}` : ""}</td>`;
 }
 
 function buildPageRow(page, ctx) {
@@ -295,7 +302,7 @@ function buildPageViewSection(pages, ctx) {
   const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
   return `<div id="page-view" hidden>
   <h2>Pages on this site</h2>
-  <p class="page-view-note">One row per page. <strong>Files</strong> are the documents the page links to. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively.</p>
+  <p class="page-view-note">One row per page. <strong>Files</strong> are the documents the page links to. Each file is listed once — under the first page that links it; a page whose other linked files already appear above shows them as a count ("listed under other pages") instead of repeating them. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively.</p>
   <nav class="paginator" aria-label="Page table pagination">
     <span class="pag-info" id="pv-page-info"></span>
     <span class="pag-controls">

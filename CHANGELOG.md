@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.31.0] — 2026-06-12
+
+### Changed
+
+- **Each file is listed once in the Page view (and the XLSX Pages tab) — duplicate mentions removed.** A file linked from several pages used to appear under every one of them, so the same filename showed up again and again — on the archive report one PDF appeared under **seven** publication pages, on the agency report the state-seal image under **eleven** — which read as duplication and over-counted remediation work. The page inversion (`buildPageList`) now lists a file only under the **first** page that links it; a later page shows a muted **"+N files listed under other pages"** note (or just that note when all of its files are listed earlier) instead of repeating the chips, and the Page-view legend explains the rule. The per-site workbook's **Pages** sheet mirrors this with a new **"Files listed elsewhere"** numeric column, and its Source column still says `links files` for pages whose every file is listed elsewhere. The file view is unchanged — each file's row still shows **all** pages that reference it, so no page→file association is lost. The inversion also now server-qualifies its dedup key, so identical paths on two different servers (consolidated by-type pages) can no longer collide.
+- *Underlying data note:* the repeated mentions were faithful to the live CMS — e.g. seven different archived ICJIA publications genuinely link the same `CAPS3.pdf` (a likely content-migration error on the live site, now easy to spot as a "+N listed under other pages" trail).
+
 ## [1.30.0] — 2026-06-12
 
 ### Added

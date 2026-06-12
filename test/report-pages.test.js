@@ -41,20 +41,54 @@ describe("buildPageList", () => {
     expect(page.pageAudit.grade).toBe("A");
   });
 
-  it("lists a file under every page that references it", () => {
+  it("v1.31.0 — lists a shared file only under the first page that references it", () => {
     const pages = buildPageList([
       fileEntry("shared.pdf", [ref("https://x/p1/"), ref("https://x/p2/")]),
     ]);
     expect(pages).toHaveLength(2);
-    expect(pages.every((p) => p.files.length === 1)).toBe(true);
+    const p1 = pages.find((p) => p.pageUrl === "https://x/p1/");
+    const p2 = pages.find((p) => p.pageUrl === "https://x/p2/");
+    expect(p1.files.map((f) => f.path)).toEqual(["shared.pdf"]);
+    expect(p1.dupeFileCount).toBe(0);
+    expect(p2.files).toEqual([]);
+    expect(p2.dupeFileCount).toBe(1);
   });
 
-  it("de-duplicates a file repeated in one page's references", () => {
+  it("de-duplicates a file repeated in one page's references without counting it as elsewhere", () => {
     const pages = buildPageList([
       fileEntry("a.pdf", [ref("https://x/p/"), ref("https://x/p/")]),
     ]);
     expect(pages).toHaveLength(1);
     expect(pages[0].files).toHaveLength(1);
+    expect(pages[0].dupeFileCount).toBe(0);
+  });
+
+  it("counts a repeat mention once per later page, even when that ref repeats", () => {
+    const pages = buildPageList([
+      fileEntry("a.pdf", [ref("https://x/p1/"), ref("https://x/p2/"), ref("https://x/p2/")]),
+    ]);
+    const p2 = pages.find((p) => p.pageUrl === "https://x/p2/");
+    expect(p2.files).toEqual([]);
+    expect(p2.dupeFileCount).toBe(1);
+  });
+
+  it("keeps same-path files from different servers distinct (consolidated inventories)", () => {
+    const pages = buildPageList([
+      { ...fileEntry("docs/a.pdf", [ref("https://x/p/")]), serverName: "server-1" },
+      { ...fileEntry("docs/a.pdf", [ref("https://x/p/")]), serverName: "server-2" },
+    ]);
+    expect(pages).toHaveLength(1);
+    expect(pages[0].files).toHaveLength(2);
+    expect(pages[0].dupeFileCount).toBe(0);
+  });
+
+  it("thin cms/sitemap rows carry dupeFileCount 0", () => {
+    const pages = buildPageList(
+      [fileEntry("a.pdf", [ref("https://x/p/")])],
+      ["https://x/from-sitemap/"],
+      [{ pageUrl: "https://x/from-cms/", contentType: "post" }],
+    );
+    for (const p of pages) expect(p.dupeFileCount).toBe(0);
   });
 
   it("skips references with no pageUrl", () => {

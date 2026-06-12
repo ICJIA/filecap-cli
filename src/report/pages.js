@@ -24,17 +24,31 @@ function normPageUrl(u) {
  *        entry's page (from the references sidecar). Pages not surfaced by the
  *        inversion are appended as thin rows — cmsPages → fromCms (carry the
  *        content type), sitemap URLs → fromSitemap — URL-only, no audit/files.
- * @returns {Array<{pageUrl,pageTitle,contentType,siteName,pageAudit,files,fromSitemap?,fromCms?}>}
+ * @returns {Array<{pageUrl,pageTitle,contentType,siteName,pageAudit,files,dupeFileCount,fromSitemap?,fromCms?}>}
+ *          files holds only the files FIRST listed under that page;
+ *          dupeFileCount counts the page's additional linked files already
+ *          listed under earlier pages.
  */
 export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
   // v1.29.0 — key the inversion by the NORMALIZED URL (same rule as the
   // sitemap/CMS merge below) so raw variants of one page ("/About/" vs
   // "/about") fold into a single row instead of splitting its files across
   // two. The first-seen raw URL stays as the display URL.
+  //
+  // v1.31.0 — each file is listed ONCE in the whole page list, under the
+  // first page that references it. A page whose reference would repeat a
+  // file already listed under an earlier page counts it in dupeFileCount
+  // instead. (Before: a file linked from seven pages produced seven
+  // identical-looking mentions, which read as duplication and over-counted
+  // remediation work. The file view still shows every referencing page.)
   const byUrl = new Map();
-  const seenByUrl = new Map();
+  // fileKey -> set of page keys that mentioned it. Server-qualified so the
+  // same path on two servers (consolidated by-type inventories) does not
+  // collide.
+  const pagesByFile = new Map();
   for (const entry of entries ?? []) {
     const refs = Array.isArray(entry?.references) ? entry.references : [];
+    const fileKey = `${entry?.serverName ?? ""}:${entry?.path ?? entry?.filename ?? ""}`;
     for (const ref of refs) {
       const pageUrl = ref?.pageUrl;
       if (!pageUrl) continue;
@@ -47,16 +61,17 @@ export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
           siteName: ref.siteName ?? "",
           pageAudit: ref.pageAudit ?? null,
           files: [],
+          dupeFileCount: 0,
         });
-        seenByUrl.set(key, new Set());
       }
-      // A file usually references a page once, but guard against a file
-      // listed twice in one page's references producing a duplicate row.
-      const fileKey = entry?.path ?? entry?.filename ?? "";
-      const seen = seenByUrl.get(key);
-      if (seen.has(fileKey)) continue;
-      seen.add(fileKey);
-      byUrl.get(key).files.push(entry);
+      if (!pagesByFile.has(fileKey)) pagesByFile.set(fileKey, new Set());
+      const mentionedOn = pagesByFile.get(fileKey);
+      // The same file repeated in one page's references is pure noise — drop.
+      if (mentionedOn.has(key)) continue;
+      mentionedOn.add(key);
+      const page = byUrl.get(key);
+      if (mentionedOn.size === 1) page.files.push(entry);
+      else page.dupeFileCount += 1;
     }
   }
   const pages = [...byUrl.values()];
@@ -76,6 +91,7 @@ export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
       siteName: "",
       pageAudit: null,
       files: [],
+      dupeFileCount: 0,
       fromCms: true,
     });
   }
@@ -90,6 +106,7 @@ export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
       siteName: "",
       pageAudit: null,
       files: [],
+      dupeFileCount: 0,
       fromSitemap: true,
     });
   }
