@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.31.1] — 2026-06-12
+
+### Changed
+
+- **SPAC removed from the audited fleet.** The `spac-prod` entry was dropped from the operator's `sites.json` roster (config, not code — backed up alongside the config for easy restoration), so the deployed bundle no longer contains its landing-page card, `/sites` roster card, per-site detail report, per-site workbook, og card image, or any of its rows on the by-type / orphaned-files / file-errors pages and in the fleet workbook. The one SPAC mention baked into code — the `/accessibility` log's 2026-05-20 browser-test entry ("live fleet index + SPAC per-site report") — is genericized to "a per-site report"; the archived research brief whose *filename* happens to contain "SPAC" is archive-server content and intentionally stays. Fleet totals now cover 12 bundled sites.
+
 ## [1.31.0] — 2026-06-12
 
 ### Changed

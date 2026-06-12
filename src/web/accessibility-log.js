@@ -89,7 +89,7 @@ export const accessibilityLog = [
     date: "2026-05-20",
     source: "browser",
     tool: "axe DevTools extension (advanced ruleset)",
-    scope: "live fleet index + SPAC per-site report",
+    scope: "live fleet index + a per-site report",
     viewport: "desktop",
     status: "fixed",
     result: "28 serious on the index + 1 on a per-site report (text-contrast, heading-markup). Fixed in v1.15.2.",
