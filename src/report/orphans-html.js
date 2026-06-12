@@ -4,6 +4,7 @@
 // (counts, confidence distribution) → sortable table of orphan rows.
 
 import { humanizeBytes } from "./format.js";
+import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
 
 function htmlEscape(s) {
   if (s === null || s === undefined) return "";
@@ -264,7 +265,8 @@ const EXPLAINER = `
 `;
 
 const STYLES = `
-  body { font-family: -apple-system, system-ui, sans-serif; max-width: 1280px; margin: 0 auto; padding: 24px; color: #222; background: #f7f7f7; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; color: #222; background: #f7f7f7; }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 24px 0; width: 100%; }
   h1 { margin-top: 0; }
   .explainer { background: #fff; padding: 20px 28px; border-radius: 10px; border: 1px solid #e4e4e4; margin-bottom: 24px; }
   .explainer h2 { margin-top: 0; }
@@ -458,9 +460,10 @@ export function writeOrphansHtml({
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Orphaned files report (${totalCount})</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
-  <style>${STYLES}</style>
+  <style>${STYLES}${siteFooterCss({ theme: "light" })}</style>
 </head>
 <body>
 <main>
@@ -507,6 +510,7 @@ export function writeOrphansHtml({
     </tbody>
   </table>
 </main>
+${renderSiteFooter()}
   <script>${TABLE_SCRIPT}</script>
 </body>
 </html>

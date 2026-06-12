@@ -10,7 +10,7 @@
 
 /** Current verified accessibility standing — shown in the page's status panel. */
 export const currentStatus = {
-  asOf: "2026-06-07",
+  asOf: "2026-06-12",
   lighthouse: 100,
   axeCore: "0 violations (WCAG A + AA)",
   axeDevTools: "0 serious — pending live re-verification",
@@ -32,6 +32,17 @@ export const currentStatus = {
  *   notes    optional, e.g. the version it shipped in
  */
 export const accessibilityLog = [
+  {
+    date: "2026-06-12",
+    source: "backend",
+    tool: "axecap (axe-core 4.11) + lightcap (Lighthouse)",
+    scope: "shared sticky footer rollout — fleet index, /sites, /accessibility, per-site detail (DVFR), by-type (PDFs), orphaned-files, file-errors pages",
+    viewport: "desktop + mobile",
+    status: "pass",
+    result:
+      "Every bundle page now ends in the same sticky bottom bar (contentinfo landmark, underlined links, dark + light palettes), pinned to the viewport so long detail grids never read as cut off. Re-checked all seven affected page templates: 0 axe-core violations (desktop, plus mobile on the index and a per-site report); Lighthouse accessibility 100 on the index (desktop + mobile) and the per-site report.",
+    notes: "v1.30.0",
+  },
   {
     date: "2026-06-07",
     source: "backend",

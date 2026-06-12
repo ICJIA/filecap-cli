@@ -1199,21 +1199,9 @@ main {
 }
 
 /* ── footer ─────────────────────────────────────────────────── */
-.site-footer {
-  border-top: 1px solid #21262d;
-  padding: 1.5rem 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  font-size: 0.8rem;
-  color: #9aa5b1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.site-footer a { color: #60a5fa; }
-.site-footer a:hover { color: #93c5fd; }
+/* v1.30.0 — footer rules moved to site-footer.js (siteFooterCss), the shared
+   sticky bottom bar used by every bundle page. Pages append that CSS after
+   this stylesheet. */
 
 /* ── print ───────────────────────────────────────────────────── */
 @media print {
@@ -1253,7 +1241,6 @@ main {
   .site-card .donut-caption span { color: #555; }
   .site-card .chip { background: #f0f0f0; color: #000; }
   .site-card .scan-meta { color: #555; }
-  .site-footer { color: #555; border-color: #ccc; }
   .site-card .actions { display: none; }
   .site-card { page-break-inside: avoid; }
   details.tech-details { display: none; }
