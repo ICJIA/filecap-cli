@@ -265,6 +265,10 @@ function buildPageFilesCell(page, ctx) {
         .map((f) => {
           const name = htmlEscape(f.filename ?? "");
           const label = htmlEscape(f.siteLabel ?? "");
+          // detailHref is a pipeline-generated slug-timestamp.html path (no
+          // scheme), so htmlEscape is sufficient — do NOT switch to safeUrl
+          // (which is for scanned public URLs): safeUrl would reject this
+          // relative path and null out the in-bundle link.
           const chip = f.detailHref
             ? `<a class="ref-link" href="${htmlEscape(f.detailHref)}" title="On ${label}">${name}</a>`
             : `<span class="ref-link-bad">${name}</span>`;
