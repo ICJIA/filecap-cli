@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.32.0] — 2026-06-16
+
+### Added
+
+- **Per-site Page view now surfaces CMS-hosted (cross-site) files.** When a page links a document served from another fleet site (for example the shared Strapi CMS at `agency.icjia-api.cloud/uploads`), that file now appears on the referring page's row in a muted "hosted on another site" group, linking to the owning site's report. Previously a git-repo site's Page view showed only files in its own repo, so CMS-hosted links (such as the Safe From the Start `/research` Evaluation Protocol DOCX) were invisible even though the association was already captured fleet-wide. The per-page **Files** count is unchanged (still local-inventory only); cross-site files are a separate group.
+- XLSX per-site **Pages** tab gains a **"Files on other sites"** column mirroring the HTML group.
+
+### Notes
+
+- Rebuild-only change: ships via `node bin/filecap.js web-rollup` (no re-scan). Fleet file/page totals are unaffected.
+
 ## [1.31.1] — 2026-06-12
 
 ### Changed
