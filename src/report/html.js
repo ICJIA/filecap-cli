@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import { CSV_COLUMNS, formatPageCount } from "./csv.js";
 import { buildPageList, attachCrossSiteFiles } from "./pages.js";
 import { humanizeBytes } from "./format.js";
-import { FILECAP_VERSION } from "../version.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
