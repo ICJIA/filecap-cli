@@ -149,13 +149,16 @@ export function parseCmsPageList(ndjson) {
  * that page links (each record's `referencedFiles`), merged across every record
  * that resolves to the same page (a page often has both a markdown and a
  * template record). Order-preserving, de-duplicated per page. Unlike
- * parseCmsPageList, this keeps the file URLs. Malformed lines are skipped.
+ * parseCmsPageList — which keeps only the first record per page — this MERGES
+ * the referenced files from every record for a page. Malformed lines skipped.
  *
  * @param {string} ndjson
  * @returns {Map<string, string[]>}
  */
 export function parsePageRefFiles(ndjson) {
   const out = new Map();
+  // key → Set<fileUrl>, for O(1) dedupe (mirrors buildPageList's Set usage).
+  const seenByPage = new Map();
   if (typeof ndjson !== "string" || ndjson.trim() === "") return out;
   for (const line of ndjson.split("\n")) {
     const trimmed = line.trim();
@@ -175,9 +178,14 @@ export function parsePageRefFiles(ndjson) {
     if (!bucket) {
       bucket = [];
       out.set(key, bucket);
+      seenByPage.set(key, new Set());
     }
+    const seen = seenByPage.get(key);
     for (const f of files) {
-      if (typeof f === "string" && f !== "" && !bucket.includes(f)) bucket.push(f);
+      if (typeof f === "string" && f !== "" && !seen.has(f)) {
+        seen.add(f);
+        bucket.push(f);
+      }
     }
   }
   return out;

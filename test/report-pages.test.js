@@ -202,6 +202,7 @@ describe("parsePageRefFiles", () => {
   it("returns an empty map for empty / non-string input", () => {
     expect(parsePageRefFiles("").size).toBe(0);
     expect(parsePageRefFiles(undefined).size).toBe(0);
+    expect(parsePageRefFiles(null).size).toBe(0);
   });
 
   it("maps normalized page URL → its referenced file URLs", () => {
