@@ -143,3 +143,42 @@ export function parseCmsPageList(ndjson) {
   }
   return out;
 }
+
+/**
+ * Parse a references sidecar into a map of normalized page URL → the file URLs
+ * that page links (each record's `referencedFiles`), merged across every record
+ * that resolves to the same page (a page often has both a markdown and a
+ * template record). Order-preserving, de-duplicated per page. Unlike
+ * parseCmsPageList, this keeps the file URLs. Malformed lines are skipped.
+ *
+ * @param {string} ndjson
+ * @returns {Map<string, string[]>}
+ */
+export function parsePageRefFiles(ndjson) {
+  const out = new Map();
+  if (typeof ndjson !== "string" || ndjson.trim() === "") return out;
+  for (const line of ndjson.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let rec;
+    try {
+      rec = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    const pageUrl = rec?.pageUrl;
+    if (typeof pageUrl !== "string" || pageUrl === "") continue;
+    const files = Array.isArray(rec?.referencedFiles) ? rec.referencedFiles : [];
+    if (files.length === 0) continue;
+    const key = normPageUrl(pageUrl);
+    let bucket = out.get(key);
+    if (!bucket) {
+      bucket = [];
+      out.set(key, bucket);
+    }
+    for (const f of files) {
+      if (typeof f === "string" && f !== "" && !bucket.includes(f)) bucket.push(f);
+    }
+  }
+  return out;
+}

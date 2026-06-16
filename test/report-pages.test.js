@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPageList, parseCmsPageList } from "../src/report/pages.js";
+import { buildPageList, parseCmsPageList, parsePageRefFiles } from "../src/report/pages.js";
 
 function fileEntry(p, references) {
   return { path: p, filename: p.split("/").pop(), category: "pdf", references };
@@ -195,5 +195,40 @@ describe("buildPageList — CMS page merge (1.14.x)", () => {
     expect(pages).toHaveLength(2);
     expect(pages.find((p) => p.pageUrl === "https://x/derived/").fromCms).toBeUndefined();
     expect(pages.find((p) => p.pageUrl === "https://x/cms-only/").fromCms).toBe(true);
+  });
+});
+
+describe("parsePageRefFiles", () => {
+  it("returns an empty map for empty / non-string input", () => {
+    expect(parsePageRefFiles("").size).toBe(0);
+    expect(parsePageRefFiles(undefined).size).toBe(0);
+  });
+
+  it("maps normalized page URL → its referenced file URLs", () => {
+    const ndjson = [
+      JSON.stringify({ pageUrl: "https://x/research", referencedFiles: ["https://cms/a.docx", "https://x/b.pdf"] }),
+    ].join("\n");
+    const m = parsePageRefFiles(ndjson);
+    expect(m.get("https://x/research")).toEqual(["https://cms/a.docx", "https://x/b.pdf"]);
+  });
+
+  it("merges + dedupes files across records that share a normalized page URL", () => {
+    const ndjson = [
+      JSON.stringify({ pageUrl: "https://x/Research/", referencedFiles: ["https://cms/a.docx"] }),
+      JSON.stringify({ pageUrl: "https://x/research", referencedFiles: ["https://cms/a.docx", "https://x/b.pdf"] }),
+    ].join("\n");
+    const m = parsePageRefFiles(ndjson);
+    expect(m.get("https://x/research")).toEqual(["https://cms/a.docx", "https://x/b.pdf"]);
+  });
+
+  it("skips records with no pageUrl, no files, or malformed JSON", () => {
+    const ndjson = [
+      "{not json",
+      JSON.stringify({ pageUrl: "", referencedFiles: ["https://cms/a.docx"] }),
+      JSON.stringify({ pageUrl: "https://x/p", referencedFiles: [] }),
+      JSON.stringify({ pageUrl: "https://x/q" }),
+    ].join("\n");
+    const m = parsePageRefFiles(ndjson);
+    expect(m.size).toBe(0);
   });
 });
