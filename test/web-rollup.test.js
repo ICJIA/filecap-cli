@@ -1615,7 +1615,7 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
     const headerRow = pages.getRow(1).values.slice(1);
     // v1.31.0 — "Files listed elsewhere" counts a page's linked files that
     // are listed under an earlier page (each file appears once per workbook).
-    expect(headerRow).toEqual(["Page", "Content type", "Source", "Files", "Files listed elsewhere", "File names", "File URLs"]);
+    expect(headerRow).toEqual(["Page", "Content type", "Source", "Files", "Files listed elsewhere", "File names", "File URLs", "Files on other sites"]);
 
     // Row 2: the file-linking page (sorted first).
     const aboutRow = pages.getRow(2);

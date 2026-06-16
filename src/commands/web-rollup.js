@@ -10,7 +10,7 @@ import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows, writeXlsxRowsMultiSheet } from "../report/xlsx.js";
 import { writeHtml } from "../report/html.js";
-import { parseCmsPageList, buildPageList, parsePageRefFiles } from "../report/pages.js";
+import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles } from "../report/pages.js";
 import { buildAliasMap, canonicalizeForFleet, entryCanonicalUrl } from "../references/cross-resolver.js";
 import { buildPublicUrl } from "../report/csv.js";
 import { classifyOrphans } from "../report/orphans.js";
@@ -1156,6 +1156,11 @@ export async function runWebRollup({
     // row per page with the files it links (file-linking pages first), then
     // cms/sitemap pages that link nothing. Same inputs as the HTML report.
     const pageList = buildPageList(perSiteEntries, sitemapUrls, cmsPages);
+    attachCrossSiteFiles(pageList, {
+      pageRefFiles,
+      resolveFleetFile,
+      currentSiteName: perSiteHeader.metadata?.serverName ?? siteKey,
+    });
     // pathPrefix mirrors what runReport injects into the header for URL
     // building (git sites deployed under a sub-path).
     const pagesHeader = site.pathPrefix
@@ -1166,18 +1171,25 @@ export async function runWebRollup({
         // v1.31.0 — mirrors the HTML Page view: a file is listed once, under
         // the first page that links it; repeat mentions on later pages roll
         // up into "Files listed elsewhere" so no filename appears twice.
+        // v1.32.0 — crossSite = CMS-hosted files the page links, owned by
+        // another fleet site.
         const files = p.files ?? [];
         const filesElsewhere = p.dupeFileCount ?? 0;
+        const crossSite = p.crossSiteFiles ?? [];
+        const linksSomething = files.length > 0 || filesElsewhere > 0 || crossSite.length > 0;
         return {
           pageUrl: p.pageUrl,
           contentType: p.contentType || "",
-          source: files.length > 0 || filesElsewhere > 0 ? "links files" : (p.fromSitemap ? "sitemap" : "cms"),
+          source: linksSomething ? "links files" : (p.fromSitemap ? "sitemap" : "cms"),
           fileCount: files.length,
           filesElsewhere,
           fileNames: files.map((f) => f.filename ?? f.path ?? "").join("; "),
           fileUrls: files
             .map((f) => buildPublicUrl({ entry: f, sourceHeader: pagesHeader, sourceMap: null, isConsolidated: false }))
             .filter(Boolean)
+            .join("; "),
+          crossSiteFiles: crossSite
+            .map((f) => (f.siteLabel ? `${f.filename} (${f.siteLabel})` : f.filename))
             .join("; "),
         };
       })
@@ -1193,6 +1205,7 @@ export async function runWebRollup({
           { key: "filesElsewhere", label: "Files listed elsewhere", type: "number" },
           { key: "fileNames", label: "File names" },
           { key: "fileUrls", label: "File URLs" },
+          { key: "crossSiteFiles", label: "Files on other sites" },
         ],
         rows: pageRows,
       });
