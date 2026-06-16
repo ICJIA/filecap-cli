@@ -1672,3 +1672,74 @@ describe("buildFleetFileIndex", () => {
     });
   });
 });
+
+describe("cross-site (CMS-hosted) files in the Page view (v1.32.0)", () => {
+  async function writeRichInventory(filePath, { serverName, scannedAt, publicUrlBase, entries }) {
+    const lines = [JSON.stringify({
+      schemaVersion: 1, kind: "filecap-inventory-header",
+      metadata: { serverName, scannedAt, publicUrlBase, siteName: serverName },
+    })];
+    for (const e of entries) lines.push(JSON.stringify(e));
+    lines.push(JSON.stringify({ kind: "filecap-inventory-footer", entryCount: entries.length }));
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, lines.join("\n") + "\n", "utf8");
+  }
+
+  it("surfaces a CMS-hosted file on the referring site's page, linked to the owner", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    const ts = "2026-06-12T20:14:54.000Z";
+
+    // agency inventory owns the DOCX (CMS host).
+    await writeRichInventory(path.join(auditsBase, "agency", "latest", "inventory.cross-ref.ndjson"), {
+      serverName: "agency", scannedAt: ts, publicUrlBase: "https://agency.cms/uploads",
+      entries: [{ path: "proto_abc.docx", filename: "proto_abc.docx", category: "office-document", remediable: true, references: [] }],
+    });
+
+    // sfs inventory: a PDF (local) whose page also links the agency DOCX.
+    await writeRichInventory(path.join(auditsBase, "sfs", "latest", "inventory.cross-ref.ndjson"), {
+      serverName: "sfs", scannedAt: ts, publicUrlBase: "https://sfs.gov",
+      entries: [{
+        path: "q.pdf", filename: "q.pdf", category: "pdf", remediable: true,
+        references: [{ siteName: "sfs", contentType: "template", entryId: "p", pageUrl: "https://sfs.gov/research" }],
+      }],
+    });
+    // sfs sidecar: /research links both the local PDF and the agency DOCX.
+    await fs.writeFile(
+      path.join(auditsBase, "sfs", "latest", "references-sidecar.ndjson"),
+      JSON.stringify({
+        siteName: "sfs", contentType: "template", entryId: "p", pageUrl: "https://sfs.gov/research",
+        referencedFiles: ["https://sfs.gov/q.pdf", "https://agency.cms/uploads/proto_abc.docx"],
+      }) + "\n",
+      "utf8",
+    );
+
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await writeSitesJson(sitesFile, [
+      { name: "sfs", siteName: "SFS", publicUrlBase: "https://sfs.gov", siteUrl: "https://sfs.gov/" },
+      { name: "agency", siteName: "ICJIA agency", publicUrlBase: "https://agency.cms/uploads" },
+    ]);
+    const outputDir = path.join(tmpDir, "output");
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, password: null });
+    expect(result.exitCode).toBe(0);
+
+    // SFS HTML shows the cross-site group with the DOCX, linked to the agency page.
+    const sfsHtml = await fs.readFile(path.join(outputDir, `sfs-20260612-201454Z.html`), "utf8");
+    expect(sfsHtml).toContain("hosted on another site");
+    expect(sfsHtml).toContain("proto_abc.docx");
+    expect(sfsHtml).toContain(`href="icjia-agency-20260612-201454Z.html"`);
+
+    // SFS XLSX Pages tab has the new column populated for /research.
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(path.join(outputDir, `sfs-20260612-201454Z.xlsx`));
+    const pagesSheet = wb.getWorksheet("Pages");
+    expect(pagesSheet).toBeTruthy();
+    const headerRow = pagesSheet.getRow(1).values.map((v) => (v && v.text) ? v.text : v);
+    expect(headerRow).toContain("Files on other sites");
+    let found = false;
+    pagesSheet.eachRow((row) => {
+      const cells = row.values.map((v) => (v && v.text) ? v.text : v);
+      if (cells.some((c) => typeof c === "string" && c.includes("proto_abc.docx") && c.includes("ICJIA agency"))) found = true;
+    });
+    expect(found).toBe(true);
+  });
+});
