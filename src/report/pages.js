@@ -14,6 +14,23 @@ function normPageUrl(u) {
   return String(u ?? "").trim().replace(/\/+$/, "").toLowerCase();
 }
 
+function basenameFromUrl(u) {
+  try {
+    const p = new URL(u).pathname;
+    return decodeURIComponent(p.split("/").filter(Boolean).pop() ?? "") || String(u);
+  } catch {
+    return String(u ?? "");
+  }
+}
+
+function hostFromUrl(u) {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Invert file entries into a list of pages, then merge in CMS-only and
  * sitemap-only URLs so the result is a complete list of the site's pages.
@@ -109,6 +126,52 @@ export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
       dupeFileCount: 0,
       fromSitemap: true,
     });
+  }
+  return pages;
+}
+
+/**
+ * Decorate each page row with the files it links that live in ANOTHER fleet
+ * site's inventory (e.g. CMS/Strapi-hosted uploads). buildPageList attaches
+ * only files from THIS site's inventory; the references sidecar records every
+ * file a page links (including cross-site ones), so this fills in the rest.
+ *
+ * Each page gets `crossSiteFiles = [{ filename, siteLabel, detailHref|null }]`.
+ * Files owned by `currentSiteName` are skipped (already shown as local files /
+ * local dupes on the row). URLs that resolve to no fleet site fall back to
+ * host-only text with no link. No cross-site dedup across pages — a file shows
+ * on every page that links it.
+ *
+ * @param {Array} pages - output of buildPageList (mutated in place + returned)
+ * @param {object} [opts]
+ * @param {Map<string,string[]>} [opts.pageRefFiles] - normPageUrl → linked file URLs
+ * @param {(fileUrl:string)=>({siteName:string,siteLabel:string,filename:string,detailHref:string|null}|null)} [opts.resolveFleetFile]
+ * @param {string} [opts.currentSiteName]
+ * @returns {Array} the same pages
+ */
+export function attachCrossSiteFiles(pages, { pageRefFiles, resolveFleetFile, currentSiteName } = {}) {
+  const refs = pageRefFiles instanceof Map ? pageRefFiles : new Map();
+  const resolve = typeof resolveFleetFile === "function" ? resolveFleetFile : () => null;
+  for (const page of pages ?? []) {
+    page.crossSiteFiles = [];
+    const urls = refs.get(normPageUrl(page.pageUrl)) ?? [];
+    const seen = new Set();
+    for (const url of urls) {
+      const owner = resolve(url);
+      // Owned by this site → already shown as a local file/dupe on this row.
+      if (owner && owner.siteName === currentSiteName) continue;
+      const item = owner
+        ? {
+            filename: owner.filename || basenameFromUrl(url),
+            siteLabel: owner.siteLabel || hostFromUrl(url),
+            detailHref: owner.detailHref ?? null,
+          }
+        : { filename: basenameFromUrl(url), siteLabel: hostFromUrl(url), detailHref: null };
+      const dedupeKey = `${item.siteLabel}:${item.filename}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      page.crossSiteFiles.push(item);
+    }
   }
   return pages;
 }

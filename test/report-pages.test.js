@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPageList, parseCmsPageList, parsePageRefFiles } from "../src/report/pages.js";
+import { buildPageList, parseCmsPageList, parsePageRefFiles, attachCrossSiteFiles } from "../src/report/pages.js";
 
 function fileEntry(p, references) {
   return { path: p, filename: p.split("/").pop(), category: "pdf", references };
@@ -231,5 +231,46 @@ describe("parsePageRefFiles", () => {
     ].join("\n");
     const m = parsePageRefFiles(ndjson);
     expect(m.size).toBe(0);
+  });
+});
+
+describe("attachCrossSiteFiles", () => {
+  // resolver: maps known URLs to a fleet owner; null otherwise.
+  const resolveFleetFile = (url) => {
+    if (url === "https://sfs.icjia.illinois.gov/q.pdf")
+      return { siteName: "sfs-git", siteLabel: "SFS", filename: "q.pdf", detailHref: "sfs-1.html" };
+    if (url === "https://agency.cms/uploads/proto_abc.docx")
+      return { siteName: "agency", siteLabel: "ICJIA agency", filename: "proto_abc.docx", detailHref: "icjia-1.html" };
+    return null;
+  };
+
+  it("adds cross-site files, skips files owned by the current site", () => {
+    const pages = [{ pageUrl: "https://sfs.icjia.illinois.gov/research", files: [] }];
+    const pageRefFiles = new Map([[
+      "https://sfs.icjia.illinois.gov/research",
+      ["https://sfs.icjia.illinois.gov/q.pdf", "https://agency.cms/uploads/proto_abc.docx"],
+    ]]);
+    attachCrossSiteFiles(pages, { pageRefFiles, resolveFleetFile, currentSiteName: "sfs-git" });
+    expect(pages[0].crossSiteFiles).toEqual([
+      { filename: "proto_abc.docx", siteLabel: "ICJIA agency", detailHref: "icjia-1.html" },
+    ]);
+  });
+
+  it("falls back to host-only (no link) for URLs inventoried nowhere", () => {
+    const pages = [{ pageUrl: "https://x/p", files: [] }];
+    const pageRefFiles = new Map([["https://x/p", ["https://other.gov/files/report.pdf"]]]);
+    attachCrossSiteFiles(pages, { pageRefFiles, resolveFleetFile, currentSiteName: "x" });
+    expect(pages[0].crossSiteFiles).toEqual([
+      { filename: "report.pdf", siteLabel: "other.gov", detailHref: null },
+    ]);
+  });
+
+  it("sets an empty array on pages with no linked files and is a no-op without inputs", () => {
+    const pages = [{ pageUrl: "https://x/p", files: [] }];
+    attachCrossSiteFiles(pages, { pageRefFiles: new Map(), resolveFleetFile, currentSiteName: "x" });
+    expect(pages[0].crossSiteFiles).toEqual([]);
+    const pages2 = [{ pageUrl: "https://x/p", files: [] }];
+    attachCrossSiteFiles(pages2);
+    expect(pages2[0].crossSiteFiles).toEqual([]);
   });
 });
