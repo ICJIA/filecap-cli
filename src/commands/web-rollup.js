@@ -10,7 +10,8 @@ import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows, writeXlsxRowsMultiSheet } from "../report/xlsx.js";
 import { writeHtml } from "../report/html.js";
-import { parseCmsPageList, buildPageList } from "../report/pages.js";
+import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles } from "../report/pages.js";
+import { buildAliasMap, canonicalizeForFleet, entryCanonicalUrl } from "../references/cross-resolver.js";
 import { buildPublicUrl } from "../report/csv.js";
 import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
@@ -407,6 +408,66 @@ async function readInventoryNdjson(filePath) {
     entries.push(obj);
   }
   return { siteHeader, entries };
+}
+
+/**
+ * Resolve the most-augmented inventory for a site, newest pipeline step first:
+ * audited → cross-ref → raw. Returns a path even if none exist (the raw path),
+ * so callers stat/try-read and skip on failure.
+ */
+function latestInventoryPath(auditsBase, siteKey) {
+  const dir = path.join(auditsBase, siteKey, "latest");
+  const audited = path.join(dir, "inventory.audited.ndjson");
+  const crossRef = path.join(dir, "inventory.cross-ref.ndjson");
+  if (existsSync(audited)) return audited;
+  if (existsSync(crossRef)) return crossRef;
+  return path.join(dir, "inventory.ndjson");
+}
+
+/**
+ * Pre-pass over every site's latest inventory → a fleet-wide map of canonical
+ * file URL → owning site, so the per-site Page view can resolve a cross-site
+ * (CMS-hosted) file link to the site that actually inventories it. Keyed by the
+ * SAME canonical form the cross-ref step uses (entryCanonicalUrl + alias
+ * collapse) so sidecar referencedFiles join cleanly. First-seen wins on
+ * collision (cross-server duplicates).
+ *
+ * @param {Array} sites - sites.json sites[] (use the FULL roster, not a filter)
+ * @param {string} auditsBase
+ * @param {Map<string,string>} aliasMap - from buildAliasMap
+ * @returns {Promise<Map<string,{siteName:string,siteLabel:string,filename:string,detailHref:string}>>}
+ */
+export async function buildFleetFileIndex(sites, auditsBase, aliasMap) {
+  const index = new Map();
+  for (const site of sites ?? []) {
+    const siteKey = site?.name;
+    if (!siteKey) continue;
+    const latestInv = latestInventoryPath(auditsBase, siteKey);
+    let header, entries;
+    try {
+      ({ siteHeader: header, entries } = await readInventoryNdjson(latestInv));
+    } catch {
+      continue;
+    }
+    if (!header) continue;
+    const publicUrlBase = site.publicUrlBase ?? header.metadata?.publicUrlBase ?? "";
+    if (!publicUrlBase) continue;
+    const siteLabel = site.siteName ?? siteKey;
+    const detailHref = `${slug(siteLabel)}-${formatScanTimestamp(header.metadata?.scannedAt)}.html`;
+    const ownerName = header.metadata?.serverName ?? siteKey;
+    for (const entry of entries ?? []) {
+      const raw = entryCanonicalUrl(entry, publicUrlBase);
+      const key = raw ? canonicalizeForFleet(raw, aliasMap) : null;
+      if (!key || index.has(key)) continue; // first-seen wins
+      index.set(key, {
+        siteName: ownerName,
+        siteLabel,
+        filename: entry.filename ?? entry.path ?? "",
+        detailHref,
+      });
+    }
+  }
+  return index;
 }
 
 // v1.21.0 — best-effort read of a site's latest scan header (any of the three

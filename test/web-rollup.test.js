@@ -9,7 +9,9 @@ import {
   findCrossServerDuplicates,
   writeDuplicatesCsv,
   deriveAccessKind,
+  buildFleetFileIndex,
 } from "../src/commands/web-rollup.js";
+import { buildAliasMap } from "../src/references/cross-resolver.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -1638,5 +1640,35 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
     expect(faqRow.getCell(4).value).toBe(0);
     expect(faqRow.getCell(5).value).toBe(0);
     expect(faqRow.getCell(6).value).toBeNull();
+  });
+});
+
+async function writeInvWithEntry(filePath, { serverName, scannedAt, publicUrlBase, entryPath, filename }) {
+  const header = JSON.stringify({
+    schemaVersion: 1, kind: "filecap-inventory-header",
+    metadata: { serverName, scannedAt, publicUrlBase },
+  });
+  const entry = JSON.stringify({ path: entryPath, filename, category: "office-document", remediable: true });
+  const footer = JSON.stringify({ kind: "filecap-inventory-footer", entryCount: 1 });
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, [header, entry, footer].join("\n") + "\n", "utf8");
+}
+
+describe("buildFleetFileIndex", () => {
+  it("maps each entry's canonical URL → owning site, label, filename, detail href", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    await writeInvWithEntry(path.join(auditsBase, "agency", "latest", "inventory.ndjson"), {
+      serverName: "agency", scannedAt: "2026-06-12T20:14:54.000Z",
+      publicUrlBase: "https://agency.cms/uploads", entryPath: "proto_abc.docx", filename: "proto_abc.docx",
+    });
+    const sites = [{ name: "agency", siteName: "ICJIA agency", publicUrlBase: "https://agency.cms/uploads" }];
+    const aliasMap = buildAliasMap({ sites });
+    const index = await buildFleetFileIndex(sites, auditsBase, aliasMap);
+    expect(index.get("https://agency.cms/uploads/proto_abc.docx")).toEqual({
+      siteName: "agency",
+      siteLabel: "ICJIA agency",
+      filename: "proto_abc.docx",
+      detailHref: "icjia-agency-20260612-201454Z.html",
+    });
   });
 });

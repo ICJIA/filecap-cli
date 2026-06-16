@@ -48,7 +48,7 @@ export function buildAliasMap(sitesJson) {
 }
 
 // Canonicalize a URL and then collapse any alias host onto its primary host.
-function canonicalizeForFleet(url, aliasMap) {
+export function canonicalizeForFleet(url, aliasMap) {
   const canonical = canonicalizeUrl(url);
   if (!canonical || !aliasMap || aliasMap.size === 0) return canonical;
   try {
