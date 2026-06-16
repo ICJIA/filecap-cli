@@ -78,7 +78,7 @@ For more details: https://github.com/ICJIA/filecap-cli
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null, sitemapUrls = [], cmsPages = [] }) {
+export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null }) {
   let header;
   const entries = [];
 
@@ -164,6 +164,12 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
       // v1.14.x: the site's full CMS page list (every content entry's page),
       // merged into the Page view alongside the sitemap.
       cmsPages,
+      // v1.32.0 — passed through from web-rollup so the Page view can resolve
+      // CMS-hosted files a page links to their owning fleet site. Null in the
+      // standalone `report` command (no fleet context) → no cross-site group.
+      resolveFleetFile,
+      pageRefFiles,
+      currentSiteName,
     });
   }
 

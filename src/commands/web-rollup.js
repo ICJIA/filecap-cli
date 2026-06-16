@@ -10,7 +10,7 @@ import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows, writeXlsxRowsMultiSheet } from "../report/xlsx.js";
 import { writeHtml } from "../report/html.js";
-import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles } from "../report/pages.js";
+import { parseCmsPageList, buildPageList, parsePageRefFiles } from "../report/pages.js";
 import { buildAliasMap, canonicalizeForFleet, entryCanonicalUrl } from "../references/cross-resolver.js";
 import { buildPublicUrl } from "../report/csv.js";
 import { classifyOrphans } from "../report/orphans.js";
@@ -1005,14 +1005,24 @@ export async function runWebRollup({
   const allEntries = []; // { entry, serverName, siteName }
   const consolidatedSources = []; // per-site metadata for the master CSV
 
+  const auditsBase = _auditsBase ?? path.join(os.homedir(), "filecap-audits");
+  // v1.32.0 — fleet-wide file index so each per-site Page view can surface the
+  // CMS-hosted files its pages link (inventoried under another site). Built
+  // from the FULL roster (allSites), not the include-filtered `sites`, so a
+  // targeted rebuild still resolves cross-site links to other sites' caches.
+  const fleetAliasMap = buildAliasMap({ sites: allSites });
+  const fleetFileIndex = await buildFleetFileIndex(allSites, auditsBase, fleetAliasMap);
+  const resolveFleetFile = (fileUrl) => {
+    const key = canonicalizeForFleet(fileUrl, fleetAliasMap);
+    return key ? (fleetFileIndex.get(key) ?? null) : null;
+  };
+
   for (const site of sites) {
     const siteKey = site.name;
     if (!siteKey) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? "(unnamed)"}: no server name configured\n`);
       continue;
     }
-
-    const auditsBase = _auditsBase ?? path.join(os.homedir(), "filecap-audits");
     const rawInv = path.join(auditsBase, siteKey, "latest", "inventory.ndjson");
     // v1.8.0 + v1.9.0: prefer the most-augmented inventory available.
     //   inventory.audited.ndjson      ← v1.9.0, has entry.audit + entry.references[]
@@ -1082,9 +1092,12 @@ export async function runWebRollup({
     // entry's page, from the references sidecar retained in latest/ — so the
     // Page view is complete even where the sitemap is missing or partial.
     let cmsPages = [];
+    let pageRefFiles = new Map();
     try {
       const sidecarPath = path.join(path.dirname(latestInv), "references-sidecar.ndjson");
-      cmsPages = parseCmsPageList(await fs.readFile(sidecarPath, "utf8"));
+      const sidecarContent = await fs.readFile(sidecarPath, "utf8");
+      cmsPages = parseCmsPageList(sidecarContent);
+      pageRefFiles = parsePageRefFiles(sidecarContent);
     } catch {
       // no retained sidecar for this site — the Page view uses the sitemap only
     }
@@ -1103,6 +1116,10 @@ export async function runWebRollup({
       pathPrefix: site.pathPrefix ?? null,
       sitemapUrls,
       cmsPages,
+      // v1.32.0 — cross-site (CMS-hosted) file resolution for the Page view.
+      resolveFleetFile,
+      pageRefFiles,
+      currentSiteName: header.metadata?.serverName ?? siteKey,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);

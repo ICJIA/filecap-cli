@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { CSV_COLUMNS, formatPageCount } from "./csv.js";
-import { buildPageList } from "./pages.js";
+import { buildPageList, attachCrossSiteFiles } from "./pages.js";
 import { humanizeBytes } from "./format.js";
 import { FILECAP_VERSION } from "../version.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
@@ -442,7 +442,7 @@ const ACCESS_PANEL_COPY = {
   },
 };
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [] }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -621,6 +621,12 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
 
   // ── Page view (v1.13.0): invert the file entries into a page list ────────────
   const pageList = buildPageList(entries, sitemapUrls, cmsPages);
+  // v1.32.0 — decorate each page with the CMS-hosted (cross-site) files it
+  // links, resolved to their owning fleet site. No-op without fleet data
+  // (standalone `report` command).
+  if (resolveFleetFile && pageRefFiles) {
+    attachCrossSiteFiles(pageList, { pageRefFiles, resolveFleetFile, currentSiteName });
+  }
   const pageViewSectionHtml = buildPageViewSection(pageList, { sourceHeader, sourceMap, isConsolidated });
   const viewToggleHtml = `
 <div class="view-toggle" role="group" aria-label="Switch report view">
