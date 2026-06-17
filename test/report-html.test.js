@@ -102,11 +102,14 @@ describe("writeHtml", () => {
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
   });
 
-  it("includes summary counts (total files, by category)", async () => {
+  it("includes summary counts (total inventoried, by category)", async () => {
     const out = path.join(tmpDir, "files.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toContain("Total files");
+    // v1.33.0: the four-card summary bar was consolidated — the total now
+    // lives once in the breakdown disclosure, and the category list stays.
+    expect(html).toContain("Total inventoried:");
+    expect(html).toContain("By category");
     expect(html).toMatch(/2/);
   });
 
@@ -527,7 +530,7 @@ describe("writeHtml", () => {
     expect(html).toMatch(/<h1[^>]*>filecap inventory report<\/h1>/);
   });
 
-  it("renders the new dp-hero block with two-up tiles + donut row", async () => {
+  it("renders the work-first dp-hero block (headline count + proportion ring + metaline)", async () => {
     const outputPath = path.join(tmpDir, "out.html");
     await writeHtml({
       sourceHeader: { ...sampleHeader, metadata: { ...sampleHeader.metadata, siteName: "DVFR" } },
@@ -539,15 +542,77 @@ describe("writeHtml", () => {
     const html = await fs.readFile(outputPath, "utf8");
     // dp-hero container
     expect(html).toMatch(/<header class="dp-hero">/);
-    // Two-up tiles (sampleEntries has 2 remediable entries -> 2 total / 2 audit -> 100%)
-    expect(html).toMatch(/<div class="dp-tile dp-total"><span class="dp-num">2<\/span>/);
-    expect(html).toMatch(/<div class="dp-tile dp-audit"><span class="dp-num">2<\/span>/);
-    // Donut on its own row
-    expect(html).toMatch(/<div class="dp-donut-row">\s*<div class="dp-donut"[^>]*style="--pct:100%/);
-    // Plain-English caption
-    expect(html).toMatch(/<p class="dp-donut-caption">/);
+    // v1.33.0: the hero leads with the actionable workload — the remediable
+    // count (sampleEntries has 2 remediable PDFs) — not a total-files tile.
+    expect(html).toMatch(/<span class="dp-headline-num">2<\/span>/);
+    expect(html).toContain("files may need audit work");
+    // The big two-up tiles + large donut are gone.
+    expect(html).not.toContain('class="dp-tile dp-total"');
+    expect(html).not.toContain('class="dp-donut"');
+    // A small proportion ring carries the percentage (2 of 2 remediable -> 100%)
+    expect(html).toMatch(/<div class="dp-ring" style="--pct:100%/);
+    expect(html).toMatch(/<div class="dp-ring-pct">100%/);
+    // The inventory totals collapse to a single quiet metaline.
+    expect(html).toMatch(/<p class="dp-metaline">/);
     // The full title appears in the h1
     expect(html).toMatch(/<h1[^>]*>Domestic Violence Fatality Review<\/h1>/);
+  });
+
+  describe("v1.33.0 density redesign", () => {
+    it("collapses the file-type breakdown into a Breakdown <details> (closed by default)", async () => {
+      const out = path.join(tmpDir, "breakdown.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      // The two stat cards now live inside a collapsed disclosure, not stacked
+      // open above the table.
+      expect(html).toMatch(/<details class="dp-disclosure dp-breakdown">/);
+      // Closed on load — the opening tag carries no `open` attribute.
+      expect(html).not.toMatch(/<details class="dp-disclosure dp-breakdown"[^>]*\bopen\b/);
+      // All the data is still present, one click away.
+      expect(html).toContain('class="stat-card remediable"');
+      expect(html).toContain("By category");
+    });
+
+    it("moves site metadata into a collapsed Site details <details>", async () => {
+      const out = path.join(tmpDir, "sitedetails.html");
+      const header = { ...sampleHeader, metadata: { ...sampleHeader.metadata, siteName: "DVFR" } };
+      await writeHtml({ sourceHeader: header, entries: sampleEntries, sources: null, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<details class="dp-disclosure dp-sitedetails">/);
+      // The meta-grid (with the Website row) is retained inside it.
+      expect(html).toContain('<div class="meta-grid">');
+      expect(html).toContain("Website:");
+    });
+
+    it("collapses the row-marker legend into a <details> with a summary", async () => {
+      const out = path.join(tmpDir, "legend.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<details class="row-marker-legend"/);
+      expect(html).toMatch(/<summary class="row-marker-summary">/);
+      // The 3-column key itself is unchanged inside the disclosure.
+      expect(html).toMatch(/<table class="row-marker-table">/);
+      // The old always-open <aside> + <h3> wrapper is gone.
+      expect(html).not.toMatch(/<aside class="row-marker-legend"/);
+    });
+
+    it("drops the always-on four-card summary bar and the audit-total line", async () => {
+      const out = path.join(tmpDir, "nosummary.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).not.toContain('class="summary-bar"');
+      expect(html).not.toContain('<div class="audit-total">');
+    });
+
+    it("puts the File/Page view toggle beside one shared inventory heading", async () => {
+      const out = path.join(tmpDir, "invheader.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/<div class="inv-header">/);
+      expect(html).toMatch(/<h2 id="dp-inv-heading">File inventory<\/h2>/);
+      // The toggle JS swaps that single heading instead of two competing h2s.
+      expect(html).toContain('document.getElementById("dp-inv-heading")');
+    });
   });
 
   it("no longer emits the inventory-table <colgroup> (column-resize removed in v1.12.0)", async () => {

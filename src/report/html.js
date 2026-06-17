@@ -315,13 +315,11 @@ function buildPageRow(page, ctx) {
 function buildPageViewSection(pages, ctx) {
   if (!pages || pages.length === 0) {
     return `<div id="page-view" hidden>
-  <h2>Pages</h2>
   <p class="page-view-empty">Page view needs CMS reference data — the map of which pages link to which files. filecap extracts that from CMS sites (Strapi); this is a static (non-CMS) site, so file-to-page mapping isn't available for it. The <strong>File view</strong> above lists every file on the site.</p>
 </div>`;
   }
   const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
   return `<div id="page-view" hidden>
-  <h2>Pages on this site</h2>
   <p class="page-view-note">One row per page. <strong>Files</strong> are the documents the page links to. Each file is listed once — under the first page that links it; a page whose other linked files already appear above shows them as a count ("listed under other pages") instead of repeating them. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively. A file a page links that is hosted on another fleet site (for example the CMS) appears in a muted <span class="page-xsite">hosted on another site</span> group that links to that site's report.</p>
   <nav class="paginator" aria-label="Page table pagination">
     <span class="pag-info" id="pv-page-info"></span>
@@ -648,14 +646,17 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     attachCrossSiteFiles(pageList, { pageRefFiles, resolveFleetFile, currentSiteName });
   }
   const pageViewSectionHtml = buildPageViewSection(pageList, { sourceHeader, sourceMap, isConsolidated });
+  // v1.33.0 — the toggle sits in the inventory header beside the heading that
+  // the toggle JS swaps between "File inventory" and "Pages on this site"; the
+  // explanatory blurb renders on its own line just below the header.
   const viewToggleHtml = `
 <div class="view-toggle" role="group" aria-label="Switch report view">
   <div class="view-toggle-buttons">
     <button type="button" class="view-toggle-btn is-active" data-view="file" aria-pressed="true">File view</button>
     <button type="button" class="view-toggle-btn" data-view="page" aria-pressed="false">Page view</button>
   </div>
-  <p class="view-toggle-blurb"><strong>File view</strong> (shown) lists every file and the pages that link to it. <strong>Page view</strong> flips it around — one row per page on the site, with the files it links to.</p>
 </div>`;
+  const viewToggleBlurbHtml = `<p class="view-toggle-blurb"><strong>File view</strong> lists every file and the pages that link to it. <strong>Page view</strong> flips it around — one row per page on the site, with the files it links to.</p>`;
 
   // ── server/scan metadata display ─────────────────────────────────────────────
   // Per-site reports pull from top-level metadata fields. Consolidated fleet
@@ -725,27 +726,22 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     })
   ).replace(/<\/script/gi, "<\\/script");
 
-  // ── hero block (v1.7.0 manager-friendly rollup redesign, decision D7) ────────
-  // Replaces the top <h1> with the same "infographic" pattern used by the index
-  // card (Q5 Variant 1): nickname -> big full name -> two-up tiles (total +
-  // audit) -> donut on its own row -> plain-English caption. All values are
-  // pre-computed here; the template literal below just interpolates them.
-  // CSS for these `dp-*` classes lands in Task 6 of the plan.
+  // ── hero block (v1.33.0 work-first redesign) ────────────────────────────────
+  // The hero leads with the one number a site manager acts on — how many files
+  // may need audit work — plus the page-count effort and the audit proportion.
+  // The full inventory totals (file count, size, scan date) drop to a single
+  // quiet metaline below, instead of being restated across stacked tiles, two
+  // stat cards, a "total inventoried" line and a four-card summary bar. A small
+  // ring carries the proportion (the old large donut was mostly empty at the
+  // low percentages typical of these audits). Values are pre-computed here; the
+  // template literal below just interpolates them.
   const heroTotal = totalFiles;
   const heroAudit = remediableCount;
   const heroPctRaw = heroTotal > 0 ? (heroAudit / heroTotal) * 100 : 0;
   const heroPct = Math.round(heroPctRaw * 10) / 10;
-  const heroPctInt = Math.round(heroPctRaw);
-  let heroPhrase;
-  if (heroTotal === 0)             heroPhrase = "No files inventoried";
-  else if (heroPctInt === 0)       heroPhrase = "No files may need audit";
-  else if (heroPctInt <= 12)       heroPhrase = "A small share may need audit";
-  else if (heroPctInt <= 28)       heroPhrase = "About a quarter may need audit";
-  else if (heroPctInt <= 42)       heroPhrase = "About a third may need audit";
-  else if (heroPctInt <= 58)       heroPhrase = "About half may need audit";
-  else if (heroPctInt <= 72)       heroPhrase = "Two-thirds may need audit";
-  else if (heroPctInt <= 88)       heroPhrase = "Most may need audit";
-  else                              heroPhrase = "Nearly all may need audit";
+  // Point-in-time date for the metaline: scan date for a single site, the
+  // consolidation date for a fleet rollup (whose per-source scans vary).
+  const heroDateFmt = fmtChicagoDate((isConsolidated ? meta?.consolidatedAt : meta?.scannedAt) ?? "");
   const heroTitle = htmlEscape(siteFullName || siteName || "filecap inventory report");
   const heroNick = htmlEscape(siteName ?? "");
 
@@ -1076,116 +1072,144 @@ a.page-audit-chip:hover {
   color: #ffffff;
   line-height: 1.12;
 }
-.dp-hero .dp-nums {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin: 0 0 22px;
+/* v1.33.0 — work-first hero: one big actionable number (files that may need
+   audit work) + a small proportion ring, with the inventory totals demoted to
+   a single quiet metaline below. */
+.dp-hero .dp-hero-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 4px 0 0;
 }
-.dp-hero .dp-tile {
-  padding: 22px 14px;
-  border-radius: 16px;
-  text-align: center;
-}
-.dp-hero .dp-tile.dp-total { background: rgba(77, 171, 247, 0.10); }
-.dp-hero .dp-tile.dp-audit { background: rgba(255, 168, 77, 0.13); }
-.dp-hero .dp-tile .dp-num {
-  font-size: 4em;
+.dp-hero .dp-headline { min-width: 0; }
+.dp-hero .dp-headline-num {
+  display: block;
+  font-size: 4.6em;
   font-weight: 900;
-  line-height: 1;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: #ffa84d;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  display: block;
 }
-.dp-hero .dp-tile.dp-total .dp-num { color: #4dabf7; }
-.dp-hero .dp-tile.dp-audit .dp-num { color: #ffa84d; }
-.dp-hero .dp-tile .dp-sub {
+.dp-hero .dp-headline-cap {
   display: block;
-  margin-top: 0.4em;
-  font-size: 0.95em;
-  font-weight: 600;
-  color: #ffc888;
-  letter-spacing: 0.02em;
-  cursor: help;
-  border-top: 1px dashed rgba(255,168,77,0.28);
-  padding-top: 0.5em;
+  margin-top: 6px;
+  font-size: 1.18em;
+  font-weight: 700;
+  color: #ffffff;
 }
-.dp-hero .dp-tile .dp-lbl {
+.dp-hero .dp-headline-sub {
   display: block;
   margin-top: 8px;
-  font-size: 0.82em;
+  font-size: 0.95em;
   color: #9aa5b1;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
-.dp-hero .dp-donut-row {
-  display: flex; align-items: center; justify-content: center;
-  gap: 22px;
-}
-.dp-hero .dp-donut {
-  width: 150px; height: 150px;
+.dp-hero .dp-headline-sub span { cursor: help; border-bottom: 1px dashed rgba(154, 165, 177, 0.4); }
+.dp-hero .dp-ring {
+  flex: none;
+  width: 92px; height: 92px;
   border-radius: 50%;
-  /* --pct is emitted with a "%" suffix. CSS calc() cannot multiply two
-     percentages, so we use the var directly as a percentage stop. */
-  background: conic-gradient(
-    #ffa84d 0 var(--pct, 0%),
-    rgba(77, 171, 247, 0.45) var(--pct, 0%) 100%
-  );
+  /* --pct is emitted with a "%" suffix; used directly as a conic stop. */
+  background: conic-gradient(#ffa84d 0 var(--pct, 0%), rgba(255, 168, 77, 0.16) var(--pct, 0%) 100%);
   display: flex; align-items: center; justify-content: center;
   position: relative;
-  flex: none;
 }
-.dp-hero .dp-donut::after {
+.dp-hero .dp-ring::after {
   content: "";
   position: absolute;
-  inset: 16px;
+  inset: 11px;
   background: #141a23;
   border-radius: 50%;
 }
-.dp-hero .dp-donut .dp-pct {
+.dp-hero .dp-ring-pct {
   position: relative; z-index: 1;
-  font-weight: 900;
-  font-size: 1.7em;
+  font-weight: 800;
+  font-size: 1.1em;
   color: #ffa84d;
   line-height: 1;
   text-align: center;
 }
-.dp-hero .dp-donut .dp-pct small {
+.dp-hero .dp-ring-pct small {
   display: block;
-  font-size: 0.42em;
+  font-size: 0.5em;
   color: #9aa5b1;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-top: 4px;
+  letter-spacing: 0.08em;
+  margin-top: 3px;
 }
-.dp-hero .dp-donut-caption {
-  margin: 0;
-  color: #9aa5b1;
-  font-size: 1em;
+.dp-hero .dp-metaline {
+  margin: 22px 0 0;
+  font-size: 0.92em;
+  color: #8b949e;
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
-.dp-hero .dp-donut-caption strong { color: #ffffff; }
+.dp-hero .dp-metaline strong { color: #9aa5b1; font-weight: 600; }
 
-/* v1.20.0 — snapshot hedge underneath the donut. Subtle amber-left strip
-   reminding remediators that page + file counts are a moment-in-time
-   estimate, not a contractual figure. */
+/* v1.20.0 — snapshot hedge: page + file counts are a moment-in-time estimate,
+   not a contractual figure. Kept (info preserved) but visually quiet. */
 .dp-hero .dp-snapshot-note {
-  margin: 1.4rem 0 0;
-  padding: 0.7rem 0.9rem;
-  background: rgba(255, 168, 77, 0.06);
-  border-left: 3px solid #d97706;
-  border-radius: 4px;
-  color: #c9d1d9;
-  font-size: 0.9em;
+  margin: 0.85rem 0 0;
+  font-size: 0.82em;
   line-height: 1.5;
+  color: #8b949e;
 }
-.dp-hero .dp-snapshot-note strong { color: #ffc888; font-weight: 700; }
+.dp-hero .dp-snapshot-note strong { color: #9aa5b1; font-weight: 600; }
 
 @media (max-width: 720px) {
-  .dp-hero .dp-nums { grid-template-columns: 1fr; }
-  .dp-hero .dp-tile .dp-num { font-size: 3em; }
-  .dp-hero .dp-donut-row { flex-direction: column; }
+  .dp-hero .dp-hero-main { flex-direction: column-reverse; align-items: flex-start; gap: 14px; }
+  .dp-hero .dp-headline-num { font-size: 3.4em; }
   .dp-hero .dp-title { font-size: 2em; }
 }
+
+/* ── v1.33.0 progressive-disclosure sections (Breakdown / Site details) ───── */
+.dp-disclosure { border-top: 1px solid #21262d; margin: 0; }
+.dp-disclosure:last-of-type { border-bottom: 1px solid #21262d; }
+.dp-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.95rem 0.25rem;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #e5e5e5;
+}
+.dp-disclosure > summary::-webkit-details-marker { display: none; }
+.dp-disclosure > summary::before {
+  content: "\\25B8";
+  color: #8b949e;
+  font-size: 0.85em;
+  transition: transform 120ms ease;
+}
+.dp-disclosure[open] > summary::before { transform: rotate(90deg); }
+.dp-disclosure > summary:hover { color: #ffffff; }
+.dp-disclosure > summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; border-radius: 4px; }
+.dp-disclosure .dp-disclosure-hint { margin-left: auto; font-size: 0.8rem; font-weight: 400; color: #8b949e; }
+.dp-disclosure-body { padding: 0.25rem 0.25rem 1.25rem 1.6rem; }
+.dp-breakdown-misc { margin: 0.9rem 0 0; font-size: 0.9em; color: #9aa5b1; }
+.dp-breakdown-misc strong { color: #e5e5e5; }
+.dp-breakdown-label {
+  margin: 1.1rem 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9aa5b1;
+}
+
+/* ── v1.33.0 inventory header: shared heading + view toggle on one row ────── */
+.inv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 2rem 0 0;
+}
+.inv-header h2 { margin: 0; }
+.inv-header .view-toggle { margin: 0; }
 
 /* ── access-method panel (v1.7.6) ────────────────────────────
    Verbose treatment of the index card's access chip. Tells a
@@ -1317,23 +1341,6 @@ a.page-audit-chip:hover {
 }
 .meta-copy.copied .meta-copy-icon { display: none; }
 .meta-copy.copied .meta-copy-feedback { display: inline; }
-
-/* ── summary cards ─────────────────────────────────────────── */
-.summary-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-.card {
-  background: #161b22;
-  border: 1px solid #21262d;
-  border-radius: 8px;
-  padding: 0.5rem 0.85rem;
-  min-width: 130px;
-}
-.card-label { font-size: 11px; color: #999999; text-transform: uppercase; letter-spacing: 0.04em; }
-.card-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; color: #e5e5e5; }
 
 /* ── category table ────────────────────────────────────────── */
 .cat-table { border-collapse: collapse; font-size: 13px; margin-bottom: 1rem; color: #e5e5e5; }
@@ -1676,22 +1683,39 @@ tr.flagged { border-left: 3px solid #fbbf24; }
 tr.flagged td { /* let row bg show through; border is the indicator */ }
 
 /* ── row-marker legend (immediately above the table) ─────────── */
+/* v1.33.0 — the legend is now a collapsed <details>; reference material a
+   click away rather than an always-open three-column wall above the table. */
 .row-marker-legend {
-  background: #161b22;
+  background: #12161d;
   border: 1px solid #21262d;
-  border-left: 4px solid #fbbf24;
-  border-radius: 4px;
-  padding: 0.8rem 1rem 0.7rem 1rem;
-  margin: 0.5rem 0 1rem 0;
+  border-radius: 6px;
+  margin: 0.6rem 0 1rem 0;
   font-size: 13px;
   line-height: 1.5;
 }
-.row-marker-legend h3 {
-  margin: 0 0 0.4rem 0;
-  font-size: 0.96rem;
+.row-marker-legend[open] { border-left: 3px solid #fbbf24; }
+.row-marker-legend > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
   font-weight: 600;
-  color: #e5e5e5;
+  color: #bfdbfe;
 }
+.row-marker-legend > summary::-webkit-details-marker { display: none; }
+.row-marker-legend > summary::before {
+  content: "\\25B8";
+  color: #8b949e;
+  font-size: 0.85em;
+  transition: transform 120ms ease;
+}
+.row-marker-legend[open] > summary::before { transform: rotate(90deg); }
+.row-marker-legend > summary:hover { color: #93c5fd; }
+.row-marker-legend > summary:focus-visible { outline: 2px solid #60a5fa; outline-offset: -2px; }
+.row-marker-legend[open] > summary { border-bottom: 1px solid #21262d; }
+.row-marker-legend .row-marker-table { margin: 0.5rem 0.9rem 0.7rem; width: auto; }
 /* v1.7.11 — proper 3-column table layout. Pre-v1.7.11 the legend was a
    two-line flex block where the description text wrapped under itself
    under the swatch, leading to ragged paragraphs with awkward line breaks
@@ -1836,7 +1860,6 @@ ${siteFooterCss()}
 .stat-card .stat-label { font-size: 0.95em; margin-top: 0.25em; color: #999999; }
 .stat-card .stat-detail { margin-top: 0.75em; font-size: 0.9em; color: #999999; padding: 0; }
 .stat-card .stat-detail li { list-style: disc; margin-left: 1.5em; padding-left: 0.25em; }
-.audit-total { text-align: center; margin: 0.5em 0 1em; font-size: 0.9em; color: #9aa5b1; }
 @media (max-width: 720px) { .audit-stats { grid-template-columns: 1fr; } }
 
 /* ── print ─────────────────────────────────────────────────── */
@@ -1852,14 +1875,11 @@ ${siteFooterCss()}
   thead { position: static; background: #f0f0f0; }
   thead th { background: #f0f0f0; color: #000; border-bottom: 2px solid #ccc; }
   td { color: #000; border-bottom: 1px solid #eee; }
-  .card { background: #f8f8f8; border-color: #ccc; }
-  .card-value, .card-label { color: #000; }
   .stat-card { background: #f8f8f8; border-color: #ccc; }
   .stat-card .stat-number, .stat-card .stat-heading, .stat-card .stat-label,
   .stat-card .stat-detail { color: #000; }
   .stat-card.remediable .stat-number { color: #d97706; }
   .stat-card.reference .stat-number { color: #555; }
-  .audit-total { color: #555; }
   tbody tr:nth-child(even) { background: #f8f8f8; }
   tbody tr:nth-child(odd) { background: #fff; }
   tbody tr:hover { background: inherit; }
@@ -1867,7 +1887,6 @@ ${siteFooterCss()}
   .cat-table td:last-child { color: #000; }
   a { color: #0066cc; }
   td a { color: #0066cc; }
-  .card-value { font-size: 1.1rem; }
 }
 </style>
 </head>
@@ -1917,86 +1936,81 @@ ${(() => {
 <header class="dp-hero">
   ${heroNick ? `<p class="dp-nickname">${heroNick}</p>` : ""}
   <h1 class="dp-title">${heroTitle}</h1>
-  <div class="dp-nums">
-    <div class="dp-tile dp-total"><span class="dp-num">${heroTotal.toLocaleString()}</span><span class="dp-lbl">total files</span></div>
-    <div class="dp-tile dp-audit"><span class="dp-num">${heroAudit.toLocaleString()}</span><span class="dp-lbl">may need audit</span>${remediablePages > 0 ? `<span class="dp-sub" title="${htmlEscape(pagesTooltip)}">≈ ${remediablePages.toLocaleString()} potential pages</span>` : ""}</div>
+  <div class="dp-hero-main">
+    <div class="dp-headline">
+      <span class="dp-headline-num">${heroAudit.toLocaleString()}</span>
+      <span class="dp-headline-cap">file${heroAudit === 1 ? "" : "s"} may need audit work</span>
+      <span class="dp-headline-sub">${remediablePages > 0 ? `<span title="${htmlEscape(pagesTooltip)}">≈ ${remediablePages.toLocaleString()} pages to remediate</span> &middot; ` : ""}${heroPct}% of inventory</span>
+    </div>
+    <div class="dp-ring" style="--pct:${heroPct}%" role="img" aria-label="${heroPct}% of files may need audit">
+      <div class="dp-ring-pct">${heroPct}%<small>audit</small></div>
+    </div>
   </div>
-  <div class="dp-donut-row">
-    <div class="dp-donut" style="--pct:${heroPct}%"><div class="dp-pct">${heroPctInt}%<small>may need audit</small></div></div>
-    <p class="dp-donut-caption"><strong>${heroPhrase}</strong> &middot; ${heroAudit.toLocaleString()} of ${heroTotal.toLocaleString()} files</p>
-  </div>
-  ${remediablePages > 0 ? `<p class="dp-snapshot-note"><strong>Snapshot as of ${htmlEscape(fmtChicagoDate(scannedAt) || "the latest scan")}.</strong> These counts are a point-in-time view — they may change as files are added, edited, or removed from the site.</p>` : ""}
+  <p class="dp-metaline"><strong>${heroTotal.toLocaleString()}</strong> file${heroTotal === 1 ? "" : "s"} &middot; <strong>${htmlEscape(humanizeBytes(totalBytes))}</strong>${heroDateFmt ? ` &middot; scanned <strong>${htmlEscape(heroDateFmt)}</strong>` : ""}</p>
+  ${remediablePages > 0 ? `<p class="dp-snapshot-note"><strong>Snapshot as of ${htmlEscape(heroDateFmt || "the latest scan")}.</strong> These counts are a point-in-time view — they may change as files are added, edited, or removed from the site.</p>` : ""}
 </header>
 
 ${accessPanelHtml}
 
-<div class="meta-grid">${metaGridHtml}
-</div>
-
-<section class="audit-stats">
-  <div class="stat-card remediable">
-    <div class="stat-heading">Audit work</div>
-    <div class="stat-number">${remediableCount}</div>
-    <div class="stat-label">files may need remediation</div>
-    <ul class="stat-detail">
-      ${pdfCount > 0 ? `<li>${pdfCount} PDF${pdfCount === 1 ? "" : "s"}</li>` : ""}
-      ${officeCount > 0 ? `<li>${officeCount} Office doc${officeCount === 1 ? "" : "s"}</li>` : ""}
-      ${spreadsheetCount > 0 ? `<li>${spreadsheetCount} spreadsheet${spreadsheetCount === 1 ? "" : "s"}</li>` : ""}
-      ${presentationCount > 0 ? `<li>${presentationCount} presentation${presentationCount === 1 ? "" : "s"}</li>` : ""}
-      ${legacyCount > 0 ? `<li>${legacyCount} legacy Office</li>` : ""}
-    </ul>
-  </div>
-  <div class="stat-card reference">
-    <div class="stat-heading">Reference files</div>
-    <div class="stat-number">${nonRemediableCount}</div>
-    <div class="stat-label">no direct work needed</div>
-    <ul class="stat-detail">
-      ${imageCount > 0 ? `<li>${imageCount} image${imageCount === 1 ? "" : "s"}</li>` : ""}
-      ${textCount > 0 ? `<li>${textCount} text file${textCount === 1 ? "" : "s"}</li>` : ""}
-      ${otherNonRemCount > 0 ? `<li>${otherNonRemCount} other</li>` : ""}
-    </ul>
-  </div>
-</section>
-<div class="audit-total">
-  Total inventoried: ${totalFiles} files (${htmlEscape(humanizeBytes(totalBytes))})
-</div>
-
-<div class="summary-bar">
-  <div class="card">
-    <div class="card-label">Total files</div>
-    <div class="card-value">${totalFiles.toLocaleString()}</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Total size</div>
-    <div class="card-value">${htmlEscape(humanizeBytes(totalBytes))}</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Image-only PDFs</div>
-    <div class="card-value">${imageOnlyCount.toLocaleString()}</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Flagged files</div>
-    <div class="card-value">${flaggedCount.toLocaleString()}</div>
-  </div>
-</div>
-
-<h2>By category</h2>
-<table class="cat-table">
-  <tbody>
+<details class="dp-disclosure dp-breakdown">
+  <summary><span class="dp-disclosure-title">Breakdown by file type</span> <span class="dp-disclosure-hint">every type &amp; category count</span></summary>
+  <div class="dp-disclosure-body">
+    <section class="audit-stats">
+      <div class="stat-card remediable">
+        <div class="stat-heading">Audit work</div>
+        <div class="stat-number">${remediableCount}</div>
+        <div class="stat-label">files may need remediation</div>
+        <ul class="stat-detail">
+          ${pdfCount > 0 ? `<li>${pdfCount} PDF${pdfCount === 1 ? "" : "s"}</li>` : ""}
+          ${officeCount > 0 ? `<li>${officeCount} Office doc${officeCount === 1 ? "" : "s"}</li>` : ""}
+          ${spreadsheetCount > 0 ? `<li>${spreadsheetCount} spreadsheet${spreadsheetCount === 1 ? "" : "s"}</li>` : ""}
+          ${presentationCount > 0 ? `<li>${presentationCount} presentation${presentationCount === 1 ? "" : "s"}</li>` : ""}
+          ${legacyCount > 0 ? `<li>${legacyCount} legacy Office</li>` : ""}
+        </ul>
+      </div>
+      <div class="stat-card reference">
+        <div class="stat-heading">Reference files</div>
+        <div class="stat-number">${nonRemediableCount}</div>
+        <div class="stat-label">no direct work needed</div>
+        <ul class="stat-detail">
+          ${imageCount > 0 ? `<li>${imageCount} image${imageCount === 1 ? "" : "s"}</li>` : ""}
+          ${textCount > 0 ? `<li>${textCount} text file${textCount === 1 ? "" : "s"}</li>` : ""}
+          ${otherNonRemCount > 0 ? `<li>${otherNonRemCount} other</li>` : ""}
+        </ul>
+      </div>
+    </section>
+    <p class="dp-breakdown-misc">Total inventoried: <strong>${totalFiles.toLocaleString()}</strong> files (${htmlEscape(humanizeBytes(totalBytes))}) &middot; Image-only PDFs: <strong>${imageOnlyCount.toLocaleString()}</strong> &middot; Flagged for review: <strong>${flaggedCount.toLocaleString()}</strong></p>
+    <p class="dp-breakdown-label">By category</p>
+    <table class="cat-table">
+      <tbody>
 ${categoryRows}
-  </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+</details>
 
+<details class="dp-disclosure dp-sitedetails">
+  <summary><span class="dp-disclosure-title">Site details</span> <span class="dp-disclosure-hint">server &middot; scan time &middot; public URL</span></summary>
+  <div class="dp-disclosure-body">
+    <div class="meta-grid">${metaGridHtml}
+    </div>
+  </div>
+</details>
+
+<div class="inv-header">
+  <h2 id="dp-inv-heading">File inventory</h2>
+  ${viewToggleHtml}
+</div>
+${viewToggleBlurbHtml}
 <div class="file-view">
-<h2>File inventory</h2>
 ${filterBarHtml}
 <div class="controls">
   <input type="search" id="search" placeholder="Filter by filename, path, server…" aria-label="Filter table rows">
   <span id="row-count"></span>
 </div>
 
-<aside class="row-marker-legend" role="note" aria-label="Row marker key">
-  <h3>What are the colored row markers in the table?</h3>
+<details class="row-marker-legend" role="note" aria-label="Row marker key">
+  <summary class="row-marker-summary">What do the colored row markers in the table mean?</summary>
   <table class="row-marker-table">
     <colgroup>
       <col class="rmt-col-marker">
@@ -2029,10 +2043,7 @@ ${filterBarHtml}
       </tr>
     </tbody>
   </table>
-</aside>
-</div>
-${viewToggleHtml}
-<div class="file-view">
+</details>
 <nav class="paginator" aria-label="Table pagination">
   <span class="pag-info" id="page-info"></span>
   <span class="pag-controls">
@@ -2288,12 +2299,16 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
   var buttons = document.querySelectorAll(".view-toggle-btn");
   var fileViews = document.querySelectorAll(".file-view");
   var pageView = document.getElementById("page-view");
+  // v1.33.0 — one heading sits in the always-visible inventory header and is
+  // swapped here, so each view keeps its own title without two competing h2s.
+  var heading = document.getElementById("dp-inv-heading");
   if (!buttons.length || !fileViews.length || !pageView) return;
   buttons.forEach(function (btn) {
     btn.addEventListener("click", function () {
       var showPage = btn.getAttribute("data-view") === "page";
       fileViews.forEach(function (fv) { fv.hidden = showPage; });
       pageView.hidden = !showPage;
+      if (heading) heading.textContent = showPage ? "Pages on this site" : "File inventory";
       buttons.forEach(function (b) {
         var on = b === btn;
         b.classList.toggle("is-active", on);

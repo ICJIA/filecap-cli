@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.33.0] — 2026-06-17
+
+### Changed
+
+- **Per-site detail pages redesigned for lower visual density.** Several reviewers said the report was great but carried too much information up top, especially on the per-site detail pages. The page now leads with a single work-first hero — the count of files that may need audit work, the page-count effort, and the audit proportion (a small ring; the old large donut was mostly empty at the low percentages these audits typically show) — and demotes the inventory totals (file count, size, scan date) to one quiet metaline. The four stacked metric blocks that used to fill the first screen (two big hero tiles + donut, the two stat cards, the "Total inventoried" line, and the four-card summary bar) are consolidated: every number is retained, but the per-type/category detail now lives in a collapsed **"Breakdown by file type"** disclosure and the server/scan/public-URL metadata in a collapsed **"Site details"** disclosure. The always-open three-column row-marker legend above the table becomes a collapsed **"What do the colored row markers mean?"** disclosure, and the File view / Page view toggle moves up beside one shared heading that swaps between "File inventory" and "Pages on this site". Fewer boxes, one accent color, a clearer type scale — no data removed, only reorganized and restyled.
+
+### Notes
+
+- Template/CSS-only change to `src/report/html.js`; ships via `node bin/filecap.js web-rollup` (no re-scan). Fleet totals, the file inventory table, filters, search, sort, pagination, XLSX downloads, the access panel, and the Page view are all unchanged.
+
 ## [1.32.0] — 2026-06-16
 
 ### Added
