@@ -10,7 +10,7 @@
 
 /** Current verified accessibility standing — shown in the page's status panel. */
 export const currentStatus = {
-  asOf: "2026-06-12",
+  asOf: "2026-06-17",
   lighthouse: 100,
   axeCore: "0 violations (WCAG A + AA)",
   axeDevTools: "0 serious — pending live re-verification",
@@ -32,6 +32,17 @@ export const currentStatus = {
  *   notes    optional, e.g. the version it shipped in
  */
 export const accessibilityLog = [
+  {
+    date: "2026-06-17",
+    source: "backend",
+    tool: "axecap (axe-core 4.11) + lightcap (Lighthouse)",
+    scope: "per-site detail report — v1.33.0 visual-density redesign: work-first hero + small proportion ring, collapsed \"Breakdown by file type\" / \"Site details\" / row-marker-legend disclosures, and a single inventory heading the File/Page toggle swaps",
+    viewport: "desktop + mobile",
+    status: "fixed",
+    result:
+      "Per-site detail pages were reorganized to cut visual density — one work-first hero plus two collapsed disclosures replace the four stacked metric blocks, and the always-open three-column row-marker legend became a collapsed <details>. Re-checked with axe-core (A + AA) and Lighthouse. Found and fixed one issue during the redesign: WCAG 1.4.3 (AA) contrast — the new disclosure hint text (e.g. \"every type & category count\") rendered in #6e7681 on the page background at ~4:1, under the 4.5:1 floor; brightened to #8b949e (~6:1). Also demoted the in-disclosure \"By category\" label from an <h3> to a styled paragraph so the collapsed breakdown can't introduce an h1->h3 heading-order skip. After the fixes, on the deployed bundle: 0 axe-core violations and Lighthouse accessibility 100, on both desktop and mobile. (Body text over the hero's gradient panel remains an axe \"needs review\" item — gradients can't be auto-evaluated — as in prior builds.)",
+    notes: "v1.33.0",
+  },
   {
     date: "2026-06-12",
     source: "backend",
