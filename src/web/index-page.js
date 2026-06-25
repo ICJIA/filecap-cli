@@ -116,6 +116,28 @@ function renderMasterCsvSection(masterCsv) {
   </section>`;
 }
 
+// v1.34.1 — download CTA for the scores-by-site summary. Deliberately a
+// download button, not an on-page grade table: the contested aggregate-grade
+// band stays off the landing page; the numbers live in the workbook.
+function renderScoresBySiteSection(scoresBySite) {
+  if (!scoresBySite || !scoresBySite.filename) return "";
+  const siteCount = scoresBySite.siteCount ?? 0;
+  const byteCount = scoresBySite.byteCount ?? 0;
+  const lastAudit = scoresBySite.lastAuditAt ? fmtAuditDate(scoresBySite.lastAuditAt) : "";
+  return `
+  <section class="section master-csv scores-by-site">
+    <h2>Scores by site — PDF accessibility coverage at a glance</h2>
+    <p>A one-row-per-site summary workbook: how many remediable files each site has, how many PDFs were scored, the average PDF score, and the A–F grade distribution, with a fleet TOTAL row. Use it to see which sites carry the most accessibility risk without opening the full file list. Scores cover PDFs only — Word, Excel, and PowerPoint files have native accessibility checkers in their authoring apps and aren't re-scored here, so they appear in the inventory without a score.</p>
+    <p class="master-csv-download">
+      <a class="cta-button" href="${he(scoresBySite.filename)}" download>
+        Download <strong>${he(scoresBySite.filename)}</strong>
+      </a>
+      <span class="master-csv-meta">${he(siteCount.toLocaleString())} sites · ${he(humanBytes(byteCount))}</span>
+    </p>
+    ${lastAudit ? `<p class="master-csv-last-audit">Last audit: <strong>${he(lastAudit)}</strong></p>` : ""}
+  </section>`;
+}
+
 function renderOrphansSection(orphans) {
   if (!orphans || !orphans.htmlFilename) return "";
   return `
@@ -750,6 +772,7 @@ export function generateIndexHtml({
   title = "filecap fleet audit snapshot",
   duplicateGroups = [],
   masterCsv = null, // { filename: string, fileCount: number, byteCount: number } | null
+  scoresBySite = null, // v1.34.1: { filename, siteCount, byteCount, lastAuditAt } | null
   duplicatesCsv = null, // { filename: string, groupCount: number, occurrenceCount: number, byteCount: number } | null
   byTypeCsvs = [], // v1.7.14: [{ slug, side, label, keys, csvFilename, htmlFilename, fileCount, byteCount }, …]
   llmContext = null, // v1.7.21: { ndjsonFilename, ndjsonByteCount, contextMdFilename, contextMdByteCount, lastAuditAt } | null
@@ -1189,6 +1212,7 @@ ${cardsHtml}
   </section>
 
 ${renderMasterCsvSection(masterCsv)}
+${renderScoresBySiteSection(scoresBySite)}
 ${renderOrphansSection(orphans)}
 ${renderFileErrorsSection(fileErrors)}
 ${renderLlmContextSection(llmContext)}

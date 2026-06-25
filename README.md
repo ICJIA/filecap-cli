@@ -75,13 +75,27 @@ To budget the remediation work, you need to know what's actually there: file cou
 
 The included `audit-remote.sh` script automates the entire workflow against any server you have SSH access to. Auditors run one command, answer a few prompts, and get a vendor-ready deliverable. Works on macOS, Linux, and Windows (via WSL2). Free; open source.
 
-**Three things you, as a manager, get out of this:**
+**Four things you, as a manager, get out of this:**
 
 1. A precise count of files that may need remediation, with composition (not just `wc -l`).
-2. A spreadsheet you can email to bid-out vendors without explanation.
-3. Repeatability — re-run quarterly, see what changed.
+2. A spreadsheet you can email to bid-out vendors without explanation — now with a **per-file accessibility score** for every PDF (a grade/score like `B/88`) so you can triage worst-first.
+3. A **scores-by-site summary** (`scores-by-site.xlsx`) — one row per site with its PDF coverage and A–F grade spread, plus a fleet total — for the "which sites are in the worst shape?" conversation.
+4. Repeatability — re-run quarterly, see what changed.
 
 As of 1.2.0, you can also publish the latest snapshot to a URL that your whole team can bookmark — one command bundles everything and deploys to Netlify. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot).
+
+### Understanding the accessibility scores
+
+Each PDF is scored by [audit.icjia.app](https://audit.icjia.app), ICJIA's automated PDF accessibility checker (strict WCAG 2.1 AA + IITAA §E205.4). The `Remediation Score` column shows the result as **grade/score**, e.g. `B/88` — an A–F letter grade and a 0–100 number; lower means more remediation work. The full per-PDF report (what failed and why) is linked from the adjacent `Audit Report` column.
+
+What the score cell can say:
+
+- **`B/88`** (etc.) — a scored PDF.
+- **`N/A (Office)`** — a Word, Excel, or PowerPoint file. Those formats have built-in accessibility checkers in their authoring apps, so filecap inventories them but doesn't duplicate that check. The cell says so explicitly rather than going blank (a blank would read as "missing data").
+- **`Not scored`** — a PDF the scorer couldn't process: usually it exceeds audit.icjia.app's upload-size limit (`413 Payload Too Large`) or hit a transient error. It's in the inventory; it just has no score.
+- **blank** — a non-remediable reference file (image, text, archive, web page), or a PDF still awaiting its first audit.
+
+Scoring covers **PDFs only** — if your fleet is heavy on Word/Excel, expect a large share of `N/A (Office)`. That's by design, not missing data. To see the big picture without opening every file, download **`scores-by-site.xlsx`** from the fleet snapshot: it has PDF coverage and the A–F grade distribution per site, plus a fleet TOTAL row.
 
 ### Current shape of the fleet rollup
 
@@ -573,9 +587,23 @@ Fleet-wide reverse-index resolver. Reads every site's sidecar (via `--sidecar` f
 | `-s, --sidecar <path>` | (required, repeatable) | Path to a `references` sidecar NDJSON. Repeat for every site in the fleet. |
 | `-o, --output <path>` | (required) | Output path for the augmented inventory NDJSON |
 
+### `filecap audits <inventory>` *(new in 1.9.0)*
+
+Scores every PDF in an inventory NDJSON against [audit.icjia.app](https://audit.icjia.app)'s accessibility checker and attaches `entry.audit = { score, grade, reportUrl, … }` to each PDF (the source of the `Audit Report` and `Remediation Score` report columns). By default it also runs a page-audit pass over referenced page URLs (`--skip-pages` to opt out). Results are cached by content hash (`~/.filecap/audit-cache.json`, 30-day TTL), so re-runs only re-fetch changed/uncached PDFs. As of v1.34.0 the HTTP layer retries `429`/transient `5xx` honoring `Retry-After`, so a large batch of newly-added PDFs no longer trips audit.icjia.app's per-IP rate limit. Only PDFs are scored — Office formats have native checkers in their authoring apps.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-o, --output <path>` | (required) | Output path for the audited inventory NDJSON |
+| `--force` | (off) | Re-fetch every PDF even if a fresh cache entry exists |
+| `--skip-pages` | (off) | Skip the page-audit pass (PDF scoring only) |
+| `--concurrency <n>` | `2` | Parallel requests (the endpoint's analyzer is 2-at-a-time) |
+| `--ttl-days <n>` | `30` | PDF audit cache TTL |
+
+Pipeline placement: `scan → references → cross-references → audits → web-rollup`.
+
 ### `filecap web-rollup`
 
-Bundle the most recent scans of every saved site into a static-site directory ready for Netlify or any static host.
+Bundle the most recent scans of every saved site into a static-site directory ready for Netlify or any static host. The bundle includes the per-site reports, the `audit-file-list-master.xlsx` (every remediable file across the fleet), and `scores-by-site.xlsx` (per-site PDF score coverage + A–F grade distribution + a fleet total).
 
 | Flag | Default | Description |
 |---|---|---|
@@ -848,7 +876,7 @@ Output directory contents:
 
 | File | Purpose |
 |---|---|
-| `audit-file-list.csv` | One row per file, 16 columns (14 file-descriptor + 2 staff-fill — the work-order vendors actually consume + the staff-edit columns added in v1.7.16). Human-readable column headers. Filterable in Excel, Smartsheet, etc. |
+| `audit-file-list.csv` | One row per file, 20 columns (18 value columns — including `Page References`, `Audit Report`, `Remediation Score`, and `Page Count` — plus the 2 `Delete?` / `Notes` staff-fill columns). Human-readable column headers. Filterable in Excel, Smartsheet, etc. |
 | `audit-file-list.html` | (Only when `--html` is passed.) Self-contained interactive dark-mode page — same data, sortable columns, full-text search, category filter chips, no external dependencies. `audit-remote.sh` always passes `--html` unless `AUDIT_HTML=0` is set. |
 | `audit-summary.txt` | Manager-friendly top-line numbers: file counts by category, total bytes, image-only PDF count, remediable count, heading coverage, alt-text coverage, and "What this means" observation bullets. |
 | `README.txt` | Plain-text guide to all files in this folder. Start here if you're not sure which file to open. |
@@ -859,17 +887,17 @@ Output directory contents:
 
 The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `filecap diff` command to detect changes.
 
-**CSV column order** (16 columns; positions 1–14 stable since v1.4.1 with v1.7.2 moving Public URL to position 4; positions 15–16 added in v1.7.16):
+**CSV column order** (20 columns; `Page References` added at position 5 in v1.8.0, `Audit Report` at 6 in v1.9.0, `Page Count` restored in v1.20.0, `Remediation Score` added in v1.34.0; the `Delete?` / `Notes` staff-fill columns stay last):
 
-`Server, Website, Server IP, Public URL, Date published, Source folder on server, File location (relative to source folder), Full file path on server, File name, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of, Delete?, Notes`
+`Server, Website, Server IP, Public URL, Page References, Audit Report, Date published, Source folder on server, File location (relative to source folder), Full file path on server, File name, Page Count, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of, Remediation Score, Delete?, Notes`
 
 The deliverable focuses on the fields a remediator needs to **find** and **price** each file (filename, path, server, type, size, duplicate marker, public URL). Format-specific introspection columns (PDF page count, image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped in v1.4.0 / v1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly from the file. The full introspection remains in the underlying NDJSON inventory for MCP queries and custom reports.
 
-**The last two columns are CSV-only and meant for staff input.** `Delete?` defaults to `No` for every row; staff types `Yes` to flag a file for removal before the next audit. `Notes` is empty by default; free-text for whatever context the staff member wants to leave on a row (why it should stay, why it should go, who owns it, etc.). When the edited CSV comes back, the audit lead removes the `Yes`-marked files on each source server, reads through the notes, and re-runs the audit. These two columns don't appear in the HTML table view — the web view is informational, the CSV is the actionable artefact. CSV is plain text so the "dropdown" feel for `Delete?` needs Excel/Google-Sheets data-validation set by the staff member (right-click → Data validation → List of items → `No, Yes`); without it, staff types `Yes` or `No` directly into the cell.
+**The last two columns are CSV-only and meant for staff input.** `Delete?` is empty by default (changed from `No` in v1.7.28); staff types any non-blank value (`X`, `Yes`, …) to flag a file for removal before the next audit. `Notes` is empty by default; free-text for whatever context the staff member wants to leave on a row (why it should stay, why it should go, who owns it, etc.). When the edited CSV comes back, the audit lead removes the `Yes`-marked files on each source server, reads through the notes, and re-runs the audit. These two columns don't appear in the HTML table view — the web view is informational, the CSV is the actionable artefact. CSV is plain text so the "dropdown" feel for `Delete?` needs Excel/Google-Sheets data-validation set by the staff member (right-click → Data validation → List of items → `No, Yes`); without it, staff types `Yes` or `No` directly into the cell.
 
 Column headers are human-facing labels (not raw field names). Empty cells indicate the field doesn't apply to this file's type.
 
-**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). Both input shapes produce the same 16-column CSV.
+**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). Both input shapes produce the same 20-column CSV.
 
 ## MCP server (Phase 7)
 
@@ -1293,7 +1321,7 @@ In interactive mode, the script asks a few questions. Here's what each one means
 
 After the script finishes, navigate to `~/filecap-audits/<server-name>/latest/report/`. You'll find:
 
-- **`audit-file-list.csv`** — The main deliverable. One row per file, 16 columns covering server, website, file location, full path, public URL, filename, type, size, content hash, duplicate-of marker, plus two staff-fill columns (`Delete?` defaulting to "No", and `Notes`). Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor (the staff-fill columns are for an internal pre-pass — vendors can ignore them).
+- **`audit-file-list.csv`** — The main deliverable. One row per file, 20 columns covering server, website, file location, full path, public URL, page references, filename, page count, type, size, content hash, duplicate-of marker, the PDF `Audit Report` link and `Remediation Score`, plus two staff-fill columns (`Delete?` empty by default, and `Notes`). Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor (the staff-fill columns are for an internal pre-pass — vendors can ignore them).
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
 - **`audit-file-list.html`** — A self-contained dark-mode web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, category filter chips, and print-to-PDF. (Set `AUDIT_HTML=0` in the environment to suppress this file on rare occasions when you don't want it.)
 - **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.

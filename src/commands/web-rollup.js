@@ -9,6 +9,7 @@ import { z } from "zod";
 import { runReport } from "./report.js";
 import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.js";
 import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows, writeXlsxRowsMultiSheet } from "../report/xlsx.js";
+import { buildScoresBySiteRows, SCORES_BY_SITE_COLUMNS } from "../report/scores-by-site.js";
 import { writeHtml } from "../report/html.js";
 import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles } from "../report/pages.js";
 import { buildAliasMap, canonicalizeForFleet, entryCanonicalUrl } from "../references/cross-resolver.js";
@@ -818,6 +819,8 @@ async function computeSiteSummary(inventoryPath) {
   let auditScoreSum = 0;
   let auditErrorCount = 0;
   let auditPending = 0;
+  // v1.34.1: A–F grade distribution for the scores-by-site summary.
+  const byGrade = { A: 0, B: 0, C: 0, D: 0, F: 0 };
   // v1.20.0: inclusive page-count estimate so the hero can advertise
   // remediation workload in the units vendors actually quote against (pages).
   // PDFs use the measured pdfjs page count; the four office formats use
@@ -872,6 +875,8 @@ async function computeSiteSummary(inventoryPath) {
         if (typeof audit.score === "number") {
           auditedPdfCount++;
           auditScoreSum += audit.score;
+          const gr = typeof audit.grade === "string" ? audit.grade.toUpperCase() : null;
+          if (gr && byGrade[gr] !== undefined) byGrade[gr]++;
         } else if (audit.error) {
           auditErrorCount++;
         } else {
@@ -902,7 +907,7 @@ async function computeSiteSummary(inventoryPath) {
   return {
     totalFiles, totalBytes, remediable, byCategory,
     withRefs, withoutRefs, refsUnknown,
-    auditedPdfCount, auditScoreSum, auditErrorCount, auditPending,
+    auditedPdfCount, auditScoreSum, auditErrorCount, auditPending, byGrade,
     pdfPagesMeasured, remediablePages,
     remediablePageCounts: { docxCount, pptxCount, xlsxCount, legacyOfficeCount },
   };
@@ -1459,6 +1464,35 @@ export async function runWebRollup({
     };
   }
 
+  // 6a-ii. v1.34.1 — scores-by-site summary (manager bird's-eye view).
+  //   One row per site with PDF score coverage + the A–F grade distribution,
+  //   plus a fleet TOTAL row. A downloadable companion to the 4,500-row master
+  //   so "give me the sites and their scores" is one click, not a pivot table.
+  let scoresBySiteMeta = null;
+  if (siteResults.length > 0) {
+    const scoresBySiteFilename = "scores-by-site.xlsx";
+    const scoresRows = buildScoresBySiteRows(
+      siteResults.map((r) => ({
+        siteName: r.site?.siteName ?? r.site?.name ?? "",
+        summary: r.summary,
+      })),
+    );
+    const scoresPath = path.join(output, scoresBySiteFilename);
+    await writeXlsxFromRows({
+      outputPath: scoresPath,
+      sheetName: "Scores by site",
+      columns: SCORES_BY_SITE_COLUMNS,
+      rows: scoresRows,
+    });
+    const scoresStat = await fs.stat(scoresPath);
+    scoresBySiteMeta = {
+      filename: scoresBySiteFilename,
+      siteCount: scoresRows.length - 1, // minus the fleet TOTAL row
+      byteCount: scoresStat.size,
+      lastAuditAt: new Date().toISOString(),
+    };
+  }
+
   // (LLM-context files are emitted AFTER duplicate detection — see 6c below.)
   let llmContextMeta = null;
 
@@ -1841,6 +1875,7 @@ export async function runWebRollup({
     password: passwordHash,
     title,
     masterCsv: masterCsvMeta,
+    scoresBySite: scoresBySiteMeta,
     duplicateGroups,
     duplicatesCsv: duplicatesCsvMeta,
     byTypeCsvs,

@@ -399,10 +399,10 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.sizeBytes,
     entry.sha256 ?? "",
     duplicateOf,
-    // v1.34.0: Remediation Score ("B/88"). Appended last to match its
-    // position in CSV_COLUMNS (the non-csvOnly tail) so the by-name value
-    // index lookup in writeHtml resolves correctly.
-    formatRemediationScore(entry.audit),
+    // v1.34.0: Remediation Score ("B/88", "N/A (Office)", "Not scored").
+    // Appended last to match its position in CSV_COLUMNS (the non-csvOnly
+    // tail) so the by-name value index lookup in writeHtml resolves correctly.
+    formatRemediationScore(entry),
   ];
 
   return raw.map(formatCellValue);

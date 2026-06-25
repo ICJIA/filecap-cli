@@ -102,15 +102,40 @@ describe("writeCsv Remediation Score column", () => {
     expect(value).toBe("B/88");
   });
 
-  it("leaves the cell empty for an errored (e.g. oversized) PDF", () => {
+  it("labels an errored (e.g. oversized 413) PDF 'Not scored' instead of blank", () => {
     const csv = writeCsv({ sourceHeader: header, entries: [erroredPdf], sources: null });
     const { value } = cell(csv, erroredPdf, "remediationScore");
+    expect(value).toBe("Not scored");
+  });
+
+  it("labels an Office file 'N/A (Office)' so a blank cell isn't read as missing data", () => {
+    const csv = writeCsv({ sourceHeader: header, entries: [docx], sources: null });
+    const { value } = cell(csv, docx, "remediationScore");
+    expect(value).toBe("N/A (Office)");
+  });
+
+  it("labels spreadsheets and presentations 'N/A (Office)' too", () => {
+    const xlsxFile = { ...docx, path: "data.xlsx", filename: "data.xlsx", extension: "xlsx", category: "spreadsheet", sha256: "x1" };
+    const pptxFile = { ...docx, path: "deck.pptx", filename: "deck.pptx", extension: "pptx", category: "presentation", sha256: "x2" };
+    const csv = writeCsv({ sourceHeader: header, entries: [xlsxFile, pptxFile], sources: null });
+    const lines = csv.trim().split("\n");
+    const idx = lines[0].split(",").indexOf("Remediation Score");
+    expect(lines[1].split(",")[idx]).toBe("N/A (Office)");
+    expect(lines[2].split(",")[idx]).toBe("N/A (Office)");
+  });
+
+  it("leaves the cell blank for a PDF still pending audit (no audit field yet)", () => {
+    const pendingPdf = { ...scoredPdf, path: "pending.pdf", filename: "pending.pdf", sha256: "p1" };
+    delete pendingPdf.audit;
+    const csv = writeCsv({ sourceHeader: header, entries: [pendingPdf], sources: null });
+    const { value } = cell(csv, pendingPdf, "remediationScore");
     expect(value).toBe("");
   });
 
-  it("leaves the cell empty for a non-PDF file", () => {
-    const csv = writeCsv({ sourceHeader: header, entries: [docx], sources: null });
-    const { value } = cell(csv, docx, "remediationScore");
+  it("leaves the cell blank for a non-remediable reference file (e.g. image)", () => {
+    const image = { ...docx, path: "logo.png", filename: "logo.png", extension: "png", category: "image", remediable: false, sha256: "i1" };
+    const csv = writeCsv({ sourceHeader: header, entries: [image], sources: null });
+    const { value } = cell(csv, image, "remediationScore");
     expect(value).toBe("");
   });
 });

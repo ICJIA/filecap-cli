@@ -160,16 +160,36 @@ function formatAuditScore(audit) {
   return "";
 }
 
-// v1.34.0: format entry.audit into the "B/88" grade/score cell. Empty when
-// there's no audit, the file was skipped/errored, or either half is missing
-// (a grade with no number, or vice-versa, is not a meaningful score pair).
-export function formatRemediationScore(audit) {
+// Office categories audit.icjia.app does not score — they have native
+// accessibility checkers in Word / Excel / PowerPoint, so filecap doesn't
+// duplicate that work. The score cell says so explicitly rather than going
+// blank (a blank cell reads as "missing data", not "intentionally N/A").
+const OFFICE_CATEGORIES = new Set([
+  "office-document",
+  "spreadsheet",
+  "presentation",
+  "legacy-office",
+]);
+
+// v1.34.0 / v1.34.1: format the Remediation Score cell from a full entry.
+//   PDF, scored            → "B/88"   (grade/score)
+//   PDF, audit error       → "Not scored"   (e.g. 413 oversized, transient)
+//   Office doc/sheet/slides → "N/A (Office)" (use the authoring-app checker)
+//   PDF pending / skipped / reference file → ""  (no final state to report)
+// Takes the entry (not just entry.audit) because only the category can
+// distinguish an Office file from a not-yet-audited PDF.
+export function formatRemediationScore(entry) {
+  if (!entry || typeof entry !== "object") return "";
+  const category = entry.category;
+  if (OFFICE_CATEGORIES.has(category)) return "N/A (Office)";
+  if (category !== "pdf") return "";
+  const audit = entry.audit;
   if (!audit || typeof audit !== "object") return "";
-  if (audit.skipped || audit.error) return "";
   const hasGrade = typeof audit.grade === "string" && audit.grade.length > 0;
   const hasScore = typeof audit.score === "number";
-  if (!hasGrade || !hasScore) return "";
-  return `${audit.grade}/${audit.score}`;
+  if (hasGrade && hasScore) return `${audit.grade}/${audit.score}`;
+  if (audit.error) return "Not scored";
+  return "";
 }
 
 export function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
@@ -254,7 +274,7 @@ export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const referenced = formatReferenced(entry.references);
   const auditScore = formatAuditScore(entry.audit);
-  const remediationScore = formatRemediationScore(entry.audit);
+  const remediationScore = formatRemediationScore(entry);
   const pageCount = formatPageCount(entry);
 
   return [

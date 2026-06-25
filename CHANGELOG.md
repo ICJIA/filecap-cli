@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.34.1] — 2026-06-25
+
+### Added
+
+- **`scores-by-site.xlsx` — a manager bird's-eye summary.** The fleet bundle now ships a one-row-per-site workbook (linked from the landing page) with each site's remediable-file count, PDF score coverage (PDFs / scored / % scored / average score), the A–F grade distribution, and an "Office files (not scored)" count — plus a fleet TOTAL row. It answers "which sites are in the worst shape?" without opening the 4,500-row master. Built from the per-site stats `computeSiteSummary` already streams (now also tallying the grade distribution); it's a downloadable companion, deliberately **not** an on-page aggregate-grade band (that display stays removed).
+
+### Changed
+
+- **Non-scored Remediation Score cells now explain themselves instead of going blank.** A blank cell read as "missing data"; now Office files (DOCX/XLSX/PPTX/legacy) show **`N/A (Office)`** (they have native accessibility checkers in their authoring apps) and PDFs the scorer couldn't process show **`Not scored`** (e.g. the `413 Payload Too Large` oversized PDFs). Genuine pending PDFs and non-remediable reference files stay blank. Across the fleet master this turns ~1,464 confusing blanks into 1,392 `N/A (Office)` + 72 `Not scored`. `formatRemediationScore` now takes the full entry (it needs the category to tell an Office file from a not-yet-audited PDF).
+
+### Docs
+
+- README: the manager TL;DR now covers per-file scores + the scores-by-site summary, with a new **"Understanding the accessibility scores"** section (what `B/88` / `N/A (Office)` / `Not scored` mean, the PDF-only scope, the `413` size limit). Added the missing **`filecap audits`** CLI reference and corrected a second stale "16-column" deliverable description (it's 20).
+
+### Notes
+
+- 959 tests green (new: `test/scores-by-site.test.js`; expanded `test/report-remediation-score.test.js` for the label states). Ships via `node bin/filecap.js web-rollup` (no re-scan).
+
 ## [1.34.0] — 2026-06-25
 
 ### Added
