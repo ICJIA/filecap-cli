@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.34.0] — 2026-06-25
+
+### Added
+
+- **Per-file `Remediation Score` column in the CSV / HTML / XLSX deliverables.** Every per-file report (and the per-file-type aggregate sheets) now carries a `Remediation Score` cell showing the audit.icjia.app letter grade and numeric score together as `B/88` (`grade/score`, read from `entry.audit`). It sits beside the existing **Audit Report** column — which links the shared report — so a manager can read the grade in the row without opening the report. PDFs only; non-PDFs, skipped files, and errored/oversized PDFs leave the cell blank. The data already lived in the inventory NDJSON; this surfaces it. Per management request — and note it is a per-row detail cell, distinct from the aggregate landing-page grade band removed in v1.19.0 (that stays removed).
+
+### Fixed
+
+- **PDF + page scoring now survives audit.icjia.app's rate limit.** The score fetcher gained a retry/backoff HTTP layer (`src/audits/retrying-fetcher.js`): `429 Too Many Requests` and transient `5xx` are retried, honoring the server's `Retry-After` header and falling back to capped exponential backoff. Previously the client threw on the first `429` and recorded a permanent error, so a large batch of cold (never-cached) files would blow past audit.icjia.app's 100-request/min per-IP ceiling and cascade into a wall of errors — a single archive content drop produced 987 such `429`s and starved two later sites of scores entirely. Both the PDF (`/api/audit-url`) and page (`/api/audit-url-page`) passes share the new fetcher. Re-auditing the affected sites through it recovered them cleanly: **archive 206 → 1199 scored, ari 13 → 295, researchhub 100 → 230**. Files that genuinely exceed the endpoint's upload limit return `413 Payload Too Large` and are correctly **not** retried (21 oversized archive PDFs remain unscoreable as-is).
+
+### Notes
+
+- 952 tests green, including new coverage for the backoff fetcher (`test/audits-retrying-fetcher.test.js`) and the score column (`test/report-remediation-score.test.js`). The report-layer change ships to the live bundle via `node bin/filecap.js web-rollup`; the scoring resilience applies to every subsequent `filecap audits` pass.
+
 ## [1.33.0] — 2026-06-17
 
 ### Changed

@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { CSV_COLUMNS, formatPageCount } from "./csv.js";
+import { CSV_COLUMNS, formatPageCount, formatRemediationScore } from "./csv.js";
 import { buildPageList, attachCrossSiteFiles } from "./pages.js";
 import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
@@ -399,6 +399,10 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.sizeBytes,
     entry.sha256 ?? "",
     duplicateOf,
+    // v1.34.0: Remediation Score ("B/88"). Appended last to match its
+    // position in CSV_COLUMNS (the non-csvOnly tail) so the by-name value
+    // index lookup in writeHtml resolves correctly.
+    formatRemediationScore(entry.audit),
   ];
 
   return raw.map(formatCellValue);
@@ -570,6 +574,9 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     // render the integer; non-PDFs render blank.
     { name: "pageCount",   label: "Pages" },
     { name: "category",    label: "File type" },
+    // v1.34.0: the grade/score ("B/88") sits left of the report link so a
+    // manager reads "what's the score" before "open the report".
+    { name: "remediationScore", label: "Remediation Score" },
     { name: "auditScore",  label: "Audit Report" },
     { name: "referenced",  label: "Page References" },
     { name: "duplicateOf", label: "Duplicate of" },

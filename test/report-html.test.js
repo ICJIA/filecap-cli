@@ -130,10 +130,10 @@ describe("writeHtml", () => {
     for (const col of ["serverName", "serverIp", "publicUrl", "scannedPath", "path", "absolutePath", "extension", "sizeBytes", "sha256"]) {
       expect(html).not.toMatch(new RegExp('<th data-col="' + col + '"'));
     }
-    // Exactly seven header cells in the inventory table.
+    // v1.34.0: eight header cells (was 7) — added Remediation Score.
     const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
     expect(theadMatch).not.toBeNull();
-    expect((theadMatch[1].match(/<th /g) || []).length).toBe(7);
+    expect((theadMatch[1].match(/<th /g) || []).length).toBe(8);
   });
 
   // v1.19.0 — the file table's Audit Report cell renders only an "Open
@@ -223,8 +223,9 @@ describe("writeHtml", () => {
     expect(html).toContain('<th data-col="siteName">Website</th>');
     const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
     expect(theadMatch).not.toBeNull();
-    // v1.20.0: 8 = Website + Filename + Pages + 5 other manager columns.
-    expect((theadMatch[1].match(/<th /g) || []).length).toBe(8);
+    // v1.20.0: Website + Filename + Pages + 5 other manager columns = 8.
+    // v1.34.0: + Remediation Score = 9.
+    expect((theadMatch[1].match(/<th /g) || []).length).toBe(9);
   });
 
   it("renders Public URL as a clickable link when publicUrlBase is set in header", async () => {

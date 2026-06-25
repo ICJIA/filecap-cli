@@ -181,6 +181,7 @@ export const XLSX_COLUMN_ORDER = [
   "referenced",     // hyperlinked (first URL)
   "category",
   "sizeBytes",
+  "remediationScore", // v1.34.0: "B/88" grade/score, left of the report link
   "auditScore",
   "siteName",
   "serverName",

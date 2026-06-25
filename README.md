@@ -111,7 +111,7 @@ See the [CHANGELOG](CHANGELOG.md) for the version-by-version breakdown.
 
 ## TL;DR for developers
 
-Node.js CLI written in ESM, distributed via npm as `@icjia/filecap`. Walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX). 16-column CSV writer (14 file-descriptor columns + `Delete?` / `Notes` staff-fill columns added in v1.7.16, csvOnly so the HTML view stays at 14) + self-contained dark-mode HTML report with sortable/filterable client-side JS. Cross-server rollup with content-duplicate detection via SHA-256.
+Node.js CLI written in ESM, run from the GitHub repo (npm package deprecated as of v1.13.0). Walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX) and, after the `audits` pass, an `entry.audit` accessibility grade/score from audit.icjia.app. 20-column CSV writer (`CSV_COLUMNS` is the single source of truth: 18 value columns — `Public URL`, `Referenced` page-links (1.8.0), `Audit Report` link + `Remediation Score` grade/score (1.9.0/1.34.0), `Page Count` (1.20.0), etc. — plus the csvOnly `Delete?` / `Notes` staff-fill columns from v1.7.16) feeding the CSV, a manager-trimmed self-contained dark-mode HTML report (sortable/filterable client-side JS), and an XLSX workbook. Cross-server rollup with content-duplicate detection via SHA-256.
 
 Includes an MCP server (`filecap mcp`) exposing five tools for AI agents (Claude Desktop, Claude Code, Cursor, Windsurf, Continue): `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory`, `filecap_web_rollup`.
 
@@ -119,7 +119,7 @@ As of 1.2.0: `filecap web-rollup` bundles the most recent scan of every saved si
 
 Two distribution shapes: `filecap` CLI invoked directly via npx, plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where filecap actually ran.
 
-ESM-only. Node 20+ required. 30 test files; 434 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
+ESM-only. Node 20+ required. 62 test files; 952 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
 
 ### Architecture summary
 
@@ -129,7 +129,7 @@ ESM-only. Node 20+ required. 30 test files; 434 tests via vitest. Source under `
 
 **Per-site detail pages.** `writeHtml` (`src/report/html.js`) renders each page using the same `dp-hero` block; it accepts `accessKind` for the access-method panel and emits the `<table class="row-marker-table">` legend plus the file table with `table-layout: fixed` + `<colgroup>` + per-`<th>` resize handles.
 
-**CSV / HTML column layout.** `CSV_COLUMNS` (`src/report/csv.js`) is the single source of truth. Entries flagged `csvOnly: true` (the `deleteFlag` and `notes` columns) are filtered out of the HTML view, so the web table stays at 14 columns + 1 `Referenced` column (1.8.0) while CSVs ship at 16 + 1.
+**CSV / HTML / XLSX column layout.** `CSV_COLUMNS` (`src/report/csv.js`) is the single source of truth for all three writers. Entries flagged `csvOnly: true` (the `deleteFlag` and `notes` columns) are filtered out of the HTML and XLSX views, so the CSV ships all 20 columns while the HTML renders a manager-trimmed projection of the non-`csvOnly` columns and the XLSX reprojects them into a manager-friendly order (`XLSX_COLUMN_ORDER`). The `Audit Report` (report link) and `Remediation Score` (`grade/score`, e.g. `B/88`) columns come from `entry.audit`.
 
 **Site classification.** `deriveAccessKind(site)` and `TYPE_BUCKETS` (`src/commands/web-rollup.js`) classify sites into `strapi` / `github` / `server` and into per-file-type buckets. The latter drives one CSV+HTML pair per non-empty bucket (`audit-pdfs.csv` + `audit-pdfs.html`, etc.) by reusing `writeHtml` with a consolidated header.
 
@@ -145,13 +145,14 @@ ESM-only. Node 20+ required. 30 test files; 434 tests via vitest. Source under `
 
 ## TL;DR for vendors and auditors
 
-You receive an `audit-file-list.csv` (16 columns, one row per file) with everything needed to scope and quote a remediation engagement:
+You receive an `audit-file-list.csv` (20 columns, one row per file) with everything needed to scope and quote a remediation engagement:
 
 - **Identification**: server name, website nickname, server IP, **public URL** (position 4 since v1.7.2 — front and centre so you don't have to scroll), date published, source folder on server, file location, full path, filename, extension, category.
 - **Filesystem metadata**: size in bytes, SHA-256 content hash (Excel-text-formula-wrapped so it doesn't auto-convert to scientific notation), duplicate-of reference.
-- **Staff-fill columns (CSV-only, since v1.7.16)**: `Delete?` (defaults to "No" — staff marks "Yes" to flag a file for removal before the next audit) and `Notes` (free-text). These columns don't appear in the HTML view; the web is informational, the CSV is the actionable artefact.
+- **Accessibility scoring (PDFs, since v1.9.0 / v1.34.0)**: an `Audit Report` column links each PDF's audit.icjia.app accessibility report, and a `Remediation Score` column shows that report's grade and score together (e.g. `B/88`) so you can triage worst-first without opening every report. Non-PDF and unscoreable files leave the cell blank.
+- **Staff-fill columns (CSV-only, since v1.7.16)**: `Delete?` (empty by default since v1.7.28 — staff writes any non-blank value to flag a file for removal before the next audit) and `Notes` (free-text). These columns don't appear in the HTML/XLSX views; the web is informational, the CSV is the actionable artefact.
 
-Format-specific introspection columns (PDF page count, image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped from the CSV in v1.4.0/1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly. The full introspection is still carried in the underlying NDJSON inventory if your tooling wants it (the MCP server exposes a `filecap_query_inventory` tool for that).
+Most format-specific introspection columns (image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped from the CSV in v1.4.0/1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly — though **PDF page count was restored in v1.20.0** (vendors quote per page). The full introspection is still carried in the underlying NDJSON inventory if your tooling wants it (the MCP server exposes a `filecap_query_inventory` tool for that).
 
 The "Server IP" and "Full file path on server" columns identify exactly where each file lives — you ssh into the server and download the file directly. Optionally accompanied by an `audit-file-list.html` rendering of the same data with sortable/searchable browser-based interface (without the staff-fill columns, by design).
 
@@ -315,6 +316,8 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
+**v1.34.0 shipped.** Per-file accessibility scoring is now both **surfaced** and **resilient**: a `Remediation Score` column (audit.icjia.app `grade/score`, e.g. `B/88`) appears in every CSV / HTML / XLSX deliverable beside the `Audit Report` link, and the scorer retries/backs-off on audit.icjia.app's 100-request/min per-IP rate limit (honoring `Retry-After`) so a large batch of newly-added files no longer cascades into `429` errors. See the [CHANGELOG](CHANGELOG.md) for the full v1.9 → v1.34 line.
+
 **v1.8.0 shipped.** Reference-discovery pipeline (`scan → references → cross-references → web-rollup`) landed. The `Referenced` column on every CSV and HTML view, plus a fleet-wide URL → referrers reverse index, is the headline change. See [Reference discovery (1.8.0)](#reference-discovery-180) for the manager-facing overview.
 
 **v1.7.x shipped.** Manager-friendly visual redesign, complete pipeline `scan → rollup → report → web-rollup → deploy`:
@@ -345,8 +348,10 @@ npx vitest run test/web-rollup.test.js
 | v1.4.x – v1.5.x | shipped | CSV trim to 14 columns; click-and-drag horizontal pan; cross-server duplicates section with explainer; master + duplicates CSVs in bundle |
 | v1.6.x | shipped | `type:"git"` site mode for Nuxt static-site repos (shallow-clone + scan); mixed strapi + git fleets in one bundle |
 | v1.7.x | shipped | Manager-friendly visual redesign: infographic site cards, big audit-count hero, copy-to-clipboard buttons throughout, per-file-type drill-down, `Delete?` + `Notes` staff-fill columns, access-method modal, PII reassurance banner, sticky-bar polish on per-site detail pages |
-| **v1.8.0** | **shipped** | **References pipeline: `Referenced` column at CSV/HTML position 5 next to `Public URL`, per-site Strapi extractor (v3 + v4 GraphQL/REST), git-repo extractor for Nuxt sites, bearer-token + auto-refresh login for intranet, fleet-wide cross-site reverse index, domain-alias-aware URL matching, cross-site reference coverage band on the fleet index hero. 10 of 10 Strapi sites + 7 git Nuxt sites in fleet now contributing.** |
-| vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; `filecap process-deletions <csv>` to act on staff-edited `Delete?=Yes` rows |
+| v1.8.0 | shipped | References pipeline: `Referenced` column at CSV/HTML position 5 next to `Public URL`, per-site Strapi extractor (v3 + v4 GraphQL/REST), git-repo extractor for Nuxt sites, bearer-token + auto-refresh login for intranet, fleet-wide cross-site reverse index, domain-alias-aware URL matching. |
+| v1.9 – v1.33 | shipped | PDF + page accessibility scoring via audit.icjia.app (`filecap audits`, `entry.audit` grade/score); `Page Count` restored (v1.20.0); `/sites` roster + tooling apps (v1.21.0); Netlify Pro Site Password gating + origin-identity removal-at-source + strict CSP (v1.21.x); CMS-hosted cross-site files in the Page view (v1.32.0); per-site detail-page redesign for lower density (v1.33.0). |
+| **v1.34.0** | **shipped** | **Per-file `Remediation Score` column (`grade/score`, e.g. `B/88`) in every CSV / HTML / XLSX; rate-limit-resilient scorer (retry + `Retry-After` backoff on `429`/transient `5xx`) so large cold batches of new files no longer cascade into errors.** |
+| vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; `filecap process-deletions <csv>` to act on staff-edited `Delete?` rows; raise/handle the audit.icjia.app `413` upload cap for oversized PDFs |
 
 ### Production deployment
 

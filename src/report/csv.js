@@ -61,6 +61,16 @@ export const CSV_COLUMNS = [
   { name: "sizeBytes",    label: "Size (bytes)" },
   { name: "sha256",       label: "Content hash (SHA-256)" },
   { name: "duplicateOf",  label: "Duplicate of" },
+  // v1.34.0 — per-file Remediation Score: the audit.icjia.app letter grade
+  // and numeric score rendered together as "B/88". Distinct from the
+  // "Audit Report" column (which links the shared report): management asked
+  // for the grade itself to be readable in the row without opening the
+  // report. Empty for non-PDFs, skips, and errors (e.g. oversized 413s) —
+  // those have no score. Appended here (before the csvOnly action columns)
+  // so it reaches HTML + XLSX while leaving every existing column index
+  // unchanged; display position is set per-format (HTML_TABLE_COLUMNS,
+  // XLSX_COLUMN_ORDER).
+  { name: "remediationScore", label: "Remediation Score" },
   // v1.7.16: CSV-only "action" columns that staff fills in. The HTML
   // table view skips these (filtered by `csvOnly`) because the web view is
   // informational — the actionable artefact is the CSV.
@@ -150,6 +160,18 @@ function formatAuditScore(audit) {
   return "";
 }
 
+// v1.34.0: format entry.audit into the "B/88" grade/score cell. Empty when
+// there's no audit, the file was skipped/errored, or either half is missing
+// (a grade with no number, or vice-versa, is not a meaningful score pair).
+export function formatRemediationScore(audit) {
+  if (!audit || typeof audit !== "object") return "";
+  if (audit.skipped || audit.error) return "";
+  const hasGrade = typeof audit.grade === "string" && audit.grade.length > 0;
+  const hasScore = typeof audit.score === "number";
+  if (!hasGrade || !hasScore) return "";
+  return `${audit.grade}/${audit.score}`;
+}
+
 export function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   // v1.7.40 — Always build the Public URL from publicUrlBase + entry.path
   // so every link lands on the deployed public site, regardless of site
@@ -232,6 +254,7 @@ export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
 
   const referenced = formatReferenced(entry.references);
   const auditScore = formatAuditScore(entry.audit);
+  const remediationScore = formatRemediationScore(entry.audit);
   const pageCount = formatPageCount(entry);
 
   return [
@@ -259,6 +282,7 @@ export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
       return `="${hash}"`;
     })(),
     duplicateOf,
+    remediationScore,
     // v1.7.16 csvOnly columns. The labels stay aligned with CSV_COLUMNS
     // entries; defaults come from the column descriptor so a future column
     // addition just needs the descriptor update. v1.7.28: deleteFlag

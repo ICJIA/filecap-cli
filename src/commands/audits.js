@@ -23,6 +23,7 @@ import {
 } from "../audits/cache.js";
 import { fetchAuditScore } from "../audits/score-fetcher.js";
 import { fetchPageAuditScore } from "../audits/page-scorer.js";
+import { createRetryingJsonFetcher } from "../audits/retrying-fetcher.js";
 
 const DEFAULT_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url";
 const DEFAULT_PAGE_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url-page";
@@ -41,14 +42,17 @@ function isScoreableEntry(entry) {
   return entry && entry.extension === "pdf" && entry.category === "pdf";
 }
 
-function defaultJsonFetcher() {
-  return async (url, init) => {
-    const resp = await fetch(url, init);
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status} ${resp.statusText} for ${url}`);
-    }
-    return resp.json();
-  };
+// The default HTTP layer retries 429 (audit.icjia.app's 100/min per-IP rate
+// limit) and transient 5xx, honoring Retry-After. Without this a big batch
+// of cold PDFs trips the limiter and every over-limit request is recorded as
+// a permanent error. Tests inject their own fetcher and bypass this.
+function defaultJsonFetcher(log) {
+  return createRetryingJsonFetcher({
+    maxRetries: 6,
+    baseDelayMs: 2000,
+    maxDelayMs: 60000,
+    log,
+  });
 }
 
 // Bounded-concurrency mapper. Each task is a () => Promise. Limits how many
@@ -142,7 +146,7 @@ export async function runAudits({
   }
 
   const cache = loadAuditCache({ cachePath });
-  const httpFetcher = fetcher ?? defaultJsonFetcher();
+  const httpFetcher = fetcher ?? defaultJsonFetcher(log);
   const now = new Date();
 
   // Identify the PDFs we need to actually call the endpoint for. Entries

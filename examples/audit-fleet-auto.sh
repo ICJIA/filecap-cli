@@ -271,3 +271,4 @@ fi
 
 echo "[fleet-auto] Full pipeline complete (scan → references → cross-references → audits → rollup)"
 exit 0
+

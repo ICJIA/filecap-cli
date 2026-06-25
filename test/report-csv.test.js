@@ -443,7 +443,8 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     // 1.20.0: 19 columns total (was 18 in 1.10.2). Added Page Count after
     // File name. 1.10.2 prior count: 15 file-descriptor + Page References +
     // Audit Score + Delete? + Notes = 18. With Page Count: 19.
-    expect(headerRow.split(",").length).toBe(19);
+    // 1.34.0: + Remediation Score = 20.
+    expect(headerRow.split(",").length).toBe(20);
   });
 
   it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {
