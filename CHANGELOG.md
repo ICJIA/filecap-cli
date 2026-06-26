@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.35.0] — 2026-06-26
+
+### Added
+
+- **Website accessibility score** — a per-site, SiteImprove-style accessibility score (0–100 + A–F grade) for each site's web pages, scored with axe via `audit.icjia.app/api/audit-url-page` and driven by the site's sitemap (∪ CMS pages), explicitly independent of the file/PDF scores. New `filecap site-audit <site>` stage (pipeline Stage 3.6) writes a purge-exempt `latest/site-audit.json` sidecar with the score, a severity + WCAG-level (A/AA) outstanding-issue breakdown, a needs-review count, and a true fixed/new issue-set trend vs. the previous run.
+- Compact "Website accessibility" tile on each audit-bundle site card, and a full breakdown section (score, coverage, severity + WCAG split, fixed/new trend, per-page table) on each per-site detail page — each carrying copy that the website score does not reflect the site's files.
+- `SKIP_SITE_AUDIT=1` opt-out in the fleet pipeline scripts.
+
+### Notes
+
+- Requires `audit.icjia.app` to return `axe.violations[]` + `axe.incomplete[]` and to render SPAs before auditing; filecap degrades gracefully (severity-only, no trend) against an endpoint that doesn't yet.
+
 ## [1.34.1] — 2026-06-25
 
 ### Added

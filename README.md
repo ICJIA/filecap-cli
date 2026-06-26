@@ -601,6 +601,25 @@ Scores every PDF in an inventory NDJSON against [audit.icjia.app](https://audit.
 
 Pipeline placement: `scan → references → cross-references → audits → web-rollup`.
 
+### `filecap site-audit <site>` *(new in 1.35.0)*
+
+Scores a site's web pages for accessibility (axe via [audit.icjia.app](https://audit.icjia.app)) using the site's sitemap plus any CMS pages as the scored set. Writes a purge-exempt `latest/site-audit.json` sidecar with the 0–100 score, A–F grade, severity + WCAG-level (A/AA) outstanding-issue breakdown, needs-review count, and a true fixed/new issue-set trend vs. the previous run. `web-rollup` reads the sidecar automatically and adds a compact "Website accessibility" tile to the site card and a full breakdown section to the per-site detail page.
+
+**The website accessibility score and the file/PDF score are independent and do not correlate.** The website score reflects how well a site's pages render in a browser; the file score reflects the intrinsic accessibility of downloadable documents. A site can have excellent pages and poor files, or vice versa.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--max-new-pages <n>` | `150` | Cap freshly fetched pages per run (cache-amortized) |
+| `--concurrency <n>` | `2` | Concurrent page audits (respects the 100/min endpoint IP cap) |
+| `--ttl-days <n>` | `14` | Page cache freshness window |
+| `--force` | (off) | Ignore cache; re-score every page |
+| `--endpoint <url>` | `audit.icjia.app/api/audit-url-page` | Override the page-audit endpoint |
+| `--sites-file <path>` | `~/.filecap/sites.json` | Override saved-sites JSON path |
+| `--audits-base <dir>` | `~/filecap-audits` | Override the audits root |
+
+Pipeline placement: `scan → references → cross-references → audits → site-audit → web-rollup`.
+To skip in the fleet pipeline: `SKIP_SITE_AUDIT=1 ./examples/audit-fleet-auto.sh`.
+
 ### `filecap web-rollup`
 
 Bundle the most recent scans of every saved site into a static-site directory ready for Netlify or any static host. The bundle includes the per-site reports, the `audit-file-list-master.xlsx` (every remediable file across the fleet), and `scores-by-site.xlsx` (per-site PDF score coverage + A–F grade distribution + a fleet total).
@@ -1057,7 +1076,7 @@ Seven phases, in order:
 |---|-------|--------|
 | 1 | **Pre-flight** | Hard-aborts unless `expect`, a logged-in `netlify` CLI, and `~/.filecap/sites.json` are all present and no other scan is running; warns (does not abort) when `$HOME` has under ~10 GB free. Fails fast instead of 15 minutes in. |
 | 2 | **Scan** | Inventories every file on all content sites over SSH + rsync. Delegated to `examples/audit-fleet-auto.sh`, which drives `audit-fleet.sh` / `audit-remote.sh` under `expect`. |
-| 3 | **Enrich** | `filecap references` (CMS page references) -> `filecap cross-references` -> `filecap audits` (per-PDF **and** per-page accessibility scores from `audit.icjia.app`). |
+| 3 | **Enrich** | `filecap references` (CMS page references) -> `filecap cross-references` -> `filecap audits` (per-PDF **and** per-page accessibility scores from `audit.icjia.app`) -> `filecap site-audit` (per-site web-page score 0–100 + A–F grade, Stage 3.6; skip with `SKIP_SITE_AUDIT=1`). |
 | 4 | **Web rollup** | `filecap web-rollup` builds the deployable bundle: every content site, plus the tooling-site roster shown on `/sites`. |
 | 5 | **Deploy** | Pushes the bundle to the `icjia-fleet-audit` Netlify site. Driven by `webRollup.autoDeploy: true` in `~/.filecap/config.json`; `--no-deploy` exports `FILECAP_NO_DEPLOY=1` to suppress it. |
 | 6 | **Purge** | Keeps only the newest run dir per site and the newest rollup bundle. Never touches `latest/` symlinks, `mirror/` rsync caches, or `_fleet/` consolidated dirs. Skip with `--no-purge`. |
