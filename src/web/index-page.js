@@ -655,8 +655,9 @@ export function renderSiteA11yTile(siteAudit) {
   const score = siteAudit.score;
   const grade = siteAudit.grade ?? "";
   const open = siteAudit.outstanding?.total ?? 0;
-  const fixed = siteAudit.trend?.new != null || siteAudit.trend?.fixed != null
-    ? `${(siteAudit.trend?.fixed ?? 0).toLocaleString()} fixed`
+  const fixedCount = siteAudit.trend?.fixed;
+  const fixed = typeof fixedCount === "number" && fixedCount > 0
+    ? `${fixedCount.toLocaleString()} fixed`
     : "";
   const openTxt = `${open.toLocaleString()} open issue${open === 1 ? "" : "s"}`;
   const trendTxt = fixed ? ` &middot; ${he(fixed)}` : "";
