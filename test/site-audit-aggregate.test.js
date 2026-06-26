@@ -43,4 +43,18 @@ describe("aggregateSite", () => {
     expect(out.grade).toBe(null);
     expect(out.outstanding.total).toBe(0);
   });
+  it("counts nodes in byWcag, not violations, when nodeCount is present", () => {
+    const pageC = {
+      pageUrl: "https://x.com/c", score: 70, grade: "C", violationCount: 1,
+      bySeverity: { critical: 0, serious: 4, moderate: 0, minor: 0 },
+      violations: [{ id: "foo", tags: ["wcag2aa"], nodeCount: 4, nodes: [
+        { target: [".a"] }, { target: [".b"] }, { target: [".c"] }, { target: [".d"] },
+      ] }],
+      incomplete: [], reportUrl: "r/c",
+    };
+    const out = aggregateSite([pageC]);
+    expect(out.outstanding.byWcag.AA).toBe(4);
+    expect(out.outstanding.byWcag.A).toBe(0);
+    expect(Object.values(out.outstanding.byWcag).reduce((a, b) => a + b, 0)).toBe(out.outstanding.total);
+  });
 });

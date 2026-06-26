@@ -73,7 +73,9 @@ describe("fetchPageAuditScore", () => {
         bySeverity: { critical: 0, serious: 1, moderate: 0, minor: 0 },
         violations: [
           { id: "color-contrast", impact: "serious", tags: ["cat.color", "wcag2aa", "wcag143"],
-            nodes: [{ target: ["main h1"] }] },
+            nodeCount: 3, nodes: [{ target: ["main h1"] }] },
+          { id: "label", impact: "serious", tags: ["wcag2a"],
+            nodes: [{ target: [".a"] }, { target: [".b"] }] },
         ],
         incomplete: [
           { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{ target: [".v-tab"] }] },
@@ -87,10 +89,11 @@ describe("fetchPageAuditScore", () => {
       fetcher: async () => withDetail,
     });
     expect(result.violations).toEqual([
-      { id: "color-contrast", impact: "serious", tags: ["cat.color", "wcag2aa", "wcag143"], nodes: [{ target: ["main h1"] }] },
+      { id: "color-contrast", impact: "serious", tags: ["cat.color", "wcag2aa", "wcag143"], nodeCount: 3, nodes: [{ target: ["main h1"] }] },
+      { id: "label", impact: "serious", tags: ["wcag2a"], nodeCount: 2, nodes: [{ target: [".a"] }, { target: [".b"] }] },
     ]);
     expect(result.incomplete).toEqual([
-      { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{ target: [".v-tab"] }] },
+      { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodeCount: 1, nodes: [{ target: [".v-tab"] }] },
     ]);
   });
 
@@ -112,7 +115,7 @@ describe("fetchPageAuditScore", () => {
       fetcher: async () => withMissingTarget,
     });
     expect(result.violations).toEqual([
-      { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{ target: [] }] },
+      { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodeCount: 1, nodes: [{ target: [] }] },
     ]);
     expect(result.violations[0].nodes[0].target).not.toContain("undefined");
   });

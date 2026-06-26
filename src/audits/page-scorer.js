@@ -25,6 +25,7 @@ function normIssues(arr) {
     id: typeof v?.id === "string" ? v.id : "",
     impact: typeof v?.impact === "string" ? v.impact : null,
     tags: Array.isArray(v?.tags) ? v.tags.filter((t) => typeof t === "string") : [],
+    nodeCount: typeof v?.nodeCount === "number" ? v.nodeCount : (Array.isArray(v?.nodes) ? Math.max(1, v.nodes.length) : 1),
     nodes: Array.isArray(v?.nodes)
       ? v.nodes.map((n) => ({
           target:

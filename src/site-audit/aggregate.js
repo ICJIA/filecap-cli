@@ -27,9 +27,12 @@ export function aggregateSite(scoredPages) {
     if (typeof p?.score === "number") { scoreSum += p.score; scoredCount++; }
     for (const sev of Object.keys(bySeverity)) bySeverity[sev] += p?.bySeverity?.[sev] ?? 0;
     for (const v of p?.violations ?? []) {
+      const n = typeof v?.nodeCount === "number" && v.nodeCount > 0
+        ? v.nodeCount
+        : (Array.isArray(v?.nodes) ? Math.max(1, v.nodes.length) : 1);
       const level = wcagLevelForTags(v?.tags);
-      if (level === "best-practice") byWcag.bestPractice++;
-      else byWcag[level]++;
+      if (level === "best-practice") byWcag.bestPractice += n;
+      else byWcag[level] += n;
     }
     const pageNeedsReview = (p?.incomplete ?? []).length;
     needsReview += pageNeedsReview;
