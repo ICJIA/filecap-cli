@@ -17,6 +17,22 @@
 //   - 4xx errors throw — usually means a misconfigured endpoint or a
 //     URL the server's allowlist rejects.
 
+// Normalise an axe violations[]/incomplete[] array down to the minimum filecap
+// needs: rule id, impact, WCAG tags, and each node's CSS-selector target.
+function normIssues(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((v) => ({
+    id: typeof v?.id === "string" ? v.id : "",
+    impact: typeof v?.impact === "string" ? v.impact : null,
+    tags: Array.isArray(v?.tags) ? v.tags.filter((t) => typeof t === "string") : [],
+    nodes: Array.isArray(v?.nodes)
+      ? v.nodes.map((n) => ({
+          target: Array.isArray(n?.target) ? n.target : n?.target !== null ? [String(n.target)] : [],
+        }))
+      : [],
+  }));
+}
+
 export async function fetchPageAuditScore({
   pageUrl,
   auditEndpoint,
@@ -93,5 +109,10 @@ export async function fetchPageAuditScore({
     pageTitle: response?.pageTitle ?? null,
     audited: response?.audited ?? null,
     cached: response?.cached === true,
+    // v1.35.0 — per-rule detail when the enhanced endpoint provides it
+    // (absent on the legacy endpoint → []). Drives the WCAG-level breakdown
+    // and the issue-set fixed/new diff.
+    violations: normIssues(axe.violations),
+    incomplete: normIssues(axe.incomplete),
   };
 }

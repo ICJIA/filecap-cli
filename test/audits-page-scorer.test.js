@@ -60,7 +60,38 @@ describe("fetchPageAuditScore", () => {
       pageTitle: "ICJIA — Authority Board Meeting · April 9, 2026",
       audited: "2026-05-19T17:32:11.000Z",
       cached: false,
+      violations: [],
+      incomplete: [],
     });
+  });
+
+  it("captures axe violations[] + incomplete[] when the endpoint returns them", async () => {
+    const withDetail = {
+      url: "https://x.com/p/", pageTitle: "P", audited: "2026-06-26T00:00:00.000Z",
+      axe: {
+        score: 80, grade: "B", violationCount: 1,
+        bySeverity: { critical: 0, serious: 1, moderate: 0, minor: 0 },
+        violations: [
+          { id: "color-contrast", impact: "serious", tags: ["cat.color", "wcag2aa", "wcag143"],
+            nodes: [{ target: ["main h1"] }] },
+        ],
+        incomplete: [
+          { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{ target: [".v-tab"] }] },
+        ],
+      },
+      reportId: "x", reportUrl: "https://audit.icjia.app/page-report/x", cached: false,
+    };
+    const result = await fetchPageAuditScore({
+      pageUrl: "https://x.com/p/",
+      auditEndpoint: "https://audit.icjia.app/api/audit-url-page",
+      fetcher: async () => withDetail,
+    });
+    expect(result.violations).toEqual([
+      { id: "color-contrast", impact: "serious", tags: ["cat.color", "wcag2aa", "wcag143"], nodes: [{ target: ["main h1"] }] },
+    ]);
+    expect(result.incomplete).toEqual([
+      { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{ target: [".v-tab"] }] },
+    ]);
   });
 
   it("attaches Bearer token when provided (forward-compat with auth-on mode)", async () => {
