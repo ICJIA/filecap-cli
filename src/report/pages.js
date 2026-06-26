@@ -46,7 +46,7 @@ function hostFromUrl(u) {
  *          dupeFileCount counts the page's additional linked files already
  *          listed under earlier pages.
  */
-export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
+export function buildPageList(entries, sitemapUrls = [], cmsPages = [], pageScores = null) {
   // v1.29.0 — key the inversion by the NORMALIZED URL (same rule as the
   // sitemap/CMS merge below) so raw variants of one page ("/About/" vs
   // "/about") fold into a single row instead of splitting its files across
@@ -126,6 +126,15 @@ export function buildPageList(entries, sitemapUrls = [], cmsPages = []) {
       dupeFileCount: 0,
       fromSitemap: true,
     });
+  }
+  // v1.35.0 — overlay per-page accessibility scores from the site-audit sidecar
+  // (keyed by normalized URL) onto every page row, so sitemap-only pages — not
+  // just file-linking ones — show a score in the Page view.
+  if (pageScores instanceof Map) {
+    for (const page of pages) {
+      const hit = pageScores.get(normPageUrl(page.pageUrl));
+      if (hit) page.pageAudit = hit;
+    }
   }
   return pages;
 }

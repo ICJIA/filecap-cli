@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPageList, parseCmsPageList, parsePageRefFiles, attachCrossSiteFiles } from "../src/report/pages.js";
+import { buildPageList, parseCmsPageList, parsePageRefFiles, attachCrossSiteFiles, normPageUrl } from "../src/report/pages.js";
 
 function fileEntry(p, references) {
   return { path: p, filename: p.split("/").pop(), category: "pdf", references };
@@ -231,6 +231,17 @@ describe("parsePageRefFiles", () => {
     ].join("\n");
     const m = parsePageRefFiles(ndjson);
     expect(m.size).toBe(0);
+  });
+});
+
+describe("buildPageList with pageScores", () => {
+  it("populates pageAudit for sitemap-only pages from the score map", () => {
+    const scores = new Map([
+      [normPageUrl("https://x.com/solo"), { score: 88, grade: "B", violationCount: 1, bySeverity: {}, reportUrl: "r" }],
+    ]);
+    const pages = buildPageList([], ["https://x.com/solo"], [], scores);
+    const solo = pages.find((p) => p.pageUrl === "https://x.com/solo");
+    expect(solo.pageAudit).toMatchObject({ score: 88, grade: "B", reportUrl: "r" });
   });
 });
 
