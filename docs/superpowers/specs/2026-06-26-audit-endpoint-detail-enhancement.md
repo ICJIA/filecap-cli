@@ -2,7 +2,11 @@
 
 - **Date:** 2026-06-26
 - **Target repo:** **`audit.icjia.app`** (NOT filecap-cli). This doc lives in filecap because filecap is the consumer; carry it into the audit app's repo to implement.
-- **Status:** Draft for review. Drafted without access to the audit.icjia.app source, so repo-specific file paths are marked `‹locate in your repo›`; everything else (the axe mapping, the Puppeteer render-wait, the exact JSON contract, the test cases) is concrete.
+- **Status:** IMPLEMENTED on branches (2026-06-26), not yet deployed.
+  - **audit.icjia.app** (`file-accessibility-audit` repo): branch `feat/page-audit-detail` (commit `cf1228e`) — exposes `axe.violations[]` + `axe.incomplete[]`. **Deploy is yours** (their infra).
+  - **filecap** consumer side: landed on `main` (`7b25f26`).
+  - **Correction to this draft:** §2.2 (render SPAs before auditing) was **already implemented** in the endpoint (`networkidle2` + a 2 s hydration wait) — no change was needed there; only the detail exposure (§2.1) was added. So `icjia.illinois.gov`'s 100/0 was a real hydrated render, not a shell.
+  - **Actual shipped per-issue shape:** `{ id, impact, description, helpUrl, tags, nodeCount, nodes: [{ target }] }`, where `nodeCount` is the uncapped `max(1, nodes.length)` and `nodes` is capped at 25. filecap counts `nodeCount` in its WCAG breakdown so it reconciles with the endpoint's node-based `bySeverity` (resolving the §3 unit concern).
 - **Consumer dependency:** filecap's `site-audit` feature (v1.35.0, merged to `main`) is built and ships **dormant** until this lands. filecap's normalizer already tolerates the absence of these fields (treats them as `[]`), so this change is non-breaking to deploy independently.
 
 ---
@@ -41,6 +45,8 @@ axe.incomplete = slimIssues(results.incomplete);
 Do **not** include `html`, `failureSummary`, `description`, `help`, `helpUrl`, or `passes`/`inapplicable` — filecap doesn't use them and they bloat the payload. The full human-readable report still lives at `reportUrl` (unchanged).
 
 ### 2.2 Render SPAs before auditing
+
+**ALREADY IMPLEMENTED — no change was needed.** `pageAuditor.ts` already navigates with `waitUntil: 'networkidle2'` plus a 2 s hydration wait, so SPAs (incl. `icjia.illinois.gov`) are already scored on the hydrated DOM. The guidance below is retained only as a record of what was verified.
 
 Ensure the page has settled before `.analyze()`. With Puppeteer:
 
