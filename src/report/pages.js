@@ -10,7 +10,7 @@
 // and pageAudit carries { score, grade, violationCount, pageTitle, reportUrl, … }.
 // So no new pipeline data is required — the Page view is a pure transform.
 
-function normPageUrl(u) {
+export function normPageUrl(u) {
   return String(u ?? "").trim().replace(/\/+$/, "").toLowerCase();
 }
 
