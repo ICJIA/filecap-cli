@@ -647,6 +647,29 @@ export function renderToolCard(tool, { showStatus = false } = {}) {
 </article>`;
 }
 
+// v1.35.0 — compact "Website accessibility" tile for the card. Visually
+// distinct from the file tiles so it never reads as a file metric. Omitted
+// (not zeroed) when the site has no scored pages. Independent of file scores.
+export function renderSiteA11yTile(siteAudit) {
+  if (!siteAudit || typeof siteAudit.score !== "number") return "";
+  const score = siteAudit.score;
+  const grade = siteAudit.grade ?? "";
+  const open = siteAudit.outstanding?.total ?? 0;
+  const fixed = siteAudit.trend?.new != null || siteAudit.trend?.fixed != null
+    ? `${(siteAudit.trend?.fixed ?? 0).toLocaleString()} fixed`
+    : "";
+  const openTxt = `${open.toLocaleString()} open issue${open === 1 ? "" : "s"}`;
+  const trendTxt = fixed ? ` &middot; ${he(fixed)}` : "";
+  return `<div class="site-a11y">
+    <div class="site-a11y-score"><span class="num">${he(String(score))}</span><span class="grade">${he(grade)}</span></div>
+    <div class="site-a11y-meta">
+      <span class="site-a11y-label">Website accessibility</span>
+      <span class="site-a11y-sub">${he(openTxt)}${trendTxt}</span>
+      <span class="site-a11y-note">Scores the site&#39;s pages — not files.</span>
+    </div>
+  </div>`;
+}
+
 export function renderCard(sr, { sortIndex = 0 } = {}) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const nickname = he(site.siteName ?? site.name ?? "");
@@ -742,6 +765,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
     <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span>${remediablePages > 0 ? `<span class="lbl-sub" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} potential pages</span>` : ""}</div>
   </div>
+  ${renderSiteA11yTile(sr.siteAudit)}
   <div class="donut-row">
     <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>may need audit</small></div></div>
     <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span></div>

@@ -889,6 +889,29 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+.site-card .site-a11y {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid #c9d8e8;
+  border-left: 4px solid #2f6fb0;
+  border-radius: 8px;
+  background: #f3f8fd;
+}
+.site-card .site-a11y-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.site-card .site-a11y-score .num { font-size: 1.9rem; font-weight: 700; color: #1b4a78; line-height: 1; }
+.site-card .site-a11y-score .grade { font-size: 1rem; font-weight: 700; color: #2f6fb0; }
+.site-card .site-a11y-meta { display: flex; flex-direction: column; gap: 1px; }
+.site-card .site-a11y-label { font-weight: 600; font-size: 0.9rem; color: #1b4a78; }
+.site-card .site-a11y-sub { font-size: 0.82rem; color: #41607c; }
+.site-card .site-a11y-note { font-size: 0.74rem; color: #6a7c8c; font-style: italic; }
+
 .site-card .donut-row {
   display: flex;
   align-items: center;

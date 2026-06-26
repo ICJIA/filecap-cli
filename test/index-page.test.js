@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot } from "../src/web/index-page.js";
+import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot, renderSiteA11yTile } from "../src/web/index-page.js";
 
 const baseSr = {
   site: {
@@ -530,5 +530,24 @@ describe("renderCard status dot (v1.21.3)", () => {
   });
   it("renders no dot when status is absent", () => {
     expect(renderCard(sr)).not.toContain("status-dot");
+  });
+});
+
+describe("renderSiteA11yTile", () => {
+  it("renders score, grade, open + fixed counts and the 'not files' note", () => {
+    const html = renderSiteA11yTile({
+      score: 94, grade: "A",
+      outstanding: { total: 37 },
+      trend: { fixed: 12, new: 5, stillOpen: 32 },
+    });
+    expect(html).toContain("94");
+    expect(html).toContain("Website accessibility");
+    expect(html).toContain("37 open");
+    expect(html).toContain("12 fixed");
+    expect(html).toMatch(/not files|pages only/i);
+  });
+  it("returns empty string for an unscored site", () => {
+    expect(renderSiteA11yTile(null)).toBe("");
+    expect(renderSiteA11yTile({ score: null })).toBe("");
   });
 });
