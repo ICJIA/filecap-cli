@@ -7,7 +7,7 @@
 #
 #    1. Pre-flight — checks expect, Netlify login, sites.json, free disk
 #    2. Scan       — inventories every file on all content sites (ssh + rsync)
-#    3. Enrich     — CMS references -> cross-references -> PDF a11y scores
+#    3. Enrich     — CMS references -> cross-references -> PDF a11y scores -> website a11y scores
 #    4. Web audit  — builds the deployable web-rollup bundle
 #                    (all content sites + the tooling-site roster)
 #    5. Deploy     — pushes the bundle to Netlify (the live fleet-audit site)

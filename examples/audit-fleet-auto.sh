@@ -37,6 +37,7 @@
 #    SKIP_REFERENCES=1 ./audit-fleet-auto.sh      # skip references + cross-references
 #    SKIP_AUDITS=1 ./audit-fleet-auto.sh          # skip the PDF accessibility scoring (v1.9.0)
 #    SKIP_ROLLUP=1 ./audit-fleet-auto.sh          # skip web-rollup bundle build
+#    SKIP_SITE_AUDIT=1 ./audit-fleet-auto.sh      # skip the website accessibility scoring (v1.35.0)
 #    FILECAP_NO_DEPLOY=1 ./audit-fleet-auto.sh    # build but don't deploy to Netlify
 #
 #  EXIT CODE
@@ -254,6 +255,36 @@ for s in d.get('sites', []):
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
+#  Stage 3.6 (v1.35.0): site-audit — score each site's WEB PAGES for
+#  accessibility (axe via audit.icjia.app/api/audit-url-page), sitemap-driven
+#  and independent of the file/PDF scores. Writes latest/site-audit.json per
+#  site (purge-exempt). Shares ~/.filecap/page-audit-cache.json with Stage 3.5,
+#  so unchanged pages are free. Sequential per site — the 100/min IP rate limit
+#  means parallel sites would only contend.
+# ────────────────────────────────────────────────────────────────────────────
+if [[ "${SKIP_SITE_AUDIT:-0}" == "1" ]]; then
+  echo "[fleet-auto] SKIP_SITE_AUDIT=1 — skipping website accessibility scoring"
+else
+  echo "[fleet-auto] Stage 3.6: running 'filecap site-audit' per site"
+  KNOWN_SITES=$(python3 -c "
+import json
+with open('$SITES_JSON') as f: d = json.load(f)
+for s in d.get('sites', []):
+    if s.get('name'): print(s['name'])
+" 2>/dev/null)
+  for site in $KNOWN_SITES; do
+    site_dir="$AUDITS_BASE/$site"
+    [[ -d "$site_dir" ]] || continue
+    if node "$FILECAP_BIN" site-audit "$site" >/tmp/filecap-siteaudit-"$site".log 2>&1; then
+      result=$(tail -1 /tmp/filecap-siteaudit-"$site".log)
+      echo "[fleet-auto]   ✓ site-audit $site: $result"
+    else
+      echo "[fleet-auto] WARN: site-audit failed for $site (see /tmp/filecap-siteaudit-$site.log)" >&2
+    fi
+  done
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
 #  Stage 4: web-rollup — bundle every site into a static-site directory
 #  (deploys to Netlify if ~/.filecap/config.json has webRollup.autoDeploy:
 #  true and FILECAP_NO_DEPLOY is not set)
@@ -269,6 +300,6 @@ else
   echo "[fleet-auto] ✓ web-rollup complete"
 fi
 
-echo "[fleet-auto] Full pipeline complete (scan → references → cross-references → audits → rollup)"
+echo "[fleet-auto] Full pipeline complete (scan → references → cross-references → audits → site-audit → rollup)"
 exit 0
 
