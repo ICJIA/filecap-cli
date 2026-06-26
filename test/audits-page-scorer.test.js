@@ -94,6 +94,29 @@ describe("fetchPageAuditScore", () => {
     ]);
   });
 
+  it("normalizes a node with a missing target key to [] (not ['undefined'])", async () => {
+    const withMissingTarget = {
+      url: "https://x.com/p/", pageTitle: "P", audited: "2026-06-26T00:00:00.000Z",
+      axe: {
+        score: 80, grade: "B", violationCount: 1,
+        bySeverity: { critical: 0, serious: 1, moderate: 0, minor: 0 },
+        violations: [
+          { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{}] },
+        ],
+      },
+      reportId: "x", reportUrl: "https://audit.icjia.app/page-report/x", cached: false,
+    };
+    const result = await fetchPageAuditScore({
+      pageUrl: "https://x.com/p/",
+      auditEndpoint: "https://audit.icjia.app/api/audit-url-page",
+      fetcher: async () => withMissingTarget,
+    });
+    expect(result.violations).toEqual([
+      { id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{ target: [] }] },
+    ]);
+    expect(result.violations[0].nodes[0].target).not.toContain("undefined");
+  });
+
   it("attaches Bearer token when provided (forward-compat with auth-on mode)", async () => {
     const calls = [];
     const fetcher = async (url, init) => {

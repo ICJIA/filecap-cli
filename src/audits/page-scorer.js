@@ -27,7 +27,12 @@ function normIssues(arr) {
     tags: Array.isArray(v?.tags) ? v.tags.filter((t) => typeof t === "string") : [],
     nodes: Array.isArray(v?.nodes)
       ? v.nodes.map((n) => ({
-          target: Array.isArray(n?.target) ? n.target : n?.target !== null ? [String(n.target)] : [],
+          target:
+            Array.isArray(n?.target)
+              ? n.target
+              : n?.target === null || n?.target === undefined
+                ? []
+                : [String(n.target)],
         }))
       : [],
   }));
