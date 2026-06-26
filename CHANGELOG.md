@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Website accessibility score** — a per-site, SiteImprove-style accessibility score (0–100 + A–F grade) for each site's web pages, scored with axe via `audit.icjia.app/api/audit-url-page` and driven by the site's sitemap (∪ CMS pages), explicitly independent of the file/PDF scores. New `filecap site-audit <site>` stage (pipeline Stage 3.6) writes a purge-exempt `latest/site-audit.json` sidecar with the score, a severity + WCAG-level (A/AA) outstanding-issue breakdown, a needs-review count, and a true fixed/new issue-set trend vs. the previous run.
 - Compact "Website accessibility" tile on each audit-bundle site card, and a full breakdown section (score, coverage, severity + WCAG split, fixed/new trend, per-page table) on each per-site detail page — each carrying copy that the website score does not reflect the site's files.
 - `SKIP_SITE_AUDIT=1` opt-out in the fleet pipeline scripts.
+- Each fleet-audit site card now shows a paired **File accessibility** vs **Website accessibility** score donut (grade-banded A–F), replacing the single "% may need audit" donut — making explicit that a site's document scores and its web-page score are independent and don't correlate. Each side shows "not scored yet" until data exists.
 
 ### Notes
 

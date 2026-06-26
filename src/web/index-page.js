@@ -2,6 +2,7 @@ import { injectPasswordGate } from "./password-gate.js";
 import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 import { INDEX_CSS } from "./index-css.js";
+import { gradeForScore } from "../site-audit/aggregate.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
 import { uptimeClientScript } from "./uptime-client.js";
 
@@ -647,27 +648,54 @@ export function renderToolCard(tool, { showStatus = false } = {}) {
 </article>`;
 }
 
-// v1.35.0 — compact "Website accessibility" tile for the card. Visually
-// distinct from the file tiles so it never reads as a file metric. Omitted
-// (not zeroed) when the site has no scored pages. Independent of file scores.
-export function renderSiteA11yTile(siteAudit) {
-  if (!siteAudit || typeof siteAudit.score !== "number") return "";
-  const score = siteAudit.score;
-  const grade = siteAudit.grade ?? "";
-  const open = siteAudit.outstanding?.total ?? 0;
-  const fixedCount = siteAudit.trend?.fixed;
-  const fixed = typeof fixedCount === "number" && fixedCount > 0
-    ? `${fixedCount.toLocaleString()} fixed`
+// v1.35.0 — paired File-vs-Website accessibility score donuts on each card.
+// Replaces the old "% may need audit" scope donut and the site-a11y tile. The
+// pairing is the point: a site's DOCUMENT accessibility and its WEB-PAGE
+// accessibility are separate measures that do not correlate.
+//
+// File score = average axe score of the site's SCORED PDFs
+//   (summary.auditScoreSum / summary.auditedPdfCount). Office files are never
+//   auto-scored, so it is labeled "scored PDFs".
+// Site score = the page-audit sidecar's score (sr.siteAudit.score).
+// Either side shows a "not scored yet" placeholder independently when absent.
+export function renderScorecards(summary, siteAudit) {
+  const auditedPdfCount = summary?.auditedPdfCount ?? 0;
+  const fileScore = auditedPdfCount > 0
+    ? Math.round((summary?.auditScoreSum ?? 0) / auditedPdfCount)
+    : null;
+  const fileCov = auditedPdfCount > 0
+    ? `avg of ${auditedPdfCount.toLocaleString()} scored PDF${auditedPdfCount === 1 ? "" : "s"}`
     : "";
-  const openTxt = `${open.toLocaleString()} open issue${open === 1 ? "" : "s"}`;
-  const trendTxt = fixed ? ` &middot; ${he(fixed)}` : "";
-  return `<div class="site-a11y">
-    <div class="site-a11y-score"><span class="num">${he(String(score))}</span><span class="grade">${he(grade)}</span></div>
-    <div class="site-a11y-meta">
-      <span class="site-a11y-label">Website accessibility</span>
-      <span class="site-a11y-sub">${he(openTxt)}${trendTxt}</span>
-      <span class="site-a11y-note">Scores the site&#39;s pages — not files.</span>
-    </div>
+
+  const siteScore = typeof siteAudit?.score === "number" ? siteAudit.score : null;
+  const cov = siteAudit?.coverage;
+  const siteCov = cov
+    ? `${(cov.scored ?? 0).toLocaleString()} / ${(cov.pagesInSet ?? 0).toLocaleString()} pages scored`
+    : "";
+
+  return `<div class="scorecards">
+    ${renderScoreDonut({ score: fileScore, label: "File accessibility", tag: "documents", coverage: fileCov, empty: "No PDFs scored yet" })}
+    ${renderScoreDonut({ score: siteScore, label: "Website accessibility", tag: "web pages", coverage: siteCov, empty: "Site not scored yet" })}
+  </div>
+  <p class="scorecards-note">Two separate measures — a site can score well on its <strong>pages</strong> and still publish inaccessible <strong>files</strong> (or the reverse). They don&#39;t correlate.</p>`;
+}
+
+// One 0–100 score donut colored by grade band, or a placeholder when unscored.
+function renderScoreDonut({ score, label, tag, coverage, empty }) {
+  if (typeof score !== "number") {
+    return `<div class="scorecard">
+      <span class="scorecard-label">${he(label)}</span>
+      <div class="score-donut score-donut-empty"><span class="score-na">—</span></div>
+      <span class="scorecard-cov">${he(empty)}</span>
+      <span class="scorecard-tag">${he(tag)}</span>
+    </div>`;
+  }
+  const grade = gradeForScore(score) ?? "";
+  return `<div class="scorecard">
+    <span class="scorecard-label">${he(label)}</span>
+    <div class="score-donut grade-${he(grade.toLowerCase())}" style="--pct:${score}%"><span class="score-val">${he(String(score))}</span><span class="score-grade">${he(grade)}</span></div>
+    <span class="scorecard-cov">${he(coverage)}</span>
+    <span class="scorecard-tag">${he(tag)}</span>
   </div>`;
 }
 
@@ -712,25 +740,6 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     (byCategory["legacy-office"] ?? 0);
   const imageCount = byCategory["image"] ?? 0;
 
-  // Audit-share percentage — rounded to 1 decimal so the conic-gradient is
-  // smooth but the percent badge in the donut stays short.
-  const pctRaw = totalFiles > 0 ? (remediable / totalFiles) * 100 : 0;
-  const pct = Math.round(pctRaw * 10) / 10;
-  const pctInt = Math.round(pctRaw);
-
-  // Plain-English caption rounded to colloquial buckets so a manager
-  // doesn't have to read a percentage to grasp the share.
-  let phrase;
-  if (totalFiles === 0)             phrase = "No files inventoried";
-  else if (pctInt === 0)            phrase = "No files may need audit";
-  else if (pctInt <= 12)            phrase = "A small share may need audit";
-  else if (pctInt <= 28)            phrase = "About a quarter may need audit";
-  else if (pctInt <= 42)            phrase = "About a third may need audit";
-  else if (pctInt <= 58)            phrase = "About half may need audit";
-  else if (pctInt <= 72)            phrase = "Two-thirds may need audit";
-  else if (pctInt <= 88)            phrase = "Most may need audit";
-  else                              phrase = "Nearly all may need audit";
-
   const chipsHtml = [
     pdfCount   > 0 ? `<span class="chip chip-pdf"><svg class="ico"><use href="#i-file"/></svg>${pdfCount.toLocaleString()} PDF${pdfCount !== 1 ? "s" : ""}</span>` : "",
     officeCount > 0 ? `<span class="chip chip-doc"><svg class="ico"><use href="#i-file"/></svg>${officeCount.toLocaleString()} Office</span>` : "",
@@ -766,11 +775,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
     <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span>${remediablePages > 0 ? `<span class="lbl-sub" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} potential pages</span>` : ""}</div>
   </div>
-  ${renderSiteA11yTile(sr.siteAudit)}
-  <div class="donut-row">
-    <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>may need audit</small></div></div>
-    <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span></div>
-  </div>
+  ${renderScorecards(summary, sr.siteAudit)}
   ${chipsHtml ? `<div class="chips">${chipsHtml}</div>` : ""}
   <p class="scan-meta">${scanMeta}</p>
   ${techDetailsHtml}

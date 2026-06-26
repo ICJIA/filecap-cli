@@ -889,91 +889,80 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
-.site-card .site-a11y {
+/* v1.35.0 — paired File/Website accessibility score donuts (replace the old
+   single "% may need audit" scope donut + the site-a11y tile). Same conic-
+   gradient technique as the old .donut, sized for two side by side and colored
+   by grade band. */
+.site-card .scorecards {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 14px 0 4px;
-  padding: 12px 14px;
-  border: 1px solid #c9d8e8;
-  border-left: 4px solid #2f6fb0;
-  border-radius: 8px;
-  background: #f3f8fd;
-}
-.site-card .site-a11y-score {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.site-card .site-a11y-score .num { font-size: 1.9rem; font-weight: 700; color: #1b4a78; line-height: 1; }
-.site-card .site-a11y-score .grade { font-size: 1rem; font-weight: 700; color: #2f6fb0; }
-.site-card .site-a11y-meta { display: flex; flex-direction: column; gap: 1px; }
-.site-card .site-a11y-label { font-weight: 600; font-size: 0.9rem; color: #1b4a78; }
-.site-card .site-a11y-sub { font-size: 0.82rem; color: #41607c; }
-.site-card .site-a11y-note { font-size: 0.74rem; color: #6a7c8c; font-style: italic; }
-
-.site-card .donut-row {
-  display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 18px;
-  margin: 6px 0 18px;
+  gap: 16px;
+  margin: 6px 0 8px;
 }
-.site-card .donut {
-  /* v1.7.10: bumped from 130x130 → 180x180 (and ::after inset 14 → 22)
-     so the inner hole's horizontal chord at the y-position of the
-     "MAY NEED AUDIT" caption is comfortably wider than the text. Pre-
-     v1.7.10 the inner hole was 102 px diameter and "may need audit" was
-     ~101 px wide — at the chord-narrower bottom of the .pct box the text
-     bled into the colored ring, reading as "the text is offset". With a
-     136 px inner hole the chord at +/- 20 px from center (where the
-     bottom of the .pct sits) is ~130 px, leaving ~10 px of clearance on
-     each side of "may need audit". */
-  width: 180px; height: 180px;
+.site-card .scorecard {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+.site-card .scorecard-label {
+  font-weight: 700;
+  font-size: 0.8em;
+  color: #cfe0f0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.site-card .score-donut {
+  width: 112px; height: 112px;
   border-radius: 50%;
-  /* --pct is emitted with a "%" suffix (e.g. "--pct:67.6%"). CSS calc()
-     cannot multiply two percentages, so we use the var directly as a
-     percentage stop. */
   background: conic-gradient(
-    #ffa84d 0 var(--pct, 0%),
-    rgba(77, 171, 247, 0.45) var(--pct, 0%) 100%
+    var(--fill, #4dabf7) 0 var(--pct, 0%),
+    rgba(255, 255, 255, 0.12) var(--pct, 0%) 100%
   );
   display: flex; align-items: center; justify-content: center;
   position: relative;
   flex: none;
 }
-.site-card .donut::after {
+.site-card .score-donut::after {
   content: "";
   position: absolute;
-  inset: 22px;
+  inset: 13px;
   background: #141a23;
   border-radius: 50%;
 }
-.site-card .donut .pct {
+.site-card .score-donut .score-val {
   position: relative; z-index: 1;
-  font-weight: 900;
-  font-size: 1.7em;
-  color: #ffa84d;
-  line-height: 1;
-  /* v1.7.9: center both the percentage and the <small> caption inside the
-     donut. Pre-v1.7.9 this was accidentally OK because "need audit" and
-     "67%" happened to be near-equal widths; the v1.7.8 softening to
-     "may need audit" made the caption wider, exposing that the .pct box
-     was a left-aligned column. The detail-page sibling .dp-pct had this
-     rule from the start. */
-  text-align: center;
+  font-weight: 900; font-size: 1.7em; line-height: 1;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
 }
-.site-card .donut .pct small {
-  display: block;
-  font-size: 0.45em;
-  color: #9aa5b1;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-top: 4px;
+.site-card .score-donut .score-grade {
+  position: relative; z-index: 1;
+  font-weight: 700; font-size: 0.9em; margin-left: 3px;
+  color: var(--fill, #4dabf7);
 }
-.site-card .donut-caption { text-align: left; }
-.site-card .donut-caption strong { display: block; color: #ffffff; font-size: 1em; }
-.site-card .donut-caption span { color: #9aa5b1; font-size: 0.85em; }
+.site-card .score-donut.grade-a { --fill: #37b24d; }
+.site-card .score-donut.grade-b { --fill: #74b816; }
+.site-card .score-donut.grade-c { --fill: #f59f00; }
+.site-card .score-donut.grade-d { --fill: #e8590c; }
+.site-card .score-donut.grade-f { --fill: #e03131; }
+.site-card .score-donut-empty { background: rgba(255, 255, 255, 0.06); }
+.site-card .score-donut-empty .score-na {
+  position: relative; z-index: 1;
+  color: #6a7c8c; font-size: 1.6em; font-weight: 700;
+}
+.site-card .scorecard-cov { font-size: 0.73em; color: #9aa5b1; }
+.site-card .scorecard-tag {
+  font-size: 0.7em; color: #7d8b99;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.site-card .scorecards-note {
+  text-align: center; font-size: 0.78em; color: #9aa5b1;
+  margin: 0 0 14px; line-height: 1.45;
+}
 
 .site-card .chips {
   display: flex; justify-content: center; flex-wrap: wrap;
@@ -1258,10 +1247,12 @@ main {
   .site-card .tile.total .num { color: #0066cc; }
   .site-card .tile.audit .num { color: #b45309; }
   .site-card .tile .lbl { color: #555; }
-  .site-card .donut .pct { color: #b45309; }
-  .site-card .donut .pct small { color: #555; }
-  .site-card .donut-caption strong { color: #000; }
-  .site-card .donut-caption span { color: #555; }
+  .site-card .score-donut::after { background: #ffffff; }
+  .site-card .score-donut .score-val { color: #1b2733; }
+  .site-card .scorecard-label { color: #1b4a78; }
+  .site-card .scorecard-cov,
+  .site-card .scorecard-tag,
+  .site-card .scorecards-note { color: #555; }
   .site-card .chip { background: #f0f0f0; color: #000; }
   .site-card .scan-meta { color: #555; }
   .site-card .actions { display: none; }

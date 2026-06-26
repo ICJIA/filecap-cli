@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot, renderSiteA11yTile } from "../src/web/index-page.js";
+import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot, renderScorecards } from "../src/web/index-page.js";
 
 const baseSr = {
   site: {
@@ -82,22 +82,15 @@ describe("renderCard", () => {
     expect(html).toMatch(/<div class="tile audit"><span class="num">69<\/span>/);
   });
 
-  it("emits a donut element with inline --pct custom property", () => {
-    const html = renderCard(baseSr);
-    // 69/102 = 67.6%
-    expect(html).toMatch(/class="donut"[^>]*style="--pct:67\.6%/);
-  });
-
-  it("renders a plain-English donut caption", () => {
+  it("renders a plain-English 'may need audit' label in the audit tile", () => {
     const html = renderCard(baseSr);
     expect(html).toMatch(/need audit/i);
   });
 
-  it("zero-files edge case renders 0/0 tiles and 0% donut", () => {
+  it("zero-files edge case renders 0/0 tiles", () => {
     const sr = { ...baseSr, summary: { totalFiles: 0, remediable: 0, totalBytes: 0, byCategory: {} } };
     const html = renderCard(sr);
     expect(html).toMatch(/<span class="num">0<\/span>/);
-    expect(html).toMatch(/--pct:0%/);
   });
 
   it("makes the whole card clickable via a stretched-link <a> with aria-label", () => {
@@ -533,21 +526,40 @@ describe("renderCard status dot (v1.21.3)", () => {
   });
 });
 
-describe("renderSiteA11yTile", () => {
-  it("renders score, grade, open + fixed counts and the 'not files' note", () => {
-    const html = renderSiteA11yTile({
-      score: 94, grade: "A",
-      outstanding: { total: 37 },
-      trend: { fixed: 12, new: 5, stillOpen: 32 },
-    });
-    expect(html).toContain("94");
+describe("renderScorecards", () => {
+  const summary = { auditScoreSum: 340, auditedPdfCount: 5 }; // avg 68 → D
+  const siteAudit = { score: 94, grade: "A", coverage: { scored: 150, pagesInSet: 412 } };
+
+  it("renders both donuts with scores, grades, coverage, and the separation note", () => {
+    const html = renderScorecards(summary, siteAudit);
+    expect(html).toContain("File accessibility");
     expect(html).toContain("Website accessibility");
-    expect(html).toContain("37 open");
-    expect(html).toContain("12 fixed");
-    expect(html).toMatch(/not files|pages only/i);
+    expect(html).toContain(">68<");                       // file score value
+    expect(html).toContain(">94<");                       // site score value
+    expect(html).toContain("5 scored PDFs");              // file coverage
+    expect(html).toContain("150 / 412 pages scored");     // site coverage
+    expect(html).toContain("grade-d");                    // 68 → D band class
+    expect(html).toContain("grade-a");                    // 94 → A band class
+    expect(html).toMatch(/don.t correlate|separate measures/i);
+    expect(html).toContain("documents");
+    expect(html).toContain("web pages");
   });
-  it("returns empty string for an unscored site", () => {
-    expect(renderSiteA11yTile(null)).toBe("");
-    expect(renderSiteA11yTile({ score: null })).toBe("");
+
+  it("placeholders the file side when no PDFs are scored", () => {
+    const html = renderScorecards({ auditedPdfCount: 0 }, siteAudit);
+    expect(html).toContain("No PDFs scored yet");
+    expect(html).toContain(">94<"); // site still scored
+  });
+
+  it("placeholders the site side when there is no site audit", () => {
+    const html = renderScorecards(summary, null);
+    expect(html).toContain("Site not scored yet");
+    expect(html).toContain(">68<"); // file still scored
+  });
+
+  it("placeholders both when neither is scored", () => {
+    const html = renderScorecards({ auditedPdfCount: 0 }, null);
+    expect(html).toContain("No PDFs scored yet");
+    expect(html).toContain("Site not scored yet");
   });
 });
