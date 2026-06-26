@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { CSV_COLUMNS, formatPageCount, formatRemediationScore } from "./csv.js";
 import { buildPageList, attachCrossSiteFiles } from "./pages.js";
+import { renderSiteAccessibilitySection } from "./site-accessibility-section.js";
 import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
@@ -464,7 +465,7 @@ const ACCESS_PANEL_COPY = {
   },
 };
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteAudit = null, pageScores = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -645,7 +646,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   ).join("");
 
   // ── Page view (v1.13.0): invert the file entries into a page list ────────────
-  const pageList = buildPageList(entries, sitemapUrls, cmsPages);
+  const pageList = buildPageList(entries, sitemapUrls, cmsPages, pageScores);
   // v1.32.0 — decorate each page with the CMS-hosted (cross-site) files it
   // links, resolved to their owning fleet site. No-op without fleet data
   // (standalone `report` command).
@@ -766,6 +767,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   <p class="access-panel-credential"><strong>${htmlEscape(accessCopy.credential)}</strong> ${accessCopy.action}</p>
 </section>`
     : "";
+
+  const siteAccessibilityHtml = renderSiteAccessibilitySection(siteAudit);
 
   // ── assemble HTML ─────────────────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
@@ -1869,6 +1872,24 @@ ${siteFooterCss()}
 .stat-card .stat-detail li { list-style: disc; margin-left: 1.5em; padding-left: 0.25em; }
 @media (max-width: 720px) { .audit-stats { grid-template-columns: 1fr; } }
 
+/* ── site-accessibility section ─────────────────────────────── */
+.site-accessibility { margin: 28px 0; padding: 20px 22px; border: 1px solid #c9d8e8; border-left: 5px solid #2f6fb0; border-radius: 10px; background: #f6fafe; }
+.site-accessibility h2 { margin: 0 0 8px; color: #1b4a78; }
+.site-accessibility .sa-independence { font-size: 0.95rem; color: #34526c; max-width: 70ch; }
+.site-accessibility .sa-headline { display: flex; align-items: center; gap: 18px; margin: 14px 0; }
+.site-accessibility .sa-num { font-size: 3rem; font-weight: 800; color: #1b4a78; line-height: 1; }
+.site-accessibility .sa-grade { font-size: 1.4rem; font-weight: 700; color: #2f6fb0; margin-left: 6px; }
+.site-accessibility .sa-coverage { margin: 0; color: #41607c; }
+.site-accessibility .sa-trend { margin: 6px 0 14px; color: #34526c; }
+.site-accessibility .sa-breakdown { display: flex; flex-wrap: wrap; gap: 16px; }
+.site-accessibility .sa-card { flex: 1 1 240px; background: #fff; border: 1px solid #d8e4f0; border-radius: 8px; padding: 12px 14px; }
+.site-accessibility .sa-card h3 { margin: 0 0 8px; font-size: 0.95rem; color: #1b4a78; }
+.site-accessibility .sa-card ul { margin: 0; padding-left: 18px; }
+.site-accessibility .sa-muted { color: #6a7c8c; font-size: 0.85rem; list-style: none; margin-left: -18px; }
+.site-accessibility .sa-pages { margin-top: 14px; }
+.site-accessibility .sa-pages table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 8px; }
+.site-accessibility .sa-pages th, .site-accessibility .sa-pages td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #e4edf5; }
+
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
   .report-back-bar { display: none; }
@@ -1958,6 +1979,7 @@ ${(() => {
 </header>
 
 ${accessPanelHtml}
+${siteAccessibilityHtml}
 
 <details class="dp-disclosure dp-breakdown">
   <summary><span class="dp-disclosure-title">Breakdown by file type</span> <span class="dp-disclosure-hint">every type &amp; category count</span></summary>
