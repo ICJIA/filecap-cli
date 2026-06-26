@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import os from "node:os";
@@ -11,7 +11,7 @@ import { fetchSitemapUrls, scopeSitemapUrlsToSite } from "../references/sitemap.
 import { writeXlsx, writeXlsxMultiSheet, writeXlsxFromRows, writeXlsxRowsMultiSheet } from "../report/xlsx.js";
 import { buildScoresBySiteRows, SCORES_BY_SITE_COLUMNS } from "../report/scores-by-site.js";
 import { writeHtml } from "../report/html.js";
-import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles } from "../report/pages.js";
+import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles, normPageUrl } from "../report/pages.js";
 import { buildAliasMap, canonicalizeForFleet, entryCanonicalUrl } from "../references/cross-resolver.js";
 import { buildPublicUrl } from "../report/csv.js";
 import { classifyOrphans } from "../report/orphans.js";
@@ -784,6 +784,23 @@ export function deriveAccessKind(site) {
   return "server";
 }
 
+// v1.35.0 — load the site-audit sidecar (written by `filecap site-audit`) and
+// derive the pageScores map the Page view overlays. Missing/corrupt → nulls, so
+// a site that hasn't been site-audited just renders without the a11y tile.
+function loadSiteAudit(latestDir) {
+  try {
+    const sc = JSON.parse(readFileSync(path.join(latestDir, "site-audit.json"), "utf8"));
+    if (!sc || typeof sc !== "object") return { siteAudit: null, pageScores: null };
+    const pageScores = new Map();
+    for (const p of sc.pages ?? []) {
+      if (p?.url) pageScores.set(normPageUrl(p.url), { score: p.score, grade: p.grade, violationCount: p.violationCount, bySeverity: p.bySeverity, reportUrl: p.reportUrl, pageTitle: "" });
+    }
+    return { siteAudit: sc, pageScores };
+  } catch {
+    return { siteAudit: null, pageScores: null };
+  }
+}
+
 /**
  * Stream the inventory and tally summary statistics.
  *
@@ -1109,6 +1126,8 @@ export async function runWebRollup({
     if (cmsPages.length > 0) {
       process.stderr.write(`[web-rollup] ${site.siteName ?? siteKey}: ${cmsPages.length} CMS page URLs\n`);
     }
+    const latestDir = path.dirname(latestInv);
+    const { siteAudit, pageScores } = loadSiteAudit(latestDir);
     const reportResult = await runReport({
       input: latestInv,
       outputDir: tempDir,
@@ -1125,6 +1144,8 @@ export async function runWebRollup({
       resolveFleetFile,
       pageRefFiles,
       currentSiteName: header.metadata?.serverName ?? siteKey,
+      siteAudit,
+      pageScores,
     });
     if (reportResult.exitCode !== 0) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
@@ -1160,7 +1181,7 @@ export async function runWebRollup({
     // v1.29.0 — "Pages" tab, the workbook twin of the HTML Page view: one
     // row per page with the files it links (file-linking pages first), then
     // cms/sitemap pages that link nothing. Same inputs as the HTML report.
-    const pageList = buildPageList(perSiteEntries, sitemapUrls, cmsPages);
+    const pageList = buildPageList(perSiteEntries, sitemapUrls, cmsPages, pageScores);
     attachCrossSiteFiles(pageList, {
       pageRefFiles,
       resolveFleetFile,
@@ -1290,6 +1311,7 @@ export async function runWebRollup({
       // v1.20.0: per-site download is the multi-sheet .xlsx workbook now.
       csvFile: `${baseName}.xlsx`,
       scannedAt: header.metadata?.scannedAt ?? null,
+      siteAudit,
     });
   }
 
