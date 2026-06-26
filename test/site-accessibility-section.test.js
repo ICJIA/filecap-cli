@@ -25,4 +25,17 @@ describe("renderSiteAccessibilitySection", () => {
     expect(renderSiteAccessibilitySection(null)).toBe("");
     expect(renderSiteAccessibilitySection({ score: null })).toBe("");
   });
+  it("suppresses the report link when reportUrl uses a non-http(s) scheme (Fix 2)", () => {
+    const maliciousSidecar = {
+      score: 80, grade: "B",
+      coverage: { pagesInSet: 10, scored: 5 },
+      outstanding: { total: 2, bySeverity: {}, byWcag: {}, needsReview: 0 },
+      pages: [{ url: "https://x.com/page", score: 75, grade: "C", violationCount: 2, needsReview: 0, reportUrl: "javascript:alert(1)" }],
+    };
+    const html = renderSiteAccessibilitySection(maliciousSidecar);
+    expect(html).not.toContain('href="javascript:');
+    // The row itself should still render (URL and score present).
+    expect(html).toContain("https://x.com/page");
+    expect(html).toContain("75");
+  });
 });

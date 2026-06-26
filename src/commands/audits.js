@@ -317,6 +317,8 @@ export async function runAudits({
           pageTitle: result.pageTitle,
           audited: result.audited,
           checkedAt,
+          violations: result.violations,
+          incomplete: result.incomplete,
         };
         pageCache[pageUrl] = stored;
         urlToResult.set(pageUrl, { ...stored, cached: result.cached });

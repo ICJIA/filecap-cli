@@ -275,7 +275,7 @@ for s in d.get('sites', []):
   for site in $KNOWN_SITES; do
     site_dir="$AUDITS_BASE/$site"
     [[ -d "$site_dir" ]] || continue
-    if node "$FILECAP_BIN" site-audit "$site" >/tmp/filecap-siteaudit-"$site".log 2>&1; then
+    if node "$FILECAP_BIN" site-audit "$site" --sites-file "$SITES_JSON" >/tmp/filecap-siteaudit-"$site".log 2>&1; then
       result=$(tail -1 /tmp/filecap-siteaudit-"$site".log)
       echo "[fleet-auto]   ✓ site-audit $site: $result"
     else

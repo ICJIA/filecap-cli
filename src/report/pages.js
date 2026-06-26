@@ -41,6 +41,8 @@ function hostFromUrl(u) {
  *        entry's page (from the references sidecar). Pages not surfaced by the
  *        inversion are appended as thin rows — cmsPages → fromCms (carry the
  *        content type), sitemap URLs → fromSitemap — URL-only, no audit/files.
+ * @param {Map<string,object>|null} [pageScores] - normPageUrl → page-audit object;
+ *        when supplied, overlays pageAudit onto every row (incl. sitemap-only pages).
  * @returns {Array<{pageUrl,pageTitle,contentType,siteName,pageAudit,files,dupeFileCount,fromSitemap?,fromCms?}>}
  *          files holds only the files FIRST listed under that page;
  *          dupeFileCount counts the page's additional linked files already

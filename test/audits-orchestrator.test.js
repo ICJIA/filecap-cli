@@ -245,4 +245,58 @@ describe("runAudits", () => {
     expect(cache[hash].grade).toBe("C");
     expect(cache[hash].checkedAt).toBeDefined();
   });
+
+  it("page-audit pass preserves violations and incomplete arrays on ref.pageAudit (Fix 1)", async () => {
+    // Non-PDF entry with a reference — only the page-audit pass fires.
+    const docEntry = {
+      path: "doc.docx",
+      filename: "doc.docx",
+      extension: "docx",
+      category: "office-document",
+      sizeBytes: 5000,
+      publicUrl: "https://icjia-api.cloud/uploads/doc.docx",
+      references: [{ pageUrl: "https://icjia.gov/page", contentType: "text/html" }],
+    };
+    writeInventory(invPath, [docEntry]);
+
+    const mockViolations = [{ id: "color-contrast", impact: "serious", tags: ["wcag2aa"], nodes: [{ target: ["button"] }] }];
+    const mockIncomplete = [{ id: "label", impact: "critical", tags: ["wcag2a"], nodes: [{ target: ["input"] }] }];
+    const pageCachePath = path.join(tmpDir, "page-audit-cache.json");
+    const fetcher = async () => ({
+      axe: {
+        score: 80,
+        grade: "B",
+        violationCount: 1,
+        bySeverity: { critical: 0, serious: 1, moderate: 0, minor: 0 },
+        violations: mockViolations,
+        incomplete: mockIncomplete,
+      },
+      reportUrl: "https://audit.icjia.app/page-report/abc",
+      reportId: "abc",
+      reportExpiresAt: "2027-01-01T00:00:00Z",
+      pageTitle: "ICJIA",
+      audited: "2026-06-01T00:00:00Z",
+      cached: false,
+    });
+
+    await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      pageCachePath,
+      fetcher,
+      log: () => {},
+    });
+
+    const records = readNdjson(outPath);
+    // records[0] = header, [1] = docEntry, [2] = footer
+    const entry = records[1];
+    expect(Array.isArray(entry.references)).toBe(true);
+    const pageAudit = entry.references[0].pageAudit;
+    expect(pageAudit).toBeDefined();
+    expect(Array.isArray(pageAudit.violations)).toBe(true);
+    expect(pageAudit.violations.length).toBeGreaterThan(0);
+    expect(Array.isArray(pageAudit.incomplete)).toBe(true);
+    expect(pageAudit.incomplete.length).toBeGreaterThan(0);
+  });
 });

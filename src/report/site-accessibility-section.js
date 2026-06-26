@@ -8,6 +8,15 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function safeHttpUrl(u) {
+  try {
+    const proto = new URL(u).protocol;
+    return proto === "http:" || proto === "https:" ? u : null;
+  } catch {
+    return null;
+  }
+}
+
 export function renderSiteAccessibilitySection(siteAudit) {
   if (!siteAudit || typeof siteAudit.score !== "number") return "";
   const cov = siteAudit.coverage ?? {};
@@ -25,8 +34,9 @@ export function renderSiteAccessibilitySection(siteAudit) {
     .slice()
     .sort((a, b) => (a.score ?? 101) - (b.score ?? 101))
     .map((p) => {
-      const link = p.reportUrl
-        ? `<a href="${esc(p.reportUrl)}" target="_blank" rel="noopener noreferrer">report &rarr;</a>`
+      const safeUrl = p.reportUrl ? safeHttpUrl(p.reportUrl) : null;
+      const link = safeUrl
+        ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">report &rarr;</a>`
         : "";
       return `<tr><td>${esc(p.url)}</td><td>${p.score ?? "—"}</td><td>${esc(p.grade ?? "")}</td><td>${(p.violationCount ?? 0).toLocaleString()}</td><td>${(p.needsReview ?? 0).toLocaleString()}</td><td>${link}</td></tr>`;
     })
