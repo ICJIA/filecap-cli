@@ -11,6 +11,7 @@ import { runWebRollup } from "../src/commands/web-rollup.js";
 import { runReferences } from "../src/commands/references.js";
 import { runCrossReferences } from "../src/commands/cross-references.js";
 import { runAudits } from "../src/commands/audits.js";
+import { runSiteAudit } from "../src/commands/site-audit.js";
 import { loadConfig } from "../src/config/load.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
@@ -380,6 +381,49 @@ program
       });
     } catch (err) {
       process.stderr.write(`filecap audits error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("site-audit <siteName>")
+  .description(
+    "Score a site's web pages for accessibility (axe via audit.icjia.app/api/audit-url-page), sitemap-driven and independent of file/PDF scores. Writes the per-site latest/site-audit.json sidecar (purge-exempt) with the score, severity + WCAG-level breakdown, and issue-set fixed/new trend.",
+  )
+  .option("--endpoint <url>", "override the page-audit endpoint", "https://audit.icjia.app/api/audit-url-page")
+  .option("--sites-file <path>", "override saved-sites JSON path")
+  .option("--audits-base <dir>", "override the ~/filecap-audits root")
+  .option("--max-new-pages <n>", "cap pages freshly fetched per run (default 150)", (v) => parseInt(v, 10))
+  .option("--concurrency <n>", "concurrent page audits (default 2 — respects the 100/min IP cap)", (v) => parseInt(v, 10))
+  .option("--ttl-days <n>", "page-cache freshness window in days (default 14)", (v) => parseInt(v, 10))
+  .option("--force", "ignore cache; re-score every page")
+  .action(async (siteName, opts) => {
+    try {
+      let bearerToken;
+      try {
+        const secretsPath = path.join(os.homedir(), ".filecap", "secrets.json");
+        const s = JSON.parse(fs.readFileSync(secretsPath, "utf8"));
+        bearerToken = s?.credentials?.["audit-icjia-app"]?.bearerToken;
+      } catch {
+        /* anonymous mode — no token needed */
+      }
+      const res = await runSiteAudit({
+        siteName,
+        sitesFile: opts.sitesFile,
+        auditsBase: opts.auditsBase,
+        auditEndpoint: opts.endpoint,
+        maxNewPages: opts.maxNewPages ?? 150,
+        concurrency: opts.concurrency ?? 2,
+        ttlDays: opts.ttlDays ?? 14,
+        force: opts.force === true,
+        bearerToken,
+      });
+      if (res.error) {
+        process.stderr.write(`filecap site-audit error: ${res.error}\n`);
+        process.exit(1);
+      }
+    } catch (err) {
+      process.stderr.write(`filecap site-audit error: ${err.message}\n`);
       process.exit(1);
     }
   });
