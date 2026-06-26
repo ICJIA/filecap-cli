@@ -799,7 +799,7 @@ git commit -m "feat: site-audit sidecar read/build/write with trend + history"
 - Test: `test/site-audit-command.test.js`
 
 **Interfaces:**
-- Consumes: `loadAuditCache`/`saveAuditCache`/`isCacheEntryFresh` (`src/audits/cache.js`), `fetchPageAuditScore` (`src/audits/page-scorer.js`), `createRetryingJsonFetcher` (`src/audits/retrying-fetcher.js`), `resolveSitePageSet` (Task 5), `aggregateSite` (Task 3), `collectIssueKeys` (Task 2), `readPriorSidecar`/`buildSidecar`/`writeSidecar` (Task 6)
+- Consumes: `loadAuditCache`/`saveAuditCache`/`isCacheEntryFresh` (`src/audits/cache.js`), `fetchPageAuditScore` (`src/audits/page-scorer.js`), `createRetryingJsonFetcher` (`src/audits/retrying-fetcher.js`), `createLimiter` (`src/util/concurrency.js` — reuse, don't hand-roll a mapper), `resolveSitePageSet` (Task 5), `aggregateSite` (Task 3), `collectIssueKeys` (Task 2), `readPriorSidecar`/`buildSidecar`/`writeSidecar` (Task 6)
 - Produces: `runSiteAudit({ siteName, sitesFile?, auditsBase?, auditEndpoint?, pageCachePath?, ttlDays?, concurrency?, maxNewPages?, force?, bearerToken?, fetcher?, now?, log? }) => Promise<{ siteName, scored, errored, capped, score, grade, sidecarPath } | { siteName, error }>`
 
 - [ ] **Step 1: Write the failing test**
@@ -896,6 +896,7 @@ import os from "node:os";
 import { loadAuditCache, saveAuditCache, isCacheEntryFresh } from "../audits/cache.js";
 import { fetchPageAuditScore } from "../audits/page-scorer.js";
 import { createRetryingJsonFetcher } from "../audits/retrying-fetcher.js";
+import { createLimiter } from "../util/concurrency.js";
 import { resolveSitePageSet } from "../site-audit/page-set.js";
 import { aggregateSite } from "../site-audit/aggregate.js";
 import { collectIssueKeys } from "../site-audit/issue-keys.js";
@@ -908,22 +909,6 @@ const DEFAULT_AUDITS_BASE = path.join(os.homedir(), "filecap-audits");
 
 function defaultJsonFetcher(log) {
   return createRetryingJsonFetcher({ maxRetries: 6, baseDelayMs: 2000, maxDelayMs: 60000, log });
-}
-
-// Bounded-concurrency mapper (mirrors src/commands/audits.js) — keeps us under
-// audit.icjia.app's 100/min IP rate limit.
-async function mapWithConcurrency(items, limit, taskFor) {
-  let next = 0;
-  async function worker() {
-    while (true) {
-      const i = next++;
-      if (i >= items.length) return;
-      await taskFor(items[i], i);
-    }
-  }
-  const workers = [];
-  for (let i = 0; i < Math.min(limit, items.length); i++) workers.push(worker());
-  await Promise.all(workers);
 }
 
 function loadSiteEntry(sitesFile, siteName) {
@@ -981,18 +966,23 @@ export async function runSiteAudit({
 
   let errored = 0;
   const fetched = new Map();
-  await mapWithConcurrency(fetchNow, concurrency, async (url) => {
-    try {
-      const result = await fetchPageAuditScore({ pageUrl: url, auditEndpoint, bearerToken, force, fetcher: httpFetcher });
-      if (result === null) { errored++; return; }
-      const stored = { ...result, checkedAt: now.toISOString() };
-      cache[url] = stored;
-      fetched.set(url, stored);
-    } catch (err) {
-      errored++;
-      log(`[site-audit] ${siteName} WARN ${url}: ${err?.message ?? err}`);
-    }
-  });
+  const limit = createLimiter(concurrency);
+  await Promise.all(
+    fetchNow.map((url) =>
+      limit(async () => {
+        try {
+          const result = await fetchPageAuditScore({ pageUrl: url, auditEndpoint, bearerToken, force, fetcher: httpFetcher });
+          if (result === null) { errored++; return; }
+          const stored = { ...result, checkedAt: now.toISOString() };
+          cache[url] = stored;
+          fetched.set(url, stored);
+        } catch (err) {
+          errored++;
+          log(`[site-audit] ${siteName} WARN ${url}: ${err?.message ?? err}`);
+        }
+      }),
+    ),
+  );
 
   try {
     saveAuditCache({ cachePath: pageCachePath, cache });
