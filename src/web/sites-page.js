@@ -196,8 +196,8 @@ ${ogImage ? `<meta property="og:type" content="website">
 
 <header class="site-header">
   <div class="site-header-left">
-    <a class="icjia-logo" href="index.html" aria-label="filecap fleet audit home" title="Back to the fleet snapshot">${ICJIA_LOGO_SVG}</a>
-    <span class="brand"><span>filecap</span> site directory</span>
+    <a class="icjia-logo" href="index.html" aria-label="ICJIA Fleet Audit Assessment home" title="Back to the fleet snapshot">${ICJIA_LOGO_SVG}</a>
+    <span class="brand"><span>ICJIA</span> site directory</span>
   </div>
   <div class="site-header-right">
     <a class="audit-tool-link nav-sites" href="index.html" title="Back to the fleet snapshot (home)">

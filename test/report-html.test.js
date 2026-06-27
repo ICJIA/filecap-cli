@@ -189,14 +189,14 @@ describe("writeHtml", () => {
     const out = path.join(tmpDir, "title-site.html");
     await writeHtml({ sourceHeader: headerWithSite, entries: sampleEntries, sources: [headerWithSite], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toContain("<title>filecap audit — DVFR</title>");
+    expect(html).toContain("<title>ICJIA Fleet Audit Assessment — DVFR</title>");
   });
 
   it("sets <title> to server name when siteName is absent", async () => {
     const out = path.join(tmpDir, "title-server.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toContain("<title>filecap audit — test-server</title>");
+    expect(html).toContain("<title>ICJIA Fleet Audit Assessment — test-server</title>");
   });
 
   it("omits the Website column from a single-site report table", async () => {
@@ -528,7 +528,7 @@ describe("writeHtml", () => {
       outputPath,
     });
     const html = await fs.readFile(outputPath, "utf8");
-    expect(html).toMatch(/<h1[^>]*>filecap inventory report<\/h1>/);
+    expect(html).toMatch(/<h1[^>]*>ICJIA inventory report<\/h1>/);
   });
 
   it("renders the work-first dp-hero block (headline count + proportion ring + metaline)", async () => {

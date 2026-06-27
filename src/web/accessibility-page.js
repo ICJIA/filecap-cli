@@ -117,7 +117,7 @@ export function generateAccessibilityPage({ currentStatus, log = [] }) {
 <main>
   <p class="ax-back"><a href="index.html">&larr; Back to fleet index</a></p>
   <h1>Accessibility</h1>
-  <p class="ax-intro">filecap audits other sites' accessibility — so the audit bundle holds itself to the same standard. This page shows its current accessibility standing and a running log of every check, from both browser (axe DevTools) and backend-build (axe-core, Lighthouse, contrastcap) tools.</p>
+  <p class="ax-intro">This tool audits other sites' accessibility — so the audit bundle holds itself to the same standard. This page shows its current accessibility standing and a running log of every check, from both browser (axe DevTools) and backend-build (axe-core, Lighthouse, contrastcap) tools.</p>
   ${statusPanel(currentStatus)}
   <h2>Audit log</h2>
   <table class="ax-log">

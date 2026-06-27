@@ -168,7 +168,7 @@ export async function dispatchTool(name, args) {
       const result = await runWebRollup({
         output: args.output,
         password: args.password ?? null,
-        title: args.title ?? "filecap fleet audit snapshot",
+        title: args.title ?? "ICJIA Fleet Audit Assessment",
         includeSite: args.includeSite ?? [],
         excludeSite: args.excludeSite ?? [],
         sitesFile: args.sitesFile ?? null,

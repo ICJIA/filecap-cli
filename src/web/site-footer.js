@@ -46,7 +46,7 @@ export function renderSiteFooter({ generatedAt = "" } = {}) {
       <span aria-hidden="true">&middot;</span>
       <a href="accessibility.html">Accessibility</a>
       <span aria-hidden="true">&middot;</span>
-      <a href="https://github.com/ICJIA/filecap-cli" target="_blank" rel="noopener noreferrer">filecap on GitHub</a>
+      <a href="https://github.com/ICJIA/filecap-cli" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
       <span aria-hidden="true">&middot;</span>
       <a href="https://github.com/ICJIA/filecap-cli/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">CHANGELOG</a>
     </span>

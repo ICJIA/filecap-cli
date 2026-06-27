@@ -821,7 +821,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
 export function generateIndexHtml({
   siteResults,
   password = null,
-  title = "filecap fleet audit snapshot",
+  title = "ICJIA Fleet Audit Assessment",
   duplicateGroups = [],
   masterCsv = null, // { filename: string, fileCount: number, byteCount: number } | null
   scoresBySite = null, // v1.34.1: { filename, siteCount, byteCount, lastAuditAt } | null
@@ -1026,7 +1026,7 @@ ${ogImage ? `<meta property="og:type" content="website">
 <header class="site-header">
   <div class="site-header-left">
     <a class="icjia-logo" href="#top" aria-label="Scroll back to the top of the page" title="Scroll to top">${ICJIA_LOGO_SVG}</a>
-    <span class="brand"><span>filecap</span> fleet audit snapshot</span>
+    <span class="brand"><span>ICJIA</span> Fleet Audit Assessment</span>
   </div>
   <div class="site-header-right">
     <a class="audit-tool-link nav-sites" href="sites.html" title="ICJIA site directory — every content + tooling site in this bundle">

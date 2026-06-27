@@ -306,9 +306,9 @@ function buildPageRow(page, ctx) {
   const urlText = htmlEscape(safePageUrl || page.pageUrl || "(no URL)");
   let tag = "";
   if (page.fromSitemap) {
-    tag = ` <span class="page-sitemap-tag" title="Listed in the site's sitemap; filecap found no files linked from this page.">sitemap</span>`;
+    tag = ` <span class="page-sitemap-tag" title="Listed in the site's sitemap; no files were found linked from this page.">sitemap</span>`;
   } else if (page.fromCms) {
-    tag = ` <span class="page-cms-tag" title="A page from the site's CMS; filecap found no files linked from it.">cms</span>`;
+    tag = ` <span class="page-cms-tag" title="A page from the site's CMS; no files were found linked from it.">cms</span>`;
   }
   const pageCell = safePageUrl
     ? `<td><a href="${htmlEscape(safePageUrl)}" target="_blank" rel="noopener noreferrer">${urlText}</a>${tag}</td>`
@@ -320,7 +320,7 @@ function buildPageRow(page, ctx) {
 function buildPageViewSection(pages, ctx) {
   if (!pages || pages.length === 0) {
     return `<div id="page-view" hidden>
-  <p class="page-view-empty">Page view needs CMS reference data — the map of which pages link to which files. filecap extracts that from CMS sites (Strapi); this is a static (non-CMS) site, so file-to-page mapping isn't available for it. The <strong>File view</strong> above lists every file on the site.</p>
+  <p class="page-view-empty">Page view needs CMS reference data — the map of which pages link to which files. The audit extracts that from CMS sites (Strapi); this is a static (non-CMS) site, so file-to-page mapping isn't available for it. The <strong>File view</strong> above lists every file on the site.</p>
 </div>`;
   }
   const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
@@ -754,7 +754,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // Point-in-time date for the metaline: scan date for a single site, the
   // consolidation date for a fleet rollup (whose per-source scans vary).
   const heroDateFmt = fmtChicagoDate((isConsolidated ? meta?.consolidatedAt : meta?.scannedAt) ?? "");
-  const heroTitle = htmlEscape(siteFullName || siteName || "filecap inventory report");
+  const heroTitle = htmlEscape(siteFullName || siteName || "ICJIA inventory report");
   const heroNick = htmlEscape(siteName ?? "");
 
   // Access-method panel: shown when web-rollup passes an accessKind. Tells a
@@ -779,7 +779,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>filecap audit — ${htmlEscape(titleSuffix)}</title>
+<title>ICJIA Fleet Audit Assessment — ${htmlEscape(titleSuffix)}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
 <style>
 /* ── base ──────────────────────────────────────────────────── */
