@@ -6,6 +6,11 @@ import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
 
+// v1.35.1: the per-page accessibility grade chip in the Page view is hidden
+// (the fleet bundle is file-only). buildPageAuditChip + its CSS are kept
+// dormant; set this to true to re-enable the inline page-accessibility grades.
+const SHOW_PAGE_AUDIT_CHIP = false;
+
 function formatCellValue(v) {
   if (v === true) return "Yes";
   if (v === false) return "No";
@@ -170,7 +175,7 @@ function buildReferencedCell(refs) {
       // when ref.pageAudit has been populated by `filecap audits
       // --enable-pages`. Answers the manager's "but is that page
       // accessible too?" question inline, without expanding the cell.
-      return `${anchor}${buildPageAuditChip(r?.pageAudit)}`;
+      return SHOW_PAGE_AUDIT_CHIP ? `${anchor}${buildPageAuditChip(r?.pageAudit)}` : anchor;
     }
     const sourceParts = [];
     if (r?.siteName) sourceParts.push(r.siteName);
