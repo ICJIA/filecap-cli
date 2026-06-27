@@ -21,7 +21,7 @@ import { CSV_COLUMNS, buildRow } from "./csv.js";
  */
 export async function writeXlsx({ sourceHeader, entries, sources, outputPath, sheetName = "Inventory" }) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "filecap";
+  wb.creator = "ICJIA Fleet Audit Assessment";
   const sheet = wb.addWorksheet(safeSheetName(sheetName));
   writeSheetContents({ sheet, sourceHeader, entries, sources });
   await wb.xlsx.writeFile(outputPath);
@@ -51,7 +51,7 @@ export async function writeXlsx({ sourceHeader, entries, sources, outputPath, sh
  */
 export async function writeXlsxMultiSheet({ outputPath, sheets }) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "filecap";
+  wb.creator = "ICJIA Fleet Audit Assessment";
   for (const s of sheets) {
     if (Array.isArray(s.columns)) {
       if (!s.rows || s.rows.length === 0) continue;
@@ -86,7 +86,7 @@ export async function writeXlsxMultiSheet({ outputPath, sheets }) {
  */
 export async function writeXlsxFromRows({ outputPath, sheetName = "Sheet1", columns, rows }) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "filecap";
+  wb.creator = "ICJIA Fleet Audit Assessment";
   const sheet = wb.addWorksheet(safeSheetName(sheetName));
   writeRowsSheet(sheet, columns, rows);
   await wb.xlsx.writeFile(outputPath);
@@ -107,7 +107,7 @@ export async function writeXlsxFromRows({ outputPath, sheetName = "Sheet1", colu
  */
 export async function writeXlsxRowsMultiSheet({ outputPath, sheets }) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "filecap";
+  wb.creator = "ICJIA Fleet Audit Assessment";
   for (const s of sheets) {
     const ws = wb.addWorksheet(safeSheetName(s.sheetName ?? "Sheet"));
     writeRowsSheet(ws, s.columns, s.rows ?? []);

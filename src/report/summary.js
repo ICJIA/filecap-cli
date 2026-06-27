@@ -144,7 +144,7 @@ function buildObservations(data) {
 export function writeSummary({ entries, sources, header = null, durationMs = null }) {
   const lines = [];
 
-  lines.push("filecap audit summary");
+  lines.push("ICJIA Fleet Audit Assessment — audit summary");
   lines.push("=====================");
   lines.push("");
 

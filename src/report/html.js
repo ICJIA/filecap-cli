@@ -524,7 +524,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     xlsxCount: spreadsheetCount,
     legacyOfficeCount: legacyCount,
   });
-  const pagesTooltip = `≈${remediablePages.toLocaleString()} potential remediation pages. `
+  const pagesTooltip = `≈${remediablePages.toLocaleString()} document pages (pages inside the PDF/Office files — not web pages). `
     + `${pdfPagesMeasured.toLocaleString()} measured PDF pages from pdfjs `
     + `+ DOCX×${PAGE_ESTIMATES.docx} (${officeCount}) `
     + `+ PPTX×${PAGE_ESTIMATES.pptx} (${presentationCount}) `
@@ -1970,7 +1970,7 @@ ${(() => {
     <div class="dp-headline">
       <span class="dp-headline-num">${heroAudit.toLocaleString()}</span>
       <span class="dp-headline-cap">file${heroAudit === 1 ? "" : "s"} may need audit work</span>
-      <span class="dp-headline-sub">${remediablePages > 0 ? `<span title="${htmlEscape(pagesTooltip)}">≈ ${remediablePages.toLocaleString()} pages to remediate</span> &middot; ` : ""}${heroPct}% of inventory</span>
+      <span class="dp-headline-sub">${remediablePages > 0 ? `<span title="${htmlEscape(pagesTooltip)}">≈ ${remediablePages.toLocaleString()} document pages to remediate</span> &middot; ` : ""}${heroPct}% of inventory</span>
     </div>
     <div class="dp-ring" style="--pct:${heroPct}%" role="img" aria-label="${heroPct}% of files may need audit">
       <div class="dp-ring-pct">${heroPct}%<small>audit</small></div>

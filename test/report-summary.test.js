@@ -69,7 +69,7 @@ const makeEntries = () => [
 describe("writeSummary — single-server", () => {
   it("contains all required sections", () => {
     const text = writeSummary({ entries: makeEntries(), sources: null, header: singleHeader });
-    expect(text).toContain("filecap audit summary");
+    expect(text).toContain("ICJIA Fleet Audit Assessment — audit summary");
     expect(text).toContain("Server:           prod-01 (10.0.0.1)");
     expect(text).toContain("Source location:  /var/uploads");
     expect(text).toContain("The numbers");
