@@ -889,80 +889,50 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
-/* v1.35.0 — paired File/Website accessibility score donuts (replace the old
-   single "% may need audit" scope donut + the site-a11y tile). Same conic-
-   gradient technique as the old .donut, sized for two side by side and colored
-   by grade band. */
-.site-card .scorecards {
+.site-card .donut-row {
   display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin: 6px 0 8px;
-}
-.site-card .scorecard {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 18px;
+  margin: 6px 0 18px;
 }
-.site-card .scorecard-label {
-  font-weight: 700;
-  font-size: 0.8em;
-  color: #cfe0f0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.site-card .score-donut {
-  width: 112px; height: 112px;
+.site-card .donut {
+  width: 180px; height: 180px;
   border-radius: 50%;
   background: conic-gradient(
-    var(--fill, #4dabf7) 0 var(--pct, 0%),
-    rgba(255, 255, 255, 0.12) var(--pct, 0%) 100%
+    #ffa84d 0 var(--pct, 0%),
+    rgba(77, 171, 247, 0.45) var(--pct, 0%) 100%
   );
   display: flex; align-items: center; justify-content: center;
   position: relative;
   flex: none;
 }
-.site-card .score-donut::after {
+.site-card .donut::after {
   content: "";
   position: absolute;
-  inset: 13px;
+  inset: 22px;
   background: #141a23;
   border-radius: 50%;
 }
-.site-card .score-donut .score-val {
+.site-card .donut .pct {
   position: relative; z-index: 1;
-  font-weight: 900; font-size: 1.7em; line-height: 1;
-  color: #ffffff;
-  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  font-size: 1.7em;
+  color: #ffa84d;
+  line-height: 1;
+  text-align: center;
 }
-.site-card .score-donut .score-grade {
-  position: relative; z-index: 1;
-  font-weight: 700; font-size: 0.9em; margin-left: 3px;
-  color: var(--fill, #4dabf7);
+.site-card .donut .pct small {
+  display: block;
+  font-size: 0.45em;
+  color: #9aa5b1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
 }
-.site-card .score-donut.grade-a { --fill: #37b24d; }
-.site-card .score-donut.grade-b { --fill: #74b816; }
-.site-card .score-donut.grade-c { --fill: #f59f00; }
-.site-card .score-donut.grade-d { --fill: #e8590c; }
-.site-card .score-donut.grade-f { --fill: #e03131; }
-.site-card .score-donut-empty { background: rgba(255, 255, 255, 0.06); }
-.site-card .score-donut-empty .score-na {
-  position: relative; z-index: 1;
-  color: #6a7c8c; font-size: 1.6em; font-weight: 700;
-}
-.site-card .scorecard-cov { font-size: 0.73em; color: #9aa5b1; }
-.site-card .scorecard-tag {
-  font-size: 0.7em; color: #7d8b99;
-  text-transform: uppercase; letter-spacing: 0.05em;
-}
-.site-card .scorecards-note {
-  text-align: center; font-size: 0.78em; color: #9aa5b1;
-  margin: 0 0 14px; line-height: 1.45;
-}
+.site-card .donut-caption { text-align: left; }
+.site-card .donut-caption strong { display: block; color: #ffffff; font-size: 1em; }
+.site-card .donut-caption span { color: #9aa5b1; font-size: 0.85em; }
 
 .site-card .chips {
   display: flex; justify-content: center; flex-wrap: wrap;
@@ -1247,12 +1217,10 @@ main {
   .site-card .tile.total .num { color: #0066cc; }
   .site-card .tile.audit .num { color: #b45309; }
   .site-card .tile .lbl { color: #555; }
-  .site-card .score-donut::after { background: #ffffff; }
-  .site-card .score-donut .score-val { color: #1b2733; }
-  .site-card .scorecard-label { color: #1b4a78; }
-  .site-card .scorecard-cov,
-  .site-card .scorecard-tag,
-  .site-card .scorecards-note { color: #555; }
+  .site-card .donut .pct { color: #b45309; }
+  .site-card .donut .pct small { color: #555; }
+  .site-card .donut-caption strong { color: #000; }
+  .site-card .donut-caption span { color: #555; }
   .site-card .chip { background: #f0f0f0; color: #000; }
   .site-card .scan-meta { color: #555; }
   .site-card .actions { display: none; }

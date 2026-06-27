@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import { CSV_COLUMNS, formatPageCount, formatRemediationScore } from "./csv.js";
 import { buildPageList, attachCrossSiteFiles } from "./pages.js";
-import { renderSiteAccessibilitySection } from "./site-accessibility-section.js";
 import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
@@ -465,7 +464,7 @@ const ACCESS_PANEL_COPY = {
   },
 };
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteAudit = null, pageScores = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, pageScores = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -767,8 +766,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   <p class="access-panel-credential"><strong>${htmlEscape(accessCopy.credential)}</strong> ${accessCopy.action}</p>
 </section>`
     : "";
-
-  const siteAccessibilityHtml = renderSiteAccessibilitySection(siteAudit);
 
   // ── assemble HTML ─────────────────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
@@ -1979,7 +1976,6 @@ ${(() => {
 </header>
 
 ${accessPanelHtml}
-${siteAccessibilityHtml}
 
 <details class="dp-disclosure dp-breakdown">
   <summary><span class="dp-disclosure-title">Breakdown by file type</span> <span class="dp-disclosure-hint">every type &amp; category count</span></summary>

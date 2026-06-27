@@ -723,13 +723,32 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   const remediablePages = summary?.remediablePages ?? 0;
   const sitePdfPagesMeasured = summary?.pdfPagesMeasured ?? 0;
   const sitePerFmt = summary?.remediablePageCounts ?? {};
-  const sitePagesTooltip = `≈${remediablePages.toLocaleString()} potential remediation pages. `
+  const sitePagesTooltip = `≈${remediablePages.toLocaleString()} document pages (pages inside the PDF/Office files — not web pages). `
     + `${sitePdfPagesMeasured.toLocaleString()} measured PDF pages from pdfjs `
     + `+ DOCX×${PAGE_ESTIMATES.docx} (${sitePerFmt.docxCount ?? 0}) `
     + `+ PPTX×${PAGE_ESTIMATES.pptx} (${sitePerFmt.pptxCount ?? 0}) `
     + `+ XLSX×${PAGE_ESTIMATES.xlsx} (${sitePerFmt.xlsxCount ?? 0}) `
     + `+ legacy Office×${PAGE_ESTIMATES.legacyOffice} (${sitePerFmt.legacyOfficeCount ?? 0}). `
     + `Subject to change as files are added, edited, or removed.`;
+
+  // Audit-share percentage — rounded to 1 decimal so the conic-gradient is
+  // smooth but the percent badge in the donut stays short.
+  const pctRaw = totalFiles > 0 ? (remediable / totalFiles) * 100 : 0;
+  const pct = Math.round(pctRaw * 10) / 10;
+  const pctInt = Math.round(pctRaw);
+
+  // Plain-English caption rounded to colloquial buckets so a manager
+  // doesn't have to read a percentage to grasp the share.
+  let phrase;
+  if (totalFiles === 0)             phrase = "No files inventoried";
+  else if (pctInt === 0)            phrase = "No files may need audit";
+  else if (pctInt <= 12)            phrase = "A small share may need audit";
+  else if (pctInt <= 28)            phrase = "About a quarter may need audit";
+  else if (pctInt <= 42)            phrase = "About a third may need audit";
+  else if (pctInt <= 58)            phrase = "About half may need audit";
+  else if (pctInt <= 72)            phrase = "Two-thirds may need audit";
+  else if (pctInt <= 88)            phrase = "Most may need audit";
+  else                              phrase = "Nearly all may need audit";
 
   const pdfCount = byCategory["pdf"] ?? 0;
   const officeCount =
@@ -773,9 +792,12 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   ${renderStatusDot(sr.status, sr.site?.name)}
   <div class="nums">
     <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
-    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span>${remediablePages > 0 ? `<span class="lbl-sub" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} potential pages</span>` : ""}</div>
+    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span>${remediablePages > 0 ? `<span class="lbl-sub" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} document pages</span>` : ""}</div>
   </div>
-  ${renderScorecards(summary, sr.siteAudit)}
+  <div class="donut-row">
+    <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>may need audit</small></div></div>
+    <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span></div>
+  </div>
   ${chipsHtml ? `<div class="chips">${chipsHtml}</div>` : ""}
   <p class="scan-meta">${scanMeta}</p>
   ${techDetailsHtml}
@@ -857,7 +879,7 @@ export function generateIndexHtml({
       legacyOfficeCount: fleetLegacyOfficeCount,
     });
   }
-  const fleetPagesTooltip = `≈${fleetRemediablePages.toLocaleString()} estimated remediation pages. `
+  const fleetPagesTooltip = `≈${fleetRemediablePages.toLocaleString()} document pages (pages inside the PDF/Office files — not web pages). `
     + `${fleetPdfPagesMeasured.toLocaleString()} measured PDF pages from pdfjs `
     + `+ DOCX×${PAGE_ESTIMATES.docx} (${fleetDocxCount}) `
     + `+ PPTX×${PAGE_ESTIMATES.pptx} (${fleetPptxCount}) `
@@ -1066,12 +1088,12 @@ ${ogImage ? `<meta property="og:type" content="website">
       else if (fleetPctInt <= 88)       fleetPhrase = "Most may need audit";
       else                              fleetPhrase = "Nearly all may need audit";
       const fleetAriaLabel = `${fleetRemediable.toLocaleString()} of ${fleetTotalFiles.toLocaleString()} files may need accessibility audit, ${fleetPctInt} percent.`
-        + (fleetRemediablePages > 0 ? ` Approximately ${fleetRemediablePages.toLocaleString()} potential pages of remediation workload. This is a snapshot — counts shift as sites are updated.` : "");
+        + (fleetRemediablePages > 0 ? ` Approximately ${fleetRemediablePages.toLocaleString()} document pages (pages inside the files — not web pages) of remediation workload. This is a snapshot — counts shift as sites are updated.` : "");
       return `<div class="fleet-hero" role="img" aria-label="${he(fleetAriaLabel)}">
       <div class="fleet-hero-num-block">
         <p class="fleet-hero-eyebrow">Files that may need accessibility audit</p>
         <p class="fleet-hero-num">${he(fleetRemediable.toLocaleString())}</p>${fleetRemediablePages > 0 ? `
-        <p class="fleet-hero-pages" title="${he(fleetPagesTooltip)}">≈ <strong>${he(fleetRemediablePages.toLocaleString())}</strong> potential pages <span class="fleet-hero-pages-hint">(remediation workload)</span></p>` : ""}
+        <p class="fleet-hero-pages" title="${he(fleetPagesTooltip)}">≈ <strong>${he(fleetRemediablePages.toLocaleString())}</strong> document pages <span class="fleet-hero-pages-hint">(remediation workload)</span></p>` : ""}
         <p class="fleet-hero-context">out of <strong>${he(fleetTotalFiles.toLocaleString())}</strong> files scanned across ${he(String(siteCount))} ICJIA website${siteCount !== 1 ? "s" : ""}</p>
       </div>
       <div class="fleet-hero-donut-block">
@@ -1083,7 +1105,7 @@ ${ogImage ? `<meta property="og:type" content="website">
     </div>${fleetRemediablePages > 0 ? `
     <aside class="potential-callout" role="note">
       <p class="potential-callout-eyebrow">Snapshot as of <strong>${he(lastFleetScanLabel)}</strong> <span class="potential-callout-eyebrow-suffix">— last fleet audit</span></p>
-      <p><strong>Potential workload — not a fixed commitment.</strong> Both the <strong>file counts</strong> and the <strong>page counts</strong> shown here are a point-in-time view of the fleet. They <strong>will change</strong> as staff remove files, edit content, update sites, or publish new material. The fleet total (≈ ${he(fleetRemediablePages.toLocaleString())} pages across ${he(fleetRemediable.toLocaleString())} files) is an inclusive estimate of <em>what a vendor could be quoted against today</em>, not what staff have committed to remediate. Treat the fleet total and the per-site numbers below as order-of-magnitude figures for planning — re-run the fleet audit before locking in any scope or budget number.</p>
+      <p><strong>Potential workload — not a fixed commitment.</strong> Both the <strong>file counts</strong> and the <strong>document page counts</strong> shown here are a point-in-time view of the fleet. They <strong>will change</strong> as staff remove files, edit content, update sites, or publish new material. The fleet total (≈ ${he(fleetRemediablePages.toLocaleString())} document pages across ${he(fleetRemediable.toLocaleString())} files) is an inclusive estimate of <em>what a vendor could be quoted against today</em>, not what staff have committed to remediate. Treat the fleet total and the per-site numbers below as order-of-magnitude figures for planning — re-run the fleet audit before locking in any scope or budget number.</p>
     </aside>` : ""}`;
     })()}
   </section>

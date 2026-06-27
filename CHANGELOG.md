@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.35.1] — 2026-06-27
+
+### Changed
+
+- **Hid the website-accessibility UI** — the fleet bundle is file-only again. The score donuts on each site card revert to the original "% may need audit" scope donut; the per-site "Website accessibility" section is removed from detail pages. The site-audit stage, `latest/site-audit.json` sidecar, and the `audit.icjia.app` detail endpoint remain fully in place (dormant) for later re-enable.
+- **Relabeled the remediation page count as "document pages"** (e.g., "≈ 4,200 document pages") everywhere it appears in the fleet bundle — card tile sub-label, fleet-hero display, aria-labels, and tooltips — to remove any ambiguity with web pages. Tooltip text now opens with "pages inside the PDF/Office files — not web pages."
+
 ## [1.35.0] — 2026-06-26
 
 ### Added
