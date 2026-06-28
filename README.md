@@ -1104,9 +1104,20 @@ Phases 2–5 are delegated to `examples/audit-fleet-auto.sh` rather than reimple
 
 The bundle deploys to **https://icjia-fleet-audit.netlify.app**, behind **Netlify visitor access**. Unauthenticated requests return **HTTP 401** on *every* path, including `/sites/` and `/.netlify/functions/uptime`. A `401` from `curl` is the *healthy* "deploy is live and gated" signal, not an error. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot) for the gate details.
 
-### Targeted re-runs (e.g. re-scoring one site)
+### Targeted re-runs (updating one site)
 
-`run-full-audit.sh` always does a full scan. When you only need to redo *part* of the pipeline — most commonly re-scoring the PDF/page audits for a site whose scoring requests timed out — skip the wrapper and run the underlying commands against the inventories already on disk. Audit errors are **never cached**, so a re-run retries only the pages that failed; successful pages are served from `~/.filecap/page-audit-cache.json`:
+When remediation happens **one site at a time** — PDFs fixed in place, or moved into the long-term archive — use **[`./run-site-update.sh`](run-site-update.sh)** to refresh just that site (or a few) and republish, instead of re-running the whole fleet with `run-full-audit.sh`. Every other site's numbers come straight from cache (`web-rollup` always rebuilds the full bundle from each site's cached inventory).
+
+```bash
+./run-site-update.sh i2i.illinois.gov                     # full refresh of one site (+ archive prompt)
+./run-site-update.sh i2i.illinois.gov archive.icjia.cloud # source + archive together
+./run-site-update.sh i2i.illinois.gov --scores-only       # re-score PDFs only; skip the SSH re-scan
+./run-site-update.sh i2i.illinois.gov --dry-run           # resolve + show the plan, do nothing
+```
+
+Name sites by **URL** (front-end or file-server), domain alias, slug, or nickname — `filecap resolve-site <query>` does the lookup, rejecting a bare host shared by several apps (e.g. `icjia.illinois.gov`) with the unique alternatives listed. Because moving excepted PDFs into `archive.icjia.cloud` changes its count too, a content-site update **prompts to also refresh the archive** (default Y; `--no-archive` opts out). A full refresh per site is SSH re-scan -> references -> cross-references -> audits; `--scores-only` skips the scan for in-place PDF fixes (and offers a full run, default Y, if a named site has no cached inventory yet).
+
+To redo *part* of the pipeline by hand instead — most commonly re-scoring the PDF/page audits for a site whose scoring requests timed out — run the underlying commands against the inventories already on disk. Audit errors are **never cached**, so a re-run retries only the pages that failed; successful pages are served from `~/.filecap/page-audit-cache.json`:
 
 ```bash
 # Re-score one site (retries only the failures), then rebuild + republish:

@@ -3,6 +3,7 @@ import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../ut
 import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 import { INDEX_CSS } from "./index-css.js";
 import { gradeForScore } from "../site-audit/aggregate.js";
+import { summarizeFileA11y, fileA11yCoverageText } from "../report/accessibility-band.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
 import { uptimeClientScript } from "./uptime-client.js";
 
@@ -699,6 +700,26 @@ function renderScoreDonut({ score, label, tag, coverage, empty }) {
   </div>`;
 }
 
+// v1.36.0 — compact "File accessibility (PDFs)" indicator for the site card.
+// `a` is the object returned by summarizeFileA11y(): the average of the site's
+// scored-PDF audit reports + its far/partial/closer band. Three states: the
+// archive is excluded (note only), thin data shows an "n/N" caption, otherwise
+// the score + colored band. The remediable count already shows in the audit
+// tile + donut caption, so this strip adds the *quality* read, not the count.
+function renderFileA11y(a) {
+  const head = `<span class="a11y-head">File accessibility <small>(PDFs)</small></span>`;
+  if (a.excluded) {
+    return `<div class="a11y-strip a11y-na">${head}<span class="a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
+  }
+  if (!a.enoughData) {
+    return `<div class="a11y-strip a11y-na">${head}<span class="a11y-note">Not enough scored PDFs yet (${a.scored.toLocaleString()} / ${a.pdfs.toLocaleString()})</span></div>`;
+  }
+  const key = a.band?.key ?? "na";
+  const label = he(a.band?.label ?? "");
+  const cover = he(fileA11yCoverageText(a));
+  return `<div class="a11y-strip a11y-${key}">${head}<span class="a11y-body"><span class="a11y-score">${a.avg}<small>/100</small></span><span class="a11y-pill"><span class="a11y-dot" aria-hidden="true"></span>${label}</span></span><span class="a11y-cover">${cover}</span></div>`;
+}
+
 export function renderCard(sr, { sortIndex = 0 } = {}) {
   const { site, summary, htmlFile, csvFile, scannedAt } = sr;
   const nickname = he(site.siteName ?? site.name ?? "");
@@ -772,6 +793,19 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   // path, public URL — each copy-to-clipboard, collapsed by default).
   const techDetailsHtml = renderTechDetails({ site, header: sr.header });
 
+  // v1.36.0 — file-accessibility read: the average of this site's scored-PDF
+  // audit reports (auditScoreSum / auditedPdfCount), banded far→closer. Derived
+  // only from the files' own audit scores — nothing about the website itself.
+  // archive-prod is excluded by slug inside summarizeFileA11y().
+  const fileA11yHtml = renderFileA11y(summarizeFileA11y({
+    auditScoreSum: summary?.auditScoreSum,
+    auditedPdfCount: summary?.auditedPdfCount,
+    auditErrorCount: summary?.auditErrorCount,
+    auditPending: summary?.auditPending,
+    remediable,
+    siteSlug: site.name,
+  }));
+
   // v1.7.39 — data-sort-* attributes feed the client-side sort control
   // above the grid. `sort-az` is the lower-cased visible heading (matches
   // the default alphabetical order). `sort-added` is the entry's index
@@ -798,6 +832,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>may need audit</small></div></div>
     <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span></div>
   </div>
+  ${fileA11yHtml}
   ${chipsHtml ? `<div class="chips">${chipsHtml}</div>` : ""}
   <p class="scan-meta">${scanMeta}</p>
   ${techDetailsHtml}

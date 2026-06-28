@@ -13,6 +13,7 @@ import { runCrossReferences } from "../src/commands/cross-references.js";
 import { runAudits } from "../src/commands/audits.js";
 import { runSiteAudit } from "../src/commands/site-audit.js";
 import { loadConfig } from "../src/config/load.js";
+import { resolveSite } from "../src/config/resolve-site.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
 
@@ -424,6 +425,44 @@ program
       }
     } catch (err) {
       process.stderr.write(`filecap site-audit error: ${err.message}\n`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("resolve-site <query>")
+  .description(
+    "Resolve a site URL, slug, or nickname to its sites.json slug (for run-site-update.sh). Prints the slug on a unique match; on ambiguity or no match, lists candidates on stderr and exits 1.",
+  )
+  .option("--sites-file <path>", "override saved-sites JSON path")
+  .action((query, opts) => {
+    try {
+      const sitesPath =
+        opts.sitesFile
+        ?? process.env.FILECAP_SITES_FILE
+        ?? path.join(os.homedir(), ".filecap", "sites.json");
+      const sites = JSON.parse(fs.readFileSync(sitesPath, "utf8"))?.sites ?? [];
+      const result = resolveSite(query, sites);
+      if (result.status === "match") {
+        process.stdout.write(`${result.site.name}\n`);
+        return;
+      }
+      const hostOf = (u) => {
+        try { return new URL(u).host; } catch { return u ?? ""; }
+      };
+      if (result.status === "ambiguous") {
+        process.stderr.write(
+          `filecap resolve-site: "${query}" matches ${result.sites.length} sites — be more specific (a file-server host or slug is unique):\n`,
+        );
+        for (const s of result.sites) {
+          process.stderr.write(`  ${s.name}  (${hostOf(s.publicUrlBase)})\n`);
+        }
+        process.exit(1);
+      }
+      process.stderr.write(`filecap resolve-site: no site matches "${query}" in ${sitesPath}\n`);
+      process.exit(1);
+    } catch (err) {
+      process.stderr.write(`filecap resolve-site error: ${err.message}\n`);
       process.exit(1);
     }
   });

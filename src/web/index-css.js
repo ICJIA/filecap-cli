@@ -958,6 +958,87 @@ main {
   text-align: center;
 }
 
+/* v1.36.0 — file-accessibility strip: the average of the site's scored-PDF
+   audit reports, banded far→partial→closer. The band class sets --a11y-accent
+   (bar + dot + score + pill) and --a11y-tint (pill background). a11y-na covers
+   the excluded archive and thin-data sites (caption only, no score). */
+.site-card .a11y-strip {
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 4px solid var(--a11y-accent, #6e7681);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.site-card .a11y-head {
+  font-size: 0.72em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9aa5b1;
+}
+.site-card .a11y-head small {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.site-card .a11y-body {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.site-card .a11y-score {
+  font-size: 2.1em;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--a11y-accent, #e5e5e5);
+}
+.site-card .a11y-score small {
+  font-size: 0.42em;
+  font-weight: 700;
+  color: #9aa5b1;
+  letter-spacing: 0.02em;
+}
+.site-card .a11y-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--a11y-tint, rgba(255, 255, 255, 0.06));
+  color: var(--a11y-accent, #d4dae0);
+  font-size: 0.82em;
+  font-weight: 700;
+}
+.site-card .a11y-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--a11y-accent, #9aa5b1);
+  flex: none;
+}
+.site-card .a11y-note {
+  color: #9aa5b1;
+  font-size: 0.86em;
+  line-height: 1.45;
+}
+.site-card .a11y-cover {
+  font-size: 0.74em;
+  color: #8b95a1;
+  line-height: 1.45;
+  margin-top: 1px;
+}
+.site-card .a11y-far     { --a11y-accent: #ff7b72; --a11y-tint: rgba(248, 81, 73, 0.13); }
+.site-card .a11y-partial { --a11y-accent: #e3b341; --a11y-tint: rgba(227, 160, 8, 0.15); }
+.site-card .a11y-closer  { --a11y-accent: #56d364; --a11y-tint: rgba(63, 185, 80, 0.15); }
+.site-card .a11y-na      { --a11y-accent: #6e7681; --a11y-tint: rgba(255, 255, 255, 0.05); }
+
 .site-card .tech-details { margin: 6px 0 12px; font-size: 0.82em; color: var(--fc-text-muted, #9aa5b1); }
 .site-card .tech-details summary { cursor: pointer; min-height: 24px; padding: 3px 0; }
 .site-card .tech-details .hostname,
@@ -1223,6 +1304,12 @@ main {
   .site-card .donut-caption span { color: #555; }
   .site-card .chip { background: #f0f0f0; color: #000; }
   .site-card .scan-meta { color: #555; }
+  .site-card .a11y-strip { background: #f8f8f8; }
+  .site-card .a11y-head, .site-card .a11y-note, .site-card .a11y-cover, .site-card .a11y-score small { color: #555; }
+  .site-card .a11y-far     { --a11y-accent: #cf222e; --a11y-tint: #fbe9e7; }
+  .site-card .a11y-partial { --a11y-accent: #9a6700; --a11y-tint: #fff5e0; }
+  .site-card .a11y-closer  { --a11y-accent: #1a7f37; --a11y-tint: #e8f5ec; }
+  .site-card .a11y-na      { --a11y-accent: #57606a; --a11y-tint: #f0f0f0; }
   .site-card .actions { display: none; }
   .site-card { page-break-inside: avoid; }
   details.tech-details { display: none; }

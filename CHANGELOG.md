@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.37.0] — 2026-06-28
+
+### Added
+
+- **`run-site-update.sh` — single-site (or few-site) refresh.** Re-scan + re-enrich just the site(s) you name and rebuild + deploy the fleet bundle, instead of re-running the whole fleet (`run-full-audit.sh`); every other site's numbers come straight from cache. Per named site: SSH re-scan → `references` → `cross-references` (against the fleet-wide sidecar index) → PDF `audits`, then one full-roster `web-rollup` + deploy + purge. Sites are named by **URL** (front-end or file-server), domain alias, slug, or nickname. Flags: `--scores-only` (skip the SSH scan; re-score PDFs only — for in-place fixes, prompting to do a full run first, default Y, if a site has no cached inventory), `--no-archive`, `--no-deploy`, `--no-purge`, `--dry-run` (resolve + print the plan, do nothing), `--help`.
+- **Archive auto-prompt.** Because remediation moves "ADA Title II exception" PDFs into `archive.icjia.cloud`, updating a content site **prompts to also refresh the archive** (default Y) so its file count reflects the newly-archived files; the archive's accessibility score stays "N/A — archive" (it remains excluded from scoring). Skipped when the archive is named explicitly, `--no-archive` is passed, or in `--scores-only` mode.
+- **`filecap resolve-site <query>` CLI + `src/config/resolve-site.js`.** Resolves a site URL / file-server host / domain alias / slug / nickname to its `sites.json` slug; prints the slug on a unique match, or lists the candidates and exits non-zero when a bare front-end host shared by several apps (e.g. `icjia.illinois.gov`, used by four) is ambiguous. Pure + unit-tested.
+
+## [1.36.0] — 2026-06-28
+
+### Added
+
+- **Per-site file-accessibility indicator** on the fleet bundle's homepage cards and on each per-site detail-page hero — the average of a site's scored-PDF audit reports (`audit.icjia.app`, 0–100) shown with a plain-language band: `< 60` red "Far from accessible" · `60–79` amber "Partial progress" · `≥ 80` green "Closer to accessible" — so a reader can judge how much remediation work remains. Derived **only** from the files' own PDF audit scores (`auditScoreSum ÷ auditedPdfCount`), explicitly **not** the dormant website/page-accessibility score. Shared `src/report/accessibility-band.js` drives the card, the detail banner, and the per-file cells so they can't disagree.
+- **Low-data guard + archive exclusion** — sites with fewer than 5 scored PDFs show "Not enough scored PDFs yet (n / N)" instead of a band, and the long-term archive (`archive-prod`) is excluded with a "Score N/A — long-term archive (many files are ADA Title II exceptions)" note, since it intentionally holds inaccessible files.
+- **Coverage transparency** on the indicator — "X of Y remediable files scored · Z non-PDF files have no score — remediable files only, not all files" — making explicit that the average covers scored PDFs only, not Office files (remediable but unscored) and not the whole inventory.
+- **Red/amber/green tint on each per-file Remediation Score cell** in the detail-page file table, using the same band thresholds, so a manager scanning the table sees at a glance which files are far from / closer to accessible. Unscored files render unstyled.
+
+### Fixed
+
+- **Page/file-table scroll cut-off on per-site detail pages** — the table sat in a `max-height: 75vh` pane that, now that rows are paginated, only created a nested vertical scroll region whose wheel got trapped at the bottom (`overscroll-behavior: contain`) while the sticky footer overlapped the last rows ("scrolling stops / rows cut off"). Removed the obsolete vertical cap so the document owns the scroll; horizontal scroll for wide tables is preserved.
+
 ## [1.35.2] — 2026-06-27
 
 ### Changed

@@ -5,6 +5,7 @@ import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
+import { summarizeFileA11y, bandForScore, fileA11yCoverageText } from "./accessibility-band.js";
 
 // v1.35.1: the per-page accessibility grade chip in the Page view is hidden
 // (the fleet bundle is file-only). buildPageAuditChip + its CSS are kept
@@ -469,7 +470,25 @@ const ACCESS_PANEL_COPY = {
   },
 };
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, pageScores = null }) {
+// v1.36.0 — detail-page "File accessibility (PDFs)" hero banner. Mirrors the
+// homepage card's renderFileA11y() (same summarizeFileA11y() input) so the two
+// surfaces never disagree: excluded archive, thin data, or score + band. The
+// average is the site's scored-PDF audit reports only — nothing site-level.
+function renderFileA11yBanner(a) {
+  const head = `<span class="dp-a11y-head">File accessibility <small>(PDFs)</small></span>`;
+  if (a.excluded) {
+    return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
+  }
+  if (!a.enoughData) {
+    return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">Not enough scored PDFs yet (${a.scored.toLocaleString()} / ${a.pdfs.toLocaleString()})</span></div>`;
+  }
+  const key = a.band?.key ?? "na";
+  const label = htmlEscape(a.band?.label ?? "");
+  const cover = htmlEscape(fileA11yCoverageText(a));
+  return `<div class="dp-a11y dp-a11y-${key}"><div class="dp-a11y-row">${head}<span class="dp-a11y-body"><span class="dp-a11y-score">${a.avg}<small>/100</small></span><span class="dp-a11y-pill"><span class="dp-a11y-dot" aria-hidden="true"></span>${label}</span></span></div><span class="dp-a11y-cover">${cover}</span></div>`;
+}
+
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, pageScores = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -485,6 +504,13 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const categoryCounts = {};
   let imageOnlyCount = 0;
   let flaggedCount = 0;
+  // v1.36.0 — per-file PDF audit tally, mirroring computeSiteSummary() so the
+  // detail-page file-accessibility banner agrees with the homepage card. Only
+  // PDFs carry a numeric score; Office files are remediable but unscored.
+  let auditScoreSum = 0;
+  let auditedPdfCount = 0;
+  let auditErrorCount = 0;
+  let auditPending = 0;
 
   for (const entry of entries) {
     totalBytes += entry.sizeBytes ?? 0;
@@ -496,6 +522,21 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     }
     if ((entry.flags ?? []).length > 0) {
       flaggedCount++;
+    }
+    if (cat === "pdf") {
+      const audit = entry.audit;
+      if (audit && typeof audit === "object") {
+        if (typeof audit.score === "number") {
+          auditedPdfCount++;
+          auditScoreSum += audit.score;
+        } else if (audit.error) {
+          auditErrorCount++;
+        } else {
+          auditPending++;
+        }
+      } else {
+        auditPending++;
+      }
     }
   }
 
@@ -631,6 +672,15 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
         const data = numStr ? ` data-num="${numStr}"` : "";
         return `<td class="col-pages num"${data}>${htmlEscape(numStr)}</td>`;
       }
+      if (col.name === "remediationScore") {
+        // v1.36.0 — tint the per-file score cell red/yellow/green by the same
+        // far/partial/closer band the homepage card uses, so a manager scanning
+        // the table sees at a glance which files still need work. Unscored
+        // files (no numeric audit.score) get no band and render unstyled.
+        const band = bandForScore(entry.audit?.score);
+        const cls = band ? ` rem-band-${band.key}` : "";
+        return `<td class="rem-score${cls}">${htmlEscape(v)}</td>`;
+      }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
     return `<tr${classAttr}${categoryAttr}>${cells}</tr>`;
@@ -756,6 +806,17 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const heroDateFmt = fmtChicagoDate((isConsolidated ? meta?.consolidatedAt : meta?.scannedAt) ?? "");
   const heroTitle = htmlEscape(siteFullName || siteName || "ICJIA inventory report");
   const heroNick = htmlEscape(siteName ?? "");
+
+  // v1.36.0 — file-accessibility read for the hero: the average of this site's
+  // scored-PDF audit reports, banded far→closer (archive excluded by slug).
+  const fileA11yBannerHtml = renderFileA11yBanner(summarizeFileA11y({
+    auditScoreSum,
+    auditedPdfCount,
+    auditErrorCount,
+    auditPending,
+    remediable: remediableCount,
+    siteSlug,
+  }));
 
   // Access-method panel: shown when web-rollup passes an accessKind. Tells a
   // manager/remediator at a glance how the site's files are served + what
@@ -1167,6 +1228,36 @@ a.page-audit-chip:hover {
   color: #8b949e;
 }
 .dp-hero .dp-snapshot-note strong { color: #9aa5b1; font-weight: 600; }
+/* v1.36.0 — file-accessibility banner in the hero: the average of the site's
+   scored-PDF audit reports + a far/partial/closer band. Band class sets
+   --dpa-accent (bar/dot/score/pill) and --dpa-tint (pill bg). dp-a11y-na covers
+   the excluded archive + thin-data sites (note only). */
+.dp-a11y {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  max-width: 100%;
+  margin: 2px 0 14px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 4px solid var(--dpa-accent, #6e7681);
+}
+.dp-a11y-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.dp-a11y-cover { font-size: 0.8rem; color: #8b95a1; line-height: 1.45; }
+.dp-a11y-head { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #9aa5b1; }
+.dp-a11y-head small { text-transform: none; letter-spacing: 0; font-weight: 600; opacity: 0.85; }
+.dp-a11y-body { display: inline-flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.dp-a11y-score { font-size: 1.9rem; font-weight: 900; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--dpa-accent, #e5e5e5); }
+.dp-a11y-score small { font-size: 0.42em; font-weight: 700; color: #9aa5b1; }
+.dp-a11y-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; background: var(--dpa-tint, rgba(255, 255, 255, 0.06)); color: var(--dpa-accent, #d4dae0); font-size: 0.85rem; font-weight: 700; }
+.dp-a11y-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dpa-accent, #9aa5b1); flex: none; }
+.dp-a11y-note { color: #9aa5b1; font-size: 0.9rem; }
+.dp-a11y-far     { --dpa-accent: #ff7b72; --dpa-tint: rgba(248, 81, 73, 0.14); }
+.dp-a11y-partial { --dpa-accent: #e3b341; --dpa-tint: rgba(227, 160, 8, 0.15); }
+.dp-a11y-closer  { --dpa-accent: #56d364; --dpa-tint: rgba(63, 185, 80, 0.15); }
+.dp-a11y-na      { --dpa-accent: #6e7681; --dpa-tint: rgba(255, 255, 255, 0.05); }
 
 @media (max-width: 720px) {
   .dp-hero .dp-hero-main { flex-direction: column-reverse; align-items: flex-start; gap: 14px; }
@@ -1363,6 +1454,13 @@ a.page-audit-chip:hover {
    digits line up across rows. Non-PDFs render a blank cell, so the column
    reads as a sparse stripe of numbers next to the filename. */
 td.col-pages { text-align: right; font-variant-numeric: tabular-nums; color: #c0cdda; padding-right: 0.6em; }
+/* v1.36.0 — per-file Remediation Score cell tinted by the same far/partial/
+   closer band as the homepage card, so a manager scanning the table sees which
+   files are far from / closer to accessible. Unscored cells stay unstyled. */
+td.rem-score { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
+td.rem-band-far     { background: rgba(248, 81, 73, 0.15); color: #ff9d96; }
+td.rem-band-partial { background: rgba(227, 160, 8, 0.15); color: #e3b341; }
+td.rem-band-closer  { background: rgba(63, 185, 80, 0.15); color: #56d364; }
 th[data-col="pageCount"] { text-align: right; }
 
 /* ── filter bar / chips ────────────────────────────────────── */
@@ -1451,32 +1549,38 @@ th[data-col="pageCount"] { text-align: right; }
 
 /* ── table wrapper (v1.7.2: scrolls both axes, touch-friendly) ──────────── */
 .table-wrap {
-  /* 'overflow: auto' activates BOTH axes - horizontal for wide tables, and
-     vertical so the file table is bounded by a scrollable pane instead of
-     pushing the page footer hundreds of viewport-heights down. Per CSS spec,
-     'overflow-x: auto' alone leaves 'overflow-y: visible', which combined
-     with max-height would clip rather than scroll. Explicit 'auto' here
-     fixes that. */
-  overflow: auto;
+  /* v1.36.0 — the vertical max-height:75vh cap was removed. It predated row
+     pagination; once the table is already bounded to one page of rows (25 by
+     default), the cap only created a NESTED vertical scroll region. With tall
+     Page-view rows that pane overflowed, and its wheel got trapped at the
+     bottom (overscroll-behavior wouldn't chain to the page) while the sticky
+     site-footer overlapped the last rows — the "scrolling stops / rows cut off"
+     bug. Letting the document own the vertical scroll fixes both.
+     'overflow-x: auto' keeps HORIZONTAL scroll for a wide file table; with no
+     height constraint the pane grows to its content, so there is no vertical
+     scrollbar to trap (per CSS spec overflow-y resolves to auto here, but at
+     content height there is nothing to scroll vertically). overscroll-behavior
+     is scoped to x only so a trackpad back-swipe doesn't navigate away mid-pan. */
+  overflow-x: auto;
   border: 1px solid #21262d;
   border-radius: 4px;
-  max-height: 75vh;
   /* Momentum scrolling on iOS; touch-action lets the browser handle native
      two-finger / single-finger pan in both axes without delay. */
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
 }
 
 /* ── scrollable container (alias for table-wrap) ───────────── */
 .table-scroll {
-  /* v1.7.2: same dual-axis scroll + touch behaviour as .table-wrap so any
-     non-file-table data (category breakdown, etc.) is equally touch-pannable. */
-  overflow: auto;
+  /* v1.7.2: horizontal touch-pan for non-file-table data (category breakdown,
+     etc.). v1.36.0: overscroll scoped to x (matches .table-wrap) so vertical
+     wheel always chains to the page — no nested vertical scroll trap. */
+  overflow-x: auto;
   width: 100%;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
 }
 
 /* ── sticky first column ───────────────────────────────────── */
@@ -1915,6 +2019,15 @@ ${siteFooterCss()}
   tbody tr:hover { background: inherit; }
   .table-wrap th:first-child, .table-wrap td:first-child { background: inherit; }
   .cat-table td:last-child { color: #000; }
+  .dp-a11y { background: #f6f8fa; }
+  .dp-a11y-head, .dp-a11y-note, .dp-a11y-cover, .dp-a11y-score small { color: #555; }
+  .dp-a11y-far     { --dpa-accent: #b42318; --dpa-tint: #fbe9e7; }
+  .dp-a11y-partial { --dpa-accent: #8a6100; --dpa-tint: #fff5e0; }
+  .dp-a11y-closer  { --dpa-accent: #1a7f37; --dpa-tint: #e8f5ec; }
+  .dp-a11y-na      { --dpa-accent: #57606a; --dpa-tint: #f0f0f0; }
+  td.rem-band-far     { background: #fbe9e7; color: #b42318; }
+  td.rem-band-partial { background: #fff5e0; color: #8a6100; }
+  td.rem-band-closer  { background: #e8f5ec; color: #1a7f37; }
   a { color: #0066cc; }
   td a { color: #0066cc; }
 }
@@ -1976,6 +2089,7 @@ ${(() => {
       <div class="dp-ring-pct">${heroPct}%<small>audit</small></div>
     </div>
   </div>
+  ${fileA11yBannerHtml}
   <p class="dp-metaline"><strong>${heroTotal.toLocaleString()}</strong> file${heroTotal === 1 ? "" : "s"} &middot; <strong>${htmlEscape(humanizeBytes(totalBytes))}</strong>${heroDateFmt ? ` &middot; scanned <strong>${htmlEscape(heroDateFmt)}</strong>` : ""}</p>
   ${remediablePages > 0 ? `<p class="dp-snapshot-note"><strong>Snapshot as of ${htmlEscape(heroDateFmt || "the latest scan")}.</strong> These counts are a point-in-time view — they may change as files are added, edited, or removed from the site.</p>` : ""}
 </header>

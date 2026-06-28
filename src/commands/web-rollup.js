@@ -1144,6 +1144,7 @@ export async function runWebRollup({
       resolveFleetFile,
       pageRefFiles,
       currentSiteName: header.metadata?.serverName ?? siteKey,
+      siteSlug: siteKey,
       siteAudit,
       pageScores,
     });
