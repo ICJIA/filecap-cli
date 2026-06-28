@@ -3,7 +3,7 @@ import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../ut
 import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 import { INDEX_CSS } from "./index-css.js";
 import { gradeForScore } from "../site-audit/aggregate.js";
-import { summarizeFileA11y, fileA11yCoverageText } from "../report/accessibility-band.js";
+import { summarizeFileA11y, fileA11yCoverageText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "../report/accessibility-band.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
 import { uptimeClientScript } from "./uptime-client.js";
 
@@ -706,7 +706,7 @@ function renderScoreDonut({ score, label, tag, coverage, empty }) {
 // archive is excluded (note only), thin data shows an "n/N" caption, otherwise
 // the score + colored band. The remediable count already shows in the audit
 // tile + donut caption, so this strip adds the *quality* read, not the count.
-function renderFileA11y(a) {
+function renderFileA11y(a, trend) {
   const head = `<span class="a11y-head">File accessibility <small>(PDFs)</small></span>`;
   if (a.excluded) {
     return `<div class="a11y-strip a11y-na">${head}<span class="a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
@@ -717,7 +717,8 @@ function renderFileA11y(a) {
   const key = a.band?.key ?? "na";
   const label = he(a.band?.label ?? "");
   const cover = he(fileA11yCoverageText(a));
-  return `<div class="a11y-strip a11y-${key}">${head}<span class="a11y-body"><span class="a11y-score">${a.avg}<small>/100</small></span><span class="a11y-pill"><span class="a11y-dot" aria-hidden="true"></span>${label}</span></span><span class="a11y-cover">${cover}</span></div>`;
+  const trendChip = fileA11yTrendChipHtml(trend);
+  return `<div class="a11y-strip a11y-${key}">${head}${fileA11yGaugeHtml(a)}<span class="a11y-body"><span class="a11y-score">${a.avg}<small>/100</small></span><span class="a11y-pill"><span class="a11y-dot" aria-hidden="true"></span>${label}</span>${trendChip}</span><span class="a11y-cover">${cover}</span></div>`;
 }
 
 export function renderCard(sr, { sortIndex = 0 } = {}) {
@@ -804,7 +805,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
     auditPending: summary?.auditPending,
     remediable,
     siteSlug: site.name,
-  }));
+  }), sr.fileA11yTrend ?? null);
 
   // v1.7.39 — data-sort-* attributes feed the client-side sort control
   // above the grid. `sort-az` is the lower-cased visible heading (matches

@@ -78,7 +78,7 @@ For more details: https://github.com/ICJIA/filecap-cli
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, siteAudit = null, pageScores = null }) {
+export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, fileA11yTrend = null, siteAudit = null, pageScores = null }) {
   let header;
   const entries = [];
 
@@ -173,6 +173,8 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
       // v1.36.0 — site `name` slug (e.g. "archive-prod"), threaded so the
       // detail-page file-accessibility banner can exclude the archive.
       siteSlug,
+      // v1.38.0 — "since last audit" trend ({delta, dir, sinceText}) for the banner.
+      fileA11yTrend,
       siteAudit,
       pageScores,
     });

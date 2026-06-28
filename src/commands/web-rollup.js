@@ -29,7 +29,9 @@ import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
 import { generateSitesHtml } from "../web/sites-page.js";
 import { fetchOgMeta, fetchImageBytes } from "../references/og-meta.js";
-import { fmtChicagoGeneratedAt } from "../util/time.js";
+import { fmtChicagoGeneratedAt, fmtChicagoDate } from "../util/time.js";
+import { summarizeFileA11y } from "../report/accessibility-band.js";
+import { appendA11yPoint, a11yTrend } from "../report/a11y-history.js";
 import pLimit from "p-limit";
 
 // v1.25.0 — deployed bundle URL, used to build the absolute og:image in the
@@ -1039,6 +1041,57 @@ export async function runWebRollup({
     return key ? (fleetFileIndex.get(key) ?? null) : null;
   };
 
+  // v1.38.0 — pre-pass: record each site's file-accessibility average into a
+  // purge-exempt time series (latest/a11y-history.json) and derive the "since
+  // last audit" trend. A point is appended only when the numbers change, so
+  // template-only rebuilds don't pad the series. The excluded archive and
+  // zero-scored sites are skipped (no displayable score). Runs before the main
+  // loop so the trend can be handed to BOTH the detail page and the card.
+  const a11yNowIso = new Date().toISOString();
+  const a11yTrendBySlug = new Map();
+  const a11yHistoryBySlug = new Map();
+  for (const site of sites) {
+    const slug = site?.name;
+    if (!slug) continue;
+    const inv = latestInventoryPath(auditsBase, slug);
+    let summary;
+    try {
+      await fs.stat(inv);
+      summary = await computeSiteSummary(inv);
+    } catch {
+      continue; // no inventory for this site yet
+    }
+    const a = summarizeFileA11y({
+      auditScoreSum: summary.auditScoreSum,
+      auditedPdfCount: summary.auditedPdfCount,
+      auditErrorCount: summary.auditErrorCount,
+      auditPending: summary.auditPending,
+      remediable: summary.remediable,
+      siteSlug: slug,
+    });
+    if (a.excluded || a.scored === 0 || a.avg === null) continue;
+    const histPath = path.join(auditsBase, slug, "latest", "a11y-history.json");
+    let history = [];
+    try {
+      const raw = JSON.parse(await fs.readFile(histPath, "utf8"));
+      if (Array.isArray(raw)) history = raw;
+    } catch {
+      /* no history yet */
+    }
+    const updated = appendA11yPoint(history, {
+      at: a11yNowIso, avg: a.avg, scored: a.scored, pdfs: a.pdfs,
+      remediable: a.remediable, band: a.band?.key ?? null,
+    });
+    try {
+      await fs.writeFile(histPath, JSON.stringify(updated, null, 2));
+    } catch (e) {
+      process.stderr.write(`WARN: could not write a11y-history for ${slug}: ${e.message}\n`);
+    }
+    a11yHistoryBySlug.set(slug, updated);
+    const t = a11yTrend(updated);
+    a11yTrendBySlug.set(slug, t ? { delta: t.delta, dir: t.dir, sinceText: fmtChicagoDate(t.sinceAt) } : null);
+  }
+
   for (const site of sites) {
     const siteKey = site.name;
     if (!siteKey) {
@@ -1145,6 +1198,7 @@ export async function runWebRollup({
       pageRefFiles,
       currentSiteName: header.metadata?.serverName ?? siteKey,
       siteSlug: siteKey,
+      fileA11yTrend: a11yTrendBySlug.get(siteKey) ?? null,
       siteAudit,
       pageScores,
     });
@@ -1313,6 +1367,7 @@ export async function runWebRollup({
       csvFile: `${baseName}.xlsx`,
       scannedAt: header.metadata?.scannedAt ?? null,
       siteAudit,
+      fileA11yTrend: a11yTrendBySlug.get(site.name) ?? null,
     });
   }
 
@@ -1908,6 +1963,15 @@ export async function runWebRollup({
     ogImage: ogImageUrl,
   });
   await fs.writeFile(path.join(output, "index.html"), indexHtml);
+
+  // v1.38.0 — consolidated file-accessibility history for the bundle: per-site
+  // time series keyed by slug, so a future graph page can fetch one file. The
+  // per-site latest/a11y-history.json files are the purge-exempt source of
+  // truth; this is the published snapshot.
+  await fs.writeFile(
+    path.join(output, "a11y-history.json"),
+    JSON.stringify(Object.fromEntries(a11yHistoryBySlug), null, 2),
+  );
 
   // 6d. Generate the /accessibility page — current a11y standing + audit log.
   let accessibilityHtml = generateAccessibilityPage({ currentStatus, log: accessibilityLog });

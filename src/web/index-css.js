@@ -1034,6 +1034,56 @@ main {
   line-height: 1.45;
   margin-top: 1px;
 }
+/* v1.38.0 — infographic gauge: a fixed red→amber→green track (band thresholds
+   as zones) with a marker at the score, so the far→closer position reads at a
+   glance without reading the number. */
+.site-card .a11y-gauge { width: 100%; padding-top: 7px; margin: 1px 0 3px; }
+.site-card .a11y-gauge-track {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(to right,
+    #e5484d 0 60%,
+    #e3a008 60% 80%,
+    #30a46c 80% 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.30);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.site-card .a11y-gauge-marker {
+  position: absolute;
+  top: -3px; bottom: -3px;
+  width: 3px;
+  background: #fff;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55);
+}
+.site-card .a11y-gauge-marker::before {
+  content: "";
+  position: absolute;
+  top: -7px; left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #fff;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+/* v1.38.0 — "since last audit" trend chip: ▲ improved (green) / ▼ declined
+   (red) / no change (grey). */
+.site-card .a11y-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78em;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.site-card .a11y-trend-up   { color: #56d364; background: rgba(63, 185, 80, 0.14); }
+.site-card .a11y-trend-down { color: #ff7b72; background: rgba(248, 81, 73, 0.14); }
+.site-card .a11y-trend-flat { color: #9aa5b1; background: rgba(255, 255, 255, 0.06); }
 .site-card .a11y-far     { --a11y-accent: #ff7b72; --a11y-tint: rgba(248, 81, 73, 0.13); }
 .site-card .a11y-partial { --a11y-accent: #e3b341; --a11y-tint: rgba(227, 160, 8, 0.15); }
 .site-card .a11y-closer  { --a11y-accent: #56d364; --a11y-tint: rgba(63, 185, 80, 0.15); }
@@ -1306,6 +1356,9 @@ main {
   .site-card .scan-meta { color: #555; }
   .site-card .a11y-strip { background: #f8f8f8; }
   .site-card .a11y-head, .site-card .a11y-note, .site-card .a11y-cover, .site-card .a11y-score small { color: #555; }
+  .site-card .a11y-trend-up { color: #1a7f37; background: #e8f5ec; }
+  .site-card .a11y-trend-down { color: #b42318; background: #fbe9e7; }
+  .site-card .a11y-trend-flat { color: #57606a; background: #f0f0f0; }
   .site-card .a11y-far     { --a11y-accent: #cf222e; --a11y-tint: #fbe9e7; }
   .site-card .a11y-partial { --a11y-accent: #9a6700; --a11y-tint: #fff5e0; }
   .site-card .a11y-closer  { --a11y-accent: #1a7f37; --a11y-tint: #e8f5ec; }

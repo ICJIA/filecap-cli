@@ -5,7 +5,7 @@ import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
-import { summarizeFileA11y, bandForScore, fileA11yCoverageText } from "./accessibility-band.js";
+import { summarizeFileA11y, bandForScore, fileA11yCoverageText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "./accessibility-band.js";
 
 // v1.35.1: the per-page accessibility grade chip in the Page view is hidden
 // (the fleet bundle is file-only). buildPageAuditChip + its CSS are kept
@@ -474,7 +474,7 @@ const ACCESS_PANEL_COPY = {
 // homepage card's renderFileA11y() (same summarizeFileA11y() input) so the two
 // surfaces never disagree: excluded archive, thin data, or score + band. The
 // average is the site's scored-PDF audit reports only — nothing site-level.
-function renderFileA11yBanner(a) {
+function renderFileA11yBanner(a, trend) {
   const head = `<span class="dp-a11y-head">File accessibility <small>(PDFs)</small></span>`;
   if (a.excluded) {
     return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
@@ -485,10 +485,11 @@ function renderFileA11yBanner(a) {
   const key = a.band?.key ?? "na";
   const label = htmlEscape(a.band?.label ?? "");
   const cover = htmlEscape(fileA11yCoverageText(a));
-  return `<div class="dp-a11y dp-a11y-${key}"><div class="dp-a11y-row">${head}<span class="dp-a11y-body"><span class="dp-a11y-score">${a.avg}<small>/100</small></span><span class="dp-a11y-pill"><span class="dp-a11y-dot" aria-hidden="true"></span>${label}</span></span></div><span class="dp-a11y-cover">${cover}</span></div>`;
+  const trendChip = fileA11yTrendChipHtml(trend);
+  return `<div class="dp-a11y dp-a11y-${key}">${head}${fileA11yGaugeHtml(a)}<span class="dp-a11y-body"><span class="dp-a11y-score">${a.avg}<small>/100</small></span><span class="dp-a11y-pill"><span class="dp-a11y-dot" aria-hidden="true"></span>${label}</span>${trendChip}</span><span class="dp-a11y-cover">${cover}</span></div>`;
 }
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, pageScores = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, fileA11yTrend = null, pageScores = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -816,7 +817,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     auditPending,
     remediable: remediableCount,
     siteSlug,
-  }));
+  }), fileA11yTrend);
 
   // Access-method panel: shown when web-rollup passes an accessKind. Tells a
   // manager/remediator at a glance how the site's files are served + what
@@ -1244,8 +1245,52 @@ a.page-audit-chip:hover {
   background: rgba(255, 255, 255, 0.04);
   border-left: 4px solid var(--dpa-accent, #6e7681);
 }
-.dp-a11y-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .dp-a11y-cover { font-size: 0.8rem; color: #8b95a1; line-height: 1.45; }
+/* v1.38.0 — infographic gauge (shared markup with the homepage card): a fixed
+   red→amber→green track with a marker at the score. */
+.dp-a11y .a11y-gauge { width: 260px; max-width: 100%; padding-top: 7px; margin: 1px 0 4px; }
+.dp-a11y .a11y-gauge-track {
+  position: relative;
+  height: 13px;
+  border-radius: 7px;
+  background: linear-gradient(to right, #e5484d 0 60%, #e3a008 60% 80%, #30a46c 80% 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.30);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.dp-a11y .a11y-gauge-marker {
+  position: absolute;
+  top: -3px; bottom: -3px;
+  width: 3px;
+  background: #fff;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55);
+}
+.dp-a11y .a11y-gauge-marker::before {
+  content: "";
+  position: absolute;
+  top: -7px; left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #fff;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+/* v1.38.0 — "since last audit" trend chip in the banner. */
+.dp-a11y .a11y-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.dp-a11y .a11y-trend-up   { color: #56d364; background: rgba(63, 185, 80, 0.14); }
+.dp-a11y .a11y-trend-down { color: #ff7b72; background: rgba(248, 81, 73, 0.14); }
+.dp-a11y .a11y-trend-flat { color: #9aa5b1; background: rgba(255, 255, 255, 0.06); }
 .dp-a11y-head { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #9aa5b1; }
 .dp-a11y-head small { text-transform: none; letter-spacing: 0; font-weight: 600; opacity: 0.85; }
 .dp-a11y-body { display: inline-flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
@@ -2021,6 +2066,9 @@ ${siteFooterCss()}
   .cat-table td:last-child { color: #000; }
   .dp-a11y { background: #f6f8fa; }
   .dp-a11y-head, .dp-a11y-note, .dp-a11y-cover, .dp-a11y-score small { color: #555; }
+  .dp-a11y .a11y-trend-up { color: #1a7f37; background: #e8f5ec; }
+  .dp-a11y .a11y-trend-down { color: #b42318; background: #fbe9e7; }
+  .dp-a11y .a11y-trend-flat { color: #57606a; background: #f0f0f0; }
   .dp-a11y-far     { --dpa-accent: #b42318; --dpa-tint: #fbe9e7; }
   .dp-a11y-partial { --dpa-accent: #8a6100; --dpa-tint: #fff5e0; }
   .dp-a11y-closer  { --dpa-accent: #1a7f37; --dpa-tint: #e8f5ec; }

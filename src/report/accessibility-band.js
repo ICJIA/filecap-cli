@@ -98,3 +98,38 @@ export function fileA11yCoverageText(a) {
   }
   return `${parts.join(" · ")} — remediable files only, not all files.`;
 }
+
+/**
+ * Infographic gauge markup for the score: a fixed red→amber→green track (the
+ * band thresholds as colored zones, painted in CSS) with a marker dropped at
+ * the score, so a manager reads the far→closer position at a glance without
+ * reading the number. Identical on the card and the detail page. `a` is a
+ * summarizeFileA11y() result with a non-null band (callers render it only in
+ * the scored state).
+ * @param {{avg:number, band:{label:string}|null}} a
+ * @returns {string}
+ */
+export function fileA11yGaugeHtml(a) {
+  const pct = Math.max(0, Math.min(100, Math.round(a.avg)));
+  const label = a.band ? a.band.label : "";
+  return `<div class="a11y-gauge" role="img" aria-label="Score ${pct} of 100 — ${label}">`
+    + `<div class="a11y-gauge-track"><span class="a11y-gauge-marker" style="left:${pct}%"></span></div></div>`;
+}
+
+/**
+ * "Since last audit" trend chip — ▲/▼ + the point change + the date being
+ * compared against (e.g. "▲ 6 since Jun 12"), or "no change since …" when flat.
+ * Returns "" for a baseline (no prior point). `trend` is a11yTrend()'s result
+ * with `sinceAt` already formatted into `sinceText` by the caller (web-rollup).
+ * @param {{delta:number, dir:"up"|"down"|"flat", sinceText:string}|null} trend
+ * @returns {string}
+ */
+export function fileA11yTrendChipHtml(trend) {
+  if (!trend) return "";
+  const { delta, dir, sinceText } = trend;
+  if (dir === "flat") {
+    return `<span class="a11y-trend a11y-trend-flat">no change since ${sinceText}</span>`;
+  }
+  const arrow = dir === "up" ? "▲" : "▼";
+  return `<span class="a11y-trend a11y-trend-${dir}">${arrow} ${Math.abs(delta)} since ${sinceText}</span>`;
+}

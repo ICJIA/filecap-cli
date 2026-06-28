@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.38.0] — 2026-06-28
+
+### Added
+
+- **Infographic accessibility gauge** on each homepage card and per-site detail-page hero — a fixed red→amber→green track (the far / partial / closer band thresholds as zones) with a marker dropped at the site's score, so the position reads at a glance without reading the number. Shared `fileA11yGaugeHtml()` keeps the card and detail identical; the per-file score cells keep their matching tint.
+- **File-accessibility history + "since last audit" trend.** `web-rollup` now records each site's average scored-PDF score into a **purge-exempt per-site time series** (`~/filecap-audits/<slug>/latest/a11y-history.json`, appended only when the number changes) and publishes a **consolidated `a11y-history.json`** into the bundle for future graphing. A SiteImprove-style trend chip on the card + detail hero shows the change vs the previous audit — **▲ N since <date>** (green, improved) · **▼ N** (red, declined) · *no change* — and is empty until a second data point exists (the first run sets each site's baseline). New pure `src/report/a11y-history.js` (`appendA11yPoint` / `a11yTrend`, unit-tested); the excluded archive and zero-scored sites record no point.
+
 ## [1.37.0] — 2026-06-28
 
 ### Added

@@ -6,6 +6,8 @@ import {
   bandForScore,
   summarizeFileA11y,
   fileA11yCoverageText,
+  fileA11yGaugeHtml,
+  fileA11yTrendChipHtml,
 } from "../src/report/accessibility-band.js";
 
 describe("constants", () => {
@@ -193,5 +195,51 @@ describe("fileA11yCoverageText", () => {
     });
     const txt = fileA11yCoverageText(a);
     expect(txt).toMatch(/1 non-PDF file has no score/);
+  });
+});
+
+describe("fileA11yGaugeHtml", () => {
+  it("renders a gauge track with the marker at the rounded score and a labelled aria", () => {
+    const a = summarizeFileA11y({
+      auditScoreSum: 350, auditedPdfCount: 5, remediable: 10, siteSlug: "x",
+    }); // avg 70 → partial
+    const html = fileA11yGaugeHtml(a);
+    expect(html).toMatch(/a11y-gauge-track/);
+    expect(html).toMatch(/a11y-gauge-marker/);
+    expect(html).toMatch(/left:\s*70%/);
+    expect(html).toMatch(/aria-label="[^"]*70 of 100[^"]*partial progress/i);
+  });
+
+  it("clamps the marker between 0 and 100", () => {
+    expect(fileA11yGaugeHtml({ avg: 0, band: { label: "Far from accessible" } })).toMatch(/left:\s*0%/);
+    expect(fileA11yGaugeHtml({ avg: 100, band: { label: "Closer to accessible" } })).toMatch(/left:\s*100%/);
+    expect(fileA11yGaugeHtml({ avg: 140, band: { label: "Closer to accessible" } })).toMatch(/left:\s*100%/);
+  });
+});
+
+describe("fileA11yTrendChipHtml", () => {
+  it("renders nothing for a baseline (no trend)", () => {
+    expect(fileA11yTrendChipHtml(null)).toBe("");
+  });
+
+  it("renders an up arrow + magnitude + date for an improvement", () => {
+    const html = fileA11yTrendChipHtml({ delta: 6, dir: "up", sinceText: "Jun 12" });
+    expect(html).toMatch(/a11y-trend-up/);
+    expect(html).toMatch(/▲/);
+    expect(html).toMatch(/6 since Jun 12/);
+  });
+
+  it("renders a down arrow and the absolute magnitude for a decline", () => {
+    const html = fileA11yTrendChipHtml({ delta: -4, dir: "down", sinceText: "Jun 12" });
+    expect(html).toMatch(/a11y-trend-down/);
+    expect(html).toMatch(/▼/);
+    expect(html).toMatch(/4 since Jun 12/);
+    expect(html).not.toMatch(/-4/);
+  });
+
+  it("says 'no change' when flat", () => {
+    const html = fileA11yTrendChipHtml({ delta: 0, dir: "flat", sinceText: "Jun 12" });
+    expect(html).toMatch(/a11y-trend-flat/);
+    expect(html).toMatch(/no change since Jun 12/);
   });
 });
