@@ -37,6 +37,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 FILECAP_BIN="$SCRIPT_DIR/bin/filecap.js"
 SITES_JSON="${SITES_JSON:-${FILECAP_SITES_FILE:-$HOME/.filecap/sites.json}}"
+# Child `filecap` invocations (site-audit, web-rollup) resolve their roster
+# from FILECAP_SITES_FILE — export so SITES_JSON steers them too.
+export FILECAP_SITES_FILE="$SITES_JSON"
 AUDITS_BASE="${AUDITS_BASE:-$HOME/filecap-audits}"
 
 say()  { printf '\n=== %s ===\n' "$*"; }

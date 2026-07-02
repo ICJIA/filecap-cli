@@ -23,6 +23,9 @@ const CATEGORY_LABELS = {
   "office-document": "Office docs",
   "spreadsheet": "Spreadsheet",
   "presentation": "Presentation",
+  // v1.39.0 — .doc/.xls/.ppt from new scans (old inventories keep the three
+  // categories above for these files; both render fine).
+  "legacy-office": "Legacy Office",
   "image": "Image",
   "archive": "Archive",
   "text": "Text",
@@ -578,7 +581,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const otherNonRemCount = nonRemediableCount - imageCount - textCount;
 
   // ── filter bar (category chips) ──────────────────────────────────────────────
-  const CHIP_ORDER = ["pdf", "office-document", "spreadsheet", "presentation", "image", "archive", "text", "web", "audio-video", "other"];
+  const CHIP_ORDER = ["pdf", "office-document", "spreadsheet", "presentation", "legacy-office", "image", "archive", "text", "web", "audio-video", "other"];
   const chipsHtml = CHIP_ORDER
     .filter((cat) => categoryCounts[cat])
     .map((cat) => `<button class="chip" data-category="${htmlEscape(cat)}">${htmlEscape(formatCategory(cat))} (${categoryCounts[cat]})</button>`)
@@ -624,8 +627,12 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     // v1.34.0: the grade/score ("B/88") sits left of the report link so a
     // manager reads "what's the score" before "open the report".
     { name: "remediationScore", label: "Remediation Score" },
-    { name: "auditScore",  label: "Audit Report" },
-    { name: "referenced",  label: "Page References" },
+    // v1.39.0: the Audit Report + Page References cells are rendered
+    // directly from entry data; their row values are "" placeholders, so
+    // sorting them is meaningless — mark them non-sortable (no cursor, no
+    // click handler; see data-nosort below).
+    { name: "auditScore",  label: "Audit Report", sortable: false },
+    { name: "referenced",  label: "Page References", sortable: false },
     { name: "duplicateOf", label: "Duplicate of" },
     { name: "modifiedAt",  label: "Date published" },
   ];
@@ -697,7 +704,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // v1.12.0: column-resize + drag-pan removed — the 6-column table fits without
   // horizontal panning, so there is no <colgroup>/resize-handle machinery.
   const headerCells = HTML_TABLE_COLUMNS.map((col) =>
-    `<th data-col="${htmlEscape(col.name)}">${htmlEscape(col.label)}</th>`
+    `<th data-col="${htmlEscape(col.name)}"${col.sortable === false ? " data-nosort" : ""}>${htmlEscape(col.label)}</th>`
   ).join("");
 
   // ── Page view (v1.13.0): invert the file entries into a page list ────────────
@@ -782,10 +789,19 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // We still escape </script> sequences to prevent premature script-tag termination.
   // v1.12.0: projected onto HTML_TABLE_COLUMNS so sort/search indices line up
   // with the visible headers.
+  // v1.39.0: path (and serverName, consolidated only) are appended as hidden
+  // trailing values so the search box's promised "path, server" matching
+  // works — the visible-column projection had dropped both. The extras sit
+  // beyond every sortable column index, so sortBy never reads them.
+  const pathVi = valueIdxByName("path");
+  const serverVi = valueIdxByName("serverName");
   const jsonData = JSON.stringify(
     entries.map((entry) => {
       const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
-      return htmlColValueIdx.map((vi) => values[vi]);
+      const row = htmlColValueIdx.map((vi) => values[vi]);
+      row.push(values[pathVi]);
+      if (isConsolidated) row.push(values[serverVi]);
+      return row;
     })
   ).replace(/<\/script/gi, "<\\/script");
 
@@ -1809,6 +1825,11 @@ thead th {
   vertical-align: middle;
 }
 thead th:hover { background: #1a1a1a; }
+/* v1.39.0 — placeholder columns (Page References / Audit Report) are not
+   sortable: their row values are "" by design, so drop the pointer cursor
+   and the hover invite. The click handler skips them too. */
+thead th[data-nosort] { cursor: default; }
+thead th[data-nosort]:hover { background: #161b22; }
 thead th.sort-asc::after  { content: " ▲"; font-size: 10px; color: #60a5fa; }
 thead th.sort-desc::after { content: " ▼"; font-size: 10px; color: #60a5fa; }
 tbody tr:nth-child(even) { background: #0c0c0c; }
@@ -2117,7 +2138,7 @@ ${(() => {
     </a>
     ${csvHref ? `<div class="report-csv-block">
       <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
-        <span aria-hidden="true">&#x2913;</span> Download spreadsheet (XLSX)
+        <span aria-hidden="true">&#x2913;</span> ${/\.csv$/i.test(String(csvHref)) ? "Download CSV" : "Download spreadsheet (XLSX)"}
       </a>
       ${lastAuditFmt ? `<p class="report-csv-date">Last audit: <strong>${htmlEscape(lastAuditFmt)}</strong></p>` : ""}
     </div>` : ""}
@@ -2439,10 +2460,16 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
     pairs.sort(function (a, b) {
       const av = a.vals[colIdx] == null ? "" : a.vals[colIdx];
       const bv = b.vals[colIdx] == null ? "" : b.vals[colIdx];
-      const an = typeof av === "number" ? av : parseFloat(av);
-      const bn = typeof bv === "number" ? bv : parseFloat(bv);
+      // v1.39.0: numeric compare ONLY when BOTH values are fully numeric.
+      // parseFloat("2025-06-15") is 2025, so every same-year ISO date (and
+      // "2023_Budget.pdf"-style filename) compared as equal and never
+      // sorted. ISO timestamps order chronologically under plain string
+      // comparison, so everything non-numeric goes through localeCompare.
+      const numRe = /^-?\\d+(\\.\\d+)?$/;
+      const aNum = typeof av === "number" || numRe.test(String(av));
+      const bNum = typeof bv === "number" || numRe.test(String(bv));
       let cmp;
-      if (!isNaN(an) && !isNaN(bn)) cmp = an - bn;
+      if (aNum && bNum) cmp = Number(av) - Number(bv);
       else cmp = String(av).localeCompare(String(bv));
       return asc ? cmp : -cmp;
     });
@@ -2450,6 +2477,8 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
   }
 
   headers.forEach(function (th, colIdx) {
+    // v1.39.0: placeholder columns (data-nosort) get no sort handler.
+    if (th.hasAttribute("data-nosort")) return;
     th.addEventListener("click", function () {
       if (sortColIdx === colIdx) {
         sortAsc = !sortAsc;

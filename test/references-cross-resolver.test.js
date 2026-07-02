@@ -118,6 +118,41 @@ describe("entryCanonicalUrl", () => {
   it("returns null when entry.path is missing", () => {
     expect(entryCanonicalUrl({}, "https://x.com/")).toBeNull();
   });
+
+  // v1.39.0 (B2) — inventory paths come from the filesystem (raw bytes, never
+  // pre-encoded). URL-special characters in filenames must be percent-encoded
+  // per segment, or new URL() misparses them ("#" starts a fragment, "?" a
+  // query) and the key silently truncates → guaranteed false orphan.
+  describe("percent-encoding of raw filesystem paths (v1.39.0)", () => {
+    it("encodes '#' so the extension survives (live ari shape)", () => {
+      const entry = { path: "Sheet#Info1V1-2025.pdf" };
+      const key = entryCanonicalUrl(entry, "https://ari.icjia-api.cloud/uploads");
+      expect(key).toBe(
+        "https://ari.icjia-api.cloud/uploads/Sheet%23Info1V1-2025.pdf",
+      );
+    });
+
+    it("encodes spaces; parens stay raw (encodeURIComponent) and the key round-trips via new URL", () => {
+      const entry = { path: "report (Final).pdf" };
+      const key = entryCanonicalUrl(entry, "https://x.com/uploads");
+      expect(key).toBe("https://x.com/uploads/report%20(Final).pdf");
+      expect(new URL(key).toString()).toBe(key);
+    });
+
+    it("encodes '?' so no query is created (and B3's query-strip can't eat the filename)", () => {
+      const entry = { path: "a?b.pdf" };
+      const key = entryCanonicalUrl(entry, "https://x.com/uploads");
+      expect(key).toBe("https://x.com/uploads/a%3Fb.pdf");
+      expect(key).not.toContain("?");
+    });
+
+    it("encodes per segment — directory slashes survive", () => {
+      const entry = { path: "docs/2020 files/a b.pdf" };
+      expect(entryCanonicalUrl(entry, "https://x.com/files")).toBe(
+        "https://x.com/files/docs/2020%20files/a%20b.pdf",
+      );
+    });
+  });
 });
 
 describe("resolveEntryReferences", () => {
@@ -162,6 +197,22 @@ describe("resolveEntryReferences", () => {
     );
     expect(resolved).not.toBe(entry);
     expect(entry.references).toBeUndefined();
+  });
+
+  // v1.39.0 (B8) — an entry whose URL cannot be resolved (no publicUrlBase)
+  // was previously given references: [], indistinguishable from a genuine
+  // orphan. Absent references = "not resolved", which orphans.js skips.
+  it("omits the references field entirely when the base is unresolvable", () => {
+    const entry = { path: "foo.pdf", filename: "foo.pdf" };
+    const resolved = resolveEntryReferences(entry, "", idx);
+    expect("references" in resolved).toBe(false);
+    const resolvedNull = resolveEntryReferences(entry, null, idx);
+    expect("references" in resolvedNull).toBe(false);
+  });
+
+  it("omits the references field when the entry has no path (unresolvable)", () => {
+    const resolved = resolveEntryReferences({ filename: "x.pdf" }, "https://x.com/", idx);
+    expect("references" in resolved).toBe(false);
   });
 });
 

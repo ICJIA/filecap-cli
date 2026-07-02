@@ -6,19 +6,30 @@ describe("categorize", () => {
     expect(categorize("pdf")).toBe("pdf");
   });
 
-  it("buckets DOCX/DOC as 'office-document'", () => {
+  it("buckets DOCX (and rtf/odt) as 'office-document'", () => {
     expect(categorize("docx")).toBe("office-document");
-    expect(categorize("doc")).toBe("office-document");
+    expect(categorize("rtf")).toBe("office-document");
+    expect(categorize("odt")).toBe("office-document");
   });
 
-  it("buckets XLSX/XLS as 'spreadsheet'", () => {
+  it("buckets XLSX/ODS as 'spreadsheet'", () => {
     expect(categorize("xlsx")).toBe("spreadsheet");
-    expect(categorize("xls")).toBe("spreadsheet");
+    expect(categorize("ods")).toBe("spreadsheet");
   });
 
-  it("buckets PPTX/PPT as 'presentation'", () => {
+  it("buckets PPTX/ODP as 'presentation'", () => {
     expect(categorize("pptx")).toBe("presentation");
-    expect(categorize("ppt")).toBe("presentation");
+    expect(categorize("odp")).toBe("presentation");
+  });
+
+  // v1.39.0 — legacy binary Office formats get their own category so the
+  // reports can price conversion + remediation separately. Old cached
+  // inventories still carry .doc as "office-document" etc.; consumers accept
+  // both categorizations.
+  it("buckets legacy .doc/.xls/.ppt as 'legacy-office'", () => {
+    expect(categorize("doc")).toBe("legacy-office");
+    expect(categorize("xls")).toBe("legacy-office");
+    expect(categorize("ppt")).toBe("legacy-office");
   });
 
   it("buckets common image extensions as 'image'", () => {
@@ -67,11 +78,12 @@ describe("categorize", () => {
 });
 
 describe("isRemediable", () => {
-  it("returns true for pdf/office/spreadsheet/presentation", () => {
+  it("returns true for pdf/office/spreadsheet/presentation/legacy-office", () => {
     expect(isRemediable("pdf")).toBe(true);
     expect(isRemediable("office-document")).toBe(true);
     expect(isRemediable("spreadsheet")).toBe(true);
     expect(isRemediable("presentation")).toBe(true);
+    expect(isRemediable("legacy-office")).toBe(true);
   });
 
   it("returns false for everything else", () => {

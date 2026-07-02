@@ -270,6 +270,8 @@ describe("inventory schemas", () => {
     expect(() => entrySchema.parse(entry)).not.toThrow();
   });
 
+  // Old cached inventories (pre-v1.39.0 categorize) carry .doc as
+  // "office-document" — that shape must stay valid forever.
   it("validates an entry with office-legacy introspection", () => {
     const entry = {
       path: "old.doc",
@@ -277,6 +279,27 @@ describe("inventory schemas", () => {
       filename: "old.doc",
       extension: "doc",
       category: "office-document",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "",
+      flags: [],
+      introspection: {
+        kind: "office-legacy",
+        format: "doc",
+      },
+    };
+    expect(() => entrySchema.parse(entry)).not.toThrow();
+  });
+
+  // v1.39.0 — new scans categorize .doc/.xls/.ppt as "legacy-office".
+  it("validates an entry with the legacy-office category (v1.39.0 scans)", () => {
+    const entry = {
+      path: "old.doc",
+      absolutePath: "/uploads/old.doc",
+      filename: "old.doc",
+      extension: "doc",
+      category: "legacy-office",
       remediable: true,
       sizeBytes: 1024,
       modifiedAt: "2024-01-01T00:00:00.000Z",

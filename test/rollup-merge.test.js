@@ -146,6 +146,34 @@ describe("rollupInventories", () => {
     expect(lines[3].stats.bytesSavedIfDeduped).toBe(1024);
   });
 
+  // v1.39.0 — the canonical key is "<server>::<path>"; a path that itself
+  // contains "::" must survive the round-trip (split on the FIRST "::" only,
+  // not every occurrence).
+  it("preserves a canonical path containing '::' in duplicateOf", async () => {
+    const inA = path.join(tmpRoot, "a.ndjson");
+    const inB = path.join(tmpRoot, "b.ndjson");
+    const out = path.join(tmpRoot, "consolidated.ndjson");
+    const weird = JSON.parse(inventoryEntry("a.pdf", "shared-hash", "2024-01-01T00:00:00.000Z"));
+    weird.path = "docs/a::b.pdf";
+    weird.absolutePath = "/uploads/docs/a::b.pdf";
+    weird.filename = "a::b.pdf";
+    await writeNdjson(inA, [
+      inventoryHeader("server-a"),
+      JSON.stringify(weird),
+      inventoryFooter(1, 1024),
+    ]);
+    await writeNdjson(inB, [
+      inventoryHeader("server-b"),
+      inventoryEntry("copy.pdf", "shared-hash", "2024-08-01T00:00:00.000Z"),
+      inventoryFooter(1, 1024),
+    ]);
+
+    await rollupInventories([inA, inB], out, { strict: false });
+    const lines = await readNdjson(out);
+    const dupe = lines.slice(1, -1).find((e) => e.serverName === "server-b");
+    expect(dupe.duplicateOf).toEqual({ serverName: "server-a", path: "docs/a::b.pdf" });
+  });
+
   it("counts totalUniqueHashes correctly", async () => {
     const inA = path.join(tmpRoot, "a.ndjson");
     const out = path.join(tmpRoot, "out.ndjson");

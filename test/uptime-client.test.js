@@ -3,6 +3,10 @@ import { shouldRefresh, uptimeClientScript, UPTIME_TTL_MS } from "../src/web/upt
 
 const H = 3600 * 1000;
 
+// v1.39.0 (E13): the TTL gate reads `fetchedAtMs` (when THIS CLIENT last hit
+// the function), not `checkedAtMs` (when the SERVER last probed — that value
+// now only feeds the "checked …" label). These tests were updated from the
+// old single-field cache shape with that split.
 describe("shouldRefresh — the serverless budget gate", () => {
   it("refreshes when there is no cache at all", () => {
     expect(shouldRefresh(null, 0, 6 * H)).toBe(true);
@@ -11,19 +15,31 @@ describe("shouldRefresh — the serverless budget gate", () => {
 
   it("refreshes when the cached timestamp is missing or not a finite number", () => {
     expect(shouldRefresh({}, 0, 6 * H)).toBe(true);
-    expect(shouldRefresh({ checkedAtMs: "nope" }, 0, 6 * H)).toBe(true);
-    expect(shouldRefresh({ checkedAtMs: NaN }, 0, 6 * H)).toBe(true);
-    expect(shouldRefresh({ checkedAtMs: Infinity }, 0, 6 * H)).toBe(true);
+    expect(shouldRefresh({ fetchedAtMs: "nope" }, 0, 6 * H)).toBe(true);
+    expect(shouldRefresh({ fetchedAtMs: NaN }, 0, 6 * H)).toBe(true);
+    expect(shouldRefresh({ fetchedAtMs: Infinity }, 0, 6 * H)).toBe(true);
+  });
+
+  it("treats a pre-v1.39.0 cache (checkedAtMs only, no fetchedAtMs) as stale", () => {
+    expect(shouldRefresh({ checkedAtMs: 0 }, 1 * H, 6 * H)).toBe(true);
+    expect(shouldRefresh({ checkedAtMs: 1 * H }, 1 * H, 6 * H)).toBe(true);
   });
 
   it("does NOT refresh inside the TTL window (no network call)", () => {
-    expect(shouldRefresh({ checkedAtMs: 0 }, 1 * H, 6 * H)).toBe(false);
-    expect(shouldRefresh({ checkedAtMs: 0 }, 5 * H + 59 * 60 * 1000, 6 * H)).toBe(false);
+    expect(shouldRefresh({ fetchedAtMs: 0 }, 1 * H, 6 * H)).toBe(false);
+    expect(shouldRefresh({ fetchedAtMs: 0 }, 5 * H + 59 * 60 * 1000, 6 * H)).toBe(false);
   });
 
   it("refreshes exactly at and after the TTL boundary", () => {
-    expect(shouldRefresh({ checkedAtMs: 0 }, 6 * H, 6 * H)).toBe(true);
-    expect(shouldRefresh({ checkedAtMs: 0 }, 7 * H, 6 * H)).toBe(true);
+    expect(shouldRefresh({ fetchedAtMs: 0 }, 6 * H, 6 * H)).toBe(true);
+    expect(shouldRefresh({ fetchedAtMs: 0 }, 7 * H, 6 * H)).toBe(true);
+  });
+
+  it("the gate ignores checkedAtMs entirely (a fresh server probe time cannot suppress the fetch)", () => {
+    // Stale fetch, fresh-looking server timestamp → still refresh.
+    expect(shouldRefresh({ fetchedAtMs: 0, checkedAtMs: 7 * H }, 7 * H, 6 * H)).toBe(true);
+    // Fresh fetch, ancient server timestamp → no refresh.
+    expect(shouldRefresh({ fetchedAtMs: 7 * H, checkedAtMs: 0 }, 7 * H + 1, 6 * H)).toBe(false);
   });
 });
 
@@ -37,7 +53,9 @@ describe("budget guarantee — fetches are bounded to ~one per TTL no matter how
     for (const now of loadTimesMs) {
       if (shouldRefresh(cache, now, ttlMs)) {
         fetches++;
-        cache = { checkedAtMs: now, sites: {} };
+        // v1.39.0: mirrors the client — fetchedAtMs is stamped locally at
+        // fetch time; checkedAtMs is whatever the server reported.
+        cache = { fetchedAtMs: now, checkedAtMs: now - H, sites: {} };
       }
     }
     return fetches;
@@ -87,5 +105,16 @@ describe("uptimeClientScript", () => {
 
   it("is same-origin only — no cross-origin URL that would need a CSP change", () => {
     expect(uptimeClientScript()).not.toMatch(/https?:\/\//);
+  });
+
+  // v1.39.0 (E13) — the "checked …" label keeps the SERVER's probe time
+  // (checkedAtMs, edge-cached responses report when the probe actually ran);
+  // the client stamps its own fetchedAtMs solely for the 6h TTL gate.
+  it("stamps fetchedAtMs for the TTL gate and never overwrites the server's checkedAtMs", () => {
+    const s = uptimeClientScript();
+    expect(s).toContain("data.fetchedAtMs=Date.now()");
+    expect(s).not.toContain("data.checkedAtMs=Date.now()");
+    // the label still reads the server-reported probe time
+    expect(s).toContain("data.checkedAtMs?fmtChecked(data.checkedAtMs)");
   });
 });

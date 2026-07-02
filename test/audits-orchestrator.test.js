@@ -211,6 +211,94 @@ describe("runAudits", () => {
     expect(records[1].audit.score).toBeUndefined();
   });
 
+  // v1.39.0: a 200 response with no numeric score (endpoint answered but the
+  // analyzer produced nothing) used to be recorded — and CACHED — as a
+  // success with score:null, poisoning the cache for a full TTL. It is now
+  // an error entry, counted as failed, and never written to the cache.
+  it("records an error (not a cached success) when a 200 response carries no numeric score", async () => {
+    writeInventory(invPath, [pdfEntry()]);
+    const fetcher = async () => ({ strict: {}, reportUrl: "https://r/", reportId: "r", cached: false });
+    const res = await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher,
+      log: () => {},
+    });
+    const records = readNdjson(outPath);
+    expect(records[1].audit.error).toBe("no score in response");
+    expect(records[1].audit.score).toBeUndefined();
+    expect(res.errors).toBe(1);
+    expect(res.audited).toBe(0);
+    const cache = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+    expect(cache[pdfEntry().sha256]).toBeUndefined();
+  });
+
+  it("treats a poisoned cache entry (score: null) as a miss and re-fetches", async () => {
+    writeInventory(invPath, [pdfEntry()]);
+    fs.writeFileSync(cachePath, JSON.stringify({
+      [pdfEntry().sha256]: {
+        score: null,
+        grade: null,
+        reportUrl: "https://r/poisoned",
+        checkedAt: new Date().toISOString(), // fresh — only the score is bad
+      },
+    }));
+    let calls = 0;
+    const fetcher = async () => {
+      calls++;
+      return { strict: { score: 85, grade: "B" }, reportUrl: "https://r/new", reportId: "new", reportExpiresAt: "2027-01-01T00:00:00Z", pageCount: 1, audited: "2026-05-19T00:00:00Z", cached: false };
+    };
+    await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher,
+      log: () => {},
+    });
+    expect(calls).toBe(1);
+    const records = readNdjson(outPath);
+    expect(records[1].audit.score).toBe(85);
+    const cache = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+    expect(cache[pdfEntry().sha256].score).toBe(85);
+  });
+
+  it("page-audit 200 without a numeric score → ref.pageAudit.error, not cached", async () => {
+    const docEntry = {
+      path: "doc.docx",
+      filename: "doc.docx",
+      extension: "docx",
+      category: "office-document",
+      sizeBytes: 5000,
+      publicUrl: "https://icjia-api.cloud/uploads/doc.docx",
+      references: [{ pageUrl: "https://icjia.gov/page", contentType: "text/html" }],
+    };
+    writeInventory(invPath, [docEntry]);
+    const pageCachePath = path.join(tmpDir, "page-audit-cache.json");
+    const fetcher = async () => ({
+      axe: {}, // 200 but the axe run produced no score
+      reportUrl: "https://audit.icjia.app/page-report/abc",
+      cached: false,
+    });
+    const res = await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      pageCachePath,
+      fetcher,
+      log: () => {},
+    });
+    const records = readNdjson(outPath);
+    expect(records[1].references[0].pageAudit.error).toBe("no score in response");
+    expect(records[1].references[0].pageAudit.score).toBeUndefined();
+    expect(res.pagesErrors).toBe(1);
+    expect(res.pagesAudited).toBe(0);
+    const pageCache = JSON.parse(fs.readFileSync(pageCachePath, "utf8"));
+    expect(pageCache["https://icjia.gov/page"]).toBeUndefined();
+  });
+
   it("records audit.skipped when the entry has no publicUrl", async () => {
     writeInventory(invPath, [pdfEntry({ publicUrl: undefined })]);
     const fetcher = async () => ({ strict: { score: 1, grade: "F" }, reportUrl: "https://r/", reportId: "r", reportExpiresAt: "2027-01-01T00:00:00Z", pageCount: 1, audited: "2026-05-19T00:00:00Z", cached: false });
@@ -244,6 +332,37 @@ describe("runAudits", () => {
     expect(cache[hash].score).toBe(70);
     expect(cache[hash].grade).toBe("C");
     expect(cache[hash].checkedAt).toBeDefined();
+  });
+
+  // v1.39.0: the summary line's ternary was inverted — when EVERY PDF was
+  // served from the local cache (pdfsToAudit.length === 0) it printed
+  // "0 from cache" instead of the actual cache-served count.
+  it("logs the real cache-served count when every PDF comes from the local cache", async () => {
+    writeInventory(invPath, [pdfEntry()]);
+    fs.writeFileSync(cachePath, JSON.stringify({
+      [pdfEntry().sha256]: {
+        score: 90,
+        grade: "A",
+        reportUrl: "https://r/cached",
+        reportId: "cached",
+        reportExpiresAt: "2027-01-01T00:00:00Z",
+        audited: "2026-05-15T00:00:00Z",
+        checkedAt: new Date().toISOString(),
+      },
+    }));
+    const logs = [];
+    await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher: async () => { throw new Error("no HTTP expected"); },
+      log: (line) => { logs.push(String(line)); },
+    });
+    const summary = logs.find((l) => l.includes("from cache"));
+    expect(summary).toBeDefined();
+    expect(summary).toMatch(/1 from cache/);
+    expect(summary).not.toMatch(/\b0 from cache/);
   });
 
   it("page-audit pass preserves violations and incomplete arrays on ref.pageAudit (Fix 1)", async () => {

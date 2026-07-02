@@ -33,6 +33,24 @@ describe("extractEntryUrls", () => {
     ]);
   });
 
+  // v1.39.0 (B7) — url-string fields carry page links (articleURL) as well
+  // as file links; only audited file URLs may enter referencedFiles, or a
+  // page link becomes a phantom "referenced file" key.
+  it("filters url-string values through the audited-extension gate", () => {
+    const entry = {
+      id: 1,
+      articleURL: "https://icjia.illinois.gov/articles/some-page",
+      fileURL: "https://researchhub.icjia-api.cloud/uploads/report.pdf",
+    };
+    const classified = [
+      { kind: "url-string", fieldName: "articleURL" },
+      { kind: "url-string", fieldName: "fileURL" },
+    ];
+    expect(
+      extractEntryUrls(entry, classified, "https://agency.icjia-api.cloud"),
+    ).toEqual(["https://researchhub.icjia-api.cloud/uploads/report.pdf"]);
+  });
+
   it("ignores null/missing url-string field values", () => {
     const entry = { id: 1, fileURL: null, articleURL: undefined };
     const classified = [
@@ -294,11 +312,145 @@ describe("introspectContentTypes", () => {
     const types = await introspectContentTypes("x", fetcher);
     expect(types).toEqual([{ singular: "page", plural: "pages" }]);
   });
+
+  // v1.39.0 (B4) — irregular plural forms beyond ies/es/s. Each pair below
+  // was silently dropped by the old reverse rules (quizzes → "quizze"/
+  // "quizz" never matched quiz, analyses → "analyse"/"analys" never matched
+  // analysis), so every entry of those types vanished from the sidecar.
+  it("pairs irregular plurals: quiz/quizzes, analysis/analyses, person/people, criterion/criteria, syllabus/syllabi", async () => {
+    const mk = (singular, plural) => [
+      { name: singular },
+      { name: plural },
+      { name: `${plural}Connection` },
+    ];
+    const fetcher = async () => ({
+      data: {
+        __schema: {
+          queryType: {
+            fields: [
+              ...mk("quiz", "quizzes"),
+              ...mk("analysis", "analyses"),
+              ...mk("person", "people"),
+              ...mk("criterion", "criteria"),
+              ...mk("syllabus", "syllabi"),
+              ...mk("grant", "grants"),
+            ],
+          },
+        },
+      },
+    });
+    const types = await introspectContentTypes("x", fetcher);
+    expect(types).toEqual([
+      { singular: "quiz", plural: "quizzes" },
+      { singular: "analysis", plural: "analyses" },
+      { singular: "person", plural: "people" },
+      { singular: "criterion", plural: "criteria" },
+      { singular: "syllabus", plural: "syllabi" },
+      { singular: "grant", plural: "grants" },
+    ]);
+  });
+
+  // v1.39.0 (B4) — silent drops become visible: every queryType field that
+  // is neither paired, a *Connection paginator, nor a known auth/plugin
+  // field is WARNed by name.
+  it("WARNs with every unpairable type name (foot/feet has no rule; home has no plural)", async () => {
+    const fetcher = async () => ({
+      data: {
+        __schema: {
+          queryType: {
+            fields: [
+              { name: "home" },
+              { name: "foot" },
+              { name: "feet" },
+              { name: "feetConnection" },
+              { name: "grant" },
+              { name: "grants" },
+              { name: "grantsConnection" },
+              { name: "role" },
+              { name: "roles" },
+              { name: "me" },
+            ],
+          },
+        },
+      },
+    });
+    const logs = [];
+    const types = await introspectContentTypes("x", fetcher, {
+      log: (msg) => logs.push(msg),
+    });
+    expect(types).toEqual([{ singular: "grant", plural: "grants" }]);
+    const warn = logs.find((l) => l.includes("could not pair GraphQL types"));
+    expect(warn).toBeDefined();
+    expect(warn).toContain("home");
+    expect(warn).toContain("foot");
+    expect(warn).toContain("feet");
+    expect(warn).toContain("will not be fetched");
+    // paired + auth/plugin names stay out of the WARN
+    expect(warn).not.toContain("grant");
+    expect(warn).not.toContain("role");
+  });
+
+  it("emits no WARN when every type pairs", async () => {
+    const fetcher = async () => ({
+      data: {
+        __schema: {
+          queryType: {
+            fields: [
+              { name: "grant" },
+              { name: "grants" },
+              { name: "grantsConnection" },
+            ],
+          },
+        },
+      },
+    });
+    const logs = [];
+    await introspectContentTypes("x", fetcher, { log: (m) => logs.push(m) });
+    expect(logs.filter((l) => l.includes("could not pair"))).toEqual([]);
+  });
+
+  // v1.39.0 (B1) — a GraphQL-level failure (errors array, null data) used
+  // to degrade to `?? []` → zero content types → an EMPTY sidecar that
+  // marked every file on the site an orphan. Fail loudly instead.
+  it("throws with the first error message when the response carries a non-empty errors array", async () => {
+    const fetcher = async () => ({
+      errors: [{ message: "Forbidden access" }, { message: "second" }],
+      data: null,
+    });
+    await expect(
+      introspectContentTypes("https://x.com/graphql", fetcher),
+    ).rejects.toThrow(/Forbidden access/);
+  });
+
+  it("throws when the response has no data at all", async () => {
+    await expect(
+      introspectContentTypes("https://x.com/graphql", async () => ({ data: null })),
+    ).rejects.toThrow(/no data/i);
+    await expect(
+      introspectContentTypes("https://x.com/graphql", async () => ({})),
+    ).rejects.toThrow(/no data/i);
+  });
 });
 
 // --- introspectTypeFields ---
 
 describe("introspectTypeFields", () => {
+  // v1.39.0 (B1) — same fail-loudly contract as introspectContentTypes
+  // (shared by the v4 adapter, which re-exports this function).
+  it("throws on a non-empty errors array instead of classifying zero fields", async () => {
+    const fetcher = async () => ({
+      errors: [{ message: "Cannot query __type" }],
+    });
+    await expect(introspectTypeFields("x", "Grant", fetcher)).rejects.toThrow(
+      /Cannot query __type/,
+    );
+  });
+
+  it("throws when the __type response has no data", async () => {
+    await expect(
+      introspectTypeFields("x", "Grant", async () => ({ data: null })),
+    ).rejects.toThrow(/no data/i);
+  });
   it("returns classified fields for a content type", async () => {
     const fetcher = async () => ({
       data: {
@@ -326,6 +478,56 @@ describe("introspectTypeFields", () => {
       { kind: "url-string", fieldName: "fileURL" },
       { kind: "upload-file-list", fieldName: "attachments" },
       { kind: "relation", fieldName: "tags" },
+    ]);
+  });
+
+  // v1.39.0 (B10) — Strapi v4 required lists are typed [UploadFile!]! =
+  // NON_NULL(LIST(NON_NULL(OBJECT))). The old __type query requested only
+  // one ofType level, so a real server truncated the chain and the inner
+  // OBJECT was invisible → classified "other" → every file in such a field
+  // dropped. Simulate a real server: answer with EXACTLY the ofType depth
+  // the query requests.
+  it("requests enough ofType depth to see through NON_NULL(LIST(NON_NULL(OBJECT)))", async () => {
+    const objT = (name) => ({ name, kind: "OBJECT", ofType: null });
+    const nonNullT = (inner) => ({ name: null, kind: "NON_NULL", ofType: inner });
+    const listT = (inner) => ({ name: null, kind: "LIST", ofType: inner });
+    const FULL_TYPES = {
+      attachments: nonNullT(listT(nonNullT(objT("UploadFile")))),
+      sections: nonNullT(listT(nonNullT(objT("ComponentSharedBlock")))),
+      splash: listT(nonNullT(objT("UploadFile"))),
+    };
+    // Serialize a type tree only as deep as the query's ofType nesting —
+    // exactly what a GraphQL server does.
+    const pruneToQueryDepth = (type, query) => {
+      const depth = (query.match(/ofType/g) ?? []).length;
+      const prune = (node, remaining) => {
+        if (!node) return null;
+        const out = { name: node.name ?? null, kind: node.kind };
+        if (remaining > 0) out.ofType = node.ofType ? prune(node.ofType, remaining - 1) : null;
+        return out;
+      };
+      return prune(type, depth);
+    };
+    const fetcher = async (url, init) => {
+      const { query } = JSON.parse(init.body);
+      return {
+        data: {
+          __type: {
+            fields: Object.entries(FULL_TYPES).map(([name, type]) => ({
+              name,
+              type: pruneToQueryDepth(type, query),
+            })),
+          },
+        },
+      };
+    };
+    const fields = await introspectTypeFields("x", "Post", fetcher, {
+      contentTypeNames: new Set(["Post"]),
+    });
+    expect(fields).toEqual([
+      { kind: "upload-file-list", fieldName: "attachments" },
+      { kind: "component-list", fieldName: "sections" },
+      { kind: "upload-file-list", fieldName: "splash" },
     ]);
   });
 
@@ -411,12 +613,15 @@ describe("fetchAllEntries", () => {
     expect(calls).toBeLessThanOrEqual(6); // up to 5 pages then the throw
   });
 
-  it("stops paginating when a page returns fewer entries than the limit", async () => {
+  // v1.39.0 (B9) — a SHORT page no longer ends the walk: Strapi caps page
+  // sizes server-side (maxLimit), so a short page can occur mid-stream.
+  // Only an EMPTY page terminates. (This test previously pinned the buggy
+  // stop-on-short-page behavior with a single call.)
+  it("keeps paginating past a short page and stops on the first EMPTY page", async () => {
     let calls = 0;
     const fetcher = async () => {
       calls++;
-      // Single-page response shorter than limit signals end of data
-      return [{ id: 1 }, { id: 2 }];
+      return calls === 1 ? [{ id: 1 }, { id: 2 }] : [];
     };
     const entries = await fetchAllEntries(
       "https://x.com",
@@ -425,6 +630,37 @@ describe("fetchAllEntries", () => {
       { limit: 100 },
     );
     expect(entries).toEqual([{ id: 1 }, { id: 2 }]);
-    expect(calls).toBe(1);
+    expect(calls).toBe(2);
+  });
+
+  // v1.39.0 (B9) — a server whose maxLimit (50) is below the requested
+  // _limit (100) returns short pages for a 250-record collection. All 250
+  // must be fetched: _start must advance by the records RECEIVED, not the
+  // requested limit (advancing by 100 would silently skip half of them).
+  it("fetches all records from a maxLimit-capped server (250 records in 50-record pages)", async () => {
+    const TOTAL = 250;
+    const CAP = 50;
+    const calls = [];
+    const fetcher = async (url) => {
+      calls.push(url);
+      const u = new URL(url);
+      const start = parseInt(u.searchParams.get("_start"), 10);
+      const limit = Math.min(parseInt(u.searchParams.get("_limit"), 10), CAP);
+      const page = [];
+      for (let i = start; i < Math.min(start + limit, TOTAL); i++) {
+        page.push({ id: i + 1 });
+      }
+      return page;
+    };
+    const entries = await fetchAllEntries(
+      "https://agency.icjia-api.cloud",
+      "grants",
+      fetcher,
+      { limit: 100 },
+    );
+    expect(entries.length).toBe(TOTAL);
+    expect(new Set(entries.map((e) => e.id)).size).toBe(TOTAL);
+    expect(entries[0].id).toBe(1);
+    expect(entries[TOTAL - 1].id).toBe(TOTAL);
   });
 });

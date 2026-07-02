@@ -66,7 +66,11 @@ export function summarizeFileA11y({
 } = {}) {
   const scored = auditedPdfCount;
   const pdfs = scored + auditErrorCount + auditPending;
-  const avg = scored > 0 ? Math.round(auditScoreSum / scored) : null;
+  // v1.39.0: clamp a rounded-up 100 to 99 unless every scored PDF really is
+  // a 100 (sum === scored × 100). 19×100 + 1×95 averages 99.75, and showing
+  // "100" for a set that still contains a failing PDF is a false perfect.
+  let avg = scored > 0 ? Math.round(auditScoreSum / scored) : null;
+  if (avg === 100 && auditScoreSum < scored * 100) avg = 99;
   const excluded = A11Y_SCORE_EXCLUDE_SLUGS.includes(siteSlug);
   const enoughData = scored >= MIN_SCORED_PDFS;
   // Non-PDF remediable files (Office: docx/xlsx/pptx/legacy) — counted as

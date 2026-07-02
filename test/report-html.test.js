@@ -122,8 +122,10 @@ describe("writeHtml", () => {
     expect(html).toContain('<th data-col="filename">File name</th>');
     expect(html).toContain('<th data-col="pageCount">Pages</th>');
     expect(html).toContain('<th data-col="category">File type</th>');
-    expect(html).toContain('<th data-col="auditScore">Audit Report</th>');
-    expect(html).toContain('<th data-col="referenced">Page References</th>');
+    // v1.39.0: the two placeholder columns carry data-nosort (their row
+    // values are "" by design, so they never actually sorted).
+    expect(html).toContain('<th data-col="auditScore" data-nosort>Audit Report</th>');
+    expect(html).toContain('<th data-col="referenced" data-nosort>Page References</th>');
     expect(html).toContain('<th data-col="duplicateOf">Duplicate of</th>');
     expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
     // Forensic columns are CSV-only — not rendered as HTML table columns.
@@ -309,6 +311,27 @@ describe("writeHtml", () => {
     expect(html).toMatch(/All \(5\)/);
   });
 
+  // v1.39.0 — new scans categorize .doc/.xls/.ppt as "legacy-office"; the
+  // report renders them with a human label, a filter chip, and counts them
+  // into the remediable hero/tooltip numbers.
+  it("renders legacy-office entries with a Legacy Office chip and label", async () => {
+    const out = path.join(tmpDir, "legacy-chip.html");
+    const entries = [
+      { ...sampleEntries[0], sha256: "l1", path: "old.ppt", filename: "old.ppt", extension: "ppt", category: "legacy-office", introspection: { kind: "office-legacy", format: "ppt" } },
+      { ...sampleEntries[0], sha256: "l2", path: "old2.ppt", filename: "old2.ppt", extension: "ppt", category: "legacy-office", introspection: { kind: "office-legacy", format: "ppt" } },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    // Type filter chip with the human label + count
+    expect(html).toMatch(/<button class="chip" data-category="legacy-office">Legacy Office \(2\)<\/button>/);
+    // Category cell uses the label, not the raw slug
+    expect(html).toContain("<td>Legacy Office</td>");
+    // Both files count as remediable in the primary filter bar
+    expect(html).toMatch(/data-filter="remediable">Remediable only \(2\)/);
+    // Hero tooltip's legacy line carries the count
+    expect(html).toMatch(/legacy Office×\d+ \(2\)/);
+  });
+
   it("counts each category correctly in chip labels", async () => {
     const out = path.join(tmpDir, "chip-counts.html");
     const threeAndTwo = [
@@ -341,6 +364,152 @@ describe("writeHtml", () => {
     expect(html).toMatch(/<script[^>]*type="application\/json"[^>]*id="filecap-data"/i);
     expect(html).toMatch(/document\.getElementById\("filecap-data"\)\.textContent/);
     expect(html).not.toMatch(/JSON\.parse\('[^]*?-08'00'/);
+  });
+
+  // v1.39.0 (D1) — the embedded sort comparator must only compare
+  // numerically when BOTH values are fully numeric. parseFloat("2025-06-15")
+  // is 2025, so every same-year ISO date (and "2023_Budget.pdf"-style
+  // filename) used to compare as equal and never actually sort. These tests
+  // extract and execute the shipped script text.
+  describe("embedded sort comparator (v1.39.0)", () => {
+    async function extractSorter() {
+      const out = path.join(tmpDir, "sortfn.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      const m = html.match(/pairs\.sort\(function \(a, b\) \{\n([\s\S]*?)\n {4}\}\);/);
+      expect(m).not.toBeNull();
+      const cmp = new Function("a", "b", "colIdx", "asc", m[1]);
+      return (values, asc) =>
+        values
+          .map((v) => ({ vals: [v] }))
+          .sort((a, b) => cmp(a, b, 0, asc))
+          .map((p) => p.vals[0]);
+    }
+
+    it("sorts ISO dates chronologically in both directions", async () => {
+      const sortVals = await extractSorter();
+      const dates = ["2025-01-02T00:00:00.000Z", "2025-11-30T00:00:00.000Z", "2025-06-15T00:00:00.000Z"];
+      expect(sortVals(dates, true)).toEqual([
+        "2025-01-02T00:00:00.000Z",
+        "2025-06-15T00:00:00.000Z",
+        "2025-11-30T00:00:00.000Z",
+      ]);
+      expect(sortVals(dates, false)).toEqual([
+        "2025-11-30T00:00:00.000Z",
+        "2025-06-15T00:00:00.000Z",
+        "2025-01-02T00:00:00.000Z",
+      ]);
+    });
+
+    it("sorts filenames with a shared numeric prefix lexicographically", async () => {
+      const sortVals = await extractSorter();
+      expect(sortVals(["2023_Budget.pdf", "2023_Annual.pdf"], true)).toEqual([
+        "2023_Annual.pdf",
+        "2023_Budget.pdf",
+      ]);
+    });
+
+    it("still sorts a fully numeric column numerically", async () => {
+      const sortVals = await extractSorter();
+      expect(sortVals([3, 12, 5], true)).toEqual([3, 5, 12]);
+      expect(sortVals(["3", "12", "5"], true)).toEqual(["3", "5", "12"]);
+    });
+
+    it("tolerates null/empty cells (sorted before non-empty strings)", async () => {
+      const sortVals = await extractSorter();
+      expect(sortVals([null, "2025-06-15", ""], true)).toEqual([null, "", "2025-06-15"]);
+    });
+  });
+
+  // v1.39.0 (D11) — the Page References and Audit Report columns render
+  // their cells directly; their embedded row values are "" placeholders, so
+  // clicking their headers could never sort anything. They must not offer
+  // the sortable affordance.
+  describe("placeholder columns are not sortable (v1.39.0)", () => {
+    it("marks Page References and Audit Report headers data-nosort; others stay sortable", async () => {
+      const out = path.join(tmpDir, "nosort.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('<th data-col="referenced" data-nosort>Page References</th>');
+      expect(html).toContain('<th data-col="auditScore" data-nosort>Audit Report</th>');
+      expect(html).toContain('<th data-col="filename">File name</th>');
+      expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
+    });
+
+    it("skips wiring a click handler for data-nosort headers", async () => {
+      const out = path.join(tmpDir, "nosort-script.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('if (th.hasAttribute("data-nosort")) return;');
+    });
+
+    it("removes the pointer cursor from non-sortable headers", async () => {
+      const out = path.join(tmpDir, "nosort-css.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("thead th[data-nosort] { cursor: default; }");
+    });
+  });
+
+  // v1.39.0 (D4) — the search box promises "Filter by filename, path,
+  // server…" but the embedded row data was projected onto the visible
+  // columns only, which exclude path and serverName. The searchable arrays
+  // now carry path (and serverName on consolidated reports) as trailing
+  // hidden values. These tests run the shipped search predicate over the
+  // shipped embedded data.
+  describe("file-table search haystack (v1.39.0)", () => {
+    function searchHits(html, query) {
+      const dataM = html.match(/<script type="application\/json" id="filecap-data">([\s\S]*?)<\/script>/);
+      expect(dataM).not.toBeNull();
+      const rows = JSON.parse(dataM[1]);
+      const predM = html.match(/rd\.some\(function \(v\) \{\n([\s\S]*?)\n {6}\}\)/);
+      expect(predM).not.toBeNull();
+      const pred = new Function("v", "q", predM[1]);
+      const q = query.trim().toLowerCase();
+      return rows.filter((rd) => rd.some((v) => pred(v, q)));
+    }
+
+    it("matches on path segments that are not part of the filename", async () => {
+      const out = path.join(tmpDir, "search-path.html");
+      const entries = [
+        { ...sampleEntries[0], path: "uploads/2019/report-x.pdf", filename: "report-x.pdf" },
+        { ...sampleEntries[1] },
+      ];
+      await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      const hits = searchHits(html, "uploads/2019");
+      expect(hits).toHaveLength(1);
+      expect(hits[0]).toContain("report-x.pdf");
+    });
+
+    it("matches on serverName in a consolidated report", async () => {
+      const consolidatedHeader = {
+        schemaVersion: 1,
+        kind: "filecap-consolidated-header",
+        metadata: { consolidatedAt: "2026-05-09T12:00:00.000Z", sources: [] },
+      };
+      const sources = [
+        { serverName: "srv-alpha-01", metadata: { ...sampleHeader.metadata, serverName: "srv-alpha-01", siteName: "Alpha" } },
+        { serverName: "srv-beta-02", metadata: { ...sampleHeader.metadata, serverName: "srv-beta-02", siteName: "Beta" } },
+      ];
+      const entries = [
+        { ...sampleEntries[0], serverName: "srv-alpha-01" },
+        { ...sampleEntries[1], serverName: "srv-beta-02" },
+      ];
+      const out = path.join(tmpDir, "search-server.html");
+      await writeHtml({ sourceHeader: consolidatedHeader, entries, sources, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      const hits = searchHits(html, "srv-alpha");
+      expect(hits).toHaveLength(1);
+      expect(hits[0]).toContain("doc.pdf");
+    });
+
+    it("keeps the placeholder text accurate", async () => {
+      const out = path.join(tmpDir, "search-placeholder.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('placeholder="Filter by filename, path, server…"');
+    });
   });
 
   it("includes the default-sort code path for modifiedAt column in the IIFE", async () => {
@@ -864,6 +1033,38 @@ describe("writeHtml", () => {
       });
       const html = await fs.readFile(outputPath, "utf8");
       expect(html).not.toMatch(/<p class="row-marker-row"/);
+    });
+  });
+
+  // v1.39.0 (D5) — the download button's label follows the href instead of
+  // always claiming XLSX (standalone reports link the sibling .csv).
+  describe("download button honesty (v1.39.0)", () => {
+    it("labels a .csv href 'Download CSV'", async () => {
+      const out = path.join(tmpDir, "dl-csv.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out, csvHref: "audit-file-list.csv" });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("Download CSV");
+      expect(html).not.toContain("Download spreadsheet (XLSX)");
+    });
+
+    it("labels an .xlsx href 'Download spreadsheet (XLSX)'", async () => {
+      const out = path.join(tmpDir, "dl-xlsx.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out, csvHref: "audit.xlsx" });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("Download spreadsheet (XLSX)");
+      expect(html).not.toContain("Download CSV");
+    });
+
+    it("omits the download button entirely when csvHref is null (Interface Contract 6)", async () => {
+      const out = path.join(tmpDir, "dl-null.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out, csvHref: null });
+      const html = await fs.readFile(out, "utf8");
+      // The CSS class definitions remain in the stylesheet; the rendered
+      // anchor/block must not.
+      expect(html).not.toContain('<a class="report-csv-link"');
+      expect(html).not.toContain('<div class="report-csv-block">');
+      expect(html).not.toContain("Download CSV");
+      expect(html).not.toContain("Download spreadsheet (XLSX)");
     });
   });
 

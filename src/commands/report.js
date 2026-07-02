@@ -78,7 +78,7 @@ For more details: https://github.com/ICJIA/filecap-cli
  * @param {string} args.outputDir - directory to write reports into (created if missing)
  * @returns {Promise<{exitCode: number, error?: string}>}
  */
-export async function runReport({ input, outputDir, html = false, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, fileA11yTrend = null, siteAudit = null, pageScores = null }) {
+export async function runReport({ input, outputDir, html = false, backHref = null, csvHref, siteUrl = null, siteFullName = null, accessKind = null, pathPrefix = null, publicUrlBaseOverride = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, fileA11yTrend = null, siteAudit = null, pageScores = null }) {
   let header;
   const entries = [];
 
@@ -119,6 +119,14 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
     header.metadata.pathPrefix = pathPrefix;
   }
 
+  // v1.39.0: web-rollup resolves the live base from sites.json; the base
+  // cached in the scanned header can be stale (site moved hosts). Injected
+  // the same way as pathPrefix so buildPublicUrl picks it up for every
+  // CSV/HTML/XLSX row.
+  if (publicUrlBaseOverride !== null && publicUrlBaseOverride !== undefined && header.metadata) {
+    header.metadata.publicUrlBase = publicUrlBaseOverride;
+  }
+
   await fs.mkdir(outputDir, { recursive: true });
 
   const isConsolidated = header.kind === "filecap-consolidated-header";
@@ -145,9 +153,12 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
       sources,
       outputPath: path.join(outputDir, "audit-file-list.html"),
       backHref,
-      // Default the CSV link to the sibling CSV file we just wrote.
-      // Web-rollup overrides with the renamed filename (e.g. "dvfr-….csv").
-      csvHref: csvHref ?? "audit-file-list.csv",
+      // Default the CSV link to the sibling CSV file we just wrote — but
+      // only when the caller didn't say otherwise. Web-rollup overrides with
+      // the workbook filename (e.g. "dvfr-….xlsx"), or passes an explicit
+      // null when there is no workbook, which must survive to writeHtml so
+      // the download button is omitted (Interface Contract 6).
+      csvHref: csvHref === undefined ? "audit-file-list.csv" : csvHref,
       // Web-rollup passes the site's front-end homepage URL here so the
       // meta-grid "Public URL" row shows the site (not the file server).
       siteUrl,

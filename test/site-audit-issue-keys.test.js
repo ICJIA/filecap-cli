@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { issueKey, collectIssueKeys, diffIssueSets } from "../src/site-audit/issue-keys.js";
+import { issueKey, collectIssueKeys, collectIssueKeysByPage, diffIssueSets } from "../src/site-audit/issue-keys.js";
 
 describe("issueKey", () => {
   it("is deterministic and stable across trailing-slash / case URL variants", () => {
@@ -32,6 +32,40 @@ describe("collectIssueKeys", () => {
   it("handles a violation with no nodes without throwing", () => {
     const keys = collectIssueKeys([{ pageUrl: "https://x.com/a", violations: [{ id: "region", nodes: [] }] }]);
     expect(keys).toHaveLength(1);
+  });
+});
+
+// v1.39.0: per-page grouping of the same keys — stored in the sidecar so the
+// NEXT run can restrict its fixed/new diff to pages scored in both runs.
+describe("collectIssueKeysByPage", () => {
+  it("groups keys under the normalized page URL; clean pages get no entry", () => {
+    const pages = [
+      { pageUrl: "https://x.com/A/", violations: [
+        { id: "image-alt", nodes: [{ target: ["img.logo"] }, { target: ["img.hero"] }] },
+      ] },
+      { pageUrl: "https://x.com/b", violations: [
+        { id: "image-alt", nodes: [{ target: ["img.logo"] }] },
+      ] },
+      { pageUrl: "https://x.com/clean", violations: [] },
+    ];
+    const byPage = collectIssueKeysByPage(pages);
+    expect(Object.keys(byPage).sort()).toEqual(["https://x.com/a", "https://x.com/b"]);
+    expect(byPage["https://x.com/a"]).toHaveLength(2);
+    expect(byPage["https://x.com/b"]).toHaveLength(1);
+  });
+
+  it("flattens to the same set collectIssueKeys yields", () => {
+    const pages = [
+      { pageUrl: "https://x.com/a", violations: [
+        { id: "image-alt", nodes: [{ target: ["img.logo"] }] },
+        { id: "region", nodes: [] },
+      ] },
+      { pageUrl: "https://x.com/b", violations: [
+        { id: "color-contrast", nodes: [{ target: ["h1"] }] },
+      ] },
+    ];
+    const flat = Object.values(collectIssueKeysByPage(pages)).flat().sort();
+    expect(flat).toEqual(collectIssueKeys(pages));
   });
 });
 

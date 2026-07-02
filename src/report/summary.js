@@ -305,7 +305,14 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
   const formPdfs = pdfWithIntro.filter((e) => e.introspection.hasFormFields === true).length;
   const linearizedPdfs = pdfWithIntro.filter((e) => e.introspection.isLinearized === true).length;
   const totalPages = pdfWithIntro.reduce((s, e) => s + (e.introspection.pageCount ?? 0), 0);
-  const avgPages = pdfCount > 0 ? (totalPages / pdfCount).toFixed(1) : "0";
+  // v1.39.0: the average divides by the PDFs that actually carry a measured
+  // pageCount, not all PDFs — dividing by pdfCount silently understated the
+  // per-document workload whenever introspection skipped files (size cap,
+  // parse failures). The label says "(measured)" and, when coverage is
+  // partial, how many of the PDFs the number is based on.
+  const pdfMeasured = pdfWithIntro.filter((e) => typeof e.introspection.pageCount === "number").length;
+  const avgPages = pdfMeasured > 0 ? (totalPages / pdfMeasured).toFixed(1) : "0";
+  const avgPagesNote = pdfMeasured < pdfCount ? ` (${pdfMeasured} of ${pdfCount} PDFs measured)` : "";
 
   lines.push(`PDFs (${pdfCount} file${pdfCount !== 1 ? "s" : ""})`);
   lines.push("-".repeat(`PDFs (${pdfCount} file${pdfCount !== 1 ? "s" : ""})`.length));
@@ -320,7 +327,7 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
     lines.push(`  Has form fields:              ${formPdfs}`);
     lines.push(`  Web-optimized (linearized):   ${linearizedPdfs}`);
     lines.push(`  Total pages across all PDFs:  ${totalPages}`);
-    lines.push(`  Average pages per PDF:        ${avgPages}`);
+    lines.push(`  Average pages per PDF (measured): ${avgPages}${avgPagesNote}`);
   }
   lines.push("");
 
@@ -410,7 +417,7 @@ export function writeSummary({ entries, sources, header = null, durationMs = nul
 
   const ALL_CATEGORIES = [
     "pdf", "image", "office-document", "spreadsheet", "presentation",
-    "archive", "text", "web", "audio-video", "other",
+    "legacy-office", "archive", "text", "web", "audio-video", "other",
   ];
 
   lines.push("By file type");

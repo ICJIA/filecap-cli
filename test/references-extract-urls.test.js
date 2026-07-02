@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractFileUrls } from "../src/references/extract-urls.js";
+import { extractFileUrls, isAuditedFileUrl } from "../src/references/extract-urls.js";
 
 describe("extractFileUrls", () => {
   it("returns an empty array for empty input", () => {
@@ -134,14 +134,17 @@ And a third time: [download](https://x.com/foo.pdf).
     });
 
     it("resolves href-style root-relative links in HTML bodies", () => {
+      // v1.39.0 (B6) — quoted href values extract whole, INCLUDING filenames
+      // with spaces (the quotes delimit the URL exactly). Previously the
+      // spaced form was dropped → false orphan for every spaced filename
+      // linked from an HTML body.
       const html = `<a href="/uploads/report final.pdf">report</a>`;
-      // Spaces survive extraction inside href quotes? No — quotes terminate
-      // the match at the space; regex extraction of spaced filenames is out
-      // of scope (media-field URLs carry those, not body text).
       expect(extractFileUrls(`<a href="/uploads/report.pdf">r</a>`, { baseUrl: "https://x.gov" })).toEqual([
         "https://x.gov/uploads/report.pdf",
       ]);
-      expect(extractFileUrls(html, { baseUrl: "https://x.gov" })).toEqual([]);
+      expect(extractFileUrls(html, { baseUrl: "https://x.gov" })).toEqual([
+        "https://x.gov/uploads/report%20final.pdf",
+      ]);
     });
 
     it("dedupes a relative link that resolves to an already-extracted absolute URL", () => {
@@ -163,6 +166,179 @@ And a third time: [download](https://x.com/foo.pdf).
       expect(extractFileUrls(md, { baseUrl: "https://x.gov/uploads" })).toEqual([
         "https://x.gov/uploads/a.pdf",
       ]);
+    });
+  });
+
+  // v1.39.0 (B6) — parens/brackets inside URL paths, a real boundary after
+  // the audited extension, and autolinker-style trailing-punctuation
+  // trimming. Each case below was a verified false-orphan producer.
+  describe("parens/brackets in paths + extension boundary (v1.39.0)", () => {
+    it("extracts report(1).pdf whole from body text", () => {
+      expect(
+        extractFileUrls("See https://x.com/uploads/report(1).pdf today."),
+      ).toEqual(["https://x.com/uploads/report(1).pdf"]);
+    });
+
+    it("extracts report(1).pdf whole from an href attribute", () => {
+      expect(
+        extractFileUrls(`<a href="https://x.com/uploads/report(1).pdf">r</a>`),
+      ).toEqual(["https://x.com/uploads/report(1).pdf"]);
+    });
+
+    it("extracts a spaced filename whole from a quoted href (report (Final).pdf)", () => {
+      expect(
+        extractFileUrls(
+          `<a href="https://x.com/uploads/report (Final).pdf">r</a>`,
+        ),
+      ).toEqual(["https://x.com/uploads/report (Final).pdf"]);
+    });
+
+    it("extracts brackets in paths whole (report[2020].pdf)", () => {
+      expect(extractFileUrls("Get https://x.com/report[2020].pdf now")).toEqual([
+        "https://x.com/report[2020].pdf",
+      ]);
+    });
+
+    it("report.doc.pdf matches the FULL .pdf URL, not a truncated .doc one", () => {
+      expect(extractFileUrls("https://x.com/files/report.doc.pdf")).toEqual([
+        "https://x.com/files/report.doc.pdf",
+      ]);
+    });
+
+    it("a mid-URL pseudo-extension does not truncate (my.docs/report.pdf)", () => {
+      expect(extractFileUrls("https://my.docs/report.pdf")).toEqual([
+        "https://my.docs/report.pdf",
+      ]);
+    });
+
+    it("report.pdfx does not match at all", () => {
+      expect(extractFileUrls("https://x.com/report.pdfx")).toEqual([]);
+      expect(extractFileUrls("https://x.com/report.pdfx more text")).toEqual([]);
+    });
+
+    it("strips an unbalanced trailing paren but keeps balanced ones", () => {
+      expect(extractFileUrls("(see https://h.com/a.pdf)")).toEqual([
+        "https://h.com/a.pdf",
+      ]);
+      expect(extractFileUrls("(see https://h.com/a(1).pdf)")).toEqual([
+        "https://h.com/a(1).pdf",
+      ]);
+    });
+
+    it("strips trailing prose punctuation .,;:! after the extension", () => {
+      expect(extractFileUrls("https://x.com/a.pdf;")).toEqual(["https://x.com/a.pdf"]);
+      expect(extractFileUrls("https://x.com/a.pdf:")).toEqual(["https://x.com/a.pdf"]);
+      expect(extractFileUrls("Get https://x.com/a.pdf!")).toEqual(["https://x.com/a.pdf"]);
+    });
+
+    it("keeps a fragment after the extension (boundary char)", () => {
+      expect(extractFileUrls("https://x.com/a.pdf#page=2 next")).toEqual([
+        "https://x.com/a.pdf#page=2",
+      ]);
+    });
+
+    it("root-relative links with parens extract whole too", () => {
+      expect(
+        extractFileUrls("[r](/uploads/report(1).pdf)", { baseUrl: "https://x.gov" }),
+      ).toEqual(["https://x.gov/uploads/report(1).pdf"]);
+    });
+  });
+
+  // v1.39.0 post-audit fixes (red-2 R-2) — two under-extraction regressions
+  // the span-then-verify rewrite introduced vs the pre-1.39 extractor, both
+  // probe-proven and both restoring the HEAD outcome:
+  //   (a) comma/semicolon-joined URL lists glued into ONE unmatchable span
+  //       (both references lost → false-orphan direction);
+  //   (b) entity-encoded quoted hrefs ("…a.pdf&amp;v=1") extracted nothing.
+  //       HEAD extracted "…/a.pdf" (B3's canonicalization strips only
+  //       "?"-queries, so the extractor must emit the truncated file URL for
+  //       the inventory key to be "a.pdf").
+  describe("comma/semicolon-joined lists + entity-encoded hrefs (v1.39.0 audit)", () => {
+    it("splits a comma-joined URL list into both file URLs", () => {
+      expect(extractFileUrls("https://x.gov/a.pdf,https://x.gov/b.pdf")).toEqual([
+        "https://x.gov/a.pdf",
+        "https://x.gov/b.pdf",
+      ]);
+    });
+
+    it("splits a semicolon-joined URL list into both file URLs", () => {
+      expect(extractFileUrls("https://x.gov/a.pdf;https://x.gov/b.pdf")).toEqual([
+        "https://x.gov/a.pdf",
+        "https://x.gov/b.pdf",
+      ]);
+    });
+
+    it("splits a three-URL comma list and keeps non-file pieces out", () => {
+      expect(
+        extractFileUrls("https://x.gov/page,https://x.gov/a.pdf,https://x.gov/b.docx"),
+      ).toEqual(["https://x.gov/a.pdf", "https://x.gov/b.docx"]);
+    });
+
+    it("a comma NOT followed by a scheme stays inside the URL (legal path char)", () => {
+      // Control pin: separators only break the span when a new scheme
+      // follows — a comma inside a filename must NOT become a boundary
+      // (that was the pre-B6 truncation bug).
+      expect(extractFileUrls("https://x.gov/report,final.pdf next")).toEqual([
+        "https://x.gov/report,final.pdf",
+      ]);
+    });
+
+    it("decodes &amp; in a quoted href and truncates at the query-starting & (HEAD outcome)", () => {
+      expect(extractFileUrls(`<a href="https://x.gov/a.pdf&amp;v=1">a</a>`)).toEqual([
+        "https://x.gov/a.pdf",
+      ]);
+    });
+
+    it("decodes the numeric &#38; form the same way", () => {
+      expect(extractFileUrls(`<a href="https://x.gov/a.pdf&#38;v=1">a</a>`)).toEqual([
+        "https://x.gov/a.pdf",
+      ]);
+    });
+
+    it("decodes &#39; &quot; &lt; &gt; in quoted href values (chars carried verbatim)", () => {
+      expect(
+        extractFileUrls(`<a href="https://x.gov/files/a&#39;s report.pdf">a</a>`),
+      ).toEqual(["https://x.gov/files/a's report.pdf"]);
+    });
+
+    it("a raw & in a quoted href path (NOFOQ&A.pdf) still extracts whole", () => {
+      // Control pin: & only starts a query when it directly follows an
+      // audited extension — a mid-name ampersand is a path character.
+      expect(
+        extractFileUrls(`<a href="https://x.gov/funding/NOFOQ&A.pdf">q</a>`),
+      ).toEqual(["https://x.gov/funding/NOFOQ&A.pdf"]);
+    });
+
+    it("does NOT entity-decode bare text spans (quoted-attribute path only)", () => {
+      // Control pin: outside a quoted attribute the raw text IS the URL —
+      // ".pdf&amp;…" has no boundary after the extension, so no match.
+      expect(extractFileUrls("see https://x.gov/a.pdf&amp;v=1 now")).toEqual([]);
+    });
+
+    it("an entity-encoded relative href resolves against baseUrl (truncated at &)", () => {
+      expect(
+        extractFileUrls(`<a href="/uploads/a.pdf&amp;v=1">a</a>`, { baseUrl: "https://x.gov" }),
+      ).toEqual(["https://x.gov/uploads/a.pdf"]);
+    });
+  });
+
+  // v1.39.0 (B7) — shared audited-extension gate for url-string field values.
+  describe("isAuditedFileUrl", () => {
+    it("accepts audited file URLs, with or without query/fragment", () => {
+      expect(isAuditedFileUrl("https://x.com/uploads/report.pdf")).toBe(true);
+      expect(isAuditedFileUrl("https://x.com/uploads/report.pdf?v=2")).toBe(true);
+      expect(isAuditedFileUrl("https://x.com/uploads/report.PDF#page=1")).toBe(true);
+      expect(isAuditedFileUrl("https://x.com/a.docx")).toBe(true);
+      expect(isAuditedFileUrl("https://x.com/a.zip")).toBe(true);
+      expect(isAuditedFileUrl("/uploads/report (Final).pdf")).toBe(true);
+    });
+
+    it("rejects page URLs and non-audited extensions", () => {
+      expect(isAuditedFileUrl("https://x.com/articles/some-page")).toBe(false);
+      expect(isAuditedFileUrl("https://x.com/report.pdfx")).toBe(false);
+      expect(isAuditedFileUrl("https://x.com/a.jpg")).toBe(false);
+      expect(isAuditedFileUrl("")).toBe(false);
+      expect(isAuditedFileUrl(null)).toBe(false);
     });
   });
 

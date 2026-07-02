@@ -64,6 +64,9 @@ const categoryEnum = z.enum([
   "office-document",
   "spreadsheet",
   "presentation",
+  // v1.39.0: legacy binary Office (.doc/.xls/.ppt). Old inventories carry
+  // these files under the three categories above — both shapes stay valid.
+  "legacy-office",
   "image",
   "archive",
   "text",

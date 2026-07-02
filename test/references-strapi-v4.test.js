@@ -60,6 +60,24 @@ describe("extractEntryUrls (v4)", () => {
     ).toEqual(["https://archive.icjia-api.cloud/files/icjia/foo.pdf"]);
   });
 
+  // v1.39.0 (B7) — url-string values must pass the audited-extension gate.
+  it("filters url-string values through the audited-extension gate (v4)", () => {
+    const entry = {
+      id: 1,
+      attributes: {
+        articleUrl: "https://icjia.illinois.gov/articles/some-page",
+        fileURL: "https://archive.icjia-api.cloud/uploads/report.pdf",
+      },
+    };
+    const classified = [
+      { kind: "url-string", fieldName: "articleUrl" },
+      { kind: "url-string", fieldName: "fileURL" },
+    ];
+    expect(
+      extractEntryUrls(entry, classified, "https://dvfr.icjia-api.cloud"),
+    ).toEqual(["https://archive.icjia-api.cloud/uploads/report.pdf"]);
+  });
+
   it("extracts a single upload-file from data.attributes.url", () => {
     // v4 single-media envelope (populated)
     const entry = {
@@ -336,9 +354,12 @@ describe("introspectContentTypes (v4)", () => {
     ]);
   });
 
-  it("skips singular fields with no matching plural (singletons or stragglers)", async () => {
-    // Defensive: if the schema lists a singular without a plural, skip rather
-    // than fabricate a 404'ing REST path.
+  // v1.39.0 (B4) — a v4 singular with no plural partner is a SINGLE TYPE
+  // (homepage, about, config): its content lives at /api/<name> and can
+  // carry file links. Previously these were silently dropped (false
+  // orphans); now they come back flagged singleType so the orchestrator
+  // fetches them as single-entry REST calls.
+  it("returns unpaired singulars as single-type entries (plural: null, singleType: true)", async () => {
     const fetcher = async () => ({
       data: {
         __schema: {
@@ -346,7 +367,7 @@ describe("introspectContentTypes (v4)", () => {
             fields: [
               { name: "page" },
               { name: "pages" },
-              { name: "config" }, // no `configs` — skip
+              { name: "config" }, // no `configs` — single type
               { name: "me" },
             ],
           },
@@ -354,7 +375,65 @@ describe("introspectContentTypes (v4)", () => {
       },
     });
     const types = await introspectContentTypes("x", fetcher);
-    expect(types).toEqual([{ singular: "page", plural: "pages" }]);
+    expect(types).toEqual([
+      { singular: "page", plural: "pages" },
+      { singular: "config", plural: null, singleType: true },
+    ]);
+  });
+
+  it("a plural-looking name iterated before its singular is still claimed by the pair, not a single type", async () => {
+    // `faqs` appears before `faq` — pairing happens on the singular pass;
+    // the singles post-pass must not mistake the already-claimed plural for
+    // a single type.
+    const fetcher = async () => ({
+      data: {
+        __schema: {
+          queryType: {
+            fields: [{ name: "faqs" }, { name: "faq" }],
+          },
+        },
+      },
+    });
+    const types = await introspectContentTypes("x", fetcher);
+    expect(types).toEqual([{ singular: "faq", plural: "faqs" }]);
+  });
+
+  // v1.39.0 (B4) — irregular plural pairing (forward direction).
+  it("pairs irregular plurals: quiz/quizzes, analysis/analyses, person/people, matrix/matrices, index/indices, curriculum/curricula", async () => {
+    const fetcher = async () => ({
+      data: {
+        __schema: {
+          queryType: {
+            fields: [
+              { name: "quiz" },
+              { name: "quizzes" },
+              { name: "analysis" },
+              { name: "analyses" },
+              { name: "person" },
+              { name: "people" },
+              { name: "matrix" },
+              { name: "matrices" },
+              { name: "index" },
+              { name: "indices" },
+              { name: "curriculum" },
+              { name: "curricula" },
+              { name: "post" },
+              { name: "posts" },
+            ],
+          },
+        },
+      },
+    });
+    const types = await introspectContentTypes("x", fetcher);
+    expect(types).toEqual([
+      { singular: "quiz", plural: "quizzes" },
+      { singular: "analysis", plural: "analyses" },
+      { singular: "person", plural: "people" },
+      { singular: "matrix", plural: "matrices" },
+      { singular: "index", plural: "indices" },
+      { singular: "curriculum", plural: "curricula" },
+      { singular: "post", plural: "posts" },
+    ]);
   });
 
   it("strips the usersPermissions-prefixed auth types even if they look like singular/plural", async () => {
@@ -376,6 +455,24 @@ describe("introspectContentTypes (v4)", () => {
     });
     const types = await introspectContentTypes("x", fetcher);
     expect(types).toEqual([{ singular: "post", plural: "posts" }]);
+  });
+
+  // v1.39.0 (B1) — GraphQL errors / missing data must throw, not silently
+  // discover zero types (which produced an empty sidecar → every file on
+  // the site reported as an orphan).
+  it("throws with the first error message on a non-empty errors array", async () => {
+    const fetcher = async () => ({
+      errors: [{ message: "Invalid token" }],
+    });
+    await expect(introspectContentTypes("x", fetcher)).rejects.toThrow(
+      /Invalid token/,
+    );
+  });
+
+  it("throws when the response has no data", async () => {
+    await expect(
+      introspectContentTypes("x", async () => ({ data: null })),
+    ).rejects.toThrow(/no data/i);
   });
 });
 
@@ -476,6 +573,93 @@ describe("fetchAllEntries (v4)", () => {
     expect(entries).toEqual([]);
   });
 
+  it("stops on an empty page even when meta is absent (no infinite loop)", async () => {
+    let calls = 0;
+    const fetcher = async () => {
+      calls++;
+      return { data: [] };
+    };
+    const entries = await fetchAllEntries(
+      "https://dvfr.icjia-api.cloud",
+      "posts",
+      fetcher,
+      { limit: 100 },
+    );
+    expect(entries).toEqual([]);
+    expect(calls).toBe(1);
+  });
+
+  // v1.39.0 (B9) — Strapi v4's maxLimit caps the page size server-side: ask
+  // for 100, get 50. A short page is NOT the end of the collection. With
+  // meta.pagination present we trust total; without it we stop only on an
+  // EMPTY page. Either way all 250 records must come back, with start
+  // advancing by the records received.
+  function cappedV4Fetcher({ total, cap, withMeta }) {
+    const calls = [];
+    const fetcher = async (url) => {
+      calls.push(url);
+      const u = new URL(url);
+      const start = parseInt(u.searchParams.get("pagination[start]"), 10);
+      const limit = Math.min(
+        parseInt(u.searchParams.get("pagination[limit]"), 10),
+        cap,
+      );
+      const data = [];
+      for (let i = start; i < Math.min(start + limit, total); i++) {
+        data.push({ id: i + 1 });
+      }
+      return withMeta
+        ? { data, meta: { pagination: { start, limit, total } } }
+        : { data };
+    };
+    return { fetcher, calls };
+  }
+
+  it("fetches all 250 records from a maxLimit-capped server (WITH v4 meta)", async () => {
+    const { fetcher, calls } = cappedV4Fetcher({ total: 250, cap: 50, withMeta: true });
+    const entries = await fetchAllEntries(
+      "https://dvfr.icjia-api.cloud",
+      "posts",
+      fetcher,
+      { limit: 100 },
+    );
+    expect(entries.length).toBe(250);
+    expect(new Set(entries.map((e) => e.id)).size).toBe(250);
+    // meta.total short-circuits the walk: no trailing empty-page request
+    expect(calls.length).toBe(5);
+  });
+
+  it("fetches all 250 records from a maxLimit-capped server (WITHOUT meta — stop on empty)", async () => {
+    const { fetcher, calls } = cappedV4Fetcher({ total: 250, cap: 50, withMeta: false });
+    const entries = await fetchAllEntries(
+      "https://dvfr.icjia-api.cloud",
+      "posts",
+      fetcher,
+      { limit: 100 },
+    );
+    expect(entries.length).toBe(250);
+    expect(calls.length).toBe(6); // 5 data pages + 1 empty terminator
+  });
+
+  it("honors page/pageCount-shaped meta (page < pageCount continues, last full page stops)", async () => {
+    const pages = [
+      { data: [{ id: 1 }, { id: 2 }], meta: { pagination: { page: 1, pageCount: 3 } } },
+      { data: [{ id: 3 }, { id: 4 }], meta: { pagination: { page: 2, pageCount: 3 } } },
+      { data: [{ id: 5 }, { id: 6 }], meta: { pagination: { page: 3, pageCount: 3 } } },
+    ];
+    let i = 0;
+    const fetcher = async () => pages[i++] ?? { data: [] };
+    const entries = await fetchAllEntries(
+      "https://dvfr.icjia-api.cloud",
+      "posts",
+      fetcher,
+      { limit: 2 },
+    );
+    expect(entries.length).toBe(6);
+    // last page is FULL but meta says page === pageCount → no 4th request
+    expect(i).toBe(3);
+  });
+
   // Strapi v4 sets each content type's REST collection name via
   // `info.pluralName` in schema.json, which isn't deterministically derivable
   // from the GraphQL plural query name. Observed in the r3 v4 fleet:
@@ -545,5 +729,38 @@ describe("fetchAllEntries (v4)", () => {
       fetchAllEntries("https://x.com", "weeklyFaqs", fetcher, { limit: 100 }),
     ).rejects.toThrow(/HTTP 403/);
     expect(calls.length).toBe(1);
+  });
+
+  // v1.39.0 (B4) — single types answer /api/<name> with `data` as an OBJECT
+  // (not an array). Normalize to [data] so the shared extraction loop works;
+  // data: null (never published) yields no entries.
+  it("normalizes a single-type object response to a one-entry array", async () => {
+    let calls = 0;
+    const fetcher = async () => {
+      calls++;
+      return {
+        data: { id: 1, attributes: { title: "Home", slug: "home" } },
+        meta: {},
+      };
+    };
+    const entries = await fetchAllEntries(
+      "https://dvfr.icjia-api.cloud",
+      "homepage",
+      fetcher,
+      { limit: 100 },
+    );
+    expect(entries).toEqual([{ id: 1, attributes: { title: "Home", slug: "home" } }]);
+    expect(calls).toBe(1); // an object response never paginates
+  });
+
+  it("single-type data: null (unpublished) yields no entries", async () => {
+    const fetcher = async () => ({ data: null, meta: {} });
+    const entries = await fetchAllEntries(
+      "https://dvfr.icjia-api.cloud",
+      "homepage",
+      fetcher,
+      { limit: 100 },
+    );
+    expect(entries).toEqual([]);
   });
 });

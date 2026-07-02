@@ -49,6 +49,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 FILECAP_BIN="$SCRIPT_DIR/bin/filecap.js"
 AUDIT_FLEET_PATH="$SCRIPT_DIR/examples/audit-fleet.sh"
 SITES_JSON="${SITES_JSON:-${FILECAP_SITES_FILE:-$HOME/.filecap/sites.json}}"
+# Child `filecap` invocations (references, audits, web-rollup) resolve their
+# roster from FILECAP_SITES_FILE — export so SITES_JSON steers them too.
+export FILECAP_SITES_FILE="$SITES_JSON"
 AUDITS_BASE="${AUDITS_BASE:-$HOME/filecap-audits}"
 ROLLUP_DIR="$AUDITS_BASE/_web-rollup"
 # Where excepted files land — overridable, resolved through the same resolver.
@@ -90,9 +93,42 @@ done
 [ -f "$SITES_JSON" ]  || die "No sites.json at $SITES_JSON"
 command -v node    >/dev/null 2>&1 || die "node not found"
 command -v python3 >/dev/null 2>&1 || die "python3 not found (used to read sites.json)"
+
+# Scan prereqs live in a function because --scores-only can still escalate a
+# site without a cached inventory to a full scan; the checks are re-run right
+# before any scan starts, regardless of mode.
+require_scan_prereqs() {
+  command -v expect >/dev/null 2>&1 ||
+    die "expect not found (needed for the SSH scan — brew install expect)"
+  [ -f "$AUDIT_FLEET_PATH" ] ||
+    die "audit-fleet.sh not found at $AUDIT_FLEET_PATH"
+}
 if [ "$SCORES_ONLY" -eq 0 ]; then
-  command -v expect >/dev/null 2>&1 || die "expect not found (needed for the SSH scan — brew install expect)"
-  [ -f "$AUDIT_FLEET_PATH" ] || die "audit-fleet.sh not found at $AUDIT_FLEET_PATH"
+  require_scan_prereqs
+fi
+
+# ── concurrency guard ──────────────────────────────────────────────────────────
+# Same rule as run-full-audit.sh: never interleave with a fleet scan. Also
+# refuse to run alongside run-full-audit.sh or another run-site-update.sh —
+# both purge run dirs and repoint latest/.
+if pgrep -fl 'audit-fleet|audit-remote' >/dev/null 2>&1; then
+  warn "Another fleet scan looks like it is already running:"
+  pgrep -fl 'audit-fleet|audit-remote' >&2 || true
+  die "Refusing to start. Wait for the other one or kill it."
+fi
+# pgrep -f would match this very process, so take a ps snapshot and filter
+# out our own PID, our own subshells (their PPID is us), and our direct
+# parent (a `bash -c './run-site-update.sh …'` wrapper carries the script
+# name on its command line). The [b]rackets keep the awk process from
+# matching its own argv.
+PS_SNAPSHOT="$(ps -axo pid=,ppid=,command=)"
+OTHER_RUNS="$(printf '%s\n' "$PS_SNAPSHOT" | awk -v me="$$" -v pp="$PPID" '
+  $1 != me && $1 != pp && $2 != me &&
+  /run-[f]ull-audit\.sh|run-[s]ite-update\.sh/')"
+if [ -n "$OTHER_RUNS" ]; then
+  warn "Another orchestrator run is in progress:"
+  printf '%s\n' "$OTHER_RUNS" >&2
+  die "Refusing to run two orchestrators at once. Wait or kill it."
 fi
 
 # ── transcript ─────────────────────────────────────────────────────────────────
@@ -188,7 +224,12 @@ fi
 # existing fleet scanner (audit-fleet.sh) over it under expect — same answers as
 # audit-fleet-auto.sh. Writes ~/filecap-audits/<slug>/latest/inventory.ndjson.
 scan_targets() {
-  local tmp; tmp="$(mktemp -t filecap-update.XXXXXX)"
+  local tmpdir tmp rc
+  # audit-fleet.sh only takes its sites.json branch when the roster path ends
+  # in .json, and macOS mktemp appends a random suffix to file templates — so
+  # build the roster inside a temp dir under an exact sites.json name.
+  tmpdir="$(mktemp -d -t filecap-update.XXXXXX)"
+  tmp="$tmpdir/sites.json"
   python3 - "$SITES_JSON" "$tmp" "$@" <<'PY'
 import json, sys
 src, dst = sys.argv[1], sys.argv[2]
@@ -198,7 +239,6 @@ out = {"version": d.get("version", 1),
        "sites": [s for s in d.get("sites", []) if s.get("name") in want]}
 json.dump(out, open(dst, "w"))
 PY
-  local rc
   AUDIT_FLEET_PATH="$AUDIT_FLEET_PATH" TEMP_SITES_JSON="$tmp" expect <<'EXPECT_EOF'
 set timeout -1
 log_user 1
@@ -211,14 +251,22 @@ expect {
     eof
 }
 catch wait result
+# A signal-killed child reports {pid spawnid 0 0 CHILDKILLED ...}, where
+# element 3 is 0 — it must not be used as the exit code. An OS-level wait
+# error sets element 2 to -1 (element 3 is then errno, not a status).
+if {[llength $result] > 4 && [lindex $result 4] eq "CHILDKILLED"} { exit 143 }
+if {[lindex $result 2] == -1} { exit 1 }
 exit [lindex $result 3]
 EXPECT_EOF
   rc=$?
-  rm -f "$tmp"
+  rm -rf "$tmpdir"
   return $rc
 }
 
 if [ ${#FULL_TARGETS[@]} -gt 0 ]; then
+  # --scores-only can reach here too (targets that had no cached inventory),
+  # so re-check the scan prereqs regardless of mode.
+  require_scan_prereqs
   say "Scanning ${#FULL_TARGETS[@]} site(s) over SSH: ${FULL_TARGETS[*]}"
   scan_targets "${FULL_TARGETS[@]}" || die "scan failed"
 
@@ -292,18 +340,35 @@ else
 fi
 
 # ── purge old runs (keep newest per site + newest rollup) ────────────────────────
-# Never touch latest/ symlinks, mirror/ caches, or _fleet/ (they don't end in
-# 'Z' so the *Z glob skips them).
+# Keep the newest timestamped run dir per site AND the run `latest` points to
+# (normally the same dir — but a partial dir left by a failed/killed scan can
+# be lexically newer than the good run). Never touch latest/ symlinks,
+# mirror/ caches, or _fleet/ (they don't end in 'Z' so the *Z glob skips them).
 if [ "$PURGE" -eq 1 ]; then
   say "Purge old runs (keep newest per site + newest rollup)"
   PER_SITE_REMOVED=0
   for runs_dir in "$AUDITS_BASE"/*/runs; do
     [ -d "$runs_dir" ] || continue
+    site_dir="${runs_dir%/runs}"
     newest=$(ls -1d "$runs_dir"/*Z 2>/dev/null | sort | tail -1)
     [ -n "$newest" ] || continue
+    # Resolve `latest` to its physical target so it is never deleted. A
+    # dangling link means the site's state is suspect: warn, delete nothing.
+    keep_latest=""
+    if [ -e "$site_dir/latest" ] || [ -L "$site_dir/latest" ]; then
+      keep_latest=$(cd "$site_dir/latest" 2>/dev/null && pwd -P)
+      if [ -z "$keep_latest" ]; then
+        warn "$(basename "$site_dir"): dangling latest link — purging nothing for this site"
+        continue
+      fi
+    fi
     for dd in "$runs_dir"/*Z; do
       [ -d "$dd" ] || continue
       [ "$dd" = "$newest" ] && continue
+      if [ -n "$keep_latest" ]; then
+        dd_phys=$(cd "$dd" 2>/dev/null && pwd -P)
+        [ "$dd_phys" = "$keep_latest" ] && continue
+      fi
       rm -rf "$dd" && PER_SITE_REMOVED=$((PER_SITE_REMOVED + 1))
     done
   done

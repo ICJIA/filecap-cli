@@ -10,7 +10,7 @@
 
 /** Current verified accessibility standing — shown in the page's status panel. */
 export const currentStatus = {
-  asOf: "2026-06-17",
+  asOf: "2026-07-02",
   lighthouse: 100,
   axeCore: "0 violations (WCAG A + AA)",
   axeDevTools: "0 serious — pending live re-verification",
@@ -32,6 +32,18 @@ export const currentStatus = {
  *   notes    optional, e.g. the version it shipped in
  */
 export const accessibilityLog = [
+  {
+    date: "2026-07-02",
+    source: "backend",
+    tool: "axecap (axe-core 4.12.1)",
+    scope:
+      "v1.39.0 review-fix release — every bundle page whose markup changed: fleet index (SSR card order, once-escaped card alt/aria-labels, orphans-blurb copy), per-site detail (non-sortable placeholder headers, per-cell confidence attributes, hidden search values, download-button omission on no-workbook sites), orphaned-files (percent-encoded public URLs, sortable confidence column), /sites, /accessibility",
+    viewport: "desktop + mobile",
+    status: "pass",
+    result:
+      "Rebuilt the full bundle from cached inventories after the v1.39.0 fix-all (about 30 defects across the shell, references, audits, report, and bundle layers — several touching shipped markup: data-nosort headers no longer advertise a click they don't have, card image alt/aria-label text is escaped exactly once, orphan file links percent-encode special characters so they resolve, and the orphans blurb uses correct singular/plural copy). Re-checked with axe-core 4.12.1 (WCAG A + AA): 0 violations on the fleet index and a per-site detail page (desktop + mobile), and on the orphaned-files, /sites, and /accessibility pages (desktop). Lighthouse/browser re-verification on the deployed bundle pending the next deploy (this release ships tooling fixes; the bundle deploys after the next fleet re-scan).",
+    notes: "v1.39.0",
+  },
   {
     date: "2026-06-17",
     source: "backend",

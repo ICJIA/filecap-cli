@@ -6,7 +6,14 @@
 // bytes say another). This module gathers both into a per-site list with a
 // plain-English likely reason — the input to audit-file-errors.html and .csv.
 
+import { csvCell, publicUrlFor } from "./format.js";
+
 const MB = 1024 * 1024;
+
+// The public-URL builder (v1.7.40 precedence: base+pathPrefix+per-segment
+// encoding, absolutePath tree→blob fallback) lives in format.js as
+// `publicUrlFor` since the v1.39.0 post-audit pass — shared with the live
+// orphan emitters so every fleet artifact encodes links the same way.
 
 /**
  * Categorise why an entry counts as an error.
@@ -52,18 +59,6 @@ export function categorizeAuditError(entry) {
 }
 
 /**
- * Build the public URL for an entry — mirrors the per-row logic used elsewhere
- * in the rollup (publicUrlBase + path, or an absolute GitHub URL).
- */
-function publicUrlFor(entry, publicUrlBase) {
-  const ap = String(entry?.absolutePath ?? "");
-  if (/^https?:\/\//i.test(ap)) return ap.replace("/tree/", "/blob/");
-  const base = String(publicUrlBase ?? "").replace(/\/+$/, "");
-  const p = String(entry?.path ?? entry?.filename ?? "").replace(/^\/+/, "");
-  return base && p ? `${base}/${p}` : "";
-}
-
-/**
  * Gather audit errors across the fleet, grouped by site.
  *
  * @param {Array<{entry:object,serverName:string,siteName:string,publicUrlBase:string}>} items
@@ -88,7 +83,7 @@ export function collectAuditErrors(items) {
       extension: String(e.extension || ""),
       category: String(e.category || ""),
       sizeBytes: e.sizeBytes ?? 0,
-      publicUrl: publicUrlFor(e, it.publicUrlBase),
+      publicUrl: publicUrlFor(e, it.publicUrlBase, it.pathPrefix),
       error: e.audit?.error ?? (cat.kind === "content-mismatch" ? "content-type-mismatch" : ""),
       kind: cat.kind,
       reason: cat.reason,
@@ -112,10 +107,9 @@ export function collectAuditErrors(items) {
  * @returns {string} CSV text
  */
 export function writeAuditErrorsCsv(groups) {
-  const cell = (v) => {
-    const s = String(v ?? "");
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
+  // v1.39.0: shared format.js csvCell — gains the formula-injection
+  // apostrophe guard and \r quoting the local re-implementation lacked.
+  const cell = csvCell;
   const header = ["Website", "File", "File type", "Size (bytes)", "Public URL", "Error", "Likely reason"];
   const lines = [header.map(cell).join(",")];
   for (const g of groups ?? []) {

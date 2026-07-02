@@ -34,10 +34,34 @@ describe("canonicalizeUrl", () => {
     );
   });
 
-  it("preserves the query string", () => {
+  // v1.39.0 (B3) — query strings are stripped: uploads/files never vary by
+  // query, and the reference side carries cache-busters ("?v=2") that made
+  // the same file produce two different keys (false orphan).
+  it("strips the query string so cache-busted references match the bare key", () => {
     expect(canonicalizeUrl("https://x.com/foo.pdf?v=2")).toBe(
-      "https://x.com/foo.pdf?v=2",
+      "https://x.com/foo.pdf",
     );
+    expect(canonicalizeUrl("https://x.com/foo.pdf?v=2")).toBe(
+      canonicalizeUrl("https://x.com/foo.pdf"),
+    );
+    expect(canonicalizeUrl("https://x.com/foo.pdf?v=2&token=abc")).toBe(
+      "https://x.com/foo.pdf",
+    );
+  });
+
+  // v1.39.0 (B3) — percent-encoding hex case is normalized to uppercase so
+  // "%2f" and "%2F" collapse to one key.
+  it("uppercases percent-encoding hex digits in the path", () => {
+    expect(canonicalizeUrl("https://x.com/a%2fb.pdf")).toBe(
+      "https://x.com/a%2Fb.pdf",
+    );
+    expect(canonicalizeUrl("https://x.com/a%2fb.pdf")).toBe(
+      canonicalizeUrl("https://x.com/a%2Fb.pdf"),
+    );
+    // Mixed-case hex in a real-shaped upload path
+    expect(
+      canonicalizeUrl("https://archive.icjia-api.cloud/files/a%3fb%20c.pdf"),
+    ).toBe("https://archive.icjia-api.cloud/files/a%3Fb%20c.pdf");
   });
 
   it("preserves percent-encoded path segments verbatim", () => {

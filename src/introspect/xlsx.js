@@ -1,11 +1,31 @@
+import fs from "node:fs/promises";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 
 const DEFAULT_SHEET_NAME_RE = /^Sheet\d+$/i;
 
-// Security note (FC-2026-013): exceljs reads the XLSX file directly without
-// extracting zip entries to disk, preventing zip-slip path traversal attacks
-// from maliciously crafted XLSX files. Keep using wb.xlsx.readFile() (in-memory
-// parse) rather than any extract-to-disk API.
+// Security note (FC-2026-013): exceljs and jszip both parse the XLSX zip
+// in memory without extracting entries to disk, preventing zip-slip path
+// traversal attacks from maliciously crafted XLSX files. Keep using the
+// in-memory APIs (wb.xlsx.load / JSZip.loadAsync) — never an
+// extract-to-disk API.
+
+// v1.39.0 (F4): chart parts live at xl/charts/chart<N>.xml (classic) or
+// xl/charts/chartEx<N>.xml (extended chart types, Excel 2016+).
+const CHART_PART_RE = /^xl\/charts\/chart(?:Ex)?\d+\.xml$/;
+
+/**
+ * True when the raw XLSX zip contains at least one chart part. exceljs
+ * never surfaces charts (ws.model.charts is always undefined), so this is
+ * the only reliable detection. Exported for unit testing.
+ *
+ * @param {Buffer} buffer - the XLSX file contents
+ * @returns {Promise<boolean>}
+ */
+export async function zipHasCharts(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  return Object.keys(zip.files).some((name) => CHART_PART_RE.test(name));
+}
 
 /**
  * Introspect an XLSX file via exceljs.
@@ -18,8 +38,11 @@ const DEFAULT_SHEET_NAME_RE = /^Sheet\d+$/i;
  * @returns {Promise<object>} introspection block per xlsxIntrospectionSchema
  */
 export async function introspectXlsx(filePath) {
+  // Single read pass: the buffer feeds both the exceljs parse and the
+  // raw-zip chart detection.
+  const buffer = await fs.readFile(filePath);
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(filePath);
+  await wb.xlsx.load(buffer);
 
   const sheetNames = wb.worksheets.map((ws) => ws.name);
   const sheetCount = wb.worksheets.length;
@@ -59,13 +82,13 @@ export async function introspectXlsx(filePath) {
     }
   }
 
-  // Charts: exceljs surfaces them inconsistently. Check worksheet model.
-  for (const ws of wb.worksheets) {
-    const charts = ws.model?.charts;
-    if (Array.isArray(charts) && charts.length > 0) {
-      hasCharts = true;
-      break;
-    }
+  // Charts: detect via the raw zip (see zipHasCharts). A detection hiccup
+  // must not void the whole introspection — default to false, matching the
+  // per-feature tolerance used for getImages above.
+  try {
+    hasCharts = await zipHasCharts(buffer);
+  } catch {
+    hasCharts = false;
   }
 
   const title = wb.title ? String(wb.title).trim() || null : null;

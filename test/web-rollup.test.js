@@ -480,9 +480,15 @@ describe("runWebRollup", () => {
     expect(html).toContain("Why aren&#39;t all");
   });
 
-  describe("alphabetical card order (v1.7.15)", () => {
-    it("renders cards in alphabetical order by siteFullName, not sites.json declaration order", async () => {
-      // sites.json declares B-first to prove the renderer is doing the sort.
+  // v1.39.0 (E12) — SSR card order follows the pressed "Most recently added"
+  // button (reverse sites.json declaration order), not the alphabet. The
+  // pre-v1.39.0 expectation (alphabetical SSR) contradicted the toolbar's
+  // shipped aria-pressed state, so this test was updated with the fix.
+  describe("SSR card order = 'Most recently added' (v1.39.0; was alphabetical v1.7.15)", () => {
+    it("renders cards in reverse sites.json declaration order (added), not alphabetical", async () => {
+      // sites.json declares Zebra → Alpha → Mango; "added" order renders
+      // Mango → Alpha → Zebra. Alphabetical would be Alpha → Mango → Zebra,
+      // so the assertion distinguishes the two modes.
       const auditsBase = path.join(tmpDir, "filecap-audits");
       for (const slug of ["zebra-prod", "alpha-prod", "mango-prod"]) {
         const dir = path.join(auditsBase, slug, "latest");
@@ -498,14 +504,12 @@ describe("runWebRollup", () => {
       const outputDir = path.join(tmpDir, "output-sort");
       await runWebRollup({ sitesFile, output: outputDir, _auditsBase: auditsBase, password: null });
       const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-      // Find the positions of each card in the rendered HTML — they should
-      // appear in alphabetical order regardless of sites.json declaration.
-      const posAlpha = html.indexOf("Alpha Site");
       const posMango = html.indexOf("Mango Site");
+      const posAlpha = html.indexOf("Alpha Site");
       const posZebra = html.indexOf("Zebra Site");
-      expect(posAlpha).toBeGreaterThan(-1);
-      expect(posMango).toBeGreaterThan(posAlpha);
-      expect(posZebra).toBeGreaterThan(posMango);
+      expect(posMango).toBeGreaterThan(-1);
+      expect(posAlpha).toBeGreaterThan(posMango);
+      expect(posZebra).toBeGreaterThan(posAlpha);
     });
   });
 

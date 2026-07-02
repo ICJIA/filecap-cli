@@ -160,15 +160,31 @@ export async function runReferences({
   log(
     `[references] discovering content types via ${refsCfg.graphqlEndpoint} (${refsCfg.strategy})`,
   );
+  // v1.39.0 (B4) — pass log so unpairable-type WARNs reach the operator.
   const contentTypes = await adapter.introspectContentTypes(
     refsCfg.graphqlEndpoint,
     fetcher,
+    { log },
   );
   log(
     `[references] ${contentTypes.length} content types: ${contentTypes.map((c) => c.singular).join(", ")}`,
   );
+  // v1.39.0 (B1) — zero discovered types on a strapi site means the schema
+  // fetch "worked" but produced nothing usable; writing an empty sidecar
+  // would mark every file on the site an orphan. Fail loudly instead.
+  if (contentTypes.length === 0) {
+    throw new Error(
+      `site "${siteConfig.name}": content-type discovery returned 0 content types from ${refsCfg.graphqlEndpoint}. ` +
+        `Likely causes: expired/missing bearer token or GraphQL introspection disabled. ` +
+        `Refusing to write an empty sidecar.`,
+    );
+  }
 
   const sidecarRecords = [];
+  // v1.39.0 (B1) — track per-type failures: all-failed is a hard error,
+  // partial failures stay WARN-and-continue but are surfaced in the summary.
+  const attemptedTypes = contentTypes.length;
+  let failedTypes = 0;
 
   // v1.29.0 — the classifier needs the discovered content-type names to tell
   // relations (skip — enumerated independently) from embedded components
@@ -178,7 +194,7 @@ export async function runReferences({
     contentTypes.map(({ singular }) => singular.charAt(0).toUpperCase() + singular.slice(1)),
   );
 
-  for (const { singular, plural } of contentTypes) {
+  for (const { singular, plural, singleType } of contentTypes) {
     const pascalCt = singular.charAt(0).toUpperCase() + singular.slice(1);
     let classifiedFields;
     try {
@@ -190,14 +206,17 @@ export async function runReferences({
       );
     } catch (err) {
       log(`[references] WARN: failed to introspect ${pascalCt}: ${err.message}`);
+      failedTypes++;
       continue;
     }
 
     // v3 REST path: kebab-case the camelCase plural (`requiredForms` →
     // `/required-forms`). v4 REST path: plural as-is (`/api/biographies`
     // works directly; observed v4 sites have no camelCase content types).
+    // v1.39.0 (B4) — v4 single types (plural: null) fetch /api/<singular>;
+    // fetchAllEntries retries the kebab-cased form on 404 either way.
     const restPath = isV4
-      ? plural
+      ? (singleType ? singular : plural)
       : plural.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
     // v1.29.0 — v4's populate=* doesn't reach media INSIDE components; tell
     // fetchAllEntries which fields need deep population. v3 embeds
@@ -216,6 +235,7 @@ export async function runReferences({
       });
     } catch (err) {
       log(`[references] WARN: failed to fetch ${restPath}: ${err.message}`);
+      failedTypes++;
       continue;
     }
     log(`[references] ${pascalCt}: ${entries.length} entries`);
@@ -247,11 +267,22 @@ export async function runReferences({
     }
   }
 
+  // v1.39.0 (B1) — every attempted type failed: nothing was extracted, so
+  // the sidecar would be empty (all files → false orphans). Hard error.
+  if (attemptedTypes > 0 && failedTypes === attemptedTypes) {
+    throw new Error(
+      `site "${siteConfig.name}": all ${attemptedTypes} content types failed to fetch — ` +
+        `refusing to write an empty sidecar (check token/permissions/REST paths)`,
+    );
+  }
+
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   const ndjson = sidecarRecords.map((r) => JSON.stringify(r)).join("\n") + "\n";
   await fs.writeFile(outputPath, ndjson);
+  const failNote =
+    failedTypes > 0 ? ` (${failedTypes}/${attemptedTypes} types failed)` : "";
   log(
-    `[references] wrote ${sidecarRecords.length} sidecar records to ${outputPath}`,
+    `[references] wrote ${sidecarRecords.length} sidecar records to ${outputPath}${failNote}`,
   );
   return { entriesProcessed: sidecarRecords.length, outputPath };
 }

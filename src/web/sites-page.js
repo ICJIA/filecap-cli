@@ -41,13 +41,16 @@ function nameKey(o) {
 function renderRosterCard(entry) {
   const site = entry.site;
   const nickname = he(site.siteName ?? site.name ?? "");
-  const fullName = he(site.siteFullName || site.siteName || site.name || "");
+  // v1.39.0 — renderCardImage escapes internally, so it gets the RAW name;
+  // fullName stays pre-escaped for the direct interpolations below.
+  const fullNameRaw = site.siteFullName || site.siteName || site.name || "";
+  const fullName = he(fullNameRaw);
   const url = site.siteUrl ?? site.publicUrlBase ?? entry.header?.metadata?.publicUrlBase ?? "";
   const desc = entry.description ?? "";
   const accessKind = entry.accessKind && ACCESS_KIND_LABEL[entry.accessKind] ? entry.accessKind : null;
   return `<article class="site-card roster-card">
   <a class="card-stretched-link" href="${he(url)}" target="_blank" rel="noopener noreferrer" aria-label="Visit ${fullName} (opens in a new tab)"></a>
-  ${renderCardImage({ image: entry.image, alt: fullName })}
+  ${renderCardImage({ image: entry.image, alt: fullNameRaw })}
   <header class="card-head">
     ${accessKind ? `<span class="access-chip access-${accessKind}" title="${he(ACCESS_KIND_LABEL[accessKind])}"><span class="access-dot" aria-hidden="true"></span>${he(ACCESS_KIND_LABEL[accessKind])}</span>` : ""}
     ${nickname ? `<p class="nickname">${nickname}</p>` : ""}

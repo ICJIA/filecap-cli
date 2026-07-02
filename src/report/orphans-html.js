@@ -3,7 +3,7 @@
 // Lays out: explainer block (why files become orphan) → summary tiles
 // (counts, confidence distribution) → sortable table of orphan rows.
 
-import { humanizeBytes } from "./format.js";
+import { humanizeBytes, publicUrlFor } from "./format.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
 
 function htmlEscape(s) {
@@ -51,15 +51,15 @@ function statusBadge(status) {
   return '<span class="status-badge status-orphan">Truly unreferenced</span>';
 }
 
+// v1.39.0 post-audit fix (red-1 R2): route through the shared format.js
+// publicUrlFor — base(+pathPrefix)+PER-SEGMENT-ENCODED path, absolutePath
+// tree→blob fallback — instead of raw concatenation. Raw concat shipped
+// hrefs like ".../Sheet#Info1V1-2025.pdf" whose "#" truncates the request
+// at the fragment (D10 encoded only the zero-caller CSV writer).
 function buildPublicUrl(entry, source) {
-  if (!entry || !source) return null;
-  const base = source.publicUrlBase ?? "";
-  if (!base) return null;
-  const prefix = source.pathPrefix
-    ? `/${source.pathPrefix.replace(/^\/+|\/+$/g, "")}`
-    : "";
-  const path = (entry.path ?? entry.filename ?? "").replace(/^\/+/, "");
-  return safeUrl(`${base.replace(/\/+$/, "")}${prefix}/${path}`);
+  if (!entry) return null;
+  const url = publicUrlFor(entry, source?.publicUrlBase, source?.pathPrefix);
+  return url ? safeUrl(url) : null;
 }
 
 function siteBreakdown(orphans, siteTotals, sourcesByServer) {
@@ -156,6 +156,9 @@ function tableRow(orphan, sourcesByServer) {
       return `<span class="reason-tag" title="${htmlEscape(label)}">${htmlEscape(r)}</span>`;
     })
     .join(" ");
+  // v1.39.0: data-confidence goes on the CELL too — the sort script reads
+  // children[idx].dataset.confidence; with the attribute only on the <tr> it
+  // fell back to the "NN%" text and sorted lexicographically (100 before 20).
   const confidence = orphan.replaceabilityConfidence;
   const confClass = confidenceClass(confidence);
   const replacedByHtml = orphan.replacedBy
@@ -168,7 +171,7 @@ function tableRow(orphan, sourcesByServer) {
   <td class="size-cell" data-bytes="${e.sizeBytes ?? 0}">${htmlEscape(humanizeBytes(e.sizeBytes ?? 0))}</td>
   <td>${htmlEscape(e.modifiedAt ? e.modifiedAt.slice(0, 10) : "")}<div class="days-old">${orphan.daysOld !== null && orphan.daysOld !== undefined ? `${orphan.daysOld}d ago` : ""}</div></td>
   <td>${statusBadge(orphan.status)}</td>
-  <td class="confidence-cell ${confClass}">${confidence}%</td>
+  <td class="confidence-cell ${confClass}" data-confidence="${confidence}">${confidence}%</td>
   <td>${replacedByHtml}</td>
   <td class="reasons-cell">${reasonsHtml}</td>
 </tr>`;

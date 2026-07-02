@@ -170,10 +170,12 @@ export async function rollupInventories(inputPaths, outputPath, { strict = false
         const canonicalKey = canonicalKeyByHash.get(hash);
         const myKey = `${item.sourceServerName}::${entry.path}`;
         if (canonicalKey && canonicalKey !== myKey) {
-          const [canonicalServerName, canonicalPath] = canonicalKey.split("::");
+          // v1.39.0: split on the FIRST "::" only — a file path may itself
+          // contain "::" and split("::") used to truncate it at that point.
+          const sep = canonicalKey.indexOf("::");
           consolidatedEntry.duplicateOf = {
-            serverName: canonicalServerName,
-            path: canonicalPath,
+            serverName: canonicalKey.slice(0, sep),
+            path: canonicalKey.slice(sep + 2),
           };
         }
       }

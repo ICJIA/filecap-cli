@@ -97,11 +97,18 @@ export function entryCanonicalUrl(entry, publicUrlBase) {
   }
   const base = publicUrlBase.replace(/\/+$/, "");
   const path = entry.path.replace(/^\/+/, "");
-  return canonicalizeUrl(`${base}/${path}`);
+  // v1.39.0 (B2) — inventory paths are raw filesystem bytes (never
+  // pre-encoded), so encode each segment: an unencoded "#" or "?" would
+  // otherwise become a fragment/query and truncate the key (false orphan).
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  return canonicalizeUrl(`${base}/${encodedPath}`);
 }
 
 export function resolveEntryReferences(entry, publicUrlBase, reverseIndex) {
   const canonical = entryCanonicalUrl(entry, publicUrlBase);
-  const refs = canonical ? reverseIndex.get(canonical) ?? [] : [];
-  return { ...entry, references: refs };
+  // v1.39.0 (B8) — unresolvable URL (no/empty base, no path): return the
+  // entry WITHOUT a references field. Absent = "not resolved", which
+  // orphans.js skips; references: [] would mark it a confirmed orphan.
+  if (!canonical) return { ...entry };
+  return { ...entry, references: reverseIndex.get(canonical) ?? [] };
 }

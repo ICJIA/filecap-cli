@@ -100,6 +100,41 @@ describe("summarizeFileA11y", () => {
     expect(r.avg).toBe(66); // 199/3 = 66.33
   });
 
+  // v1.39.0 — a 100 must mean every scored PDF is a 100, not a rounding
+  // artifact (19×100 + 1×95 rounds to 100 and used to display a perfect
+  // score with a failing PDF in the set).
+  it("clamps a rounded-up 100 to 99 when not every PDF scored 100", () => {
+    const r = summarizeFileA11y({
+      auditScoreSum: 19 * 100 + 95, // = 1995, /20 = 99.75 → rounds to 100
+      auditedPdfCount: 20,
+      remediable: 20,
+      siteSlug: "x",
+    });
+    expect(r.avg).toBe(99);
+    expect(r.band.key).toBe("closer"); // band derives from the clamped value
+  });
+
+  it("still reports 100 when every scored PDF is a 100", () => {
+    const r = summarizeFileA11y({
+      auditScoreSum: 20 * 100,
+      auditedPdfCount: 20,
+      remediable: 20,
+      siteSlug: "x",
+    });
+    expect(r.avg).toBe(100);
+  });
+
+  it("does not disturb ordinary rounding at band thresholds (79.5 → 80)", () => {
+    const r = summarizeFileA11y({
+      auditScoreSum: 159, // /2 = 79.5 → rounds to 80
+      auditedPdfCount: 2,
+      auditPending: 3,
+      remediable: 5,
+      siteSlug: "x",
+    });
+    expect(r.avg).toBe(80);
+  });
+
   it("applies the 80 boundary inclusively (avg 80 = closer)", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 480,

@@ -14,6 +14,7 @@ import { writeHtml } from "../report/html.js";
 import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles, normPageUrl } from "../report/pages.js";
 import { buildAliasMap, canonicalizeForFleet, entryCanonicalUrl } from "../references/cross-resolver.js";
 import { buildPublicUrl } from "../report/csv.js";
+import { publicUrlFor } from "../report/format.js";
 import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
 import { collectAuditErrors } from "../report/audit-errors.js";
@@ -607,10 +608,13 @@ function isRemediableEntry(entry) {
  */
 function buildFleetContextMarkdown({ allEntries, siteResults, duplicateGroupsCount, consolidatedAt, ndjsonFilename }) {
   const fleetTotal = allEntries.length;
-  const REMEDIABLE_CATS = new Set(["pdf", "office-document", "spreadsheet", "presentation", "office-legacy", "legacy-office"]);
+  // v1.39.0 post-audit fix (red-1 R1a/R1b): "office-legacy" removed — it is a
+  // phantom category no scan ever emitted (old .doc files were
+  // "office-document"; the string exists only as an introspection *kind*).
+  const REMEDIABLE_CATS = new Set(["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"]);
   let fleetAudit = 0;
   let pdfCount = 0, pdfImageOnly = 0;
-  let docxCount = 0, xlsxCount = 0, pptxCount = 0;
+  let docxCount = 0, xlsxCount = 0, pptxCount = 0, legacyOfficeCount = 0;
   let imageCount = 0, textCount = 0, archiveCount = 0, webCount = 0, otherCount = 0;
   for (const it of allEntries) {
     const e = it.entry;
@@ -621,6 +625,10 @@ function buildFleetContextMarkdown({ allEntries, siteResults, duplicateGroupsCou
     } else if (e?.category === "office-document") docxCount++;
     else if (e?.category === "spreadsheet") xlsxCount++;
     else if (e?.category === "presentation") pptxCount++;
+    // v1.39.0 post-audit fix (red-1 R1a): legacy-office gets a first-class
+    // remediable row — it used to fall into "Other | reference" while being
+    // counted remediable, making the shipped markdown self-contradictory.
+    else if (e?.category === "legacy-office") legacyOfficeCount++;
     else if (e?.category === "image") imageCount++;
     else if (e?.category === "text") textCount++;
     else if (e?.category === "archive") archiveCount++;
@@ -677,6 +685,7 @@ edit this NDJSON to mark files for deletion?", point them at
 | Word documents (.docx) | ${docxCount.toLocaleString()} | remediable |
 | Excel spreadsheets (.xlsx) | ${xlsxCount.toLocaleString()} | remediable |
 | PowerPoint (.pptx) | ${pptxCount.toLocaleString()} | remediable |
+| Legacy Office (.doc, .xls, .ppt) | ${legacyOfficeCount.toLocaleString()} | remediable |
 | Images | ${imageCount.toLocaleString()} | reference |
 | Text files | ${textCount.toLocaleString()} | reference |
 | Archives | ${archiveCount.toLocaleString()} | reference |
@@ -700,8 +709,8 @@ file entry each. Each entry has:
 - \`absolutePath\` — full path on the source server (Strapi) or GitHub URL (git-type)
 - \`filename\` — basename
 - \`extension\` — lowercase, no dot (e.g. \`pdf\`, \`docx\`)
-- \`category\` — \`pdf\` | \`office-document\` | \`spreadsheet\` | \`presentation\` | \`office-legacy\` | \`image\` | \`text\` | \`archive\` | \`audio-video\` | \`web\` | \`other\`
-- \`remediable\` — boolean. True for \`pdf\`, \`office-document\`, \`spreadsheet\`, \`presentation\`, \`office-legacy\`; false for everything else. This is what the deployed bundle's downloadable XLSX workbooks filter on.
+- \`category\` — \`pdf\` | \`office-document\` | \`spreadsheet\` | \`presentation\` | \`legacy-office\` | \`image\` | \`text\` | \`archive\` | \`audio-video\` | \`web\` | \`other\`
+- \`remediable\` — boolean. True for \`pdf\`, \`office-document\`, \`spreadsheet\`, \`presentation\`, \`legacy-office\`; false for everything else. This is what the deployed bundle's downloadable XLSX workbooks filter on.
 - \`sizeBytes\` — file size in bytes
 - \`modifiedAt\` — ISO 8601 last-modified timestamp
 - \`sha256\` — 64-char hex content hash (cross-server duplicate detection)
@@ -789,18 +798,108 @@ export function deriveAccessKind(site) {
 // v1.35.0 — load the site-audit sidecar (written by `filecap site-audit`) and
 // derive the pageScores map the Page view overlays. Missing/corrupt → nulls, so
 // a site that hasn't been site-audited just renders without the a11y tile.
-function loadSiteAudit(latestDir) {
-  try {
-    const sc = JSON.parse(readFileSync(path.join(latestDir, "site-audit.json"), "utf8"));
-    if (!sc || typeof sc !== "object") return { siteAudit: null, pageScores: null };
-    const pageScores = new Map();
-    for (const p of sc.pages ?? []) {
-      if (p?.url) pageScores.set(normPageUrl(p.url), { score: p.score, grade: p.grade, violationCount: p.violationCount, bySeverity: p.bySeverity, reportUrl: p.reportUrl, pageTitle: "" });
+// v1.39.0 (E3, Interface Contract 2): the canonical sidecar path moved to
+// <auditsBase>/<slug>/site-audit.json — a sibling of latest/, so purge runs
+// and latest-symlink repoints can't orphan it. Falls back one release to the
+// old <slug>/latest/site-audit.json. Exported for tests.
+export function loadSiteAudit(auditsBase, siteSlug) {
+  const candidates = [
+    path.join(auditsBase, siteSlug, "site-audit.json"),
+    path.join(auditsBase, siteSlug, "latest", "site-audit.json"),
+  ];
+  for (const candidate of candidates) {
+    try {
+      const sc = JSON.parse(readFileSync(candidate, "utf8"));
+      if (!sc || typeof sc !== "object") continue; // unusable — try the fallback
+      const pageScores = new Map();
+      for (const p of sc.pages ?? []) {
+        if (p?.url) pageScores.set(normPageUrl(p.url), { score: p.score, grade: p.grade, violationCount: p.violationCount, bySeverity: p.bySeverity, reportUrl: p.reportUrl, pageTitle: "" });
+      }
+      return { siteAudit: sc, pageScores };
+    } catch {
+      // missing or corrupt — try the fallback location
     }
-    return { siteAudit: sc, pageScores };
-  } catch {
-    return { siteAudit: null, pageScores: null };
   }
+  return { siteAudit: null, pageScores: null };
+}
+
+// ── a11y-history persistence (v1.39.0, E2 / Interface Contract 3) ─────────────
+// The per-site file-accessibility time series moved OUT of latest/ (which is a
+// symlink to a run dir on real systems — every new scan repointed it and
+// orphaned the series in the old run dir, resetting trends) to the purge-safe
+// <auditsBase>/<slug>/a11y-history.json.
+
+/** Read a JSON file that must parse to an array; returns null for non-arrays. */
+async function readJsonArrayFile(filePath) {
+  const raw = JSON.parse(await fs.readFile(filePath, "utf8"));
+  return Array.isArray(raw) ? raw : null;
+}
+
+/**
+ * Load a site's a11y history from the canonical path, migrating on first
+ * touch: when the canonical file is absent, points found at the old
+ * latest/a11y-history.json AND in every runs/*Z/a11y-history.json are merged,
+ * deduped by `at` (first seen wins — same-timestamp points are identical),
+ * and sorted ascending. A corrupt canonical file is NOT silently reset: it is
+ * moved aside to a11y-history.json.corrupt-<ts> with a WARN and the series
+ * restarts from whatever the old locations can recover. Exported for tests.
+ *
+ * @param {string} auditsBase
+ * @param {string} siteSlug
+ * @returns {Promise<{histPath: string, history: Array<object>}>}
+ */
+export async function loadA11yHistory(auditsBase, siteSlug) {
+  const histPath = path.join(auditsBase, siteSlug, "a11y-history.json");
+  let corrupt = false;
+  try {
+    const arr = await readJsonArrayFile(histPath);
+    if (arr) return { histPath, history: arr };
+    corrupt = true; // parsed but not an array
+  } catch (err) {
+    if (err?.code !== "ENOENT") corrupt = true;
+  }
+  if (corrupt) {
+    const asidePath = `${histPath}.corrupt-${Date.now()}`;
+    try {
+      await fs.rename(histPath, asidePath);
+      process.stderr.write(
+        `WARN: ${siteSlug} a11y-history.json is corrupt — moved aside to ${path.basename(asidePath)}; rebuilding from prior runs\n`,
+      );
+    } catch {
+      // best-effort — an unmovable file still falls through to recovery
+    }
+  }
+  // One-time migration: old canonical location + every retained run dir.
+  const candidates = [path.join(auditsBase, siteSlug, "latest", "a11y-history.json")];
+  try {
+    const runsDir = path.join(auditsBase, siteSlug, "runs");
+    for (const name of await fs.readdir(runsDir)) {
+      if (name.endsWith("Z")) candidates.push(path.join(runsDir, name, "a11y-history.json"));
+    }
+  } catch {
+    // no runs/ dir
+  }
+  const byAt = new Map();
+  for (const candidate of candidates) {
+    let arr = null;
+    try {
+      arr = await readJsonArrayFile(candidate);
+    } catch {
+      arr = null; // missing/corrupt old copy — recover what we can
+    }
+    for (const point of arr ?? []) {
+      if (point && typeof point.at === "string" && !byAt.has(point.at)) byAt.set(point.at, point);
+    }
+  }
+  const history = [...byAt.values()].sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return { histPath, history };
+}
+
+/** Atomic write (tmp + same-dir rename) so a crash can't truncate the series. */
+async function writeA11yHistoryAtomic(histPath, history) {
+  const tmpPath = `${histPath}.tmp-${process.pid}`;
+  await fs.writeFile(tmpPath, JSON.stringify(history, null, 2));
+  await fs.rename(tmpPath, histPath);
 }
 
 /**
@@ -850,6 +949,11 @@ async function computeSiteSummary(inventoryPath) {
   let xlsxCount = 0;
   let legacyOfficeCount = 0;
 
+  // v1.39.0 (E7, Interface Contract 1): the scanner emits "legacy-office" for
+  // .doc/.xls/.ppt. Post-audit fix (red-1 R1b): the "office-legacy" synonym
+  // E7 added here was a phantom — no cached inventory ever carried it as a
+  // category (old .doc files are "office-document"; the string exists only
+  // as an introspection *kind*) — so it was removed.
   const REMEDIABLE_CATS = new Set(["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"]);
 
   const stream = createReadStream(inventoryPath, { encoding: "utf8" });
@@ -967,6 +1071,9 @@ export async function runWebRollup({
   noOg = false,
   _ogFetch = fetchOgMeta,
   _imageFetch = fetchImageBytes,
+  // v1.39.0 (E1) — injectable spawner for the netlify CLI so deploy-outcome
+  // tests never execute a real `netlify deploy`.
+  _netlifySpawn = spawn,
 }) {
   // 1. Load sites.json
   const sitesPath = sitesFile
@@ -1042,11 +1149,12 @@ export async function runWebRollup({
   };
 
   // v1.38.0 — pre-pass: record each site's file-accessibility average into a
-  // purge-exempt time series (latest/a11y-history.json) and derive the "since
-  // last audit" trend. A point is appended only when the numbers change, so
-  // template-only rebuilds don't pad the series. The excluded archive and
-  // zero-scored sites are skipped (no displayable score). Runs before the main
-  // loop so the trend can be handed to BOTH the detail page and the card.
+  // purge-exempt time series (<slug>/a11y-history.json as of v1.39.0) and
+  // derive the "since last audit" trend. A point is appended only when the
+  // numbers change, so template-only rebuilds don't pad the series. The
+  // excluded archive and zero-scored sites are skipped (no displayable score).
+  // Runs before the main loop so the trend can be handed to BOTH the detail
+  // page and the card.
   const a11yNowIso = new Date().toISOString();
   const a11yTrendBySlug = new Map();
   const a11yHistoryBySlug = new Map();
@@ -1070,20 +1178,17 @@ export async function runWebRollup({
       siteSlug: slug,
     });
     if (a.excluded || a.scored === 0 || a.avg === null) continue;
-    const histPath = path.join(auditsBase, slug, "latest", "a11y-history.json");
-    let history = [];
-    try {
-      const raw = JSON.parse(await fs.readFile(histPath, "utf8"));
-      if (Array.isArray(raw)) history = raw;
-    } catch {
-      /* no history yet */
-    }
+    // v1.39.0 (E2): the series lives at <auditsBase>/<slug>/a11y-history.json
+    // (purge-safe, survives latest repoints); loadA11yHistory migrates any
+    // points stranded at the old latest/ + runs/*Z locations on first touch,
+    // and the write is atomic (tmp + rename).
+    const { histPath, history } = await loadA11yHistory(auditsBase, slug);
     const updated = appendA11yPoint(history, {
       at: a11yNowIso, avg: a.avg, scored: a.scored, pdfs: a.pdfs,
       remediable: a.remediable, band: a.band?.key ?? null,
     });
     try {
-      await fs.writeFile(histPath, JSON.stringify(updated, null, 2));
+      await writeA11yHistoryAtomic(histPath, updated);
     } catch (e) {
       process.stderr.write(`WARN: could not write a11y-history for ${slug}: ${e.message}\n`);
     }
@@ -1136,8 +1241,8 @@ export async function runWebRollup({
 
     // Web-rollup bundles index.html as a sibling of each per-site report —
     // pass backHref so each detail page has a "← Back to fleet index" link.
-    // csvHref points at the renamed per-site CSV (web-rollup renames
-    // audit-file-list.csv to <slug>-<timestamp>.csv in step 5 below).
+    // csvHref points at the per-site workbook (<slug>-<timestamp>.xlsx,
+    // written in step 5 below when the site has any sheets).
     // siteUrl is the site's front-end homepage URL from sites.json (e.g.
     // dvfr.illinois.gov), distinct from publicUrlBase (the file server).
     const accessKind = deriveAccessKind(site);
@@ -1179,47 +1284,35 @@ export async function runWebRollup({
     if (cmsPages.length > 0) {
       process.stderr.write(`[web-rollup] ${site.siteName ?? siteKey}: ${cmsPages.length} CMS page URLs\n`);
     }
-    const latestDir = path.dirname(latestInv);
-    const { siteAudit, pageScores } = loadSiteAudit(latestDir);
-    const reportResult = await runReport({
-      input: latestInv,
-      outputDir: tempDir,
-      html: true,
-      backHref: "index.html",
-      csvHref: `${baseName}.xlsx`,
-      siteUrl: site.siteUrl ?? null,
-      siteFullName: site.siteFullName ?? null,
-      accessKind,
-      pathPrefix: site.pathPrefix ?? null,
-      sitemapUrls,
-      cmsPages,
-      // v1.32.0 — cross-site (CMS-hosted) file resolution for the Page view.
-      resolveFleetFile,
-      pageRefFiles,
-      currentSiteName: header.metadata?.serverName ?? siteKey,
-      siteSlug: siteKey,
-      fileA11yTrend: a11yTrendBySlug.get(siteKey) ?? null,
-      siteAudit,
-      pageScores,
-    });
-    if (reportResult.exitCode !== 0) {
-      process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
-      await fs.rm(tempDir, { recursive: true, force: true });
-      continue;
-    }
+    // v1.39.0 (E3): sidecar read moved to the relocated canonical path
+    // (<slug>/site-audit.json) with a one-release latest/ fallback.
+    const { siteAudit, pageScores } = loadSiteAudit(auditsBase, siteKey);
 
     // 5. v1.20.0 — per-site XLSX replaces the per-site CSV. Multi-sheet
     // workbook with one tab per remediable file type, scoped to this site.
     // Reference categories (images / text / archives / web / audio-video /
     // other) are dropped so the download holds only what vendors quote
     // against. HTML is unchanged (still shows everything, chip filter
-    // available).
+    // available). v1.39.0 (E8): the sheet configs are built BEFORE runReport
+    // so the detail page's download link can be omitted (csvHref: null) when
+    // no workbook will be written for this site.
     const srcHtml = path.join(tempDir, "audit-file-list.html");
     const dstXlsx = path.join(output, `${baseName}.xlsx`);
     const dstHtml = path.join(output, `${baseName}.html`);
 
     // Stream the per-site inventory + build sheets per remediable bucket.
     const { siteHeader: perSiteHeader, entries: perSiteEntries } = await readInventoryNdjson(latestInv);
+    // v1.39.0 (E6, Interface Contracts 4+5): per-site sheet URLs build from
+    // sites.json-resolved metadata — publicUrlBase (authoritative over a
+    // stale cached header, mirroring the consolidatedSources override below)
+    // and pathPrefix — extending the v1.29.0 pagesHeader pattern to ALL
+    // per-site sheets.
+    const sheetMetaOverride = {};
+    if (site.publicUrlBase) sheetMetaOverride.publicUrlBase = site.publicUrlBase;
+    if (site.pathPrefix) sheetMetaOverride.pathPrefix = site.pathPrefix;
+    const perSiteSheetHeader = Object.keys(sheetMetaOverride).length > 0
+      ? { ...perSiteHeader, metadata: { ...perSiteHeader.metadata, ...sheetMetaOverride } }
+      : perSiteHeader;
     const perSiteSheetConfigs = [];
     for (const bucket of TYPE_BUCKETS) {
       if (bucket.side !== "remediable") continue;
@@ -1227,7 +1320,7 @@ export async function runWebRollup({
       if (bucketEntries.length === 0) continue;
       perSiteSheetConfigs.push({
         name: bucket.sheetName,
-        sourceHeader: perSiteHeader,
+        sourceHeader: perSiteSheetHeader,
         entries: bucketEntries,
         sources: null,
         totals: bucket.slug === "pdfs" ? { pageCount: true } : undefined,
@@ -1242,11 +1335,6 @@ export async function runWebRollup({
       resolveFleetFile,
       currentSiteName: perSiteHeader.metadata?.serverName ?? siteKey,
     });
-    // pathPrefix mirrors what runReport injects into the header for URL
-    // building (git sites deployed under a sub-path).
-    const pagesHeader = site.pathPrefix
-      ? { ...perSiteHeader, metadata: { ...perSiteHeader.metadata, pathPrefix: site.pathPrefix } }
-      : perSiteHeader;
     const pageRows = pageList
       .map((p) => {
         // v1.31.0 — mirrors the HTML Page view: a file is listed once, under
@@ -1266,7 +1354,7 @@ export async function runWebRollup({
           filesElsewhere,
           fileNames: files.map((f) => f.filename ?? f.path ?? "").join("; "),
           fileUrls: files
-            .map((f) => buildPublicUrl({ entry: f, sourceHeader: pagesHeader, sourceMap: null, isConsolidated: false }))
+            .map((f) => buildPublicUrl({ entry: f, sourceHeader: perSiteSheetHeader, sourceMap: null, isConsolidated: false }))
             .filter(Boolean)
             .join("; "),
           crossSiteFiles: crossSite
@@ -1291,7 +1379,41 @@ export async function runWebRollup({
         rows: pageRows,
       });
     }
-    if (perSiteSheetConfigs.length > 0) {
+    // v1.39.0 (E8): only claim a downloadable workbook when one will exist.
+    const hasWorkbook = perSiteSheetConfigs.length > 0;
+
+    const reportResult = await runReport({
+      input: latestInv,
+      outputDir: tempDir,
+      html: true,
+      backHref: "index.html",
+      csvHref: hasWorkbook ? `${baseName}.xlsx` : null,
+      siteUrl: site.siteUrl ?? null,
+      siteFullName: site.siteFullName ?? null,
+      accessKind,
+      pathPrefix: site.pathPrefix ?? null,
+      // v1.39.0 (E6, Interface Contract 5): sites.json's publicUrlBase is
+      // authoritative for the detail page's per-row URLs too — cached
+      // headers may carry a stale base from before a domain move.
+      publicUrlBaseOverride: site.publicUrlBase ?? null,
+      sitemapUrls,
+      cmsPages,
+      // v1.32.0 — cross-site (CMS-hosted) file resolution for the Page view.
+      resolveFleetFile,
+      pageRefFiles,
+      currentSiteName: header.metadata?.serverName ?? siteKey,
+      siteSlug: siteKey,
+      fileA11yTrend: a11yTrendBySlug.get(siteKey) ?? null,
+      siteAudit,
+      pageScores,
+    });
+    if (reportResult.exitCode !== 0) {
+      process.stderr.write(`WARN: skipping ${site.siteName ?? siteKey}: report generation failed (${reportResult.error ?? ""})\n`);
+      await fs.rm(tempDir, { recursive: true, force: true });
+      continue;
+    }
+
+    if (hasWorkbook) {
       await writeXlsxMultiSheet({ outputPath: dstXlsx, sheets: perSiteSheetConfigs });
     }
 
@@ -1331,6 +1453,10 @@ export async function runWebRollup({
         serverName: siteServerName,
         siteName: siteSiteName,
         publicUrlBase: sitePublicUrlBase,
+        // v1.39.0 (E6, Interface Contract 4): collectAuditErrors' publicUrlFor
+        // inserts this between the base and the entry path (git sites deployed
+        // under a sub-path).
+        pathPrefix: site.pathPrefix ?? null,
       });
     }
 
@@ -1364,7 +1490,9 @@ export async function runWebRollup({
       summary,
       htmlFile: `${baseName}.html`,
       // v1.20.0: per-site download is the multi-sheet .xlsx workbook now.
-      csvFile: `${baseName}.xlsx`,
+      // v1.39.0 (E8, Interface Contract 6): null when no workbook was written
+      // (zero sheets) — renderers omit the download link for null.
+      csvFile: hasWorkbook ? `${baseName}.xlsx` : null,
       scannedAt: header.metadata?.scannedAt ?? null,
       siteAudit,
       fileA11yTrend: a11yTrendBySlug.get(site.name) ?? null,
@@ -1440,14 +1568,18 @@ export async function runWebRollup({
 
   // Description + live/down status from the og scrape; the card image prefers
   // an explicit config `image` (URL or local file), else the scraped og:image.
-  async function enrichOg({ url, slug: slugName, configImage }) {
+  // v1.39.0 (E4): a config `description` wins over the scraped og:description
+  // — mirroring configImage — so a curated blurb (or a gated site whose scrape
+  // 401s, like the fleet-audit tool itself) keeps its copy.
+  async function enrichOg({ url, slug: slugName, configImage, configDescription }) {
     let og = { image: null, title: null, description: null, reachable: false };
     let status = null;
     if (!noOg && url) {
       try { og = await _ogFetch(url); } catch { /* best-effort */ }
       status = og.reachable ? "live" : "down";
     }
-    const description = !noOg && url ? og.description || "" : "";
+    const scrapedDescription = !noOg && url ? og.description || "" : "";
+    const description = configDescription || scrapedDescription || "";
     const image = await bundleImage(configImage || og.image, slugName);
     return { description, image, status };
   }
@@ -1459,6 +1591,7 @@ export async function runWebRollup({
       url,
       slug: slug(s.name ?? s.siteName ?? "site"),
       configImage: s.image,
+      configDescription: s.description,
     });
     entry.description = description;
     entry.image = image;
@@ -1471,6 +1604,7 @@ export async function runWebRollup({
       url: t.siteUrl,
       slug: slug(t.name ?? t.siteName ?? "tool"),
       configImage: t.image,
+      configDescription: t.description,
     });
     t.description = description;
     t.image = image;
@@ -1682,15 +1816,13 @@ export async function runWebRollup({
 
   // 6b. Detect cross-server duplicates by normalised filename, then write the
   //     per-occurrence duplicates XLSX alongside the master XLSX. v1.20.0: was
-  //     .csv with every entry; now filtered to remediable categories only and
-  //     emitted as a real workbook (one row per file occurrence within each
-  //     duplicate group). Reference-side duplicates (e.g. images shared
-  //     across sites) are dropped — vendors don't quote against them.
-  // Filter remediable BEFORE running the duplicate detector — the detector
-  // flattens its items and drops .category, so a post-filter wouldn't have
-  // anything to match against.
-  const remediableAllEntries = allEntries.filter((it) => isRemediableEntry(it.entry));
-  const duplicateGroups = findCrossServerDuplicates(remediableAllEntries);
+  //     .csv with every entry; emitted as a real workbook (one row per file
+  //     occurrence within each duplicate group).
+  // v1.39.0 (E5): the detector runs over ALL entries again. The v1.20.0
+  // remediable-only pre-filter left the index page's Reference-only /
+  // All duplicate filters permanently empty — the page classifies each
+  // group's side by filename extension, so it was built for the full data.
+  const duplicateGroups = findCrossServerDuplicates(allEntries);
   const duplicatesCsvFilename = "audit-file-duplicates.xlsx";
   let duplicatesCsvMeta = null;
   if (duplicateGroups.length > 0) {
@@ -1773,10 +1905,10 @@ export async function runWebRollup({
         const e = o.entry;
         const source = sourcesByServer.get(e.serverName ?? "");
         const siteLabel = source?.siteName ?? e.serverName ?? "";
-        const base = (source?.publicUrlBase ?? "").replace(/\/+$/, "");
-        const prefix = source?.pathPrefix ? `/${String(source.pathPrefix).replace(/^\/+|\/+$/g, "")}` : "";
-        const relPath = (e.path ?? e.filename ?? "").replace(/^\/+/, "");
-        const publicUrl = base ? `${base}${prefix}/${relPath}` : "";
+        // v1.39.0 post-audit fix (red-1 R2): shared format.js publicUrlFor —
+        // per-segment encoding (Sheet#… → Sheet%23…) instead of raw concat,
+        // matching the audit-errors and orphans-html emitters.
+        const publicUrl = publicUrlFor(e, source?.publicUrlBase, source?.pathPrefix);
         return {
           siteLabel, path: e.path ?? "", filename: e.filename ?? "",
           extension: e.extension ?? "", sizeBytes: e.sizeBytes ?? "",
@@ -1966,8 +2098,8 @@ export async function runWebRollup({
 
   // v1.38.0 — consolidated file-accessibility history for the bundle: per-site
   // time series keyed by slug, so a future graph page can fetch one file. The
-  // per-site latest/a11y-history.json files are the purge-exempt source of
-  // truth; this is the published snapshot.
+  // per-site <slug>/a11y-history.json files (v1.39.0 location) are the
+  // purge-exempt source of truth; this is the published snapshot.
   await fs.writeFile(
     path.join(output, "a11y-history.json"),
     JSON.stringify(Object.fromEntries(a11yHistoryBySlug), null, 2),
@@ -2087,21 +2219,45 @@ export async function runWebRollup({
   // 9. Generate shared CSS
   await fs.writeFile(path.join(output, "assets", "style.css"), darkModeCss());
 
-  // 10. Optionally deploy via netlify CLI
+  const summary = {
+    sitesIncluded: siteResults.length,
+    sitesSkipped: sites.length - siteResults.length,
+    outputDir: output,
+    passwordEnabled: !!password,
+    clientGateEnabled: useClientGateForIndex,
+  };
+
+  // 10. Optionally deploy via netlify CLI. v1.39.0 (E1): a REQUESTED deploy
+  // that fails must fail the whole run — pre-v1.39.0 the helper printed the
+  // netlify error and resolved anyway, so orchestration scripts reported
+  // success while production was never updated. A deploy skipped via
+  // FILECAP_NO_DEPLOY=1 is not a failure (bundle written, exit 0).
   if (deploy) {
-    await runNetlifyDeploy({ output, deploySite });
+    const deployResult = await runNetlifyDeploy({ output, deploySite, _spawn: _netlifySpawn });
+    const deployExit = deployOutcomeToExit({
+      requested: !deployResult.skipped,
+      ok: deployResult.ok,
+    });
+    if (deployExit !== 0) {
+      process.stderr.write(
+        `web-rollup: bundle written to ${output} but deploy FAILED — production not updated\n`,
+      );
+      return {
+        exitCode: 1,
+        error: "netlify deploy failed — production not updated",
+        summary,
+      };
+    }
   }
 
-  return {
-    exitCode: 0,
-    summary: {
-      sitesIncluded: siteResults.length,
-      sitesSkipped: sites.length - siteResults.length,
-      outputDir: output,
-      passwordEnabled: !!password,
-      clientGateEnabled: useClientGateForIndex,
-    },
-  };
+  return { exitCode: 0, summary };
+}
+
+// v1.39.0 (E1) — pure decision: only a deploy that was actually REQUESTED
+// (i.e. not skipped via FILECAP_NO_DEPLOY=1) and did not succeed fails the
+// run. Bundle-written + deploy-skipped stays success.
+export function deployOutcomeToExit({ requested, ok }) {
+  return requested && !ok ? 1 : 0;
 }
 
 // ── netlify deploy helper ──────────────────────────────────────────────────────
@@ -2111,12 +2267,18 @@ export async function runWebRollup({
  * Inherits stdio so the user sees Netlify CLI progress.
  * If netlify CLI is not found, prints friendly remediation instructions.
  *
+ * v1.39.0 (E1): resolves a deploy OUTCOME instead of swallowing failures —
+ * `{ok, skipped?, reason?}`. Non-zero exit / spawn error → ok:false; missing
+ * CLI (ENOENT) → ok:false with reason "netlify-cli-missing" (install hint
+ * still printed); FILECAP_NO_DEPLOY=1 → ok:true + skipped:true.
+ *
  * @param {object} args
  * @param {string} args.output      - Output directory to deploy
  * @param {string|null} args.deploySite - Pass --site <id> to netlify deploy
- * @returns {Promise<void>}
+ * @param {Function} [args._spawn]  - injectable spawner (tests)
+ * @returns {Promise<{ok: boolean, skipped?: boolean, reason?: string}>}
  */
-async function runNetlifyDeploy({ output, deploySite }) {
+async function runNetlifyDeploy({ output, deploySite, _spawn = spawn }) {
   // 1.7.36 — Honor FILECAP_NO_DEPLOY=1 so local builds / tests / quick
   // regenerations don't accidentally push to production when the user
   // has `webRollup.autoDeploy: true` in ~/.filecap/config.json. Loud
@@ -2127,7 +2289,7 @@ async function runNetlifyDeploy({ output, deploySite }) {
       "FILECAP_NO_DEPLOY=1 set — skipping `netlify deploy --prod`. " +
         `Bundle is in ${output}.\n`,
     );
-    return;
+    return { ok: true, skipped: true };
   }
   process.stderr.write(
     "\n────────────────────────────────────────────────────────────\n" +
@@ -2147,36 +2309,45 @@ async function runNetlifyDeploy({ output, deploySite }) {
     args.push("--site", deploySite);
   }
 
+  const installHint =
+    "To deploy automatically, install the Netlify CLI: `npm install -g netlify-cli`.\n" +
+    `Otherwise, you can manually run: cd ${output} && netlify deploy --prod --dir .\n`;
+
   return new Promise((resolve) => {
+    // "error" (ENOENT) and "close" can both fire — first outcome wins.
+    let settled = false;
+    const settle = (outcome) => {
+      if (settled) return;
+      settled = true;
+      resolve(outcome);
+    };
+
     let child;
     try {
-      child = spawn("netlify", args, { stdio: "inherit" });
+      child = _spawn("netlify", args, { stdio: "inherit" });
     } catch {
-      process.stderr.write(
-        "To deploy automatically, install the Netlify CLI: `npm install -g netlify-cli`.\n" +
-        `Otherwise, you can manually run: cd ${output} && netlify deploy --prod --dir .\n`,
-      );
-      resolve();
+      process.stderr.write(installHint);
+      settle({ ok: false, reason: "spawn-error" });
       return;
     }
 
     child.on("error", (err) => {
       if (err.code === "ENOENT") {
-        process.stderr.write(
-          "To deploy automatically, install the Netlify CLI: `npm install -g netlify-cli`.\n" +
-          `Otherwise, you can manually run: cd ${output} && netlify deploy --prod --dir .\n`,
-        );
+        process.stderr.write(installHint);
+        settle({ ok: false, reason: "netlify-cli-missing" });
       } else {
         process.stderr.write(`netlify deploy error: ${err.message}\n`);
+        settle({ ok: false, reason: err.message });
       }
-      resolve();
     });
 
     child.on("close", (code) => {
       if (code !== 0) {
         process.stderr.write(`netlify deploy exited with code ${code}\n`);
+        settle({ ok: false, reason: `exit-${code}` });
+      } else {
+        settle({ ok: true });
       }
-      resolve();
     });
   });
 }

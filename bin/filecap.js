@@ -74,6 +74,7 @@ program
         hash: opts.hash,
         concurrency: opts.concurrency,
         progress: opts.progress,
+        quiet: opts.quiet,
         serverName: opts.serverName,
         serverIp: opts.serverIp,
         siteName: opts.siteName,
@@ -389,7 +390,7 @@ program
 program
   .command("site-audit <siteName>")
   .description(
-    "Score a site's web pages for accessibility (axe via audit.icjia.app/api/audit-url-page), sitemap-driven and independent of file/PDF scores. Writes the per-site latest/site-audit.json sidecar (purge-exempt) with the score, severity + WCAG-level breakdown, and issue-set fixed/new trend.",
+    "Score a site's web pages for accessibility (axe via audit.icjia.app/api/audit-url-page), sitemap-driven and independent of file/PDF scores. Writes the per-site <site>/site-audit.json sidecar (outside the purged run dirs) with the score, severity + WCAG-level breakdown, and issue-set fixed/new trend.",
   )
   .option("--endpoint <url>", "override the page-audit endpoint", "https://audit.icjia.app/api/audit-url-page")
   .option("--sites-file <path>", "override saved-sites JSON path")

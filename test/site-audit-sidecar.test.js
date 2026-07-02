@@ -40,6 +40,136 @@ describe("buildSidecar", () => {
   });
 });
 
+// v1.39.0: the fixed/new trend is computed ONLY over pages scored in BOTH
+// runs. A page entering or leaving the sample is coverage change, reported
+// as trend.coverageChanged — never as fake fixed/new counts.
+describe("buildSidecar trend vs coverage (v1.39.0)", () => {
+  const agg = (pagesByUrl) => ({
+    score: 90, grade: "A",
+    outstanding: { total: 1, bySeverity: { critical: 0, serious: 1, moderate: 0, minor: 0 }, byWcag: { A: 0, AA: 1, AAA: 0, bestPractice: 0 }, needsReview: 0 },
+    pages: Object.keys(pagesByUrl).map((url) => ({ url, score: 90, grade: "A", violationCount: 0, bySeverity: {}, needsReview: 0, reportUrl: null })),
+  });
+  const build = ({ pages, byPage, prior }) => buildSidecar({
+    siteName: "x", auditedAt: "2026-07-01T00:00:00Z", endpoint: "e",
+    coverage: { pagesInSet: Object.keys(pages).length, scored: Object.keys(pages).length, errored: 0, capped: 0 },
+    aggregate: agg(pages),
+    issueKeys: Object.values(byPage).flat().sort(),
+    issueKeysByPage: byPage,
+    prior,
+  });
+  const priorOf = (pages, byPage) => ({
+    auditedAt: "2026-06-01T00:00:00Z", score: 85,
+    issueKeys: Object.values(byPage).flat().sort(),
+    issueKeysByPage: byPage,
+    pages: Object.keys(pages).map((url) => ({ url })),
+    scoreHistory: [{ date: "2026-06-01T00:00:00Z", score: 85, outstandingTotal: 3 }],
+  });
+
+  it("a page leaving the scored set is coverage change, not remediation", () => {
+    const prior = priorOf(
+      { "https://x.com/a": 1, "https://x.com/b": 1 },
+      { "https://x.com/a": ["kA1"], "https://x.com/b": ["kB1", "kB2"] },
+    );
+    const s = build({
+      pages: { "https://x.com/a": 1 },
+      byPage: { "https://x.com/a": ["kA1"] },
+      prior,
+    });
+    expect(s.trend.fixed).toBe(0); // kB1/kB2 left the sample — NOT fixed
+    expect(s.trend.new).toBe(0);
+    expect(s.trend.stillOpen).toBe(1);
+    expect(s.trend.coverageChanged).toEqual({ added: 0, removed: 1 });
+  });
+
+  it("a page entering the scored set is coverage change, not new issues", () => {
+    const prior = priorOf(
+      { "https://x.com/a": 1 },
+      { "https://x.com/a": ["kA1"] },
+    );
+    const s = build({
+      pages: { "https://x.com/a": 1, "https://x.com/b": 1 },
+      byPage: { "https://x.com/a": ["kA1"], "https://x.com/b": ["kB1"] },
+      prior,
+    });
+    expect(s.trend.new).toBe(0); // kB1 entered the sample — NOT new
+    expect(s.trend.fixed).toBe(0);
+    expect(s.trend.stillOpen).toBe(1);
+    expect(s.trend.coverageChanged).toEqual({ added: 1, removed: 0 });
+  });
+
+  it("a genuine fix on a common page counts as fixed", () => {
+    const prior = priorOf(
+      { "https://x.com/a": 1, "https://x.com/b": 1 },
+      { "https://x.com/a": ["kA1", "kA2"], "https://x.com/b": ["kB1"] },
+    );
+    const s = build({
+      pages: { "https://x.com/a": 1, "https://x.com/b": 1 },
+      byPage: { "https://x.com/a": ["kA2"], "https://x.com/b": ["kB1"] },
+      prior,
+    });
+    expect(s.trend.fixed).toBe(1);
+    expect(s.trend.new).toBe(0);
+    expect(s.trend.stillOpen).toBe(2);
+    expect(s.trend.coverageChanged).toEqual({ added: 0, removed: 0 });
+  });
+
+  it("legacy prior (flat keys only) with identical coverage still diffs", () => {
+    const prior = {
+      auditedAt: "2026-06-01T00:00:00Z", score: 85,
+      issueKeys: ["kA1", "kOld"],
+      pages: [{ url: "https://x.com/a" }],
+      scoreHistory: [],
+    };
+    const s = build({
+      pages: { "https://x.com/a": 1 },
+      byPage: { "https://x.com/a": ["kA1", "kNew"] },
+      prior,
+    });
+    expect(s.trend.fixed).toBe(1);
+    expect(s.trend.new).toBe(1);
+    expect(s.trend.stillOpen).toBe(1);
+    expect(s.trend.coverageChanged).toEqual({ added: 0, removed: 0 });
+  });
+
+  it("legacy prior with a coverage shift suppresses the trend instead of faking counts", () => {
+    const prior = {
+      auditedAt: "2026-06-01T00:00:00Z", score: 85,
+      issueKeys: ["kA1", "kB1"], // unattributable to pages
+      pages: [{ url: "https://x.com/a" }, { url: "https://x.com/b" }],
+      scoreHistory: [],
+    };
+    const s = build({
+      pages: { "https://x.com/a": 1 },
+      byPage: { "https://x.com/a": ["kA1"] },
+      prior,
+    });
+    expect(s.trend).toBeNull();
+  });
+
+  it("stores issueKeysByPage so the next run can restrict its diff", () => {
+    const s = build({
+      pages: { "https://x.com/a": 1 },
+      byPage: { "https://x.com/a": ["kA1"] },
+      prior: null,
+    });
+    expect(s.issueKeysByPage).toEqual({ "https://x.com/a": ["kA1"] });
+  });
+
+  it("normalizes URL variants (trailing slash / case) when intersecting", () => {
+    const prior = priorOf(
+      { "https://x.com/About/": 1 },
+      { "https://x.com/About/": ["kA1"] },
+    );
+    const s = build({
+      pages: { "https://x.com/about": 1 },
+      byPage: { "https://x.com/about": ["kA1"] },
+      prior,
+    });
+    expect(s.trend.coverageChanged).toEqual({ added: 0, removed: 0 });
+    expect(s.trend.stillOpen).toBe(1);
+  });
+});
+
 describe("readPriorSidecar", () => {
   it("returns null for a missing or corrupt file", () => {
     expect(readPriorSidecar(path.join(os.tmpdir(), "nope-site-audit.json"))).toBe(null);

@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { introspectPdf } from "../src/introspect/pdf.js";
+import { introspectPdf, parsePdfDate } from "../src/introspect/pdf.js";
 import { pdfIntrospectionSchema } from "../src/schema/inventory.js";
 
 let tmpRoot;
@@ -131,5 +131,98 @@ describe("introspectPdf", () => {
     const file = path.join(tmpRoot, "garbage.pdf");
     await fs.writeFile(file, "not a pdf at all, just bytes");
     await expect(introspectPdf(file)).rejects.toThrow();
+  });
+
+  // v1.39.0 (F2): pdfjs logs warnings via console.log at its default
+  // verbosity; in NDJSON-to-stdout pipelines that chatter corrupts the
+  // stream. verbosity is pinned to errors-only (VerbosityLevel.ERRORS = 0).
+  it("suppresses pdfjs warning chatter (verbosity pinned to errors-only)", async () => {
+    const file = path.join(tmpRoot, "corrupt-xref.pdf");
+    // Corrupt the startxref offset: pdfjs recovers by indexing all objects,
+    // which at default verbosity prints "Warning: Indexing all PDF objects".
+    await writePdf(file, async (doc) => {
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const page = doc.addPage([300, 200]);
+      page.drawText("x", { x: 10, y: 10, size: 8, font });
+    });
+    const raw = await fs.readFile(file);
+    const corrupted = raw
+      .toString("latin1")
+      .replace(/startxref\n\d+/, "startxref\n999999");
+    await fs.writeFile(file, Buffer.from(corrupted, "latin1"));
+
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...args) => {
+      logs.push(args.join(" "));
+    };
+    try {
+      const result = await introspectPdf(file);
+      expect(result.pageCount).toBe(1);
+    } finally {
+      console.log = origLog;
+    }
+    const warnings = logs.filter((l) => l.startsWith("Warning:"));
+    expect(warnings).toEqual([]);
+  });
+
+  // v1.39.0 (F5): both date fields are consistent ISO 8601 UTC (or null).
+  it("emits ISO 8601 UTC for both creationDate and modificationDate", async () => {
+    const file = path.join(tmpRoot, "dates.pdf");
+    const created = new Date("2024-03-05T10:20:30.000Z");
+    const modified = new Date("2025-02-07T16:16:07.000Z");
+    await writePdf(file, async (doc) => {
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const page = doc.addPage([300, 200]);
+      page.drawText("dated", { x: 10, y: 10, size: 8, font });
+      doc.setCreationDate(created);
+      doc.setModificationDate(modified);
+    });
+
+    const result = await introspectPdf(file);
+    expect(() => pdfIntrospectionSchema.parse(result)).not.toThrow();
+    expect(result.creationDate).toBe(created.toISOString());
+    expect(result.modificationDate).toBe(modified.toISOString());
+  });
+});
+
+// v1.39.0 (F5): parsePdfDate previously DROPPED the O±HH'mm' timezone
+// suffix, shifting every offset-bearing timestamp by its local offset.
+describe("parsePdfDate", () => {
+  it("applies a negative UTC offset to produce the true instant", () => {
+    expect(parsePdfDate("D:20260101120000-06'00")).toBe("2026-01-01T18:00:00.000Z");
+  });
+
+  it("applies a positive half-hour offset (spec form with trailing apostrophe)", () => {
+    expect(parsePdfDate("D:20260101120000+05'30'")).toBe("2026-01-01T06:30:00.000Z");
+  });
+
+  it("applies an hour-only offset", () => {
+    expect(parsePdfDate("D:20260101120000-06")).toBe("2026-01-01T18:00:00.000Z");
+  });
+
+  it("passes an explicit Z through unchanged", () => {
+    expect(parsePdfDate("D:20260101120000Z")).toBe("2026-01-01T12:00:00.000Z");
+  });
+
+  // The plan asks for a naive no-Z timestamp here, but the inventory schema
+  // (inventory.js: isoDate = z.string().datetime({ offset: false })) pins
+  // creationDate to a Z-terminated UTC instant — a naive value would fail
+  // entrySchema.parse and abort the scan. Keep the long-standing assume-UTC
+  // reading for offset-less dates; see the parser comment.
+  it("treats a missing offset as UTC (schema requires a Z-instant)", () => {
+    expect(parsePdfDate("D:20260101120000")).toBe("2026-01-01T12:00:00.000Z");
+  });
+
+  it("accepts date-only values and a missing D: prefix", () => {
+    expect(parsePdfDate("D:20260101")).toBe("2026-01-01T00:00:00.000Z");
+    expect(parsePdfDate("20260101120000Z")).toBe("2026-01-01T12:00:00.000Z");
+  });
+
+  it("returns undefined for garbage and non-strings", () => {
+    expect(parsePdfDate("not a date")).toBeUndefined();
+    expect(parsePdfDate("D:99999999")).toBeUndefined();
+    expect(parsePdfDate(undefined)).toBeUndefined();
+    expect(parsePdfDate(null)).toBeUndefined();
   });
 });

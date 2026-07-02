@@ -97,7 +97,9 @@ export async function runCrossReferences({
       }
       const resolved = resolveEntryReferences(obj, base, idx);
       augmentedCount++;
-      if (resolved.references.length > 0) matchedCount++;
+      // v1.39.0 (B8) — resolved.references is absent when the entry's URL
+      // could not be built (no publicUrlBase); guard the count.
+      if ((resolved.references?.length ?? 0) > 0) matchedCount++;
       out.push(JSON.stringify(resolved));
     }
   }

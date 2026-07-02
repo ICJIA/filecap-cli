@@ -13,9 +13,15 @@ export const UPTIME_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 // Pure + self-contained (no closure references) so it can be unit-tested AND
 // embedded into the inline script. Returns true = fetch the function; false =
 // use the cached status and make NO network call.
+//
+// v1.39.0: the gate reads `fetchedAtMs` — when THIS CLIENT last called the
+// function — not `checkedAtMs`, which is the SERVER's probe time and now only
+// feeds the "checked …" label. Old cached objects (pre-split, checkedAtMs
+// only) have no fetchedAtMs and are treated as stale → one refresh migrates
+// them to the new shape.
 export function shouldRefresh(cache, nowMs, ttlMs) {
-  if (!cache || typeof cache.checkedAtMs !== "number" || !Number.isFinite(cache.checkedAtMs)) return true;
-  return nowMs - cache.checkedAtMs >= ttlMs;
+  if (!cache || typeof cache.fetchedAtMs !== "number" || !Number.isFinite(cache.fetchedAtMs)) return true;
+  return nowMs - cache.fetchedAtMs >= ttlMs;
 }
 
 /**
@@ -54,7 +60,7 @@ export function uptimeClientScript({
   if(!shouldRefresh(cache,Date.now(),TTL))return;
   fetch(EP,{headers:{accept:"application/json"}}).then(function(r){return r&&r.ok?r.json():null;}).then(function(data){
     if(!data||!data.sites)return;
-    data.checkedAtMs=Date.now();
+    data.fetchedAtMs=Date.now();
     writeCache(data);
     apply(data);
   }).catch(function(){});

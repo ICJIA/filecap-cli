@@ -6,26 +6,63 @@ import { runWebRollup } from "../commands/web-rollup.js";
 import { queryInventory } from "./query.js";
 
 /**
- * Check whether `dir` is within one of the colon-separated paths in
+ * Check whether `p` is within one of the colon-separated paths in
  * FILECAP_MCP_ALLOWED_PATHS. Returns null if the env var is not set
  * (no restriction) or an error message string if the path is blocked.
  *
- * @param {string} dir - resolved absolute path to check
+ * @param {string} p - resolved absolute path to check
  * @returns {string|null}
  */
-function checkAllowedPath(dir) {
+function checkAllowedPath(p) {
   const allowedRaw = process.env.FILECAP_MCP_ALLOWED_PATHS;
   if (!allowedRaw) return null; // no restriction
   const allowed = allowedRaw
     .split(":")
-    .map((p) => p.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
   if (allowed.length === 0) return null;
-  for (const root of allowed) {
-    const norm = root.endsWith("/") ? root : root + "/";
-    if (dir === root || dir.startsWith(norm)) return null;
+  for (const rawRoot of allowed) {
+    // v1.39.0: strip trailing slashes so "/srv/www/" allows "/srv/www"
+    // itself (path.resolve on the argument side never keeps a trailing /).
+    const root = rawRoot.replace(/\/+$/, "") || "/";
+    if (p === root || p.startsWith(root === "/" ? "/" : root + "/")) return null;
   }
-  return `directory "${dir}" is not in allowed paths (FILECAP_MCP_ALLOWED_PATHS=${allowedRaw})`;
+  return `path "${p}" is not in allowed paths (FILECAP_MCP_ALLOWED_PATHS=${allowedRaw})`;
+}
+
+/**
+ * v1.39.0: gate EVERY path-typed tool argument, not just scan's directory.
+ * Skips null/undefined values (schema-level required checks handle those).
+ *
+ * @param {Array<string|undefined|null>} paths
+ * @returns {string|null} first block message, or null when all pass
+ */
+function checkAllowedPaths(paths) {
+  for (const p of paths) {
+    if (p === undefined || p === null) continue;
+    const blocked = checkAllowedPath(path.resolve(String(p)));
+    if (blocked) return blocked;
+  }
+  return null;
+}
+
+function blockedResult(message) {
+  return { isError: true, content: [{ type: "text", text: `error: ${message}` }] };
+}
+
+/**
+ * v1.39.0: payloads that carry an `error` field (scan exitCode 2, query on a
+ * missing file, …) are real failures — mark them isError so MCP clients
+ * don't read them as successes.
+ */
+function toResult(payload) {
+  const result = {
+    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+  };
+  if (payload && typeof payload === "object" && payload.error) {
+    result.isError = true;
+  }
+  return result;
 }
 
 export const TOOL_DEFINITIONS = [
@@ -130,11 +167,8 @@ export const TOOL_DEFINITIONS = [
 export async function dispatchTool(name, args) {
   try {
     if (name === "filecap_scan") {
-      const resolvedDir = path.resolve(args.directory ?? "");
-      const blocked = checkAllowedPath(resolvedDir);
-      if (blocked) {
-        return { isError: true, content: [{ type: "text", text: `error: ${blocked}` }] };
-      }
+      const blocked = checkAllowedPaths([args.directory ?? "", args.output]);
+      if (blocked) return blockedResult(blocked);
       const result = await runScan({
         directory: args.directory,
         output: args.output,
@@ -146,25 +180,40 @@ export async function dispatchTool(name, args) {
         includeExt: args.includeExt,
         excludeExt: args.excludeExt,
       });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      // v1.39.0: surface where the inventory landed (tool description
+      // promises the written path). Omitted on failure — nothing usable
+      // was written.
+      const payload = result.error
+        ? result
+        : { ...result, outputPath: path.resolve(String(args.output ?? "")) };
+      return toResult(payload);
     }
     if (name === "filecap_rollup") {
+      const blocked = checkAllowedPaths([...(args.inputs ?? []), args.output]);
+      if (blocked) return blockedResult(blocked);
       const result = await runRollup({
         inputs: args.inputs,
         output: args.output,
         strict: args.strict ?? false,
       });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      return toResult(result);
     }
     if (name === "filecap_report") {
+      const blocked = checkAllowedPaths([args.input, args.outputDir]);
+      if (blocked) return blockedResult(blocked);
       const result = await runReport({
         input: args.input,
         outputDir: args.outputDir,
         html: args.html ?? false,
       });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      return toResult(result);
     }
     if (name === "filecap_web_rollup") {
+      // v1.39.0 audit fix (blue-F): sitesFile is path-typed too — gate it.
+      // checkAllowedPaths skips null/undefined, so an omitted sitesFile
+      // (the normal case) is unaffected.
+      const blocked = checkAllowedPaths([args.output, args.sitesFile]);
+      if (blocked) return blockedResult(blocked);
       const result = await runWebRollup({
         output: args.output,
         password: args.password ?? null,
@@ -173,16 +222,18 @@ export async function dispatchTool(name, args) {
         excludeSite: args.excludeSite ?? [],
         sitesFile: args.sitesFile ?? null,
       });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      return toResult(result);
     }
     if (name === "filecap_query_inventory") {
+      const blocked = checkAllowedPaths([args.inventory]);
+      if (blocked) return blockedResult(blocked);
       const result = await queryInventory({
         inventory: args.inventory,
         filters: args.filters ?? {},
         limit: args.limit ?? 50,
         sortBy: args.sortBy ?? null,
       });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      return toResult(result);
     }
     return {
       isError: true,

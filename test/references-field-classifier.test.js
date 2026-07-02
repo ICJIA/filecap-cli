@@ -47,6 +47,32 @@ describe("classifyField", () => {
         classifyField(field("relatedURL", obj("RelatedThing"))).kind,
       ).not.toBe("url-string");
     });
+
+    // v1.39.0 (B5) — the suffix match is case-insensitive and covers bare
+    // "url"/"link" names. Fields literally named `url`, `link`, `permalink`
+    // were silently classified "other" (their file links dropped → false
+    // orphans). Values are still filtered by domain + audited extension
+    // downstream, so loose matching here is safe.
+    it("classifies bare url / link / URL field names as url-string", () => {
+      expect(classifyField(field("url", scalar("String"))).kind).toBe("url-string");
+      expect(classifyField(field("link", scalar("String"))).kind).toBe("url-string");
+      expect(classifyField(field("URL", scalar("String"))).kind).toBe("url-string");
+    });
+
+    it("classifies lowercase-suffix names (articleUrl, permalink, pdfLink) as url-string", () => {
+      expect(classifyField(field("articleUrl", scalar("String"))).kind).toBe("url-string");
+      expect(classifyField(field("permalink", scalar("String"))).kind).toBe("url-string");
+      expect(classifyField(field("pdfLink", scalar("String"))).kind).toBe("url-string");
+    });
+
+    it("does not match mid-word: blank / unlinked stay non-URL", () => {
+      expect(classifyField(field("blank", scalar("String"))).kind).toBe("other");
+      expect(classifyField(field("unlinked", scalar("String"))).kind).toBe("other");
+    });
+
+    it("uplink ends in 'link' and matches — accepted trade-off (filtered downstream)", () => {
+      expect(classifyField(field("uplink", scalar("String"))).kind).toBe("url-string");
+    });
   });
 
   describe("Body / markdown string fields", () => {
@@ -95,6 +121,24 @@ describe("classifyField", () => {
         kind: "upload-file-list",
         fieldName: "attachments",
       });
+    });
+
+    // v1.39.0 (B10) — NON_NULL wrappers inside/around LIST are unwrapped:
+    // [UploadFile!] and [UploadFile!]! are the Strapi v4 required-list forms.
+    it("classifies LIST(NON_NULL(UploadFile)) as upload-file-list", () => {
+      expect(
+        classifyField(field("attachments", list(nonNull(obj("UploadFile"))))),
+      ).toEqual({ kind: "upload-file-list", fieldName: "attachments" });
+    });
+
+    it("classifies NON_NULL(LIST(NON_NULL(component))) as component-list", () => {
+      const opts = { contentTypeNames: new Set(["Post"]) };
+      expect(
+        classifyField(
+          field("sections", nonNull(list(nonNull(obj("ComponentSharedBlock"))))),
+          opts,
+        ),
+      ).toEqual({ kind: "component-list", fieldName: "sections" });
     });
 
     // Strapi v4 wraps single-media references in UploadFileEntityResponse and

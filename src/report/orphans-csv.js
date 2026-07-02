@@ -3,6 +3,8 @@
 //          Status | Confidence % | Replaced by | Replaced on | Days between |
 //          Reasons | Group size | Public URL
 
+import { csvCell } from "./format.js";
+
 const HEADER = [
   "Site",
   "Path",
@@ -21,14 +23,8 @@ const HEADER = [
   "Public URL",
 ];
 
-function csvCell(v) {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  if (s.includes('"') || s.includes(",") || s.includes("\n") || s.includes("\r")) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
+// v1.39.0: cells go through the shared format.js csvCell (imported above) —
+// the local re-implementation lacked the formula-injection apostrophe guard.
 
 function buildPublicUrl(entry, source) {
   if (!entry || !source) return "";
@@ -36,7 +32,10 @@ function buildPublicUrl(entry, source) {
   if (!base) return "";
   const prefix = source.pathPrefix ? `/${source.pathPrefix.replace(/^\/+|\/+$/g, "")}` : "";
   const path = (entry.path ?? entry.filename ?? "").replace(/^\/+/, "");
-  return `${base.replace(/\/+$/, "")}${prefix}/${path}`;
+  // v1.39.0: percent-encode each segment (mirrors csv.js buildPublicUrl) so
+  // filenames with spaces/# produce valid URLs.
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  return `${base.replace(/\/+$/, "")}${prefix}/${encodedPath}`;
 }
 
 export function writeOrphansCsv({ orphans, sources = [] }) {

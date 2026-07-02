@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot, renderScorecards } from "../src/web/index-page.js";
+import { INDEX_CSS } from "../src/web/index-css.js";
 
 const baseSr = {
   site: {
@@ -523,6 +524,144 @@ describe("renderCard status dot (v1.21.3)", () => {
   });
   it("renders no dot when status is absent", () => {
     expect(renderCard(sr)).not.toContain("status-dot");
+  });
+});
+
+// v1.39.0 (E8) — a site whose rollup wrote no per-site workbook carries
+// csvFile: null; the card must not render a dead download link.
+describe("renderCard download link only when a workbook exists (v1.39.0)", () => {
+  it("omits the download anchor when csvFile is null", () => {
+    const html = renderCard({ ...baseSr, csvFile: null });
+    expect(html).not.toContain("btn-secondary");
+    expect(html).not.toContain("Download spreadsheet");
+  });
+
+  it("keeps the download anchor for a normal site (csvFile set)", () => {
+    const html = renderCard(baseSr);
+    expect(html).toMatch(
+      /<a href="dvfr-2026\.csv" class="btn btn-secondary" download>Download spreadsheet<\/a>/,
+    );
+  });
+});
+
+// v1.39.0 (E9) — the audit tile's "≈ N document pages" sub-label carries a
+// title tooltip; pointer-events must be re-enabled on it or the tooltip
+// never shows (every card descendant is pointer-events:none by default).
+describe("index CSS re-enables pointer-events on the pages tooltip label (v1.39.0)", () => {
+  it("includes .site-card .nums .lbl-sub in the pointer-events:auto block", () => {
+    expect(INDEX_CSS).toMatch(
+      /\.site-card \.nums \.lbl-sub[^}]*\{[^}]*pointer-events:\s*auto/,
+    );
+  });
+});
+
+// v1.39.0 (E10) — card image alt text must be escaped exactly once.
+// Callers used to pass a pre-escaped name into renderCardImage (which
+// escapes internally), double-escaping & < > in alt attributes.
+describe("card image alt text is escaped exactly once (v1.39.0)", () => {
+  const gnarly = "Theft & Insurance <Council>";
+  const once = "Theft &amp; Insurance &lt;Council&gt;";
+  const twice = "Theft &amp;amp; Insurance &amp;lt;Council&amp;gt;";
+
+  it("renderCard passes the raw name to renderCardImage", () => {
+    const html = renderCard({
+      ...baseSr,
+      image: "assets/og/x.png",
+      site: { ...baseSr.site, siteFullName: gnarly },
+    });
+    expect(html).toContain(`alt="${once}"`);
+    expect(html).not.toContain(twice);
+  });
+
+  it("renderCard fallback tile aria-label is once-escaped too", () => {
+    const html = renderCard({
+      ...baseSr,
+      image: null,
+      site: { ...baseSr.site, siteFullName: gnarly },
+    });
+    expect(html).toContain(`aria-label="${once}"`);
+    expect(html).not.toContain(twice);
+  });
+
+  it("renderToolCard passes the raw name to renderCardImage", () => {
+    const html = renderToolCard({
+      name: "x", siteName: "X", siteFullName: gnarly,
+      siteUrl: "https://x.example.gov", image: "assets/og/x.png",
+    });
+    expect(html).toContain(`alt="${once}"`);
+    expect(html).not.toContain(twice);
+  });
+});
+
+// v1.39.0 (E11) — orphans blurb: locale-formatted numbers + correct
+// singular/plural verbs.
+describe("orphans section blurb pluralization (v1.39.0)", () => {
+  const orphansMeta = (n, stale, truly) => ({
+    csvFilename: "audit-orphaned-files.xlsx",
+    htmlFilename: "audit-orphaned-files.html",
+    orphanCount: n,
+    staleRevisionCount: stale,
+    trulyUnreferencedCount: truly,
+    csvByteCount: 100,
+    htmlByteCount: 100,
+  });
+
+  it("singular copy for count 1", () => {
+    const html = generateIndexHtml({ siteResults: [], password: null, orphans: orphansMeta(1, 1, 1) });
+    expect(html).toContain("1 file on the fleet had no detectable references");
+    expect(html).toContain("1 looks like");
+    expect(html).toContain("1 is truly unreferenced");
+  });
+
+  it("plural copy for count 2 and thousands separators for large counts", () => {
+    const html = generateIndexHtml({ siteResults: [], password: null, orphans: orphansMeta(2, 2, 2) });
+    expect(html).toContain("2 files on the fleet had no detectable references");
+    expect(html).toContain("2 look like");
+    expect(html).toContain("2 are truly unreferenced");
+
+    const big = generateIndexHtml({ siteResults: [], password: null, orphans: orphansMeta(1234, 1000, 234) });
+    expect(big).toContain("1,234 files on the fleet had no detectable references");
+    expect(big).toContain("1,000 look like");
+    expect(big).toContain("234 are truly unreferenced");
+  });
+});
+
+// v1.39.0 (E12) — the server-rendered card order must match the sort button
+// that ships pressed ("Most recently added" = highest sites.json index
+// first), so the no-JS page agrees with aria-pressed.
+describe("SSR card order matches the pressed 'Most recently added' button (v1.39.0)", () => {
+  const mkSr = (name, fullName) => ({
+    site: { name, siteName: name.toUpperCase(), siteFullName: fullName },
+    summary: { totalFiles: 1, remediable: 0, totalBytes: 1, byCategory: {} },
+    htmlFile: `${name}.html`,
+    csvFile: `${name}.xlsx`,
+    scannedAt: "2026-05-01T00:00:00.000Z",
+    header: { metadata: {} },
+  });
+
+  it("renders cards in reverse declaration order (added), not alphabetical", () => {
+    // Declaration order: Zebra, Alpha, Mango. Added order → Mango, Alpha, Zebra.
+    // Alphabetical would be Alpha, Mango, Zebra — different from both, so the
+    // assertion distinguishes the modes.
+    const html = generateIndexHtml({
+      siteResults: [mkSr("zebra", "Zebra Site"), mkSr("alpha", "Alpha Site"), mkSr("mango", "Mango Site")],
+      password: null,
+    });
+    const posMango = html.indexOf("Mango Site");
+    const posAlpha = html.indexOf("Alpha Site");
+    const posZebra = html.indexOf("Zebra Site");
+    expect(posMango).toBeGreaterThan(-1);
+    expect(posAlpha).toBeGreaterThan(posMango);
+    expect(posZebra).toBeGreaterThan(posAlpha);
+  });
+
+  it("still stamps data-sort-added with the declaration index for the client sorter", () => {
+    const html = generateIndexHtml({
+      siteResults: [mkSr("zebra", "Zebra Site"), mkSr("alpha", "Alpha Site")],
+      password: null,
+    });
+    expect(html).toMatch(/data-sort-az="zebra site"[^>]*data-sort-added="0"/);
+    expect(html).toMatch(/data-sort-az="alpha site"[^>]*data-sort-added="1"/);
   });
 });
 

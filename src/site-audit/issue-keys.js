@@ -25,6 +25,28 @@ export function collectIssueKeys(scoredPages) {
   return [...keys].sort();
 }
 
+// v1.39.0: the same keys grouped by normalized page URL. Stored in the
+// sidecar so the NEXT run can restrict its fixed/new diff to pages scored in
+// both runs — a page entering/leaving the sample must not masquerade as
+// remediation. Pages with zero violations get no entry (the scored-URL set
+// comes from the sidecar's pages[], not from this map).
+export function collectIssueKeysByPage(scoredPages) {
+  const byPage = new Map();
+  for (const page of scoredPages ?? []) {
+    const url = normPageUrl(page?.pageUrl);
+    for (const v of page?.violations ?? []) {
+      const nodes = Array.isArray(v?.nodes) && v.nodes.length ? v.nodes : [{ target: [] }];
+      for (const n of nodes) {
+        if (!byPage.has(url)) byPage.set(url, new Set());
+        byPage.get(url).add(issueKey(page?.pageUrl, v?.id, n?.target));
+      }
+    }
+  }
+  const out = {};
+  for (const [url, keys] of byPage) out[url] = [...keys].sort();
+  return out;
+}
+
 // Diff two issue-key sets into fixed / introduced / still-open counts.
 export function diffIssueSets(prevKeys, currKeys) {
   const prev = new Set(prevKeys ?? []);

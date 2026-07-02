@@ -27,7 +27,11 @@
 // discovered content-type names get component classification; callers that
 // don't (legacy shape) keep the old behavior.
 
-const URL_SUFFIX_RE = /(?:URL|Url|Link)$/;
+// v1.39.0 (B5) — case-insensitive so bare `url`/`link` and lowercase-suffix
+// names (articleUrl, permalink, pdfLink) classify as url-string. Odd matches
+// like `uplink` are accepted: values are filtered by domain + audited file
+// extension downstream, so a non-file value never reaches referencedFiles.
+const URL_SUFFIX_RE = /(?:url|link)$/i;
 const BODY_FIELD_NAMES = new Set([
   "body",
   "summary",

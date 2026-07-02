@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TOOL_DEFINITIONS, dispatchTool } from "../src/mcp/tools.js";
 
 describe("dispatchTool — filecap_scan path allowlist", () => {
@@ -53,6 +53,164 @@ describe("dispatchTool — filecap_scan path allowlist", () => {
     const result = await dispatchTool("filecap_scan", { directory: subDir, output: outPath });
     expect(result.isError).toBeFalsy();
     await fs.rm(allowedRoot, { recursive: true, force: true });
+  });
+});
+
+// v1.39.0 (F6): the allowlist previously gated ONLY filecap_scan's directory
+// — every other path-typed argument (scan output, rollup inputs/output,
+// report input/outputDir, web_rollup output, query inventory) bypassed it.
+describe("dispatchTool — allowlist covers every path argument (F6)", () => {
+  let savedEnv;
+  let fs;
+  let nodePath;
+  let os;
+  let allowedRoot;
+
+  beforeEach(async () => {
+    savedEnv = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    fs = await import("node:fs/promises");
+    nodePath = await import("node:path");
+    os = await import("node:os");
+    allowedRoot = await fs.mkdtemp(nodePath.join(os.tmpdir(), "fc-gate-"));
+    process.env.FILECAP_MCP_ALLOWED_PATHS = allowedRoot;
+  });
+
+  afterEach(async () => {
+    if (savedEnv !== undefined) {
+      process.env.FILECAP_MCP_ALLOWED_PATHS = savedEnv;
+    } else {
+      delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+    }
+    await fs.rm(allowedRoot, { recursive: true, force: true });
+  });
+
+  it("blocks a scan whose output path is outside allowed paths", async () => {
+    const result = await dispatchTool("filecap_scan", {
+      directory: allowedRoot,
+      output: nodePath.join(os.tmpdir(), "outside-gate.ndjson"),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
+  });
+
+  it("a trailing-slash allowed root still allows the root directory itself", async () => {
+    process.env.FILECAP_MCP_ALLOWED_PATHS = `${allowedRoot}/`;
+    const outPath = nodePath.join(allowedRoot, "scan.ndjson");
+    const result = await dispatchTool("filecap_scan", {
+      directory: allowedRoot,
+      output: outPath,
+      hash: false,
+      introspect: false,
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it("blocks rollup when an input path is outside allowed paths", async () => {
+    const result = await dispatchTool("filecap_rollup", {
+      inputs: [nodePath.join(os.tmpdir(), "outside.ndjson")],
+      output: nodePath.join(allowedRoot, "consolidated.ndjson"),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
+  });
+
+  it("blocks report when outputDir is outside allowed paths", async () => {
+    const result = await dispatchTool("filecap_report", {
+      input: nodePath.join(allowedRoot, "inv.ndjson"),
+      outputDir: nodePath.join(os.tmpdir(), "outside-report"),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
+  });
+
+  it("blocks web_rollup when output is outside allowed paths", async () => {
+    const result = await dispatchTool("filecap_web_rollup", {
+      output: nodePath.join(os.tmpdir(), "outside-bundle"),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
+  });
+
+  // v1.39.0 audit fix (blue-F new finding 1): sitesFile is path-typed
+  // ("Override saved-sites JSON path") but the web_rollup gate only checked
+  // args.output — a gated MCP client could point the bundle build at an
+  // arbitrary readable JSON as the site roster.
+  it("blocks web_rollup when sitesFile is outside allowed paths", async () => {
+    const result = await dispatchTool("filecap_web_rollup", {
+      output: nodePath.join(allowedRoot, "bundle"),
+      sitesFile: nodePath.join(os.tmpdir(), "outside-sites.json"),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
+  });
+
+  // Control pin for the fix above: an in-allowlist sitesFile must still get
+  // through the gate (the run then fails on the missing file itself, proving
+  // runWebRollup was reached, not blocked).
+  it("web_rollup with sitesFile inside the allowlist passes the gate", async () => {
+    const result = await dispatchTool("filecap_web_rollup", {
+      output: nodePath.join(allowedRoot, "bundle"),
+      sitesFile: nodePath.join(allowedRoot, "no-such-sites.json"),
+    });
+    expect(result.content[0].text).not.toMatch(/not in allowed paths/i);
+    expect(result.content[0].text).toMatch(/cannot read sites file/i);
+  });
+
+  it("blocks query_inventory when the inventory path is outside allowed paths", async () => {
+    const result = await dispatchTool("filecap_query_inventory", {
+      inventory: nodePath.join(os.tmpdir(), "outside.ndjson"),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
+  });
+});
+
+describe("dispatchTool — result payloads (F6)", () => {
+  it("scan result carries the absolute outputPath alongside exitCode", async () => {
+    const fs = await import("node:fs/promises");
+    const nodePath = await import("node:path");
+    const os = await import("node:os");
+    const tmpRoot = await fs.mkdtemp(nodePath.join(os.tmpdir(), "fc-outpath-"));
+    await fs.writeFile(nodePath.join(tmpRoot, "x.txt"), "hi");
+    const outPath = nodePath.join(tmpRoot, "scan.ndjson");
+
+    const result = await dispatchTool("filecap_scan", {
+      directory: tmpRoot,
+      output: outPath,
+      hash: false,
+      introspect: false,
+    });
+    expect(result.isError).toBeFalsy();
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.exitCode).toBe(0);
+    expect(payload.outputPath).toBe(nodePath.resolve(outPath));
+
+    await fs.rm(tmpRoot, { recursive: true, force: true });
+  });
+
+  it("sets isError when the scan payload carries an error (exitCode 2)", async () => {
+    const nodePath = await import("node:path");
+    const os = await import("node:os");
+    const missingDir = nodePath.join(os.tmpdir(), "fc-no-such-dir-ever");
+    const result = await dispatchTool("filecap_scan", {
+      directory: missingDir,
+      output: nodePath.join(os.tmpdir(), "never-written.ndjson"),
+    });
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.exitCode).toBe(2);
+    expect(payload.error).toMatch(/cannot read/i);
+  });
+
+  it("sets isError when the query inventory file is missing", async () => {
+    const nodePath = await import("node:path");
+    const os = await import("node:os");
+    const result = await dispatchTool("filecap_query_inventory", {
+      inventory: nodePath.join(os.tmpdir(), "fc-missing-inventory.ndjson"),
+    });
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.error).toMatch(/cannot read/i);
   });
 });
 

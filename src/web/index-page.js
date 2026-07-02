@@ -142,10 +142,15 @@ function renderScoresBySiteSection(scoresBySite) {
 
 function renderOrphansSection(orphans) {
   if (!orphans || !orphans.htmlFilename) return "";
+  // v1.39.0 — locale-formatted counts + singular/plural agreement so
+  // "1 files … look like" can't ship.
+  const orphanCount = Number(orphans.orphanCount ?? 0);
+  const staleCount = Number(orphans.staleRevisionCount ?? 0);
+  const trulyCount = Number(orphans.trulyUnreferencedCount ?? 0);
   return `
   <section class="section orphans">
     <h2>Orphaned files</h2>
-    <p>${he(orphans.orphanCount)} files on the fleet had no detectable references after cross-resolution. ${he(orphans.staleRevisionCount)} look like upgrade-replaced stale revisions (a newer version of the same logical file is still attached). ${he(orphans.trulyUnreferencedCount)} are truly unreferenced — uploaded and never linked.</p>
+    <p>${he(orphanCount.toLocaleString())} file${orphanCount === 1 ? "" : "s"} on the fleet had no detectable references after cross-resolution. ${he(staleCount.toLocaleString())} look${staleCount === 1 ? "s" : ""} like upgrade-replaced stale revisions (a newer version of the same logical file is still attached). ${he(trulyCount.toLocaleString())} ${trulyCount === 1 ? "is" : "are"} truly unreferenced — uploaded and never linked.</p>
     <ul class="action-list">
       <li><a href="${he(orphans.htmlFilename)}">Open orphan report (HTML)</a> — sortable table with per-site breakdown, confidence scores, fuzzy-match replacements, reason flags.</li>
       <li><a href="${he(orphans.csvFilename)}" download>Download orphan report (XLSX, ${humanBytes(orphans.csvByteCount ?? 0)})</a> — opens in Excel/Numbers/Sheets.</li>
@@ -627,13 +632,16 @@ export function renderStatusDot(status, key) {
 // `showStatus` adds the live/down dot (on /sites only, not the home band).
 export function renderToolCard(tool, { showStatus = false } = {}) {
   const nickname = he(tool.siteName ?? tool.name ?? "");
-  const fullName = he(tool.siteFullName || tool.siteName || tool.name || "");
+  // v1.39.0 — renderCardImage escapes internally, so it gets the RAW name;
+  // fullName stays pre-escaped for the direct interpolations below.
+  const fullNameRaw = tool.siteFullName || tool.siteName || tool.name || "";
+  const fullName = he(fullNameRaw);
   const url = tool.siteUrl ?? "";
   const desc = tool.description ?? "";
   const stack = tool.stack ?? "";
   return `<article class="site-card tool-card">
   <a class="card-stretched-link" href="${he(url)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${fullName} in a new tab"></a>
-  ${renderCardImage({ image: tool.image, alt: fullName })}
+  ${renderCardImage({ image: tool.image, alt: fullNameRaw })}
   <header class="card-head">
     <span class="tool-badge">Tooling</span>
     ${nickname ? `<p class="nickname">${nickname}</p>` : ""}
@@ -726,7 +734,10 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   const nickname = he(site.siteName ?? site.name ?? "");
   // `||` (not `??`) so an empty-string siteFullName falls through to siteName.
   // Same rationale as commit 01c1d4e on the detail-page H1.
-  const fullName = he(site.siteFullName || site.siteName || site.name || "");
+  // v1.39.0 — keep the raw name too: renderCardImage escapes internally, so
+  // passing the pre-escaped fullName double-escaped the alt text.
+  const fullNameRaw = site.siteFullName || site.siteName || site.name || "";
+  const fullName = he(fullNameRaw);
   const accessKind = site.accessKind && ACCESS_CHIP_LABEL[site.accessKind] ? site.accessKind : null;
   const accessLabel = accessKind ? ACCESS_CHIP_LABEL[accessKind] : "";
 
@@ -816,7 +827,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   const sortAzKey = (site.siteFullName || site.siteName || site.name || "").toLowerCase();
   return `<article class="site-card" data-sort-az="${he(sortAzKey)}" data-sort-added="${sortIndex}" data-sort-files="${totalFiles}">
   <a class="card-stretched-link" href="${he(htmlFile)}" aria-label="View detailed report for ${fullName}"></a>
-  ${renderCardImage({ image: sr.image, alt: fullName })}
+  ${renderCardImage({ image: sr.image, alt: fullNameRaw })}
   <header class="card-head">
     ${accessKind ? `<button type="button" class="access-chip access-${accessKind}" data-access-modal="${he(accessKind)}" aria-haspopup="dialog" aria-controls="access-modal-${he(accessKind)}" title="${he(accessLabel)} — click for the credentials and steps"><span class="access-dot" aria-hidden="true"></span>${he(accessLabel)}</button>` : ""}
     <p class="nickname">${nickname}</p>
@@ -839,7 +850,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   ${techDetailsHtml}
   <div class="actions">
     <a href="${he(htmlFile)}" class="btn btn-primary">View detailed report &rarr;</a>
-    <a href="${he(csvFile)}" class="btn btn-secondary" download>Download spreadsheet</a>
+    ${csvFile ? `<a href="${he(csvFile)}" class="btn btn-secondary" download>Download spreadsheet</a>` : ""}
     ${scannedAt ? `<p class="csv-last-audit">Last audit: <strong>${he(fmtAuditDate(scannedAt))}</strong></p>` : ""}
   </div>
 </article>`;
@@ -1014,23 +1025,21 @@ export function generateIndexHtml({
 
   const pageTitle = he(title);
 
-  // v1.7.15: cards alphabetized by siteFullName (fallback siteName, then
-  // the server-name slug) so managers can find a site by its visible title.
-  // Pre-v1.7.15 the order followed sites.json declaration order, which
-  // matched how the audit team thought about the fleet but not how an
-  // outside viewer scans the page. localeCompare so case + diacritics
-  // behave naturally on a real keyboard.
+  // v1.7.39 — capture the original input order so each rendered card
+  // carries its sites.json declaration index as `data-sort-added`. That's
+  // the data the "Most recently added" sort option in the toolbar above
+  // the grid reads (and what the A→Z button re-sorts away from).
   //
-  // v1.7.39 — capture the original input order before sorting so each
-  // rendered card carries its sites.json declaration index as
-  // `data-sort-added`. That's the data the "Most recently added" sort
-  // option in the toolbar above the grid reads.
+  // v1.39.0 — server-render the cards in the SAME "added" order the
+  // client's default "Most recently added" button produces (highest
+  // declaration index first). The toolbar ships with that button
+  // aria-pressed="true", so the no-JS/HTML state must agree with it —
+  // pre-v1.39.0 the SSR order was alphabetical, contradicting the
+  // pressed button until the client script re-sorted on load.
   const originalOrder = new Map(siteResults.map((sr, i) => [sr, i]));
-  const sortedSiteResults = [...siteResults].sort((a, b) => {
-    const aKey = a.site?.siteFullName || a.site?.siteName || a.site?.name || "";
-    const bKey = b.site?.siteFullName || b.site?.siteName || b.site?.name || "";
-    return aKey.localeCompare(bKey, undefined, { sensitivity: "base" });
-  });
+  const sortedSiteResults = [...siteResults].sort(
+    (a, b) => (originalOrder.get(b) ?? 0) - (originalOrder.get(a) ?? 0),
+  );
   const cardsHtml = sortedSiteResults
     .map((sr) => renderCard(sr, { sortIndex: originalOrder.get(sr) ?? 0 }))
     .join("\n");
@@ -1589,8 +1598,9 @@ ${renderSiteFooter({ generatedAt })}
   });
 
   // v1.12.2: default sort is "added" (most recently added first) so newer
-  // sites lead and the oldest (e.g. the ARI summits) sit at the bottom. Cards
-  // are rendered alphabetically server-side, so always sort on load.
+  // sites lead and the oldest (e.g. the ARI summits) sit at the bottom.
+  // v1.39.0: cards are server-rendered in that same "added" order, so the
+  // on-load sort is a no-op unless the user saved a different preference.
   var saved = null;
   try { saved = sessionStorage.getItem("filecap-site-sort"); } catch (_) {}
   var initial = saved || "added";

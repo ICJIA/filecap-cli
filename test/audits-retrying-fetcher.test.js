@@ -132,6 +132,49 @@ describe("createRetryingJsonFetcher", () => {
     expect(sleeps).toEqual([]);
   });
 
+  // v1.39.0: a rejected fetch (DNS failure, ECONNRESET, ETIMEDOUT, undici
+  // "fetch failed") used to propagate on the FIRST throw, so one network
+  // blip became a permanent error entry while HTTP 429/5xx got 6 retries.
+  // Any rejection is treated as transient and retried with the same backoff.
+  it("retries network-level fetch rejections and succeeds once the network recovers", async () => {
+    const sleeps = [];
+    const logs = [];
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls++;
+      if (calls <= 2) throw new TypeError("fetch failed");
+      return resp({ ok: true, status: 200, json: { recovered: true } });
+    };
+    const fetcher = createRetryingJsonFetcher({
+      fetchImpl,
+      sleep: (ms) => { sleeps.push(ms); },
+      log: (line) => { logs.push(line); },
+    });
+
+    const out = await fetcher("https://audit.icjia.app/api/audit-url", {});
+
+    expect(out).toEqual({ recovered: true });
+    expect(calls).toBe(3); // 2 rejections + 1 success
+    expect(sleeps).toHaveLength(2);
+    expect(logs[0]).toMatch(/network error \(fetch failed\) from https:\/\/audit\.icjia\.app\/api\/audit-url; backing off/);
+  });
+
+  it("rethrows the last network error after maxRetries rejections", async () => {
+    const sleeps = [];
+    let calls = 0;
+    const fetcher = createRetryingJsonFetcher({
+      fetchImpl: async () => { calls++; throw new Error("getaddrinfo EAI_AGAIN audit.icjia.app"); },
+      sleep: (ms) => { sleeps.push(ms); },
+      maxRetries: 2,
+    });
+
+    await expect(fetcher("https://audit.icjia.app/api/audit-url", {})).rejects.toThrow(
+      /EAI_AGAIN/,
+    );
+    expect(calls).toBe(3); // 1 initial + 2 retries = maxRetries+1
+    expect(sleeps).toHaveLength(2);
+  });
+
   it("gives up after maxRetries on a persistent 429 and throws the HTTP error", async () => {
     const sleeps = [];
     let calls = 0;

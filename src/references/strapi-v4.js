@@ -13,9 +13,13 @@
 //      `data.attributes.url` wrapper.
 
 import { canonicalizeUrl } from "./url-canonical.js";
-import { extractFileUrls } from "./extract-urls.js";
+import { extractFileUrls, isAuditedFileUrl } from "./extract-urls.js";
 import { collectComponentFileUrls } from "./component-walk.js";
-import { introspectTypeFields as introspectTypeFieldsV3 } from "./strapi-v3.js";
+import {
+  introspectTypeFields as introspectTypeFieldsV3,
+  assertGraphqlResponseOk,
+} from "./strapi-v3.js";
+import { pluralCandidatesFor } from "./pluralize.js";
 
 // Strapi v4's bare content-type (e.g. `Post`) exposes the same shape of
 // __type fields as v3 — only the typed media wrapper names differ
@@ -49,29 +53,39 @@ export async function introspectContentTypes(graphqlEndpoint, fetcher) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query: INTROSPECT_SCHEMA_QUERY }),
   });
+  // v1.39.0 (B1) — GraphQL errors / missing data throw (shared guard).
+  assertGraphqlResponseOk(response, graphqlEndpoint);
   const names = (response?.data?.__schema?.queryType?.fields ?? []).map(
     (f) => f.name,
   );
   const set = new Set(names);
   const result = [];
   const claimed = new Set();
-  // For each singular name we haven't already claimed as the plural-side of a
-  // pair, try common English pluralization rules forward (s, es, y→ies) and
-  // pair it to whichever plural exists in the schema.
+  // For each singular name, try English pluralization rules forward
+  // (pluralize.js: irregular map + y/is/z/us/sxz/s) and pair it to
+  // whichever plural exists in the schema. Set membership guards against
+  // wrong guesses.
   for (const singular of names) {
     if (SYSTEM_FIELDS.has(singular)) continue;
     if (claimed.has(singular)) continue;
-    const candidates = [];
-    if (singular.endsWith("y")) candidates.push(singular.slice(0, -1) + "ies");
-    if (singular.endsWith("s") || singular.endsWith("x") || singular.endsWith("z")) {
-      candidates.push(singular + "es");
-    }
-    candidates.push(singular + "s");
-    const plural = candidates.find((p) => set.has(p));
+    const plural = pluralCandidatesFor(singular).find((p) => set.has(p));
     if (!plural) continue;
     if (SYSTEM_FIELDS.has(plural)) continue;
     result.push({ singular, plural });
     claimed.add(plural);
+  }
+  // v1.39.0 (B4) — a v4 singular with no plural partner is a SINGLE TYPE
+  // (homepage, about, config): its content lives at /api/<name> and can
+  // carry file links, so dropping it produces false orphans. Names-only
+  // introspection cannot distinguish a single type from a custom resolver,
+  // so every unpaired non-system name is attempted; junk names 404 into
+  // the orchestrator's per-type WARN. Post-pass, because a plural can be
+  // iterated before the singular that claims it (faqs before faq).
+  const pairedSingulars = new Set(result.map((r) => r.singular));
+  for (const name of names) {
+    if (SYSTEM_FIELDS.has(name)) continue;
+    if (pairedSingulars.has(name) || claimed.has(name)) continue;
+    result.push({ singular: name, plural: null, singleType: true });
   }
   return result;
 }
@@ -94,6 +108,18 @@ function buildPageUrl(base, plural, limit, start, populateParams) {
 // ask for populate[<field>][populate]=* per component (one level inside),
 // keeping plain media fields populated explicitly. With no field lists
 // the legacy populate=* is preserved.
+//
+// v1.39.0 (B11) — KNOWN DEPTH LIMIT: populate[<field>][populate]=* reaches
+// exactly ONE level inside each component. Media nested a level deeper
+// (a sub-component's file, e.g. dynamicZone → block → download.file) is
+// NOT populated and its links are invisible to extraction. Going deeper
+// requires the sub-components' field names, which our __type introspection
+// does not provide — and guessing (populate[a][populate][b][populate]=*)
+// risks 400s on every fetch, so we deliberately do not. Nor is the miss
+// detectable at walk time: an unpopulated relation key is simply ABSENT
+// from the REST JSON (indistinguishable from a component with no media
+// field), while a populated-but-empty one is `data: null`. If a fleet site
+// ever nests media two components deep, this is the comment to revisit.
 function buildPopulateParams(componentFields, mediaFields) {
   const comps = Array.isArray(componentFields) ? componentFields : [];
   const media = Array.isArray(mediaFields) ? mediaFields : [];
@@ -103,6 +129,22 @@ function buildPopulateParams(componentFields, mediaFields) {
   for (const f of media) parts.push(`populate${enc(`[${f}]`)}=%2A`);
   for (const f of comps) parts.push(`populate${enc(`[${f}]`)}${enc("[populate]")}=%2A`);
   return parts.join("&");
+}
+
+// v1.39.0 (B9) — decide whether the server has more records after this page,
+// trusting the response's meta.pagination when present (both the start/limit/
+// total and page/pageSize/pageCount shapes). Returns null when meta is absent
+// or unrecognizable so the caller can fall back to stop-on-EMPTY-page. A
+// SHORT page never ends the walk by itself: Strapi caps page sizes
+// server-side (maxLimit), so short pages occur mid-stream.
+function hasMorePages(meta, fetchedCount) {
+  const p = meta?.pagination;
+  if (!p || typeof p !== "object") return null;
+  if (Number.isFinite(p.total)) return fetchedCount < p.total;
+  if (Number.isFinite(p.page) && Number.isFinite(p.pageCount)) {
+    return p.page < p.pageCount;
+  }
+  return null;
 }
 
 export async function fetchAllEntries(restApiBase, plural, fetcher, options = {}) {
@@ -139,11 +181,23 @@ export async function fetchAllEntries(restApiBase, plural, fetcher, options = {}
   let start = 0;
   let pages = 1; // first page already fetched above
   while (true) {
-    const data = Array.isArray(response?.data) ? response.data : [];
+    const raw = response?.data;
+    // v1.39.0 (B4) — single types answer with `data` as an OBJECT; normalize
+    // to a one-entry array (data: null → empty) so extraction is shared.
+    const data = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object"
+        ? [raw]
+        : [];
     if (data.length === 0) break;
     for (const entry of data) out.push(entry);
-    if (data.length < limit) break;
-    start += limit;
+    if (!Array.isArray(raw)) break; // single-entry object: nothing to paginate
+    // v1.39.0 (B9) — trust meta.pagination when present; without it, stop
+    // only on an EMPTY page (a short page is a maxLimit cap, not the end).
+    if (hasMorePages(response?.meta, out.length) === false) break;
+    // Advance by the records RECEIVED, not the requested limit — a capped
+    // server returns short pages and advancing by limit would skip records.
+    start += data.length;
     if (++pages > maxPages) {
       throw new Error(
         `fetchAllEntries: exceeded maxPages=${maxPages} for ${pluralToUse} (FC-2026-031 guard)`,
@@ -185,7 +239,9 @@ export function extractEntryUrls(entry, classifiedFields, restApiBase) {
     if (value === null || value === undefined) continue;
 
     if (kind === "url-string" && typeof value === "string") {
-      addCandidate(value);
+      // v1.39.0 (B7) — url-string fields carry page links too; only audited
+      // file URLs may enter referencedFiles.
+      if (isAuditedFileUrl(value)) addCandidate(value);
     } else if (kind === "body-string" && typeof value === "string") {
       // v1.29.0 — baseUrl resolves root-relative "/uploads/x.pdf" body links
       // against the API host, where Strapi serves uploads.

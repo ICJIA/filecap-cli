@@ -291,4 +291,61 @@ describe("buildAuditScopeBlock", () => {
     const numbersIdx = text.indexOf("The numbers");
     expect(scopeIdx).toBeLessThan(numbersIdx);
   });
+
+  // v1.39.0 — new scans categorize .doc/.xls/.ppt as "legacy-office", so the
+  // scope box's Legacy Office row (category-based) finally lights up and
+  // agrees with the introspection-kind-based Legacy Office section.
+  it("counts legacy-office entries in the Legacy Office scope row and the remediable total", () => {
+    const entries = [
+      { category: "legacy-office", remediable: true, sizeBytes: 100, sha256: "l1", flags: [], introspection: { kind: "office-legacy", format: "ppt" } },
+      { category: "legacy-office", remediable: true, sizeBytes: 200, sha256: "l2", flags: [], introspection: { kind: "office-legacy", format: "ppt" } },
+    ];
+    const text = buildAuditScopeBlock(entries);
+    expect(text).toMatch(/Legacy Office \(\.doc\/\.xls\)\s+2/);
+    expect(text).toMatch(/Total that may need work:\s+2/);
+  });
+
+  it("agrees between the category-based scope count and the kind-based Legacy Office section for new scans", () => {
+    const entries = [
+      { category: "legacy-office", remediable: true, sizeBytes: 100, sha256: "l1", flags: [], introspection: { kind: "office-legacy", format: "doc" } },
+      { category: "legacy-office", remediable: true, sizeBytes: 200, sha256: "l2", flags: [], introspection: { kind: "office-legacy", format: "xls" } },
+    ];
+    const text = writeSummary({ entries, sources: null, header: singleHeader });
+    // Scope box (category-based) and the detail section (kind-based) both say 2.
+    expect(text).toMatch(/Legacy Office \(\.doc\/\.xls\)\s+2/);
+    expect(text).toContain("Legacy Office files (2 files)");
+    // The By-file-type breakdown lists the new category too.
+    expect(text).toMatch(/legacy-office:\s+2 files/);
+  });
+});
+
+// ── Average pages per PDF (v1.39.0 divisor fix) ─────────────────────────────
+
+describe("writeSummary — average pages per PDF", () => {
+  const pdf = (over = {}) => ({
+    category: "pdf",
+    remediable: true,
+    sizeBytes: 100,
+    flags: [],
+    ...over,
+  });
+
+  it("divides by the count of measured PDFs and says how many were measured", () => {
+    // 10 PDFs, only 5 introspected with page counts totalling 100 pages.
+    const measured = [20, 20, 20, 20, 20].map((n, i) =>
+      pdf({ sha256: `m${i}`, introspection: { kind: "pdf", pageCount: n, hasTextLayer: true, isImageOnly: false, hasTags: false, hasFormFields: false, hasSignatures: false, encrypted: false } }));
+    const unmeasured = [0, 1, 2, 3, 4].map((i) => pdf({ sha256: `u${i}` }));
+    const text = writeSummary({ entries: [...measured, ...unmeasured], sources: null, header: singleHeader });
+    // 100 pages / 5 measured = 20.0 (NOT 100 / 10 = 10.0), labelled honestly.
+    expect(text).toMatch(/Average pages per PDF \(measured\):\s+20\.0 \(5 of 10 PDFs measured\)/);
+    expect(text).not.toMatch(/:\s+10\.0/);
+  });
+
+  it("omits the coverage note when every PDF was measured", () => {
+    const measured = [10, 30].map((n, i) =>
+      pdf({ sha256: `m${i}`, introspection: { kind: "pdf", pageCount: n, hasTextLayer: true, isImageOnly: false, hasTags: false, hasFormFields: false, hasSignatures: false, encrypted: false } }));
+    const text = writeSummary({ entries: measured, sources: null, header: singleHeader });
+    expect(text).toMatch(/Average pages per PDF \(measured\):\s+20\.0\s*$/m);
+    expect(text).not.toContain("PDFs measured)");
+  });
 });

@@ -1013,9 +1013,39 @@ THIS_RUN_DIR="${WORK_DIR}/runs/${RUN_TS}"
 LATEST_LINK="${WORK_DIR}/latest"
 REPORT_DIR="${THIS_RUN_DIR}/report"
 
+# v1.39.0: refuse a non-symlink 'latest' up front, BEFORE any scan work.
+# Pre-fix site-audit runs (and operators) could leave a REAL DIRECTORY at
+# <site>/latest; the end-of-run repoint's `rm -f` would then fail only AFTER
+# a long scan had already finished. Never delete or rename it ourselves —
+# it may hold data that isn't ours to remove.
+if [[ -e "${LATEST_LINK}" && ! -L "${LATEST_LINK}" ]]; then
+  die "${LATEST_LINK} exists but is not a symlink — move it aside (e.g. mv \"${LATEST_LINK}\" \"${LATEST_LINK}.pre-symlink\") and re-run."
+fi
+
 step "Setting up work directory: ${WORK_DIR}"
 mkdir -p "${MIRROR_DIR}" "${THIS_RUN_DIR}/report"
 chmod 700 "${WORK_DIR}" 2>/dev/null || true
+
+# ── failed-run cleanup ────────────────────────────────────────────────────────
+# 'latest' is only repointed on success, so a failed or interrupted run would
+# otherwise leave a partial runs/<ts>Z dir that is lexically newer than the
+# good run — poison for anything that assumes "newest run = best run".
+# Remove ONLY this run's dir on failure; mirror/ is rsync's incremental cache
+# and must never be touched. RUN_OK=1 (set once the run's outputs are
+# complete) disarms the trap. HUP/INT/TERM are converted to exits so the
+# EXIT trap also cleans up when the run is interrupted.
+RUN_OK=0
+cleanup_partial_run() {
+  local rc=$?
+  if [[ "$RUN_OK" -ne 1 && "$rc" -ne 0 && -d "${THIS_RUN_DIR}" ]]; then
+    rm -rf "${THIS_RUN_DIR}"
+    warn "Run failed (exit ${rc}) — removed partial run dir ${THIS_RUN_DIR}"
+  fi
+}
+trap cleanup_partial_run EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ── write SOURCE_INFO.txt ─────────────────────────────────────────────────────
 AUDIT_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -1306,6 +1336,12 @@ if ! node "$FILECAP_BIN" report "${INVENTORY}" -o "${REPORT_DIR}" ${HTML_FLAG} \
   die "filecap report generation failed."
 fi
 REPORT_PHASE_DURATION=$(( $(date +%s) - REPORT_PHASE_START ))
+
+# The run's material outputs (inventory + report) are complete — disarm the
+# failed-run cleanup NOW, before any late metadata step. The 'latest' repoint
+# or the summary tail below can still abort the script (set -e, nonzero
+# exit), but a finished run must never be deleted over it.
+RUN_OK=1
 
 # ── update 'latest' symlink ───────────────────────────────────────────────────
 # Use rm-then-ln inside a subshell to avoid macOS mv-symlink quirks.

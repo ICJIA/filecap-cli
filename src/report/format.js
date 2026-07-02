@@ -44,3 +44,33 @@ export function boolToYesNo(v) {
   if (v === false) return "No";
   return v;
 }
+
+/**
+ * Build the public URL for an inventory entry — v1.7.40 precedence:
+ * publicUrlBase (+ optional pathPrefix) + the per-segment percent-encoded
+ * entry path; an https absolutePath (an old audit-static.sh GitHub URL,
+ * /tree/ rewritten to /blob/) is only a fallback for legacy inventories
+ * with no base. Extracted from audit-errors.js (D10) in the v1.39.0
+ * post-audit pass so the LIVE orphan emitters (orphans-html + the
+ * web-rollup orphans XLSX) share the exact same encoding — red-1 R2 showed
+ * they still emitted raw URLs where "#" truncates at the fragment.
+ *
+ * @param {object} entry
+ * @param {string|null|undefined} publicUrlBase
+ * @param {string|null|undefined} pathPrefix
+ * @returns {string} URL, or "" when nothing usable exists
+ */
+export function publicUrlFor(entry, publicUrlBase, pathPrefix) {
+  const base = String(publicUrlBase ?? "").replace(/\/+$/, "");
+  const p = String(entry?.path ?? entry?.filename ?? "").replace(/^\/+/, "");
+  if (base && p) {
+    const prefix = pathPrefix
+      ? "/" + String(pathPrefix).replace(/^\/+|\/+$/g, "")
+      : "";
+    const encodedPath = p.split("/").map(encodeURIComponent).join("/");
+    return `${base}${prefix}/${encodedPath}`;
+  }
+  const ap = String(entry?.absolutePath ?? "");
+  if (/^https?:\/\//i.test(ap)) return ap.replace("/tree/", "/blob/");
+  return "";
+}

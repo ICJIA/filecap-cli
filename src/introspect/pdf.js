@@ -24,6 +24,10 @@ export async function introspectPdf(filePath) {
     useWorkerFetch: false,
     isEvalSupported: false,
     useSystemFonts: false,
+    // v1.39.0: errors-only (VerbosityLevel.ERRORS = 0) — pdfjs's default
+    // verbosity logs warnings via console.log, which corrupts NDJSON when
+    // the scan streams to stdout (`-o -`).
+    verbosity: 0,
   });
 
   const doc = await loadingTask.promise;
@@ -145,13 +149,12 @@ export async function introspectPdf(filePath) {
     result.author = author ?? null;
     result.subject = subject ?? null;
     result.keywords = keywords ?? null;
-    if (modificationDateRaw) {
-      result.modificationDate = modificationDateRaw.startsWith("D:")
-        ? modificationDateRaw.slice(2)
-        : modificationDateRaw;
-    } else {
-      result.modificationDate = null;
-    }
+    // v1.39.0: modificationDate previously carried the raw PDF-format string
+    // (minus "D:"); it now goes through the same parser as creationDate so
+    // both fields are consistent ISO 8601 UTC (or null).
+    result.modificationDate = modificationDateRaw
+      ? (parsePdfDate(modificationDateRaw) ?? null)
+      : null;
     result.approxWordCount = approxWordCount;
 
     return result;
@@ -173,16 +176,37 @@ function sanitizePdfString(v) {
 }
 
 /**
- * Convert PDF "D:YYYYMMDDHHmmSSOHH'mm" format to ISO 8601 UTC.
- * Returns undefined if the input doesn't parse.
+ * Convert PDF "D:YYYYMMDDHHmmSSOHH'mm'" format to an ISO 8601 UTC instant.
+ *
+ * v1.39.0: the O±HH'mm' timezone suffix is now applied (it was previously
+ * dropped, shifting every offset-bearing timestamp by its local offset).
+ * Apostrophe placement varies in the wild (-06'00', -06'00, -0600, -06);
+ * all are accepted.
+ *
+ * When NO offset is present the PDF spec means "local time, zone unknown".
+ * The inventory schema pins creationDate to a Z-terminated UTC instant
+ * (inventory.js: isoDate = z.string().datetime({ offset: false })), so we
+ * keep the long-standing assume-UTC interpretation for offset-less dates
+ * rather than emitting a naive timestamp that would fail entrySchema.parse.
+ *
+ * Exported for unit testing. Returns undefined if the input doesn't parse.
  */
-function parsePdfDate(s) {
+export function parsePdfDate(s) {
   if (typeof s !== "string") return undefined;
   const raw = s.startsWith("D:") ? s.slice(2) : s;
-  const m = raw.match(/^(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?(\d{2})?/);
+  const m = raw.match(
+    /^(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?(\d{2})?(Z|[+-]\d{2}(?:'?\d{2})?'?)?/,
+  );
   if (!m) return undefined;
-  const [, y, mo, d, h = "00", mi = "00", se = "00"] = m;
-  const date = new Date(`${y}-${mo}-${d}T${h}:${mi}:${se}.000Z`);
-  if (isNaN(date.getTime())) return undefined;
-  return date.toISOString();
+  const [, y, mo, d, h = "00", mi = "00", se = "00", tz] = m;
+  const base = new Date(`${y}-${mo}-${d}T${h}:${mi}:${se}.000Z`);
+  if (isNaN(base.getTime())) return undefined;
+  if (!tz || tz === "Z") return base.toISOString();
+  const tm = tz.match(/^([+-])(\d{2})'?(\d{2})?'?$/);
+  if (!tm) return base.toISOString();
+  const sign = tm[1] === "-" ? -1 : 1;
+  const offsetMinutes = sign * (Number(tm[2]) * 60 + Number(tm[3] ?? "0"));
+  // The offset describes the local wall-clock's displacement from UTC, so
+  // the UTC instant is the wall-clock reading MINUS the offset.
+  return new Date(base.getTime() - offsetMinutes * 60000).toISOString();
 }

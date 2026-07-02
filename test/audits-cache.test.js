@@ -113,6 +113,18 @@ describe("isCacheEntryFresh", () => {
     expect(isCacheEntryFresh(undefined, { ttlDays: 30 })).toBe(false);
   });
 
+  // v1.39.0: a 200 response without a numeric score used to be cached as a
+  // "success" ({score: null}), poisoning the cache for a full TTL. Such an
+  // entry is now treated as a miss so it gets re-fetched (self-healing).
+  it("returns false when the entry lacks a finite score (poisoned success)", () => {
+    const now = new Date("2026-05-19T12:00:00Z");
+    const fresh = "2026-05-18T12:00:00Z"; // 1 day ago — within any TTL
+    expect(isCacheEntryFresh({ score: null, checkedAt: fresh }, { now, ttlDays: 30 })).toBe(false);
+    expect(isCacheEntryFresh({ checkedAt: fresh }, { now, ttlDays: 30 })).toBe(false);
+    expect(isCacheEntryFresh({ score: "90", checkedAt: fresh }, { now, ttlDays: 30 })).toBe(false);
+    expect(isCacheEntryFresh({ score: 0, checkedAt: fresh }, { now, ttlDays: 30 })).toBe(true);
+  });
+
   it("uses 30 days as the default TTL when ttlDays not specified", () => {
     const now = new Date("2026-05-19T12:00:00Z");
     const recent = { score: 90, checkedAt: "2026-05-10T12:00:00Z" };

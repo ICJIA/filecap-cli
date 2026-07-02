@@ -1,16 +1,21 @@
 const EXTENSION_MAP = {
   pdf: "pdf",
 
-  doc: "office-document",
+  // v1.39.0: legacy binary Office formats (.doc/.xls/.ppt) get their own
+  // category — they need conversion before remediation, so the reports price
+  // them separately. Old cached inventories still carry them under the
+  // office-document/spreadsheet/presentation categories; every consumer
+  // keeps accepting both categorizations.
+  doc: "legacy-office",
   docx: "office-document",
   rtf: "office-document",
   odt: "office-document",
 
-  xls: "spreadsheet",
+  xls: "legacy-office",
   xlsx: "spreadsheet",
   ods: "spreadsheet",
 
-  ppt: "presentation",
+  ppt: "legacy-office",
   pptx: "presentation",
   odp: "presentation",
 
@@ -63,6 +68,7 @@ const REMEDIABLE_CATEGORIES = new Set([
   "office-document",
   "spreadsheet",
   "presentation",
+  "legacy-office",
 ]);
 
 export function categorize(extension) {

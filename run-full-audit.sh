@@ -34,7 +34,12 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 AUTO="$SCRIPT_DIR/examples/audit-fleet-auto.sh"
 FILECAP_BIN="$SCRIPT_DIR/bin/filecap.js"
-SITES_JSON="${SITES_JSON:-$HOME/.filecap/sites.json}"
+SITES_JSON="${SITES_JSON:-${FILECAP_SITES_FILE:-$HOME/.filecap/sites.json}}"
+# Child `filecap` invocations (references, audits, site-audit, web-rollup)
+# resolve their roster from FILECAP_SITES_FILE, and audit-fleet-auto.sh
+# reads SITES_JSON — export both so one roster steers the whole pipeline.
+export SITES_JSON
+export FILECAP_SITES_FILE="$SITES_JSON"
 AUDITS_BASE="${AUDITS_BASE:-$HOME/filecap-audits}"
 ROLLUP_DIR="$AUDITS_BASE/_web-rollup"
 
@@ -77,6 +82,9 @@ say "Pre-flight"
 
 command -v expect >/dev/null 2>&1 || die "'expect' not found. Install with: brew install expect"
 ok "expect present"
+
+command -v jq >/dev/null 2>&1 || die "jq is required (brew install jq)"
+ok "jq present"
 
 [ -f "$AUTO" ] || die "Cannot find $AUTO — run this from inside the filecap-cli checkout."
 ok "pipeline script found"
@@ -140,7 +148,9 @@ HUMAN="$((ELAPSED / 60))m $((ELAPSED % 60))s"
 ok "Audit pipeline finished in $HUMAN"
 
 # ── 6. purge old runs (keep newest per site + newest rollup) ─────────────────
-# Rules (deliberate): keep the newest timestamped run dir per site and the
+# Rules (deliberate): keep the newest timestamped run dir per site AND the
+# run `latest` points to (normally the same dir — but a partial dir left by
+# a failed/killed scan can be lexically newer than the good run), plus the
 # newest rollup bundle. Never touch `latest/` symlinks or `mirror/` rsync
 # caches (they do not end in 'Z' so the *Z glob skips them), and leave the
 # _fleet/ consolidated dirs alone.
@@ -151,11 +161,26 @@ if [ "$PURGE" -eq 1 ]; then
   PER_SITE_REMOVED=0
   for runs_dir in "$AUDITS_BASE"/*/runs; do
     [ -d "$runs_dir" ] || continue
+    site_dir="${runs_dir%/runs}"
     newest=$(ls -1d "$runs_dir"/*Z 2>/dev/null | sort | tail -1)
     [ -n "$newest" ] || continue
+    # Resolve `latest` to its physical target so it is never deleted. A
+    # dangling link means the site's state is suspect: warn, delete nothing.
+    keep_latest=""
+    if [ -e "$site_dir/latest" ] || [ -L "$site_dir/latest" ]; then
+      keep_latest=$(cd "$site_dir/latest" 2>/dev/null && pwd -P)
+      if [ -z "$keep_latest" ]; then
+        warn "$(basename "$site_dir"): dangling latest link — purging nothing for this site"
+        continue
+      fi
+    fi
     for d in "$runs_dir"/*Z; do
       [ -d "$d" ] || continue
       [ "$d" = "$newest" ] && continue
+      if [ -n "$keep_latest" ]; then
+        d_phys=$(cd "$d" 2>/dev/null && pwd -P)
+        [ "$d_phys" = "$keep_latest" ] && continue
+      fi
       rm -rf "$d" && PER_SITE_REMOVED=$((PER_SITE_REMOVED + 1))
     done
   done

@@ -10,6 +10,8 @@
 // This wrapper sits at the HTTP layer — where the Response status and the
 // Retry-After header are still visible — and waits the limiter out:
 //   - 429 (rate limit) and transient 5xx (502/503/504) are retried.
+//   - v1.39.0: network-level fetch rejections (DNS, reset, timeout —
+//     any rejection) are retried with the same backoff budget.
 //   - When the server sends Retry-After (seconds), we honor it exactly;
 //     otherwise we fall back to capped exponential backoff.
 //   - Any other non-2xx (404, 400, 401, …) throws immediately — those are
@@ -34,7 +36,7 @@ function defaultSleep(ms) {
 // backoff) to keep the delay deterministic and side-effect free.
 function retryAfterMs(response) {
   const raw = response?.headers?.get?.("retry-after");
-  if (raw == null) return null;
+  if (raw === null || raw === undefined) return null;
   const seconds = Number(raw);
   if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
   return null;
@@ -58,7 +60,25 @@ export function createRetryingJsonFetcher({
   return async function retryingJsonFetcher(url, init) {
     let attempt = 0;
     while (true) {
-      const response = await fetchImpl(url, init);
+      let response;
+      try {
+        response = await fetchImpl(url, init);
+      } catch (err) {
+        // v1.39.0: a rejected fetch never produced a Response — DNS failure
+        // (EAI_AGAIN), connection reset (ECONNRESET), timeout (ETIMEDOUT),
+        // undici's generic TypeError "fetch failed". These are exactly as
+        // transient as a 429/503, so ANY rejection retries with the same
+        // backoff budget; after maxRetries the last error is rethrown.
+        if (attempt >= maxRetries) throw err;
+        const delay = backoffMs({ attempt, baseDelayMs, maxDelayMs });
+        attempt++;
+        log(
+          `[audits] network error (${err?.message ?? err}) from ${url}; backing off ${delay}ms ` +
+            `(retry ${attempt}/${maxRetries})`,
+        );
+        await sleep(delay);
+        continue;
+      }
       if (response.ok) return response.json();
 
       const retryable = RETRYABLE_STATUSES.has(response.status);
@@ -70,7 +90,7 @@ export function createRetryingJsonFetcher({
 
       const afterHeader = retryAfterMs(response);
       const delay =
-        afterHeader != null
+        afterHeader !== null
           ? Math.min(maxDelayMs, afterHeader)
           : backoffMs({ attempt, baseDelayMs, maxDelayMs });
       attempt++;

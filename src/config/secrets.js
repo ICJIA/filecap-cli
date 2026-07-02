@@ -161,13 +161,17 @@ export function persistSiteToken({
   }
   let current = { version: 1, tokens: {}, credentials: {} };
   if (fs.existsSync(secretsPath)) {
+    const raw = fs.readFileSync(secretsPath, "utf-8");
     try {
-      const raw = fs.readFileSync(secretsPath, "utf-8");
       current = JSON.parse(raw);
     } catch {
-      // Treat unparseable file as fresh start — but warn rather than
-      // overwrite silently. The caller typically already ran loadSecrets
-      // before this and would have surfaced parse errors there.
+      // v1.39.0: refuse to clobber. "Starting fresh" here would silently
+      // drop every other site's tokens on the atomic rewrite below. The
+      // caller typically ran loadSecrets first (which throws on bad JSON),
+      // so this only fires when the file was corrupted mid-run.
+      throw new Error(
+        `Cannot parse ${secretsPath} — fix or remove it before saving new tokens`,
+      );
     }
   }
   current.tokens = current.tokens ?? {};

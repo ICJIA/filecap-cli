@@ -72,6 +72,11 @@ export function saveAuditCache({ cachePath = DEFAULT_CACHE_PATH, cache }) {
 
 export function isCacheEntryFresh(entry, { now = new Date(), ttlDays = DEFAULT_TTL_DAYS } = {}) {
   if (!entry || typeof entry !== "object") return false;
+  // v1.39.0: entries without a finite score are poisoned "successes" (a 200
+  // whose analyzer produced no score used to be cached as {score: null}).
+  // Treating them as misses makes previously-poisoned caches self-heal on
+  // the next run instead of serving score-less hits for a full TTL.
+  if (!Number.isFinite(entry.score)) return false;
   const checkedAt = entry.checkedAt;
   if (typeof checkedAt !== "string") return false;
   const checkedAtMs = Date.parse(checkedAt);

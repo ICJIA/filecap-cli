@@ -204,6 +204,15 @@ export async function runAudits({
         errorCount++;
         return;
       }
+      // v1.39.0: a 200 without a numeric score is a failed audit, not a
+      // success — record the error and keep it OUT of the cache so the
+      // next run retries instead of serving a poisoned hit for a TTL.
+      if (!Number.isFinite(result.score)) {
+        entry.audit = { error: "no score in response" };
+        errorCount++;
+        log(`[audits] WARN: ${entry.filename ?? entry.path}: no score in response`);
+        return;
+      }
       const checkedAt = new Date().toISOString();
       entry.audit = {
         score: result.score,
@@ -305,6 +314,14 @@ export async function runAudits({
           pagesErrorCount++;
           return;
         }
+        // v1.39.0: same rule as the PDF pass — a 200 without a numeric
+        // score is an error, never a cache entry.
+        if (!Number.isFinite(result.score)) {
+          urlToResult.set(pageUrl, { error: "no score in response" });
+          pagesErrorCount++;
+          log(`[audits] page-audit WARN: ${pageUrl}: no score in response`);
+          return;
+        }
         const checkedAt = new Date().toISOString();
         const stored = {
           score: result.score,
@@ -352,7 +369,9 @@ export async function runAudits({
   await fs.writeFile(outputPath, ndjson);
   log(
     `[audits] wrote ${records.length} records → ${outputPath} ` +
-      `(PDFs: ${auditedCount} freshly audited, ${errorCount} errors, ${pdfsToAudit.length === 0 ? "0" : (records.filter(r => r.audit?.cached).length)} from cache; ` +
+      // v1.39.0: the count is unconditional — the old ternary printed "0"
+      // exactly when EVERYTHING was served from the local cache.
+      `(PDFs: ${auditedCount} freshly audited, ${errorCount} errors, ${records.filter((r) => r.audit?.cached).length} from cache; ` +
       `pages: ${pagesTotalUnique} unique, ${pagesAuditedCount} freshly audited, ${pagesCachedCount} cached, ${pagesErrorCount} errors)`,
   );
 

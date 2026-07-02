@@ -105,6 +105,126 @@ describe("writeOrphansHtml", () => {
     expect(html).toMatch(/<\/title>\s*<link rel="icon"/);
   });
 
+  // v1.39.0 — the sort script reads dataset.confidence off the CELL; the
+  // attribute used to live only on the <tr>, so "Confidence %" sorted its
+  // "NN%" text lexicographically (100 before 20). These tests execute the
+  // shipped script's comparator over stub rows built from the rendered HTML.
+  describe("confidence column sort (D3)", () => {
+    // Minimal DOM-shaped stubs: one per <tr>, cells exposing .dataset and
+    // .textContent the way the browser would.
+    function stubRows(html) {
+      const rowsHtml = html.match(/<tr data-status[\s\S]*?<\/tr>/g) ?? [];
+      return rowsHtml.map((rh) => ({
+        children: (rh.match(/<td[\s\S]*?<\/td>/g) ?? []).map((cellHtml) => {
+          const dataset = {};
+          for (const m of cellHtml.matchAll(/data-([a-z]+)="([^"]*)"/g)) {
+            dataset[m[1]] = m[2];
+          }
+          return { dataset, textContent: cellHtml.replace(/<[^>]+>/g, "") };
+        }),
+      }));
+    }
+
+    function extractComparator(html) {
+      const m = html.match(/rows\.sort\(\(a, b\) => \{([\s\S]*?)\}\);/);
+      expect(m).not.toBeNull();
+      return new Function("a", "b", "idx", "dir", m[1]);
+    }
+
+    const fourOrphans = [100, 85, 20, 0].map((conf, i) =>
+      orphan({
+        replaceabilityConfidence: conf,
+        entry: {
+          filename: `f${i}.pdf`,
+          path: `uploads/f${i}.pdf`,
+          serverName: "icjia-agency-prod",
+          extension: "pdf",
+          sizeBytes: 10 + i,
+          modifiedAt: "2021-01-01T00:00:00.000Z",
+        },
+      }));
+
+    it("emits data-confidence on the confidence <td> (and keeps the <tr> attribute)", () => {
+      const html = writeOrphansHtml({ orphans: fourOrphans, sources, siteTotals });
+      expect(html).toMatch(/<td class="confidence-cell conf-high" data-confidence="100">100%<\/td>/);
+      expect(html).toMatch(/<tr data-status="stale-revision" data-confidence="100">/);
+    });
+
+    it("the shipped sort script orders confidence 0,20,85,100 ascending", () => {
+      const html = writeOrphansHtml({ orphans: fourOrphans, sources, siteTotals });
+      const cmp = extractComparator(html);
+      const rows = stubRows(html);
+      expect(rows).toHaveLength(4);
+      // Column order: Site, Filename, Type, Size, Modified, Status,
+      // Confidence %, Replaced by, Reasons → confidence is index 6.
+      const CONF_IDX = 6;
+      const sorted = rows.slice().sort((a, b) => cmp(a, b, CONF_IDX, "asc"));
+      const confidences = sorted.map((r) => r.children[CONF_IDX].textContent.trim());
+      expect(confidences).toEqual(["0%", "20%", "85%", "100%"]);
+    });
+
+    it("the size column still sorts numerically via data-bytes", () => {
+      const html = writeOrphansHtml({ orphans: fourOrphans, sources, siteTotals });
+      const cmp = extractComparator(html);
+      const rows = stubRows(html);
+      const SIZE_IDX = 3;
+      const sorted = rows.slice().sort((a, b) => cmp(a, b, SIZE_IDX, "desc"));
+      const bytes = sorted.map((r) => Number(r.children[SIZE_IDX].dataset.bytes));
+      expect(bytes).toEqual([13, 12, 11, 10]);
+    });
+  });
+
+  // v1.39.0 post-audit fix (red-1 R2): the LIVE orphan emitters still shipped
+  // raw un-encoded public URLs (D10 fixed only the zero-caller CSV writer). A
+  // real fleet filename like Sheet#Info1V1-2025.pdf produced an href whose
+  // "#" truncates the request at the fragment. Same base(+pathPrefix)+
+  // per-segment encoding as audit-errors.js publicUrlFor.
+  describe("public-URL encoding (R2)", () => {
+    it("percent-encodes # in the filename link (the live Sheet#Info1V1-2025.pdf trigger)", () => {
+      const html = writeOrphansHtml({
+        orphans: [orphan({
+          entry: {
+            filename: "Sheet#Info1V1-2025.pdf",
+            path: "uploads/Sheet#Info1V1-2025.pdf",
+            serverName: "icjia-agency-prod",
+            extension: "pdf",
+            sizeBytes: 1,
+            modifiedAt: "2021-01-01T00:00:00.000Z",
+          },
+        })],
+        sources,
+        siteTotals,
+      });
+      expect(html).toContain(
+        'href="https://agency.icjia-api.cloud/uploads/Sheet%23Info1V1-2025.pdf"',
+      );
+      expect(html).not.toContain(
+        'href="https://agency.icjia-api.cloud/uploads/Sheet#Info1V1-2025.pdf"',
+      );
+    });
+
+    it("composes pathPrefix and per-segment-encodes each path segment (pin)", () => {
+      // Control pin: prefix composition + space encoding (spaces were already
+      // normalized by the URL round-trip; the prefix rule must survive the
+      // shared-helper swap).
+      const html = writeOrphansHtml({
+        orphans: [orphan({
+          entry: {
+            filename: "a b.pdf",
+            path: "docs/a b.pdf",
+            serverName: "px",
+            extension: "pdf",
+            sizeBytes: 1,
+            modifiedAt: "2021-01-01T00:00:00.000Z",
+          },
+        })],
+        sources: [{ serverName: "px", siteName: "PX", publicUrlBase: "https://files.example.gov/", pathPrefix: "static" }],
+        siteTotals: new Map([["px", 1]]),
+      });
+      expect(html).toContain('href="https://files.example.gov/static/docs/a%20b.pdf"');
+    });
+  });
+
   it("wraps the page body in exactly one <main> landmark", () => {
     const html = writeOrphansHtml({ orphans: [orphan()], sources, siteTotals });
     expect((html.match(/<main>/g) ?? []).length).toBe(1);

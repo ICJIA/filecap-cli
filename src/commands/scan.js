@@ -21,6 +21,8 @@ export async function runScan({
   hash,
   concurrency,
   progress,
+  quiet = false,
+  progressStream,
   serverName,
   serverIp,
   siteName,
@@ -96,9 +98,17 @@ export async function runScan({
       permissionDenials: 0,
     };
 
-    const reporter = new Progress({ enabled: progress });
+    // v1.39.0: --quiet wins over --progress — the reporter (ticks + final
+    // summary, the scan's only INFO-level output) emits nothing. Errors still
+    // surface via the returned { error } that bin prints unconditionally.
+    const reporter = new Progress({ enabled: progress && !quiet, stream: progressStream });
     const limit = createLimiter(concurrency);
     const inFlight = [];
+    // v1.39.0: first unexpected task error (first one wins). Tasks capture
+    // their own failures instead of rejecting — a rejected promise sitting in
+    // inFlight[] before Promise.all attaches would crash the process as an
+    // unhandled rejection (truncated NDJSON, no footer).
+    let firstTaskError = null;
     const includeSet = includeExt ? new Set(includeExt.map((e) => e.toLowerCase())) : null;
     const excludeSet = excludeExt ? new Set(excludeExt.map((e) => e.toLowerCase())) : null;
 
@@ -125,12 +135,13 @@ export async function runScan({
       if (includeSet && !includeSet.has(fileStats.extension)) continue;
       if (excludeSet && excludeSet.has(fileStats.extension)) continue;
 
-      const task = limit(async () => {
+      const processFile = async () => {
         let sha256 = "";
         if (hash) {
           try {
             sha256 = await hashFile(filePath);
           } catch (err) {
+            if (err.code === "ENOENT") return; // file vanished mid-scan — skip silently
             if (err.code === "EACCES" || err.code === "EPERM") {
               stats.permissionDenials++;
               return;
@@ -187,11 +198,19 @@ export async function runScan({
         stats.fileCount++;
         stats.totalBytes += fileStats.sizeBytes;
         reporter.tick(entry.path);
-      });
+      };
+      const task = limit(() =>
+        processFile().catch((err) => {
+          if (!firstTaskError) firstTaskError = err;
+        }),
+      );
       inFlight.push(task);
     }
 
+    // Every task resolves (errors are captured above), so this waits for ALL
+    // tasks to settle — no write can race the stream teardown below.
     await Promise.all(inFlight);
+    if (firstTaskError) throw firstTaskError;
 
     const footer = {
       kind: "filecap-inventory-footer",

@@ -746,6 +746,7 @@ main {
 .site-card .tech-details .meta-copy,
 .site-card .tech-details .meta-value a,
 .site-card .site-url a,
+.site-card .nums .lbl-sub,
 .site-card .access-chip {
   pointer-events: auto;
 }

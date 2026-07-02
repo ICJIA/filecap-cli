@@ -88,7 +88,7 @@ describe("CSV_COLUMNS Remediation Score", () => {
 });
 
 describe("writeCsv Remediation Score column", () => {
-  function cell(csv, entry, name) {
+  function cell(csv, _entry, _name) {
     const lines = csv.trim().split("\n");
     const headers = lines[0].split(",");
     const idx = headers.indexOf("Remediation Score");

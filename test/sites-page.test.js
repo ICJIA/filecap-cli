@@ -132,4 +132,28 @@ describe("generateSitesHtml", () => {
     const html = generateSitesHtml({ contentRoster: [scannedEntry], tools: [] });
     expect(html).toContain(".site-card {");
   });
+
+  // v1.39.0 (E10) — roster-card image alt text escaped exactly once (the
+  // caller used to pass a pre-escaped name into renderCardImage, which
+  // escapes internally → double escape).
+  it("escapes the roster card image alt exactly once (v1.39.0)", () => {
+    const gnarly = {
+      ...scannedEntry,
+      site: { ...scannedEntry.site, siteFullName: "Theft & Insurance <Council>" },
+    };
+    const html = generateSitesHtml({ contentRoster: [gnarly], tools: [] });
+    expect(html).toContain('alt="Theft &amp; Insurance &lt;Council&gt;"');
+    expect(html).not.toContain("&amp;amp;");
+    expect(html).not.toContain("&amp;lt;");
+  });
+
+  it("escapes the roster fallback tile aria-label exactly once (v1.39.0)", () => {
+    const gnarly = {
+      ...unscannedEntry,
+      site: { ...unscannedEntry.site, siteFullName: "A & B <C>" },
+    };
+    const html = generateSitesHtml({ contentRoster: [gnarly], tools: [] });
+    expect(html).toContain('aria-label="A &amp; B &lt;C&gt;"');
+    expect(html).not.toContain("&amp;amp;");
+  });
 });

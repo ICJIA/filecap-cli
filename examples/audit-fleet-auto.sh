@@ -75,7 +75,28 @@ if [[ ! -r "$AUDIT_FLEET_PATH" ]]; then
   exit 1
 fi
 
+# v1.39.0: fail fast on a bad roster path, BEFORE any work. A missing file
+# used to silently bare-spawn audit-fleet.sh (which auto-detects the DEFAULT
+# roster — wrong fleet scanned); a non-.json name used to fall into
+# audit-fleet.sh's legacy CSV branch (the JSON roster parsed as CSV).
+if [[ ! -f "$SITES_JSON" ]]; then
+  echo "ERROR: sites roster not found: $SITES_JSON" >&2
+  echo "       Set SITES_JSON to an existing .json roster (default: ~/.filecap/sites.json)." >&2
+  exit 1
+fi
+if [[ "$SITES_JSON" != *.json ]]; then
+  echo "ERROR: sites roster must be a .json file: $SITES_JSON" >&2
+  echo "       (audit-fleet.sh treats a non-.json roster as its legacy CSV format)" >&2
+  exit 1
+fi
+
 export AUDIT_FLEET_PATH
+export SITES_JSON
+# v1.39.0: steer the spawned filecap children (references / cross-references /
+# site-audit / web-rollup) to the same roster the shell stages use. An
+# explicit FILECAP_SITES_FILE from the caller still wins (run-full-audit.sh
+# exports both, pointed at the same file).
+export FILECAP_SITES_FILE="${FILECAP_SITES_FILE:-$SITES_JSON}"
 export SKIP_VERSION_CHECK="${SKIP_VERSION_CHECK:-1}"
 export AUDIT_HTML="${AUDIT_HTML:-1}"
 
@@ -87,7 +108,15 @@ expect <<'EXPECT_EOF'
 set timeout -1
 log_user 1
 
-spawn -noecho bash $env(AUDIT_FLEET_PATH)
+# Forward the sites.json override to audit-fleet.sh as its positional arg,
+# so stage 1 scans the same fleet the later stages read. Only when the file
+# exists — a bare spawn keeps audit-fleet.sh's own auto-detect/interactive
+# behavior for the missing-file case.
+if {[info exists env(SITES_JSON)] && [file exists $env(SITES_JSON)]} {
+    spawn -noecho bash $env(AUDIT_FLEET_PATH) $env(SITES_JSON)
+} else {
+    spawn -noecho bash $env(AUDIT_FLEET_PATH)
+}
 
 # Every interactive prompt audit-fleet.sh / audit-remote.sh can show during a
 # fleet run, with the desired non-interactive answer:
@@ -116,6 +145,11 @@ expect {
 }
 
 catch wait result
+# A signal-killed child reports {pid spawnid 0 0 CHILDKILLED ...}, where
+# element 3 is 0 — it must not be used as the exit code. An OS-level wait
+# error sets element 2 to -1 (element 3 is then errno, not a status).
+if {[llength $result] > 4 && [lindex $result 4] eq "CHILDKILLED"} { exit 143 }
+if {[lindex $result 2] == -1} { exit 1 }
 exit [lindex $result 3]
 EXPECT_EOF
 FLEET_EXIT=$?
@@ -163,6 +197,29 @@ for s in d.get('sites', []):
           if ! node "$FILECAP_BIN" references "$site" \
                  -o "$SIDECARS_DIR/$site.refs.ndjson" >/tmp/filecap-refs-"$site".log 2>&1; then
             echo "[fleet-auto] WARN: references failed for $site (see /tmp/filecap-refs-$site.log)" >&2
+            # v1.39.0: stage 1 already repointed latest/ at a FRESH run dir,
+            # so with no sidecar this cycle cross-references would mark every
+            # file referenced only by this site's pages as an orphan — and
+            # those false orphans would deploy. Stale references beat none:
+            # fall back to the newest prior run's retained sidecar, feeding
+            # cross-references (temp dir) AND retaining it in the current run
+            # dir for web-rollup, exactly like the success path does.
+            prior_sidecar=""
+            prior_ts=""
+            for prior_run in "$AUDITS_BASE/$site/runs/"*Z; do
+              [[ -d "$prior_run" && -f "$prior_run/references-sidecar.ndjson" ]] || continue
+              run_ts="$(basename "$prior_run")"
+              if [[ -z "$prior_ts" || "$run_ts" > "$prior_ts" ]]; then
+                prior_ts="$run_ts"
+                prior_sidecar="$prior_run/references-sidecar.ndjson"
+              fi
+            done
+            if [[ -n "$prior_sidecar" ]] && cp "$prior_sidecar" "$SIDECARS_DIR/$site.refs.ndjson" 2>/dev/null; then
+              cp "$prior_sidecar" "$AUDITS_BASE/$site/latest/references-sidecar.ndjson" 2>/dev/null || true
+              echo "[fleet-auto] WARN: references failed for $site; reusing stale sidecar from $prior_ts (references may be outdated)" >&2
+            else
+              echo "[fleet-auto] WARN: no prior references sidecar for $site — reference status unknown this cycle (files referenced only by this site's pages may be misreported as orphans)" >&2
+            fi
           else
             # v1.14.x: retain the sidecar in the site's audit dir so web-rollup
             # can merge the full CMS page list into the Page view.

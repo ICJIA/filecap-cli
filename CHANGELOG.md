@@ -10,6 +10,143 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.39.0] — 2026-07-02
+
+A fix-all release: a full-application review (seven parallel domain reviewers)
+found ~30 verified defects across every pipeline stage; all were fixed, then
+verified by a ten-agent red/blue audit (six blue verifiers re-proving each fix
+against pre-fix code, four red attackers hunting the diff for regressions,
+contract breaks, old-data breakage, and weak tests). The audit's own findings
+were fixed in a second round. Suite grew from 73 files / 1,041 tests to
+83 files / 1,260. No deploy with this release — the reference-extraction fixes
+change sidecar contents, so the bundle ships after the next full
+references → cross-references → audits → web-rollup run.
+
+### Fixed — data loss and false success
+
+- **Purge could delete the newest audit.** Both purge loops (`run-full-audit.sh`,
+  `run-site-update.sh`) picked "newest" by directory-name sort and ignored what
+  `latest` actually pointed at; they now keep the `latest` target AND the newest
+  run, and a dangling `latest` logs a WARN and skips purging instead of deleting
+  blind. `audit-remote.sh`'s failure-cleanup trap could `rm -rf` a **completed**
+  run when the end-of-run `latest` repoint failed — the trap now disarms the
+  moment run content is complete, and a non-symlink `latest` is refused up front
+  (never deleted). A committed fixture probe (`test/shell/purge-fixture-probe.sh`
+  + vitest wrapper) turns the suite red if the purge logic regresses.
+- **Deploy failures no longer look like success.** `web-rollup` used to resolve
+  every Netlify outcome as success; a requested deploy that fails now exits 1
+  with "bundle written … but deploy FAILED — production not updated"
+  (`FILECAP_NO_DEPLOY=1` skip remains exit 0, missing CLI keeps the install hint).
+- **Expired Strapi tokens no longer silently orphan a whole fleet.** GraphQL
+  `errors`/null-`data` responses now throw instead of degrading to "no
+  references"; `filecap references` exits 1 on zero discovered types or
+  all-types-failed (partial failures WARN with a `(N/M types failed)` summary).
+  The fleet script continues past a failing site but now falls back to the
+  previous run's sidecar with a loud WARN — stale references beat false orphans.
+  Hard-error paths are pinned to never write a sidecar.
+- **Null/invalid audit scores are no longer cached as successes.** A score-less
+  200 becomes an error entry and is retried next run; previously poisoned cache
+  entries self-heal (verified against the real 6,942-entry cache: zero valid
+  entries invalidated).
+- **The file-accessibility history finally survives.** The per-site series was
+  written through the `latest` symlink into the run dir, so every scan orphaned
+  it and purge deleted it — that was why cards said "baseline recorded" but
+  never showed a trend. The series now lives at the purge-safe
+  `<site>/a11y-history.json`, a one-time migration rescues points stranded in
+  old run dirs (verified against real data: all 11 sites' stranded June
+  baselines recovered, trend chips render), writes are atomic, and a corrupt
+  file is set aside as `.corrupt-<ts>` — never silently reset. The
+  `site-audit.json` sidecar moved out of the purge blast radius the same way
+  (`<site>/site-audit.json`, with fallback reads of the old locations and a
+  `runs/*Z` rescue so score history carries forward).
+
+### Fixed — references and cross-references
+
+- URL extraction rewritten span-then-verify: parentheses/brackets in paths
+  survive, extensions must sit at a real boundary (`report.pdfx` rejected,
+  `report.doc.pdf` whole), quoted `href`/`src` values are extracted verbatim so
+  spaced filenames survive, HTML entities in hrefs are decoded, and
+  comma/semicolon-joined URL lists yield every URL instead of one glued
+  unmatchable string.
+- Canonical URL matching: file paths are percent-encoded per segment (`#`, `?`,
+  spaces no longer truncate or miss), query strings are stripped, and `%xx` hex
+  case is normalized — each previously produced false orphans for real fleet
+  filenames.
+- Strapi pagination is complete: v3 stops only on an empty page and advances by
+  records received (server `maxLimit` caps no longer silently drop the tail);
+  v4 trusts `meta.pagination` with an empty-page fallback.
+- Strapi v4 collection names that don't pluralize cleanly (e.g. `analysis`) are
+  now paired via a proper pluralizer, and unpaired non-system types are fetched
+  as single types (`/api/<name>`, kebab-case retry) instead of skipped; v3 WARNs
+  every unpairable name. Reference-bearing fields are matched by `/(?:url|link)$/i`
+  instead of exact names, gated by an audited-file check so page URLs stay out.
+- Unresolvable public-URL bases leave entries **without** a `references` key
+  (unknown) instead of `[]` (orphan); the introspection query nests three
+  `ofType` levels so wrapped media relations classify correctly.
+
+### Fixed — reports and bundle
+
+- Embedded table sorting: numeric compare only when both values are fully
+  numeric — dates like "Jun 28, 2026" sort chronologically instead of as text;
+  the orphans confidence column sorts 0→100 numerically and carries per-cell
+  `data-confidence`; embedded search also matches path and server name; the two
+  placeholder headers are marked `data-nosort` (no cursor inviting a dead click).
+- Public URLs in audit-errors and orphans outputs (HTML **and** XLSX — the
+  original fix had landed in a writer nothing calls) are built from the
+  site's live base with per-segment encoding; `Sheet#Info…pdf`-style names now
+  resolve. Per-site sheets and detail pages use the sites.json base instead of
+  the possibly-stale base cached in old inventory headers.
+- A rounded average of 100 displays as 99 unless every score is truly 100;
+  "Average pages per PDF" divides by *measured* PDFs with an "(N of M measured)"
+  note; duplicate keys containing `::` in paths round-trip; CSV cells share one
+  formula-injection guard; sites without a workbook omit the download button
+  end-to-end instead of linking a nonexistent file.
+- Bundle renderers: curated og descriptions survive scrape failures; card
+  alt/aria-label text is escaped exactly once; the orphans blurb pluralizes and
+  formats counts; SSR card order matches the pressed "Most recently added"
+  toggle; tile sub-label tooltips are hoverable again; uptime freshness is
+  gated by a client-local timestamp (a stale server `checkedAtMs` no longer
+  pins "checked …" forever); cross-server duplicate detection covers all
+  entries, and reference-side groups are marked and counted.
+- `legacy-office` category for binary `.doc`/`.xls`/`.ppt` end-to-end (scanner,
+  schema, remediable sets, summary scope box, chips, fleet-context markdown
+  table and documented enum) — these need conversion before remediation and now
+  price separately. Old cached inventories keep their old categories and remain
+  valid and remediable; counts populate as sites re-scan.
+
+### Fixed — scan, CLI, MCP, shell
+
+- A file vanishing mid-scan no longer crashes the inventory stream (footer
+  still written); `--quiet` plus PDF-parser warnings can no longer corrupt
+  NDJSON on stdout; an unparseable secrets file throws instead of silently
+  wiping other sites' tokens; XLSX chart detection actually detects charts;
+  PDF dates parse to real ISO UTC (offset-less values assume UTC by schema
+  contract); transient network failures (DNS/reset/timeout) retry with the
+  same backoff budget as 429/5xx, honoring `Retry-After`.
+- MCP tools: every path-typed argument (including `web_rollup.sitesFile`) is
+  gated by the path allowlist; error payloads return `isError`.
+- Shell orchestration: temp rosters end in `.json` (audit-fleet's gate rejected
+  the old names); expect wrappers map signal-killed children to exit 143 instead
+  of 0; a concurrent-run guard refuses to double-run; prereq checks run in every
+  mode; `jq` is checked before first use; `SITES_JSON` overrides are validated
+  (must exist, must be `.json`), forwarded to the stage-1 scan, and exported as
+  `FILECAP_SITES_FILE` so spawned filecap children read the same roster.
+
+### Changed
+
+- `filecap references` now fails loudly (exit 1) where it previously reported
+  success with empty results — see the token-expiry fix above for fleet-run
+  behavior.
+- `audit-file-duplicates.xlsx` and the LLM-context duplicate count now include
+  reference-side duplicate groups (previously only same-inventory groups).
+
+### Known minor (pre-existing, documented during the audit)
+
+- `runAudits` serializes an internal `__auditUrl` scratch field into audited
+  inventories (harmless; slated for cleanup).
+- Fresh detail-less page-audit cache entries can inflate "fixed" counts in the
+  site-audit trend exactly as in prior releases.
+
 ## [1.38.0] — 2026-06-28
 
 ### Added

@@ -63,4 +63,39 @@ describe("a11yTrend", () => {
     expect(t.delta).toBe(6); // 67 vs 61, not vs 50
     expect(t.sinceAt).toBe("B");
   });
+
+  // v1.39.0: when the scored-PDF sample shifts by more than 20% between the
+  // two compared points, the delta measures the sampling change, not
+  // remediation — suppress the chip (null) rather than mislead.
+  it("returns null when the scored sample shrank by more than 20%", () => {
+    const t = a11yTrend([
+      { at: "A", avg: 62, scored: 40 },
+      { at: "B", avg: 65, scored: 12 },
+    ]);
+    expect(t).toBeNull();
+  });
+
+  it("returns null when the scored sample grew by more than 20%", () => {
+    const t = a11yTrend([
+      { at: "A", avg: 62, scored: 12 },
+      { at: "B", avg: 65, scored: 40 },
+    ]);
+    expect(t).toBeNull();
+  });
+
+  it("keeps the chip for a close sample (40 → 41 scored)", () => {
+    const t = a11yTrend([
+      { at: "A", avg: 62, scored: 40 },
+      { at: "B", avg: 65, scored: 41 },
+    ]);
+    expect(t).toEqual({ delta: 3, dir: "up", sinceAt: "A" });
+  });
+
+  it("keeps the chip at exactly a 20% sample shift (boundary)", () => {
+    const t = a11yTrend([
+      { at: "A", avg: 62, scored: 50 },
+      { at: "B", avg: 65, scored: 40 }, // |50-40| = 10 = 0.2 × 50 — not over
+    ]);
+    expect(t).toEqual({ delta: 3, dir: "up", sinceAt: "A" });
+  });
 });
