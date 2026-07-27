@@ -13,7 +13,7 @@
 
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_MAX_IMAGE_BYTES = 5_000_000;
-const USER_AGENT = "filecap-og/1.0 (+https://github.com/ICJIA/filecap-cli)";
+const USER_AGENT = "filecap-og/1.0 (+https://github.com/ICJIA/icjia-fleet-audit)";
 
 /**
  * Fetch a page and extract its Open Graph metadata.

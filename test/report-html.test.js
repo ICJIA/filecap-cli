@@ -119,15 +119,15 @@ describe("writeHtml", () => {
     const html = await fs.readFile(out, "utf8");
     // v1.20.0: 7 columns — Pages added between File name and File type
     // because vendors quote remediation per page. v1.12.0 used 6.
-    expect(html).toContain('<th data-col="filename">File name</th>');
-    expect(html).toContain('<th data-col="pageCount">Pages</th>');
-    expect(html).toContain('<th data-col="category">File type</th>');
+    expect(html).toContain('<th data-col="filename" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">File name</button></th>');
+    expect(html).toContain('<th data-col="pageCount" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Pages</button></th>');
+    expect(html).toContain('<th data-col="category" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">File type</button></th>');
     // v1.39.0: the two placeholder columns carry data-nosort (their row
     // values are "" by design, so they never actually sorted).
-    expect(html).toContain('<th data-col="auditScore" data-nosort>Audit Report</th>');
-    expect(html).toContain('<th data-col="referenced" data-nosort>Page References</th>');
-    expect(html).toContain('<th data-col="duplicateOf">Duplicate of</th>');
-    expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
+    expect(html).toContain('<th data-col="auditScore" scope="col" data-nosort>Audit Report</th>');
+    expect(html).toContain('<th data-col="referenced" scope="col" data-nosort>Page References</th>');
+    expect(html).toContain('<th data-col="duplicateOf" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Duplicate of</button></th>');
+    expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Date published</button></th>');
     // Forensic columns are CSV-only — not rendered as HTML table columns.
     for (const col of ["serverName", "serverIp", "publicUrl", "scannedPath", "path", "absolutePath", "extension", "sizeBytes", "sha256"]) {
       expect(html).not.toMatch(new RegExp('<th data-col="' + col + '"'));
@@ -222,7 +222,7 @@ describe("writeHtml", () => {
     const out = path.join(tmpDir, "consolidated-website.html");
     await writeHtml({ sourceHeader: consolidatedHeader, entries: consolidatedEntries, sources, outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toContain('<th data-col="siteName">Website</th>');
+    expect(html).toContain('<th data-col="siteName" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Website</button></th>');
     const theadMatch = html.match(/<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
     expect(theadMatch).not.toBeNull();
     // v1.20.0: Website + Filename + Pages + 5 other manager columns = 8.
@@ -347,7 +347,7 @@ describe("writeHtml", () => {
     expect(html).toMatch(/Image[^(]*\(2\)/i);
   });
 
-  it("embeds entry data via <script type=application/json> so values containing single quotes do not break the IIFE", async () => {
+  it("ships row values once — no filecap-data blob; sort/search project from the DOM (v1.40.0)", async () => {
     const out = path.join(tmpDir, "files.html");
     const trickyEntries = [
       {
@@ -361,9 +361,11 @@ describe("writeHtml", () => {
     ];
     await writeHtml({ sourceHeader: sampleHeader, entries: trickyEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
-    expect(html).toMatch(/<script[^>]*type="application\/json"[^>]*id="filecap-data"/i);
-    expect(html).toMatch(/document\.getElementById\("filecap-data"\)\.textContent/);
-    expect(html).not.toMatch(/JSON\.parse\('[^]*?-08'00'/);
+    // v1.40.0 — the 481KB-per-big-page values blob is gone; the client
+    // projects sort/search values from the rendered cells + data-search.
+    expect(html).not.toMatch(/id="filecap-data"/);
+    expect(html).toContain("td.dataset.num || td.textContent.trim()");
+    expect(html).toContain("row.dataset.search");
   });
 
   // v1.39.0 (D1) — the embedded sort comparator must only compare
@@ -425,15 +427,99 @@ describe("writeHtml", () => {
   // their cells directly; their embedded row values are "" placeholders, so
   // clicking their headers could never sort anything. They must not offer
   // the sortable affordance.
+  describe("client-side remediable set is generated from the canonical one (v1.40.0)", () => {
+    it("emits the scanner's REMEDIABLE_CATEGORIES as JSON — no hand-kept copy", async () => {
+      const out = path.join(tmpDir, "remediable-cats.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('const REMEDIABLE_CATS = ["pdf","office-document","spreadsheet","presentation","legacy-office"];');
+    });
+  });
+
+  describe("table sort keyboard accessibility + live status (v1.40.0)", () => {
+    it("wraps sortable headers in real buttons and tracks aria-sort", async () => {
+      const out = path.join(tmpDir, "sort-a11y.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('class="th-sort-btn"');
+      expect(html).toContain('setAttribute("aria-sort"');
+      // the ::after sort arrows must still key off the th classes
+      expect(html).toContain("thead th.sort-asc::after");
+    });
+
+    it("announces filter/pagination changes via polite live regions", async () => {
+      const out = path.join(tmpDir, "live-status.html");
+      // references on an entry make the Page view (and its paginator) render too
+      const entries = [{
+        ...sampleEntries[0],
+        references: [{ siteName: "test-server", contentType: "meeting", entryId: 1, pageUrl: "https://example.org/p1/" }],
+      }];
+      await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('<span class="pag-info" id="page-info" role="status" aria-live="polite">');
+      expect(html).toContain('<span class="pag-info" id="pv-page-info" role="status" aria-live="polite">');
+    });
+
+    it("gives the header buttons a keyboard focus style", async () => {
+      const out = path.join(tmpDir, "sort-focus.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/\.th-sort-btn:focus-visible \{[^}]*outline/);
+    });
+  });
+
+  describe("website-accessibility section wiring (v1.40.0)", () => {
+    const siteAudit = {
+      score: 82, grade: "B",
+      coverage: { scored: 40, pagesInSet: 44, capped: 2, errored: 2 },
+      outstanding: { total: 9, bySeverity: { critical: 1, serious: 3, moderate: 4, minor: 1 }, byWcag: { A: 2, AA: 5, AAA: 1, bestPractice: 1 }, needsReview: 6 },
+      trend: { fixed: 4, new: 1, stillOpen: 8 },
+      pages: [{ url: "https://example.org/a", score: 61, grade: "D", violationCount: 5, needsReview: 2, reportUrl: "https://audit.icjia.app/r/1" }],
+    };
+
+    it("renders the SiteImprove-depth section when site-audit data exists", async () => {
+      const out = path.join(tmpDir, "sa-yes.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out, siteAudit });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('<h2 id="sa-heading">Website accessibility</h2>');
+      expect(html).toContain("This is the website&#39;s score &mdash; not its documents&#39;.".replace("&mdash;", "—"));
+      expect(html).toMatch(/<span class="sa-num">82<\/span><span class="sa-grade">B<\/span>/);
+      expect(html).toContain("Scored <strong>40</strong> of 44 pages (2 not yet reached this run), 2 errored.");
+      expect(html).toContain("<strong>4 fixed</strong>");
+      expect(html).toContain("https://example.org/a");
+    });
+
+    it("renders nothing when the site has no site-audit data", async () => {
+      const out = path.join(tmpDir, "sa-no.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).not.toContain("Website accessibility");
+    });
+  });
+
+  describe("thin-data file-accessibility banner caption (v1.40.0)", () => {
+    it("explains WHY there is no score instead of a bare (n / N) ratio", async () => {
+      const out = path.join(tmpDir, "thin-a11y.html");
+      const entries = [
+        { ...sampleEntries[0], audit: { score: 88, grade: "B" } },
+        sampleEntries[1],
+      ];
+      await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("Only 1 of 2 PDFs scored so far — too few for a reliable score (needs 5).");
+      expect(html).not.toContain("Not enough scored PDFs yet");
+    });
+  });
+
   describe("placeholder columns are not sortable (v1.39.0)", () => {
     it("marks Page References and Audit Report headers data-nosort; others stay sortable", async () => {
       const out = path.join(tmpDir, "nosort.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toContain('<th data-col="referenced" data-nosort>Page References</th>');
-      expect(html).toContain('<th data-col="auditScore" data-nosort>Audit Report</th>');
-      expect(html).toContain('<th data-col="filename">File name</th>');
-      expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
+      expect(html).toContain('<th data-col="referenced" scope="col" data-nosort>Page References</th>');
+      expect(html).toContain('<th data-col="auditScore" scope="col" data-nosort>Audit Report</th>');
+      expect(html).toContain('<th data-col="filename" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">File name</button></th>');
+      expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Date published</button></th>');
     });
 
     it("skips wiring a click handler for data-nosort headers", async () => {
@@ -458,17 +544,6 @@ describe("writeHtml", () => {
   // hidden values. These tests run the shipped search predicate over the
   // shipped embedded data.
   describe("file-table search haystack (v1.39.0)", () => {
-    function searchHits(html, query) {
-      const dataM = html.match(/<script type="application\/json" id="filecap-data">([\s\S]*?)<\/script>/);
-      expect(dataM).not.toBeNull();
-      const rows = JSON.parse(dataM[1]);
-      const predM = html.match(/rd\.some\(function \(v\) \{\n([\s\S]*?)\n {6}\}\)/);
-      expect(predM).not.toBeNull();
-      const pred = new Function("v", "q", predM[1]);
-      const q = query.trim().toLowerCase();
-      return rows.filter((rd) => rd.some((v) => pred(v, q)));
-    }
-
     it("matches on path segments that are not part of the filename", async () => {
       const out = path.join(tmpDir, "search-path.html");
       const entries = [
@@ -477,9 +552,12 @@ describe("writeHtml", () => {
       ];
       await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      const hits = searchHits(html, "uploads/2019");
-      expect(hits).toHaveLength(1);
-      expect(hits[0]).toContain("report-x.pdf");
+      // v1.40.0 — the haystack extras ride the row itself now: data-search
+      // carries path (and serverName on consolidated reports), the client
+      // projection appends row.dataset.search, and the predicate is unchanged.
+      expect(html).toMatch(/<tr[^>]*data-search="[^"]*uploads\/2019\/report-x\.pdf[^"]*"/);
+      expect(html).toContain("if (row.dataset.search) vals.push(row.dataset.search);");
+      expect(html).toContain("String(v).toLowerCase().indexOf(q) >= 0");
     });
 
     it("matches on serverName in a consolidated report", async () => {
@@ -499,9 +577,15 @@ describe("writeHtml", () => {
       const out = path.join(tmpDir, "search-server.html");
       await writeHtml({ sourceHeader: consolidatedHeader, entries, sources, outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      const hits = searchHits(html, "srv-alpha");
-      expect(hits).toHaveLength(1);
-      expect(hits[0]).toContain("doc.pdf");
+      expect(html).toMatch(/<tr[^>]*data-search="[^"]*srv-alpha-01[^"]*"/);
+    });
+
+    it("escapes hostile path values inside data-search", async () => {
+      const out = path.join(tmpDir, "search-hostile.html");
+      const entries = [{ ...sampleEntries[0], path: 'up"loads/<img src=x>/a.pdf' }];
+      await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("data-search=\"up&quot;loads/&lt;img src=x&gt;/a.pdf\"");
     });
 
     it("keeps the placeholder text accurate", async () => {
@@ -526,7 +610,7 @@ describe("writeHtml", () => {
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
     // v1.12.0: column-resize handles removed — the th is just label.
-    expect(html).toContain('<th data-col="modifiedAt">Date published</th>');
+    expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Date published</button></th>');
     expect(html).not.toContain("Last modified");
   });
 
@@ -1487,5 +1571,16 @@ describe("writeHtml", () => {
       const html = await fs.readFile(out, "utf8");
       expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
     });
+  });
+});
+
+describe("meta description (v1.40.0)", () => {
+  it("ships a description naming the site on detail pages", async () => {
+    const os = await import("node:os");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "filecap-meta-"));
+    const out = path.join(dir, "meta.html");
+    await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out, siteFullName: "Example Site" });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/<meta name="description" content="[^"]*Example Site[^"]*"/);
   });
 });

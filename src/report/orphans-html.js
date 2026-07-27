@@ -4,28 +4,11 @@
 // (counts, confidence distribution) → sortable table of orphan rows.
 
 import { humanizeBytes, publicUrlFor } from "./format.js";
+import { escapeHtml as htmlEscape, safeUrlNormalized as safeUrl } from "../util/html.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
 
-function htmlEscape(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
-function safeUrl(s) {
-  if (typeof s !== "string") return null;
-  try {
-    const u = new URL(s);
-    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
+// (safeUrl → src/util/html.js safeUrlNormalized — encoded form, links must resolve)
 
 const REASON_LABELS = {
   "strapi-hash-variant":
@@ -464,12 +447,14 @@ export function writeOrphansHtml({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Files on ICJIA servers that no site page references — review candidates for archiving or removal." />
   <title>Orphaned files report (${totalCount})</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
   <style>${STYLES}${siteFooterCss({ theme: "light" })}</style>
 </head>
 <body>
-<main>
+<a class="skip-link" href="#main">Skip to content</a>
+<main id="main">
   <p><a href="${htmlEscape(backHref)}">&larr; Back to fleet index</a> &middot; <a href="sites.html">Sites</a> &middot; <a href="accessibility.html">Accessibility</a></p>
   <h1>Orphaned files (${totalCount})</h1>
   <p>Files on the server that no Strapi entry, page body, or attachments array currently references.</p>

@@ -7,17 +7,9 @@
 // fleet index and the per-site reports.
 
 import { humanizeBytes } from "./format.js";
+import { escapeHtml as htmlEscape } from "../util/html.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
 
-function htmlEscape(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 const FAVICON = `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">`;
 
@@ -106,12 +98,14 @@ export function generateAuditErrorsPage({ groups = [], backHref = "index.html" }
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Files the fleet audit could not fully process, grouped by error type, with per-file detail for follow-up." />
   <title>File errors — ICJIA Fleet Audit</title>
   ${FAVICON}
   <style>${STYLES}${siteFooterCss()}</style>
 </head>
 <body>
-<main>
+<a class="skip-link" href="#main">Skip to content</a>
+<main id="main">
   <p class="fe-back"><a href="${htmlEscape(backHref)}">&larr; Back to fleet index</a></p>
   <h1>File errors</h1>
   <p class="fe-intro">Files the accessibility audit could not score, or whose content does not match their extension. A 422 means the file is not actually a PDF; "could not process" usually means a very large PDF timed out — re-running the audit retries it. Every site is listed; sites with no problems are marked clean.</p>

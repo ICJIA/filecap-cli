@@ -47,6 +47,28 @@ describe("generateSitesHtml", () => {
     expect(html).not.toContain("/uploads");  // scanned path dropped
   });
 
+  describe("content-sites lede vs audited count (v1.40.0)", () => {
+    const roster3 = [scannedEntry, { ...scannedEntry, site: { ...scannedEntry.site, name: "b-prod", siteName: "B" } }, { ...scannedEntry, site: { ...scannedEntry.site, name: "c-prod", siteName: "C" } }];
+
+    it("distinguishes directory size from the audited count instead of over-claiming", () => {
+      const html = generateSitesHtml({ contentRoster: roster3, tools: [], auditedCount: 2 });
+      expect(html).toContain("The 3 ICJIA content sites &mdash; 2 of them under file accessibility audit.");
+      expect(html).not.toContain("3 ICJIA websites under accessibility audit");
+    });
+
+    it("says 'all' when every directory site is audited", () => {
+      const html = generateSitesHtml({ contentRoster: roster3, tools: [], auditedCount: 3 });
+      expect(html).toContain("The 3 ICJIA content sites, all under file accessibility audit.");
+    });
+
+    it("makes no audited-count claim when the count is not provided", () => {
+      const html = generateSitesHtml({ contentRoster: roster3, tools: [] });
+      expect(html).toContain("The 3 ICJIA content sites.");
+      expect(html).not.toContain("under file accessibility audit");
+      expect(html).not.toContain("websites under accessibility audit");
+    });
+  });
+
   it("renders no audit numbers in the page body (no donut / 'may need audit' / total files)", () => {
     const b = body(generateSitesHtml({ contentRoster: [scannedEntry], tools: [tool] }));
     expect(b).not.toContain("may need audit");
@@ -155,5 +177,12 @@ describe("generateSitesHtml", () => {
     const html = generateSitesHtml({ contentRoster: [gnarly], tools: [] });
     expect(html).toContain('aria-label="A &amp; B &lt;C&gt;"');
     expect(html).not.toContain("&amp;amp;");
+  });
+});
+
+describe("meta description (v1.40.0)", () => {
+  it("ships a description for the site directory", () => {
+    const html = generateSitesHtml({ contentRoster: [], tools: [] });
+    expect(html).toMatch(/<meta name="description" content="[^"]{40,}"/);
   });
 });

@@ -231,7 +231,7 @@ Then in the HTML template, after the explainer section and before the Sites sect
 - [ ] **Step 5: Run tests to confirm nothing is broken yet (tests expected to fail on old assertions)**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && npx vitest run test/web-rollup.test.js 2>&1 | tail -20
+cd /Volumes/satechi/webdev/icjia-fleet-audit && npx vitest run test/web-rollup.test.js 2>&1 | tail -20
 ```
 
 Expected output: Some failures are OK at this point since we haven't updated the test assertions yet. What we must NOT see: JS syntax errors or `Cannot find module` errors.
@@ -344,7 +344,7 @@ Find `<h2>Sites</h2>` and replace it with `<h2>Websites in this audit</h2>`.
 - [ ] **Step 5: Run tests to verify card changes don't break existing structural assertions**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && npx vitest run test/web-rollup.test.js 2>&1 | grep -E "(FAIL|PASS|✓|✗)" | head -30
+cd /Volumes/satechi/webdev/icjia-fleet-audit && npx vitest run test/web-rollup.test.js 2>&1 | grep -E "(FAIL|PASS|✓|✗)" | head -30
 ```
 
 Expected: The test `"index.html references the per-site HTML and CSV files"` must still pass since `htmlFile` and `csvFile` are still rendered in the card.
@@ -608,7 +608,7 @@ The existing print block has rules for `.hero-stat .number`, `.hero-stat.needs-w
 - [ ] **Step 5: Verify no leftover class references**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && grep -n "hero-stats\|by-type-table\|hero-stat\b\|type-label\|type-count\|type-pct" src/web/index-page.js
+cd /Volumes/satechi/webdev/icjia-fleet-audit && grep -n "hero-stats\|by-type-table\|hero-stat\b\|type-label\|type-count\|type-pct" src/web/index-page.js
 ```
 
 Expected: no output (those classes should be gone).
@@ -633,7 +633,7 @@ After reading the test file — the existing tests do NOT contain `"Total invent
 
 **Verification:**
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && grep -n "Total inventoried\|total files\|hero-stats\|need remediation" test/web-rollup.test.js
+cd /Volumes/satechi/webdev/icjia-fleet-audit && grep -n "Total inventoried\|total files\|hero-stats\|need remediation" test/web-rollup.test.js
 ```
 
 Expected: no matches for "Total inventoried" or "hero-stats". If matches exist, update them to match the new wording.
@@ -721,13 +721,13 @@ The fixture has 1 PDF (`category: "pdf"`) and nothing else, so the XLSX, PPTX, W
 - [ ] **Step 7: Run tests**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && npx vitest run test/web-rollup.test.js 2>&1 | tail -15
+cd /Volumes/satechi/webdev/icjia-fleet-audit && npx vitest run test/web-rollup.test.js 2>&1 | tail -15
 ```
 
 Expected: all tests in `web-rollup.test.js` pass. Total count will be 288 + 5 new = 293 in that file. Confirm with:
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && npx vitest run 2>&1 | grep "Tests "
+cd /Volumes/satechi/webdev/icjia-fleet-audit && npx vitest run 2>&1 | grep "Tests "
 ```
 
 ---
@@ -755,13 +755,13 @@ Wait — the 1.2.3 entry should go BEFORE the 1.2.2 entry (most recent first). I
 
 - **Fleet snapshot index page rewritten for non-technical managers.** The page that managers see when handed the URL now leads with plain-English context ("We scanned 7 websites and found 1,247 files in total. 892 need accessibility work; 355 don't.") followed by an explainer section answering the obvious follow-up question ("Why aren't all 1,247 counted?") with side-by-side cards explaining what gets fixed (PDFs, Word docs, Excel, PowerPoint) versus what doesn't (images get descriptions in the CMS; text files, placeholders). The "By file type" breakdown is now a side-by-side table showing remediation-scope vs reference-only counts. Per-site cards drop the hostname and IP from the visible part (folded into a collapsed "Technical details" disclosure) and use friendlier button labels ("View detailed report" / "Download spreadsheet"). Designed for managers who don't know what a11y, alt text, CMS, or remediation mean — every term is defined in plain language at first use.
 
-[1.2.3]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.2.3
+[1.2.3]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v1.2.3
 ```
 
 - [ ] **Step 3: Run npm install to update package-lock.json**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && npm install --package-lock-only 2>&1 | tail -5
+cd /Volumes/satechi/webdev/icjia-fleet-audit && npm install --package-lock-only 2>&1 | tail -5
 ```
 
 Expected: `up to date` or similar (no new dependencies).
@@ -773,7 +773,7 @@ Expected: `up to date` or similar (no new dependencies).
 - [ ] **Step 1: Run full test suite**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && npx vitest run 2>&1 | tail -10
+cd /Volumes/satechi/webdev/icjia-fleet-audit && npx vitest run 2>&1 | tail -10
 ```
 
 Expected:
@@ -787,7 +787,7 @@ Test Files  27 passed (27)
 - [ ] **Step 2: Run ESLint**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && npx eslint src/ test/ 2>&1
+cd /Volumes/satechi/webdev/icjia-fleet-audit && npx eslint src/ test/ 2>&1
 ```
 
 Expected: no errors or warnings.
@@ -795,7 +795,7 @@ Expected: no errors or warnings.
 - [ ] **Step 3: Verify version string**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && ./bin/filecap.js --version
+cd /Volumes/satechi/webdev/icjia-fleet-audit && ./bin/filecap.js --version
 ```
 
 Expected: `1.2.3`
@@ -807,7 +807,7 @@ Expected: `1.2.3`
 - [ ] **Step 1: Generate bundle**
 
 ```bash
-rm -rf /tmp/icjia-fleet-demo && /Volumes/satechi/webdev/filecap-cli/bin/filecap.js web-rollup --output /tmp/icjia-fleet-demo --title "ICJIA accessibility audit fleet"
+rm -rf /tmp/icjia-fleet-demo && /Volumes/satechi/webdev/icjia-fleet-audit/bin/filecap.js web-rollup --output /tmp/icjia-fleet-demo --title "ICJIA accessibility audit fleet"
 ```
 
 If no saved sites exist (`~/.filecap/sites.json` is missing or empty), the command will return exit 2. That's expected in a dev environment with no real inventories. Verify the HTML was written, OR confirm the expected error if no sites are configured:
@@ -834,13 +834,13 @@ All four should return matches.
 - [ ] **Step 1: Stage changed files**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && git add src/web/index-page.js test/web-rollup.test.js package.json CHANGELOG.md package-lock.json
+cd /Volumes/satechi/webdev/icjia-fleet-audit && git add src/web/index-page.js test/web-rollup.test.js package.json CHANGELOG.md package-lock.json
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && git commit -m "$(cat <<'EOF'
+cd /Volumes/satechi/webdev/icjia-fleet-audit && git commit -m "$(cat <<'EOF'
 feat(web-rollup): rewrite index page for non-technical managers with plain-English explainer + by-type breakdown
 
 - Hero section replaced with narrative lead: "We scanned N websites and found N files" plus two-stat remediable/non-remediable blocks
@@ -858,13 +858,13 @@ EOF
 - [ ] **Step 3: Push**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && git push origin main
+cd /Volumes/satechi/webdev/icjia-fleet-audit && git push origin main
 ```
 
 - [ ] **Step 4: Verify push succeeded**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli && git log --oneline -3
+cd /Volumes/satechi/webdev/icjia-fleet-audit && git log --oneline -3
 ```
 
 Expected: latest commit message contains "rewrite index page for non-technical managers".

@@ -6,10 +6,12 @@
 // carries a 6h cache hint — so serverless invocations stay bounded no matter
 // how often the page is viewed. See test/uptime-function.test.js.
 
-// Pure probe: any HTTP response (including a gated 401/403) means the origin
-// answered → "live"; a network error or timeout → "down". Exported so it can be
-// unit-tested, AND embedded verbatim (via .toString()) into the generated
-// function so the tested code is the shipped code — no drift.
+// Pure probe: a non-5xx HTTP response (including a gated 401/403 or a 3xx)
+// means the origin answered and is serving → "live"; a 5xx means the origin is
+// erroring — reporting that as "Site live" would mislead a reader — and a
+// network error or timeout means it never answered, so both → "down". Exported
+// so it can be unit-tested, AND embedded verbatim (via .toString()) into the
+// generated function so the tested code is the shipped code — no drift.
 export async function probeReachability(url, fetchImpl, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -23,7 +25,7 @@ export async function probeReachability(url, fetchImpl, timeoutMs) {
       signal: controller.signal,
       headers: { "user-agent": "filecap-uptime/1.0" },
     });
-    return res ? "live" : "down";
+    return res && !(res.status >= 500) ? "live" : "down";
   } catch {
     return "down";
   } finally {

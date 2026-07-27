@@ -4,7 +4,7 @@ import { FILECAP_VERSION } from "../version.js";
 // ── Category classification ────────────────────────────────────────────────────
 // REMEDIABLE: the file itself can be fixed for accessibility
 // NON-REMEDIABLE: alt text lives in the CMS schema, not in the file
-const REMEDIABLE_CATEGORIES = new Set(["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"]);
+import { REMEDIABLE_CATEGORIES } from "../scanner/category.js";
 
 function isRemediableCategory(cat) {
   return REMEDIABLE_CATEGORIES.has(cat);

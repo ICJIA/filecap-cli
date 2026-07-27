@@ -19,7 +19,7 @@
 #    directory ready to drag-and-drop to Netlify for manager-facing sharing.
 #
 #  HOW TO GET THIS SCRIPT
-#    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+#    curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
 #    chmod +x audit-remote.sh
 #    ./audit-remote.sh
 #
@@ -40,10 +40,10 @@
 #    - Full path to the uploads directory on the remote
 #    - A friendly name for the server (used in the report header)
 #    - Website nickname (e.g. DVFR, i2i, vpp — press Enter to skip)
-#    - Public URL base (e.g. https://dvfr.icjia-api.cloud/uploads — press Enter to skip)
+#    - Public URL base (e.g. https://files.example.org/uploads — press Enter to skip)
 #
 #  WHERE OUTPUT GOES
-#    ~/filecap-audits/<server-name>/    (e.g., dvfr-strapi-prod, not 192.241.146.85)
+#    ~/filecap-audits/<server-name>/    (e.g., dvfr-strapi-prod, not 203.0.113.10)
 #      ├── mirror/                       shared local rsync copy (incremental)
 #      ├── runs/
 #      │   ├── 20260509-143000Z/         each run gets its own timestamped dir (UTC)
@@ -66,7 +66,7 @@
 #  USAGE
 #    ./audit-remote.sh                                                              # interactive
 #    ./audit-remote.sh USER HOST REMOTE_PATH [SERVER_NAME] [SITE_NAME] [PUBLIC_URL_BASE]
-#    ./audit-remote.sh forge 192.241.146.85 ~/uploads dvfr-strapi-prod DVFR https://dvfr.icjia-api.cloud/uploads
+#    ./audit-remote.sh deploy 203.0.113.10 ~/uploads dvfr-strapi-prod DVFR https://files.example.org/uploads
 #    ./audit-remote.sh --no-version-check                                           # skip update check
 #    SKIP_VERSION_CHECK=1 ./audit-remote.sh                                         # same, via env var
 #
@@ -93,7 +93,7 @@ set -euo pipefail
 FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
 if [[ ! -f "$FILECAP_BIN" ]]; then
   echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
-  echo "       Run this script from inside a filecap-cli checkout." >&2
+  echo "       Run this script from inside a icjia-fleet-audit checkout." >&2
   exit 1
 fi
 
@@ -245,7 +245,7 @@ check_script_version() {
   # local copy still checks against the canonical filename.
   local script_basename
   script_basename="$(basename "${BASH_SOURCE[0]}")"
-  local upstream_url="https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/${script_basename}"
+  local upstream_url="https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/${script_basename}"
 
   # Compute local hash
   local local_path
@@ -847,7 +847,7 @@ if [[ -z "$USER_ARG" ]]; then
   USER_ARG="${USER_ARG:-$DEFAULT_SSH_USER}"
 fi
 while [[ -z "$HOST_ARG" ]]; do
-  read -r -p "Server IP or hostname (e.g. 192.241.146.85): " HOST_ARG
+  read -r -p "Server IP or hostname (e.g. 203.0.113.10): " HOST_ARG
   if [[ -z "$HOST_ARG" ]]; then
     echo "  (required — please type a value)" >&2
   fi
@@ -875,7 +875,7 @@ SITE_NAME="$SITE_NAME_ARG"
 # Optional: public URL base — where files are publicly served (enables clickable links in report)
 # PUBLIC_URL_BASE_ARG may be pre-set by audit-fleet.sh via env var.
 if [[ -z "$PUBLIC_URL_BASE_ARG" ]]; then
-  read -r -p "Public URL prefix (optional, e.g. https://dvfr.icjia-api.cloud/uploads; press Enter to skip): " PUBLIC_URL_BASE_ARG
+  read -r -p "Public URL prefix (optional, e.g. https://files.example.org/uploads; press Enter to skip): " PUBLIC_URL_BASE_ARG
 fi
 PUBLIC_URL_BASE="$PUBLIC_URL_BASE_ARG"
 
@@ -1081,14 +1081,14 @@ if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "${SSH_USER}@${HOST}" true 2>/dev
   echo "  1. Generate a key (one-time):  ssh-keygen -t ed25519 -C \"you@example.com\"" >&2
   echo "  2. Copy ~/.ssh/id_ed25519.pub  (the .pub file, not the private key)" >&2
   echo "  3. Email the public key to ICJIA IDS, asking them to add it to" >&2
-  echo "     forge@${HOST}:~/.ssh/authorized_keys" >&2
+  echo "     ${SSH_USER:-<user>}@${HOST}:~/.ssh/authorized_keys" >&2
   echo "  4. Re-run this script after IDS confirms" >&2
   echo >&2
   echo "If you already have key-based access, check ssh-agent and try:" >&2
   echo "  ssh ${SSH_USER}@${HOST} \"echo OK\"" >&2
   echo >&2
   echo "See the README's 'Setting up SSH access' section for full setup details:" >&2
-  echo "  https://github.com/ICJIA/filecap-cli#setting-up-ssh-access" >&2
+  echo "  https://github.com/ICJIA/icjia-fleet-audit#setting-up-ssh-access" >&2
   exit 1
 fi
 SSH_PHASE_DURATION=$(( $(date +%s) - SSH_PHASE_START ))

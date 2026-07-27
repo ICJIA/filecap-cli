@@ -147,7 +147,7 @@ files, only re-audits new/changed).
 **Q. "Are you sending file contents to a third party?"**
 A. audit.icjia.app is ICJIA-owned, ICJIA-hosted. No third party. Source
 code is open: github.com/ICJIA/file-accessibility-audit. The fleet audit
-tool itself (filecap) is also open: github.com/ICJIA/filecap-cli.
+tool itself (filecap) is also open: github.com/ICJIA/icjia-fleet-audit.
 
 **Q. "Can I see the actual issues, not just the grade?"**
 A. Click the **Open report** link in the Audit Report column. That's the
@@ -160,7 +160,7 @@ serious / moderate / minor) and remediation hints per finding.
 ## What to NOT show / sidestep
 
 - **The 192-IP stale-directory bug.** Pre-2026-05-19 fleet runs sometimes
-  included a stale "192.241.146.85" directory whose entries rendered as
+  included a stale "203.0.113.10" directory whose entries rendered as
   `Unavailable`. Already fixed in audit-fleet-auto.sh; ignore if anyone
   asks why old screenshots had those.
 - **The Vue 2 git-site Netlify SPA catch-all.** Old ARI Summit sites

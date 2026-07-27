@@ -4,18 +4,7 @@
 // needs-review, fixed/new trend, and a per-page table. Opens with the blunt
 // statement that this is the SITE's score, independent of the file/PDF scores.
 
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-function safeHttpUrl(u) {
-  try {
-    const proto = new URL(u).protocol;
-    return proto === "http:" || proto === "https:" ? u : null;
-  } catch {
-    return null;
-  }
-}
+import { escapeHtml as esc, safeUrl as safeHttpUrl } from "../util/html.js";
 
 export function renderSiteAccessibilitySection(siteAudit) {
   if (!siteAudit || typeof siteAudit.score !== "number") return "";

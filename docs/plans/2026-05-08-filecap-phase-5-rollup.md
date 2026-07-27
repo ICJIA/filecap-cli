@@ -15,7 +15,7 @@
 ## File Structure
 
 ```
-filecap-cli/
+icjia-fleet-audit/
 ├── src/
 │   ├── commands/
 │   │   └── rollup.js                     ← create
@@ -180,7 +180,7 @@ import {
 - [ ] **Step 1.2: Run tests, verify failure**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npx vitest run test/schema.test.js
 ```
 
@@ -1122,7 +1122,7 @@ Expected: 128 tests passing (126 + 2).
 - [ ] **Step 4.5: Smoke test the CLI**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 ./bin/filecap.js rollup --help
 ```
 
@@ -1273,7 +1273,7 @@ git commit -m "docs: add Phase 5 rollup workflow section and update status"
 - `--strict` flag on `filecap rollup`: fails on schema mismatch or missing footer (default: warn and skip).
 - New programmatic exports from package main: `runRollup`, `rollupInventories`, `pickCanonical`, plus the three consolidated schemas.
 
-[0.5.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v0.5.0
+[0.5.0]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v0.5.0
 ```
 
 - [ ] **Step 7.2: Commit**

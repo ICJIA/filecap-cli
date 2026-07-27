@@ -21,7 +21,7 @@ const header = {
   metadata: {
     serverName: "archive-prod",
     siteName: "Archive",
-    serverIp: "143.244.146.43",
+    serverIp: "203.0.113.12",
     scannedPath: "/home/forge/files",
     publicUrlBase: "https://archive.icjia.cloud/files",
   },

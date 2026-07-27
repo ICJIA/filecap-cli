@@ -15,7 +15,7 @@
 ## File Structure
 
 ```
-filecap-cli/
+icjia-fleet-audit/
 ├── src/
 │   ├── commands/
 │   │   └── mcp.js                        ← create (stdio server entry point)
@@ -43,7 +43,7 @@ filecap-cli/
 - [ ] **Step 1.1: Install the dep**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npm install @modelcontextprotocol/sdk@^1
 ```
 
@@ -803,7 +803,7 @@ Commit: `docs: add Phase 7 MCP server section and update status`.
 
 - Version bumped to **1.0.0** to mark feature-complete v0.x → v1.0 milestone. The v0.x line covered scan (Phase 1), PDF introspection (Phase 2), Office introspection (Phase 3), filename flagging (Phase 4), rollup (Phase 5), report (Phase 6), and now MCP server (Phase 7). The full inventory-to-handoff pipeline is functional end-to-end.
 
-[1.0.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.0.0
+[1.0.0]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v1.0.0
 ```
 
 Commit: `docs: add [1.0.0] CHANGELOG entry`.

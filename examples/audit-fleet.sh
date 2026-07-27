@@ -15,8 +15,8 @@
 #    print-friendly version of the same data that opens in any browser.
 #
 #  HOW TO GET BOTH SCRIPTS
-#    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
-#    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+#    curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-fleet.sh
+#    curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
 #    chmod +x audit-fleet.sh audit-remote.sh
 #    ./audit-fleet.sh                  # auto-detects ~/.filecap/sites.json, else interactive
 #    ./audit-fleet.sh sites.json       # batch mode from JSON bundle
@@ -46,9 +46,9 @@
 #        "version": 1,
 #        "sites": [
 #          { "name": "dvfr-strapi-prod", "siteName": "DVFR", "user": "forge",
-#            "host": "192.241.146.85",
-#            "remotePath": "/home/forge/dvfr.icjia-api.cloud/strapi_v4/public/uploads",
-#            "publicUrlBase": "https://dvfr.icjia-api.cloud/uploads" }
+#            "host": "203.0.113.10",
+#            "remotePath": "/home/forge/example-site/strapi/public/uploads",
+#            "publicUrlBase": "https://files.example.org/uploads" }
 #        ]
 #      }
 #    siteName and publicUrlBase are optional. Hand the file plus both .sh
@@ -58,7 +58,7 @@
 #    No header row; lines starting with # are comments.
 #    Columns: server_name,user,host,remote_path[,site_name[,public_url_base]]
 #    Examples:
-#      dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads
+#      dvfr-strapi-prod,deploy,203.0.113.10,~/example-site/strapi/public/uploads,DVFR,https://files.example.org/uploads
 #      i2i-strapi-prod,forge,10.0.0.5,/var/strapi/uploads,i2i
 #      vpp-strapi-prod,forge,10.0.0.6,/var/strapi/uploads
 #                  (4-column, 5-column, and 6-column rows still work — trailing columns are optional)
@@ -100,7 +100,7 @@ set -euo pipefail
 FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
 if [[ ! -f "$FILECAP_BIN" ]]; then
   echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
-  echo "       Run this script from inside a filecap-cli checkout." >&2
+  echo "       Run this script from inside a icjia-fleet-audit checkout." >&2
   exit 1
 fi
 
@@ -252,7 +252,7 @@ check_script_version() {
   # local copy still checks against the canonical filename.
   local script_basename
   script_basename="$(basename "${BASH_SOURCE[0]}")"
-  local upstream_url="https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/${script_basename}"
+  local upstream_url="https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/${script_basename}"
 
   # Compute local hash
   local local_path
@@ -353,7 +353,7 @@ AUDIT_STATIC="${SCRIPT_DIR}/audit-static.sh"
 if [[ ! -x "$AUDIT_REMOTE" ]]; then
   die "audit-remote.sh not found or not executable at: ${AUDIT_REMOTE}
   Download it alongside this script:
-    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+    curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
     chmod +x audit-remote.sh"
 fi
 
@@ -542,7 +542,7 @@ else
       [[ -z "$_path" ]] && echo "  (required — please type a value)" >&2
     done
     read -r -p "  Website nickname (e.g. DVFR, i2i, vpp; press Enter to skip): " _site
-    read -r -p "  Public URL prefix (e.g. https://dvfr.icjia-api.cloud/uploads; press Enter to skip): " _urlbase
+    read -r -p "  Public URL prefix (e.g. https://files.example.org/uploads; press Enter to skip): " _urlbase
 
     SRV_NAMES+=("$_name")
     SRV_USERS+=("$_user")
@@ -608,7 +608,7 @@ for i in "${!SRV_NAMES[@]}"; do
   if [[ "$srv_type" == "git" ]]; then
     if [[ ! -x "$AUDIT_STATIC" ]]; then
       printf "  %-22s %-18s ${R}%-12s${N} %-10s %-22s %-8s\n" "$name" "git" "NO SCRIPT" "-" "audit-static.sh" "-"
-      SKIPPED_REASONS+=("$name: audit-static.sh missing at $AUDIT_STATIC (curl it from filecap-cli/examples/)")
+      SKIPPED_REASONS+=("$name: audit-static.sh missing at $AUDIT_STATIC (curl it from icjia-fleet-audit/examples/)")
       continue
     fi
     if ! git ls-remote --exit-code --heads "$git_repo" >/dev/null 2>&1; then
@@ -820,7 +820,7 @@ if [[ "${FAIL_COUNT}" -gt 0 ]]; then
   bundle anyway with the failed sites missing.
 
   Common fixes:
-    SSH failures   - re-check 'ssh forge@<host> true' and the README's SSH setup
+    SSH failures   - re-check 'ssh deploy@<host> true' and the README's SSH setup
     git failures   - re-check 'gh auth status' or rotate FILECAP_GITHUB_TOKEN
     URL HEAD fails - check the publicUrlBase in ~/.filecap/sites.json"
   fi

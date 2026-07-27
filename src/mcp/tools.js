@@ -46,6 +46,24 @@ function checkAllowedPaths(paths) {
   return null;
 }
 
+/**
+ * v1.40.0 — startup posture check. With FILECAP_MCP_ALLOWED_PATHS unset the
+ * server exposes whole-filesystem read (scan/query any path) plus
+ * arbitrary-path write (report/web-rollup output). That stays the default for
+ * compatibility, but it should never be silent: runMcp() prints this to
+ * stderr at startup. Returns null when an allowlist is configured.
+ * @returns {string|null}
+ */
+export function allowedPathsWarning() {
+  const raw = process.env.FILECAP_MCP_ALLOWED_PATHS;
+  if (raw && raw.split(":").map((s) => s.trim()).filter(Boolean).length > 0) return null;
+  return (
+    "filecap mcp: FILECAP_MCP_ALLOWED_PATHS is not set — filesystem access is UNRESTRICTED " +
+    "(any readable path can be scanned/queried; outputs can be written anywhere). " +
+    "Set FILECAP_MCP_ALLOWED_PATHS=/path/one:/path/two to restrict."
+  );
+}
+
 function blockedResult(message) {
   return { isError: true, content: [{ type: "text", text: `error: ${message}` }] };
 }

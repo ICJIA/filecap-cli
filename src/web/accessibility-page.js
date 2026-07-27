@@ -5,16 +5,8 @@
 // theme, consistent with the fleet index and the per-site reports.
 
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
+import { escapeHtml as htmlEscape } from "../util/html.js";
 
-function htmlEscape(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 const FAVICON = `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">`;
 
@@ -109,12 +101,14 @@ export function generateAccessibilityPage({ currentStatus, log = [] }) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="The fleet-audit bundle's own accessibility standing: current axe-core and Lighthouse results plus a dated log of every self-check." />
   <title>Accessibility — ICJIA Fleet Audit</title>
   ${FAVICON}
   <style>${STYLES}${siteFooterCss()}</style>
 </head>
 <body>
-<main>
+<a class="skip-link" href="#main">Skip to content</a>
+<main id="main">
   <p class="ax-back"><a href="index.html">&larr; Back to fleet index</a></p>
   <h1>Accessibility</h1>
   <p class="ax-intro">This tool audits other sites' accessibility — so the audit bundle holds itself to the same standard. This page shows its current accessibility standing and a running log of every check, from both browser (axe DevTools) and backend-build (axe-core, Lighthouse, contrastcap) tools.</p>

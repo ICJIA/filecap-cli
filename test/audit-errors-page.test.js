@@ -83,3 +83,10 @@ describe("generateAuditErrorsPage", () => {
     expect(html).toContain("r &amp; r");
   });
 });
+
+describe("meta description (v1.40.0)", () => {
+  it("ships a description for the file-errors page", () => {
+    const html = generateAuditErrorsPage({ groups: [] });
+    expect(html).toMatch(/<meta name="description" content="[^"]{40,}"/);
+  });
+});

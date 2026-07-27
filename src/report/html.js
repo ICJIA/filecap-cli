@@ -5,7 +5,12 @@ import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
-import { summarizeFileA11y, bandForScore, fileA11yCoverageText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "./accessibility-band.js";
+import { renderSiteAccessibilitySection } from "./site-accessibility-section.js";
+import { escapeHtml as htmlEscape, safeUrl } from "../util/html.js";
+import { REMEDIABLE_CATEGORIES } from "../scanner/category.js";
+import { copyableValue as copyableMetaCell } from "../util/html.js";
+import { summarizeFileA11y, bandForScore, fileA11yCoverageText,
+  fileA11yThinDataText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "./accessibility-band.js";
 
 // v1.35.1: the per-page accessibility grade chip in the Page view is hidden
 // (the fleet bundle is file-only). buildPageAuditChip + its CSS are kept
@@ -38,20 +43,6 @@ function formatCategory(cat) {
   return CATEGORY_LABELS[cat] ?? cat;
 }
 
-/**
- * Escape a value for safe insertion into HTML.
- * @param {*} s
- * @returns {string}
- */
-function htmlEscape(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 /**
  * 1.7.36 — Return the URL string only when it parses cleanly and its
@@ -64,40 +55,13 @@ function htmlEscape(s) {
  * null, so the offending value still appears as text but isn't
  * clickable.
  */
-function safeUrl(url) {
-  if (!url) return null;
-  try {
-    const u = new URL(String(url));
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    return String(url);
-  } catch {
-    return null;
-  }
-}
+// (safeUrl moved to src/util/html.js — same semantics, one implementation)
 
 // Small clipboard-outline icon used by the meta-grid copy buttons. Inline SVG
 // (no external request, no font dependency) and stroke: currentColor so the
 // hover/copied states can recolor it via CSS.
-const COPY_ICON_SVG = '<svg class="meta-copy-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4.25" y="3.25" width="8.5" height="10.5" rx="1.25"/><path d="M10.75 3.25V2.75a1 1 0 0 0-1-1h-2.5a1 1 0 0 0-1 1v0.5"/></svg>';
 
-/**
- * Wrap a meta-grid value in a flex container with the value text and a small
- * copy-to-clipboard button. Designed for the per-site detail page so a
- * remediator can copy IP / hostname / scanned path / public URL with one
- * click instead of selecting the monospace text by hand. The button copies
- * the *raw* value (no surrounding HTML escapes); display HTML can be richer
- * (e.g. an <a> wrapping the URL) without affecting what gets copied.
- *
- * @param {string} value - raw text that goes on the clipboard
- * @param {string|null} displayHtml - HTML to render (defaults to escaped value)
- * @param {string} label - aria-label suffix, e.g. "IP address"
- * @returns {string}
- */
-function copyableMetaCell(value, displayHtml, label) {
-  if (value === undefined || value === null || value === "") return "<span></span>";
-  const display = displayHtml ?? htmlEscape(value);
-  return `<span class="meta-value">${display}<button type="button" class="meta-copy" data-copy="${htmlEscape(value)}" aria-label="Copy ${htmlEscape(label || "value")} to clipboard" title="Copy to clipboard">${COPY_ICON_SVG}<span class="meta-copy-feedback" aria-hidden="true">Copied</span></button></span>`;
-}
+// (copyableMetaCell → src/util/html.js copyableValue — shared with the index)
 
 /**
  * Build a display-ready row value array for one entry, parallel to CSV_COLUMNS.
@@ -331,7 +295,7 @@ function buildPageViewSection(pages, ctx) {
   return `<div id="page-view" hidden>
   <p class="page-view-note">One row per page. <strong>Files</strong> are the documents the page links to. Each file is listed once — under the first page that links it; a page whose other linked files already appear above shows them as a count ("listed under other pages") instead of repeating them. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively. A file a page links that is hosted on another fleet site (for example the CMS) appears in a muted <span class="page-xsite">hosted on another site</span> group that links to that site's report.</p>
   <nav class="paginator" aria-label="Page table pagination">
-    <span class="pag-info" id="pv-page-info"></span>
+    <span class="pag-info" id="pv-page-info" role="status" aria-live="polite"></span>
     <span class="pag-controls">
       <label class="pag-size">Rows per page
         <select id="pv-page-size">
@@ -483,7 +447,7 @@ function renderFileA11yBanner(a, trend) {
     return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
   }
   if (!a.enoughData) {
-    return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">Not enough scored PDFs yet (${a.scored.toLocaleString()} / ${a.pdfs.toLocaleString()})</span></div>`;
+    return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">${htmlEscape(fileA11yThinDataText(a))}</span></div>`;
   }
   const key = a.band?.key ?? "na";
   const label = htmlEscape(a.band?.label ?? "");
@@ -492,7 +456,7 @@ function renderFileA11yBanner(a, trend) {
   return `<div class="dp-a11y dp-a11y-${key}">${head}${fileA11yGaugeHtml(a)}<span class="dp-a11y-body"><span class="dp-a11y-score">${a.avg}<small>/100</small></span><span class="dp-a11y-pill"><span class="dp-a11y-dot" aria-hidden="true"></span>${label}</span>${trendChip}</span><span class="dp-a11y-cover">${cover}</span></div>`;
 }
 
-export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, fileA11yTrend = null, pageScores = null }) {
+export async function writeHtml({ sourceHeader, entries, sources, outputPath, backHref = null, csvHref = null, siteUrl = null, siteFullName = null, accessKind = null, sitemapUrls = [], cmsPages = [], resolveFleetFile = null, pageRefFiles = null, currentSiteName = null, siteSlug = null, fileA11yTrend = null, siteAudit = null, pageScores = null }) {
   const isConsolidated = sourceHeader.kind === "filecap-consolidated-header";
   const sourceMap = new Map();
   if (isConsolidated && sources) {
@@ -638,6 +602,12 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   ];
   const htmlColValueIdx = HTML_TABLE_COLUMNS.map((c) => valueIdxByName(c.name));
   const publicUrlVi = valueIdxByName("publicUrl");
+  // v1.40.0 — path (and serverName on consolidated reports) are searchable but
+  // not visible columns. They ride each row as a data-search attribute; the
+  // client projection appends them to the haystack. This replaced the embedded
+  // values blob that shipped every row's data a second time (May review P1).
+  const pathVi = valueIdxByName("path");
+  const serverVi = valueIdxByName("serverName");
 
   const rowsHtml = entries.map((entry) => {
     const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
@@ -651,6 +621,9 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
 
     const classAttr = classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
     const categoryAttr = ` data-category="${htmlEscape(entry.category ?? "other")}"`;
+    const searchExtras = [values[pathVi], isConsolidated ? values[serverVi] : null]
+      .filter(Boolean).join(" ");
+    const searchAttr = searchExtras ? ` data-search="${htmlEscape(searchExtras)}"` : "";
     const publicUrl = values[publicUrlVi];
     const cells = HTML_TABLE_COLUMNS.map((col, i) => {
       const v = values[htmlColValueIdx[i]];
@@ -691,7 +664,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
       }
       return `<td>${htmlEscape(v)}</td>`;
     }).join("");
-    return `<tr${classAttr}${categoryAttr}>${cells}</tr>`;
+    return `<tr${classAttr}${categoryAttr}${searchAttr}>${cells}</tr>`;
   }).join("\n");
 
   // ── category breakdown ───────────────────────────────────────────────────────
@@ -704,7 +677,11 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // v1.12.0: column-resize + drag-pan removed — the 6-column table fits without
   // horizontal panning, so there is no <colgroup>/resize-handle machinery.
   const headerCells = HTML_TABLE_COLUMNS.map((col) =>
-    `<th data-col="${htmlEscape(col.name)}"${col.sortable === false ? " data-nosort" : ""}>${htmlEscape(col.label)}</th>`
+    (col.sortable === false
+      ? `<th data-col="${htmlEscape(col.name)}" scope="col" data-nosort>${htmlEscape(col.label)}</th>`
+      // v1.40.0 — a real <button> makes the sort keyboard-operable for free
+      // (Enter/Space fire click); aria-sort carries the state for AT.
+      : `<th data-col="${htmlEscape(col.name)}" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">${htmlEscape(col.label)}</button></th>`)
   ).join("");
 
   // ── Page view (v1.13.0): invert the file entries into a page list ────────────
@@ -793,17 +770,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // trailing values so the search box's promised "path, server" matching
   // works — the visible-column projection had dropped both. The extras sit
   // beyond every sortable column index, so sortBy never reads them.
-  const pathVi = valueIdxByName("path");
-  const serverVi = valueIdxByName("serverName");
-  const jsonData = JSON.stringify(
-    entries.map((entry) => {
-      const values = buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated });
-      const row = htmlColValueIdx.map((vi) => values[vi]);
-      row.push(values[pathVi]);
-      if (isConsolidated) row.push(values[serverVi]);
-      return row;
-    })
-  ).replace(/<\/script/gi, "<\\/script");
+  // (values blob removed in v1.40.0 — rows carry their own data; see data-search)
 
   // ── hero block (v1.33.0 work-first redesign) ────────────────────────────────
   // The hero leads with the one number a site manager acts on — how many files
@@ -856,6 +823,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="File inventory and accessibility-audit scoping for ${htmlEscape(siteFullName || titleSuffix)} — counts, remediation workload, and per-file detail.">
 <meta name="robots" content="noindex, nofollow">
 <title>ICJIA Fleet Audit Assessment — ${htmlEscape(titleSuffix)}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
@@ -1830,6 +1798,10 @@ thead th:hover { background: #1a1a1a; }
    and the hover invite. The click handler skips them too. */
 thead th[data-nosort] { cursor: default; }
 thead th[data-nosort]:hover { background: #161b22; }
+/* v1.40.0 — sortable-header buttons: inherit the th look, add a visible
+   keyboard focus ring. The sort arrows stay on the th classes below. */
+.th-sort-btn { background: none; border: 0; padding: 0; margin: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.th-sort-btn:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; border-radius: 3px; }
 thead th.sort-asc::after  { content: " ▲"; font-size: 10px; color: #60a5fa; }
 thead th.sort-desc::after { content: " ▼"; font-size: 10px; color: #60a5fa; }
 tbody tr:nth-child(even) { background: #0c0c0c; }
@@ -2045,22 +2017,30 @@ ${siteFooterCss()}
 @media (max-width: 720px) { .audit-stats { grid-template-columns: 1fr; } }
 
 /* ── site-accessibility section ─────────────────────────────── */
-.site-accessibility { margin: 28px 0; padding: 20px 22px; border: 1px solid #c9d8e8; border-left: 5px solid #2f6fb0; border-radius: 10px; background: #f6fafe; }
-.site-accessibility h2 { margin: 0 0 8px; color: #1b4a78; }
-.site-accessibility .sa-independence { font-size: 0.95rem; color: #34526c; max-width: 70ch; }
+/* v1.40.0 — restyled to the detail page's dark idiom (the original palette
+   was a light-page draft; the section itself first ships in v1.40.0). */
+.site-accessibility { margin: 28px 0; padding: 20px 22px; border: 1px solid #21262d; border-left: 5px solid #4dabf7; border-radius: 10px; background: #161b22; }
+.site-accessibility h2 { margin: 0 0 8px; color: #e5e5e5; }
+.site-accessibility .sa-independence { font-size: 0.95rem; color: #9aa5b1; max-width: 70ch; }
+.site-accessibility .sa-independence strong { color: #d4dae0; }
 .site-accessibility .sa-headline { display: flex; align-items: center; gap: 18px; margin: 14px 0; }
-.site-accessibility .sa-num { font-size: 3rem; font-weight: 800; color: #1b4a78; line-height: 1; }
-.site-accessibility .sa-grade { font-size: 1.4rem; font-weight: 700; color: #2f6fb0; margin-left: 6px; }
-.site-accessibility .sa-coverage { margin: 0; color: #41607c; }
-.site-accessibility .sa-trend { margin: 6px 0 14px; color: #34526c; }
+.site-accessibility .sa-num { font-size: 3rem; font-weight: 800; color: #e5e5e5; line-height: 1; }
+.site-accessibility .sa-grade { font-size: 1.4rem; font-weight: 700; color: #4dabf7; margin-left: 6px; }
+.site-accessibility .sa-coverage { margin: 0; color: #9aa5b1; }
+.site-accessibility .sa-coverage strong { color: #d4dae0; }
+.site-accessibility .sa-trend { margin: 6px 0 14px; color: #9aa5b1; }
+.site-accessibility .sa-trend strong { color: #d4dae0; }
 .site-accessibility .sa-breakdown { display: flex; flex-wrap: wrap; gap: 16px; }
-.site-accessibility .sa-card { flex: 1 1 240px; background: #fff; border: 1px solid #d8e4f0; border-radius: 8px; padding: 12px 14px; }
-.site-accessibility .sa-card h3 { margin: 0 0 8px; font-size: 0.95rem; color: #1b4a78; }
-.site-accessibility .sa-card ul { margin: 0; padding-left: 18px; }
-.site-accessibility .sa-muted { color: #6a7c8c; font-size: 0.85rem; list-style: none; margin-left: -18px; }
+.site-accessibility .sa-card { flex: 1 1 240px; min-width: 0; background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 12px 14px; }
+.site-accessibility .sa-card h3 { margin: 0 0 8px; font-size: 0.95rem; color: #c0cdda; }
+.site-accessibility .sa-card ul { margin: 0; padding-left: 18px; color: #9aa5b1; }
+.site-accessibility .sa-card strong { color: #d4dae0; }
+.site-accessibility .sa-muted { color: #8b949e; font-size: 0.85rem; list-style: none; margin-left: -18px; }
 .site-accessibility .sa-pages { margin-top: 14px; }
+.site-accessibility .sa-pages summary { cursor: pointer; color: #c0cdda; }
 .site-accessibility .sa-pages table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 8px; }
-.site-accessibility .sa-pages th, .site-accessibility .sa-pages td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #e4edf5; }
+.site-accessibility .sa-pages th, .site-accessibility .sa-pages td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #21262d; color: #9aa5b1; }
+.site-accessibility .sa-pages td:first-child { word-break: break-all; }
 
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
@@ -2103,7 +2083,8 @@ ${siteFooterCss()}
 </style>
 </head>
 <body>
-<main>
+<a class="skip-link" href="#main">Skip to content</a>
+<main id="main">
 
 ${(() => {
   // v1.7.16: sticky nav now also surfaces the audit-tool button (visible on
@@ -2164,6 +2145,7 @@ ${(() => {
 </header>
 
 ${accessPanelHtml}
+${renderSiteAccessibilitySection(siteAudit)}
 
 <details class="dp-disclosure dp-breakdown">
   <summary><span class="dp-disclosure-title">Breakdown by file type</span> <span class="dp-disclosure-hint">every type &amp; category count</span></summary>
@@ -2258,7 +2240,7 @@ ${filterBarHtml}
   </table>
 </details>
 <nav class="paginator" aria-label="Table pagination">
-  <span class="pag-info" id="page-info"></span>
+  <span class="pag-info" id="page-info" role="status" aria-live="polite"></span>
   <span class="pag-controls">
     <label class="pag-size">Rows per page
       <select id="page-size">
@@ -2286,25 +2268,28 @@ ${pageViewSectionHtml}
 
 ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt })}
 
-<script type="application/json" id="filecap-data">${jsonData}</script>
 <script>
 (function () {
   "use strict";
-
-  // ── embedded data (column-parallel to the visible table headers) ────────────
-  const data = JSON.parse(document.getElementById("filecap-data").textContent);
 
   const tbody = document.getElementById("inventory-body");
   const searchInput = document.getElementById("search");
   const rowCountEl = document.getElementById("row-count");
   const allRows = Array.from(tbody.querySelectorAll("tr"));
-  // Row element -> its data array. Survives DOM re-ordering by sort.
+  // v1.40.0 — no embedded values blob: sort/search values are projected from
+  // the rendered cells (data-num for numerics, textContent otherwise), plus
+  // each row's hidden data-search extras (path, serverName). One copy of the
+  // data on the page instead of two. Survives DOM re-ordering by sort.
   const rowData = new Map();
-  allRows.forEach(function (row, i) { rowData.set(row, data[i] || []); });
+  allRows.forEach(function (row) {
+    const vals = Array.from(row.cells).map(function (td) { return td.dataset.num || td.textContent.trim(); });
+    if (row.dataset.search) vals.push(row.dataset.search);
+    rowData.set(row, vals);
+  });
 
   let activeFilter = "remediable";
   let activeCategory = "";
-  const REMEDIABLE_CATS = ["pdf", "office-document", "spreadsheet", "presentation", "legacy-office"];
+  const REMEDIABLE_CATS = ${JSON.stringify([...REMEDIABLE_CATEGORIES])};
 
   // ── pagination state (v1.12.0 — replaces click-and-drag panning) ────────────
   let pageSize = 25;
@@ -2486,8 +2471,12 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
         sortColIdx = colIdx;
         sortAsc = true;
       }
-      headers.forEach(function (h) { h.classList.remove("sort-asc", "sort-desc"); });
+      headers.forEach(function (h) {
+        h.classList.remove("sort-asc", "sort-desc");
+        if (h.hasAttribute("aria-sort")) h.setAttribute("aria-sort", "none");
+      });
       th.classList.add(sortAsc ? "sort-asc" : "sort-desc");
+      th.setAttribute("aria-sort", sortAsc ? "ascending" : "descending");
       sortBy(colIdx, sortAsc);
       applyFilters();
     });
@@ -2499,6 +2488,7 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
     sortColIdx = dateColIdx;
     sortAsc = false;
     headers[dateColIdx].classList.add("sort-desc");
+    headers[dateColIdx].setAttribute("aria-sort", "descending");
     sortBy(dateColIdx, false);
   }
 

@@ -627,7 +627,7 @@ fi
 echo
 echo "==> Done."
 echo "    npm:    https://www.npmjs.com/package/@icjia/filecap"
-echo "    GitHub: https://github.com/ICJIA/filecap-cli"
+echo "    GitHub: https://github.com/ICJIA/icjia-fleet-audit"
 ```
 
 `chmod +x publish` after creating. The `first` mode is for initial registration (`npm publish` on the version already in package.json, no bump). After that, `./publish patch` (or minor/major) for every subsequent release.
@@ -654,7 +654,7 @@ The following decisions were locked during design review and govern Phase 1+ imp
 
 | # | Decision | Resolution |
 |---|---|---|
-| 1 | GitHub repo location | `github.com/ICJIA/filecap-cli` |
+| 1 | GitHub repo location | `github.com/ICJIA/icjia-fleet-audit` |
 | 2 | Output format (single-instance and consolidated) | **NDJSON** with header line + entry lines + footer line. File extension `.ndjson`. Streamed write, streamed read in `rollup`/`report`. |
 | 3 | Hash algorithm | **SHA-256** via Node native `crypto` (C-backed via OpenSSL). Default-on; `--no-hash` for fast triage. Native crypto outperforms any pure-JS alternative (BLAKE3, xxHash) at our constraint of no native deps. |
 | 4 | Rollup canonical-row semantics | **One row per physical copy** in the consolidated NDJSON and CSV. Content-duplicates carry a `duplicateOf` field pointing to the canonical entry (oldest `modifiedAt`, alphabetical tiebreaker on `serverName`). Canonical entry has `duplicateOf: null`. Preserves per-server path/mtime in the CSV; consumers group by hash for dedup analysis. |

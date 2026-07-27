@@ -17,7 +17,7 @@
 After Phase 1, the repository looks like this. Files marked `(existing)` were created during the design phase; everything else is new in Phase 1.
 
 ```
-filecap-cli/
+icjia-fleet-audit/
 ├── .eslintrc                        (not created — using flat config)
 ├── .gitignore                       (existing)
 ├── .prettierrc.json                 ← create
@@ -86,10 +86,10 @@ filecap-cli/
 Run:
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 git init
 git branch -M main
-git remote add origin git@github.com:ICJIA/filecap-cli.git
+git remote add origin git@github.com:ICJIA/icjia-fleet-audit.git
 ```
 
 Expected output: `Initialized empty Git repository in ...`. The remote add is silent.
@@ -116,10 +116,10 @@ Create file `package.json` with this exact content:
   "author": "Illinois Criminal Justice Information Authority (ICJIA)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ICJIA/filecap-cli.git"
+    "url": "git+https://github.com/ICJIA/icjia-fleet-audit.git"
   },
-  "homepage": "https://github.com/ICJIA/filecap-cli#readme",
-  "bugs": "https://github.com/ICJIA/filecap-cli/issues",
+  "homepage": "https://github.com/ICJIA/icjia-fleet-audit#readme",
+  "bugs": "https://github.com/ICJIA/icjia-fleet-audit/issues",
   "type": "module",
   "bin": {
     "filecap": "./bin/filecap.js"
@@ -1940,7 +1940,7 @@ fi
 echo
 echo "==> Done."
 echo "    npm:    https://www.npmjs.com/package/@icjia/filecap"
-echo "    GitHub: https://github.com/ICJIA/filecap-cli"
+echo "    GitHub: https://github.com/ICJIA/icjia-fleet-audit"
 ```
 
 - [ ] **Step 14.2: Make publish executable**
@@ -2015,7 +2015,7 @@ In `CHANGELOG.md`, replace the entire `## [Unreleased]` section with:
 - **Vendor workflow.** Out of scope. filecap is a pure inventory tool.
 - **CSV column additions.** `category`, `remediable`, `documentLanguage`, `pdfHasFormFields`, `pdfHasSignatures`, `pdfProducer`, `pdfCreator`, `pdfCreationDate`, `docxImageCount`. *(Implementation pending Phase 6.)*
 
-[0.1.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v0.1.0
+[0.1.0]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v0.1.0
 ```
 
 - [ ] **Step 15.3: Run the full test suite one more time**

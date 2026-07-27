@@ -21,7 +21,7 @@ For consolidated input, `serverName` is per-entry (already on the entry); for si
 ## File Structure
 
 ```
-filecap-cli/
+icjia-fleet-audit/
 ├── src/
 │   ├── commands/
 │   │   └── report.js                     ← create
@@ -1038,7 +1038,7 @@ Commit: `docs: add Phase 6 report workflow section and update status`.
 - 32-column CSV writer per design-doc spec, with stable column order, header row, and pipe-separated `flags` cell.
 - New programmatic exports: `runReport`, `writeCsv`, `CSV_COLUMNS`, `writeSummary`, `writeLargestFiles`, `writeFlaggedFilenames`, `writeDuplicateHashes`, `writePdfImageOnly`, `humanizeBytes`, `csvCell`.
 
-[0.6.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v0.6.0
+[0.6.0]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v0.6.0
 ```
 
 Commit: `docs: add [0.6.0] CHANGELOG entry`.

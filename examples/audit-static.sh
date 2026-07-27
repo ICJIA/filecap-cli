@@ -53,7 +53,7 @@ set -euo pipefail
 FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
 if [[ ! -f "$FILECAP_BIN" ]]; then
   echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
-  echo "       Run this script from inside a filecap-cli checkout." >&2
+  echo "       Run this script from inside a icjia-fleet-audit checkout." >&2
   exit 1
 fi
 

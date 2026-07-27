@@ -2,7 +2,7 @@
 
 - **Date:** 2026-06-26
 - **Status:** Approved design — ready for implementation plan
-- **Scope:** filecap-cli, homepage site cards only. Extends the website-accessibility-score work on the same branch (`website-accessibility-score`).
+- **Scope:** icjia-fleet-audit, homepage site cards only. Extends the website-accessibility-score work on the same branch (`website-accessibility-score`).
 
 ---
 

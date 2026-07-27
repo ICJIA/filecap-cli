@@ -95,3 +95,12 @@ describe("isRemediable", () => {
     expect(isRemediable("other")).toBe(false);
   });
 });
+
+describe("REMEDIABLE_CATEGORIES is the single canonical set (v1.40.0)", () => {
+  it("exports exactly the five real categories — no phantom office-legacy synonym", async () => {
+    const { REMEDIABLE_CATEGORIES } = await import("../src/scanner/category.js");
+    expect([...REMEDIABLE_CATEGORIES].sort()).toEqual(
+      ["legacy-office", "office-document", "pdf", "presentation", "spreadsheet"],
+    );
+  });
+});

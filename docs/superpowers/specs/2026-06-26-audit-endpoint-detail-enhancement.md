@@ -1,7 +1,7 @@
 # audit.icjia.app — `/api/audit-url-page` detail + SPA-render enhancement
 
 - **Date:** 2026-06-26
-- **Target repo:** **`audit.icjia.app`** (NOT filecap-cli). This doc lives in filecap because filecap is the consumer; carry it into the audit app's repo to implement.
+- **Target repo:** **`audit.icjia.app`** (NOT icjia-fleet-audit). This doc lives in filecap because filecap is the consumer; carry it into the audit app's repo to implement.
 - **Status:** IMPLEMENTED on branches (2026-06-26), not yet deployed.
   - **audit.icjia.app** (`file-accessibility-audit` repo): branch `feat/page-audit-detail` (commit `cf1228e`) — exposes `axe.violations[]` + `axe.incomplete[]`. **Deploy is yours** (their infra).
   - **filecap** consumer side: landed on `main` (`7b25f26`).

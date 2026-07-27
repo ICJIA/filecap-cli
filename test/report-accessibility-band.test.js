@@ -6,6 +6,7 @@ import {
   bandForScore,
   summarizeFileA11y,
   fileA11yCoverageText,
+  fileA11yThinDataText,
   fileA11yGaugeHtml,
   fileA11yTrendChipHtml,
 } from "../src/report/accessibility-band.js";
@@ -276,5 +277,46 @@ describe("fileA11yTrendChipHtml", () => {
     const html = fileA11yTrendChipHtml({ delta: 0, dir: "flat", sinceText: "Jun 12" });
     expect(html).toMatch(/a11y-trend-flat/);
     expect(html).toMatch(/no change since Jun 12/);
+  });
+});
+
+describe("fileA11yThinDataText", () => {
+  it("names the too-few-PDFs reason instead of a bare ratio when everything scorable is scored", () => {
+    expect(fileA11yThinDataText({ scored: 1, pdfs: 1 })).toBe(
+      "Only 1 PDF on this site — too few for a reliable score (needs 5).",
+    );
+    expect(fileA11yThinDataText({ scored: 2, pdfs: 2 })).toBe(
+      "Only 2 PDFs on this site — too few for a reliable score (needs 5).",
+    );
+  });
+
+  it("shows scored-of-total when some PDFs are still unscored", () => {
+    expect(fileA11yThinDataText({ scored: 1, pdfs: 3 })).toBe(
+      "Only 1 of 3 PDFs scored so far — too few for a reliable score (needs 5).",
+    );
+  });
+
+  it("handles a site with no PDFs at all", () => {
+    expect(fileA11yThinDataText({ scored: 0, pdfs: 0 })).toBe("No PDFs on this site to score.");
+  });
+
+  it("stays in sync with MIN_SCORED_PDFS", () => {
+    expect(fileA11yThinDataText({ scored: 1, pdfs: 1 })).toContain(`needs ${MIN_SCORED_PDFS}`);
+  });
+});
+
+describe("band module escapes its own interpolations (v1.40.0)", () => {
+  it("renders hostile sinceText inert in the trend chip", () => {
+    const html = fileA11yTrendChipHtml({ delta: 2, dir: "up", sinceText: '<img src=x onerror=alert(1)>' });
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    const flat = fileA11yTrendChipHtml({ delta: 0, dir: "flat", sinceText: "<b>x</b>" });
+    expect(flat).not.toContain("<b>");
+  });
+
+  it("escapes the band label inside the gauge aria-label", () => {
+    const html = fileA11yGaugeHtml({ avg: 50, band: { label: '"><script>alert(1)</script>' } });
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&quot;&gt;&lt;script&gt;");
   });
 });

@@ -2,7 +2,7 @@
 
 - **Date:** 2026-06-26
 - **Status:** Approved design — ready for implementation plan
-- **Scope:** filecap-cli, plus one dependency change in the `audit.icjia.app` repo
+- **Scope:** icjia-fleet-audit, plus one dependency change in the `audit.icjia.app` repo
 
 ---
 

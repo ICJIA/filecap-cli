@@ -2,9 +2,16 @@ import { describe, it, expect } from "vitest";
 import { probeReachability, generateUptimeFunction } from "../src/web/uptime-function.js";
 
 describe("probeReachability", () => {
-  it("returns 'live' when the server answers (any status, including a gated 401)", async () => {
+  it("returns 'live' when the server answers with a non-5xx status (2xx/3xx/4xx, incl. a gated 401)", async () => {
     expect(await probeReachability("https://x", async () => ({ ok: true, status: 200 }), 1000)).toBe("live");
+    expect(await probeReachability("https://x", async () => ({ ok: false, status: 301 }), 1000)).toBe("live");
+    expect(await probeReachability("https://x", async () => ({ ok: false, status: 404 }), 1000)).toBe("live");
     expect(await probeReachability("https://x", async () => ({ ok: false, status: 401 }), 1000)).toBe("live");
+  });
+
+  it("returns 'down' on a 5xx — an erroring origin is not 'live' to a reader", async () => {
+    expect(await probeReachability("https://x", async () => ({ ok: false, status: 500 }), 1000)).toBe("down");
+    expect(await probeReachability("https://x", async () => ({ ok: false, status: 503 }), 1000)).toBe("down");
   });
 
   it("returns 'down' on a network error / abort", async () => {

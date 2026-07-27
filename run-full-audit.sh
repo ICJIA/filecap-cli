@@ -86,7 +86,7 @@ ok "expect present"
 command -v jq >/dev/null 2>&1 || die "jq is required (brew install jq)"
 ok "jq present"
 
-[ -f "$AUTO" ] || die "Cannot find $AUTO — run this from inside the filecap-cli checkout."
+[ -f "$AUTO" ] || die "Cannot find $AUTO — run this from inside the icjia-fleet-audit checkout."
 ok "pipeline script found"
 
 [ -f "$SITES_JSON" ] || die "No sites.json at $SITES_JSON"

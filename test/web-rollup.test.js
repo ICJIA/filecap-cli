@@ -82,7 +82,7 @@ afterEach(async () => {
 async function buildFixture({
   siteName = "DVFR",
   siteServerName = "dvfr",
-  ip = "192.241.146.85",
+  ip = "203.0.113.10",
   scannedAt = "2026-05-09T16:05:04.000Z",
 } = {}) {
   const auditsBase = path.join(tmpDir, "filecap-audits");
@@ -1262,15 +1262,15 @@ describe("deriveAccessKind (v1.7.6)", () => {
   });
 
   it("returns 'strapi' when publicUrlBase ends in /uploads", () => {
-    expect(deriveAccessKind({ publicUrlBase: "https://dvfr.icjia-api.cloud/uploads" })).toBe("strapi");
+    expect(deriveAccessKind({ publicUrlBase: "https://files.example.org/uploads" })).toBe("strapi");
   });
 
   it("returns 'strapi' when publicUrlBase ends in /uploads/ with trailing slash", () => {
-    expect(deriveAccessKind({ publicUrlBase: "https://dvfr.icjia-api.cloud/uploads/" })).toBe("strapi");
+    expect(deriveAccessKind({ publicUrlBase: "https://files.example.org/uploads/" })).toBe("strapi");
   });
 
   it("returns 'server' when host is set but publicUrlBase is /files (Archive case)", () => {
-    expect(deriveAccessKind({ host: "143.244.146.43", publicUrlBase: "https://archive.icjia.cloud/files" })).toBe("server");
+    expect(deriveAccessKind({ host: "203.0.113.12", publicUrlBase: "https://archive.icjia.cloud/files" })).toBe("server");
   });
 
   it("returns 'server' as the fallback when nothing matches", () => {
@@ -1302,7 +1302,7 @@ describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
       serverName: "dvfr-strapi-prod",
       serverIp: "1.2.3.4",
       hostname: "dvfr.example.com",
-      publicUrlBase: "https://dvfr.icjia-api.cloud/uploads",
+      publicUrlBase: "https://files.example.org/uploads",
     });
 
     const sitesFile = path.join(tmpDir, "sites-strapi.json");
@@ -1314,7 +1314,7 @@ describe("runWebRollup — access chip + panel plumbing (v1.7.6)", () => {
         user: "forge",
         host: "1.2.3.4",
         remotePath: "/uploads",
-        publicUrlBase: "https://dvfr.icjia-api.cloud/uploads",
+        publicUrlBase: "https://files.example.org/uploads",
       },
     ]);
 

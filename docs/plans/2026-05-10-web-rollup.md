@@ -174,7 +174,7 @@ Danger:                 #f87171    (rare; for actual errors)
 │  ┌──────────────────────┐  ┌──────────────────────┐     │
 │  │ DVFR                 │  │ i2i                  │     │
 │  │ dvfr.icjia-api.cloud │  │ i2i.icjia-api.cloud  │     │
-│  │ 192.241.146.85       │  │ 10.0.0.5             │     │
+│  │ 203.0.113.10       │  │ 10.0.0.5             │     │
 │  │                      │  │                      │     │
 │  │     102              │  │      245             │     │
 │  │  total files         │  │   total files        │     │
@@ -207,7 +207,7 @@ Danger:                 #f87171    (rare; for actual errors)
   <header>
     <h3>DVFR</h3>
     <p class="hostname">dvfr.icjia-api.cloud</p>
-    <p class="ip">192.241.146.85</p>
+    <p class="ip">203.0.113.10</p>
   </header>
   <div class="big-stat">
     <span class="number">102</span>

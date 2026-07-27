@@ -61,7 +61,7 @@ data (2026-06-28), most fleet sites currently land in `far`/`partial`; none reac
 
 An average over very few scored PDFs is noise. When a site has **fewer than 5 scored
 PDFs**, show *"Not enough scored PDFs yet (n / N)"* instead of a score/band. (Currently
-affects `vpp-git`, `192.241.146.85`, `ari-summit-2023`, `i2i`, and the zero-scored
+affects `vpp-git`, `203.0.113.10`, `ari-summit-2023`, `i2i`, and the zero-scored
 `ari-summit-2019` / `sfs`.)
 
 ### Archive exclusion (hardcoded)

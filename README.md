@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/filecap-cli-banner.png" alt="filecap-cli — file inventory CLI for accessibility audit scoping" width="820">
+  <img src="assets/icjia-fleet-audit-banner.png" alt="icjia-fleet-audit — file inventory CLI for accessibility audit scoping" width="820">
 </p>
 
 ## Table of contents
@@ -186,7 +186,7 @@ The tool is general-purpose. Any organization that hosts public-facing document 
 
 The complexity in filecap exists because "is this PDF accessible?" is a much harder question than "does this file exist?" Answering it requires actually opening every file and inspecting its internal structure — see the [next section](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-filecap-is-more-than-wc--l) for why this matters.
 
-→ See the project page on GitHub: https://github.com/ICJIA/filecap-cli
+→ See the project page on GitHub: https://github.com/ICJIA/icjia-fleet-audit
 
 ---
 
@@ -240,7 +240,7 @@ inline-JS additions). The summary below is for managers and auditors.
 - **Bundle privacy** uses Netlify's server-side Site Password (Pro plan) — gates **every** file in the bundle including the master spreadsheet (verified HTTP 401 on both the index and `audit-file-list-master.xlsx` for the production deployment). As of v1.21.2, origin-server identity (IPs, Forge scan paths, hostnames) is also **removed from the output at source**, not merely gated (FC-2026-033).
 - **Output directory** `~/filecap-audits/<server-name>/` is created with mode 700 (user-only readable).
 - **Configuration files** at `~/.filecap/config.json` (autoDeploy + deploySite) and `~/.filecap/secrets.json` (bearer tokens) — schema-validated on load via Zod (strict mode rejects unknown fields, catches typos). Both files mode-0600.
-- **MCP scan path restriction.** Set `FILECAP_MCP_ALLOWED_PATHS` (colon-separated absolute paths) to restrict which directories an AI agent can scan.
+- **MCP scan path restriction.** Set `FILECAP_MCP_ALLOWED_PATHS` (colon-separated absolute paths) to restrict which directories an AI agent can scan. Since v1.40.0 the server prints a stderr warning at startup when this variable is unset, because the default is unrestricted filesystem access (any readable path can be scanned or queried, and outputs can be written anywhere the process can write).
 
 ### What we don't protect (residual risk)
 
@@ -311,7 +311,7 @@ Subsequent releases added features (bearer-token storage in 1.3.3, master CSV + 
 ### How to report a security issue
 
 Email the audit administrator or open a **private** GitHub Security Advisory at
-`https://github.com/ICJIA/filecap-cli/security/advisories/new`.
+`https://github.com/ICJIA/icjia-fleet-audit/security/advisories/new`.
 **Do not open a public GitHub issue for security bugs.**
 Acknowledged within 5 business days.
 
@@ -426,7 +426,7 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 > 4. Run these three commands:
 >
 >    ```bash
->    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+>    curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
 >    chmod +x audit-remote.sh
 >    ./audit-remote.sh
 >    ```
@@ -450,8 +450,8 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 > 3. Download both scripts and run:
 >
 >    ```bash
->    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
->    curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+>    curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-fleet.sh
+>    curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
 >    chmod +x audit-fleet.sh audit-remote.sh
 >    ./audit-fleet.sh
 >    ```
@@ -668,9 +668,9 @@ Line-delimited JSON. First line: header (scan metadata). Last line: footer (summ
     "siteName": "DVFR",
     "serverName": "dvfr-strapi-prod",
     "hostname": "dvfr-strapi-prod",
-    "serverIp": "192.241.146.85",
+    "serverIp": "203.0.113.10",
     "scannedPath": "/var/strapi/uploads",
-    "publicUrlBase": "https://dvfr.icjia-api.cloud/uploads",
+    "publicUrlBase": "https://files.example.org/uploads",
     "scannedAt": "2026-05-09T14:23:11.000Z",
     "filecapVersion": "1.2.0",
     "nodeVersion": "20.19.0",
@@ -1143,7 +1143,7 @@ Check this list before running anything. All five items are required.
 
 1. **A computer running macOS, Linux, or Windows with WSL2.** Standard Mac and Linux terminals work out of the box. Windows users need one extra setup step — see [Windows: the situation](#windows-the-situation) below for a plain-language explanation of why, and how to fix it in about 5 minutes.
 
-2. **SSH access to the remote server.** This means you (or your IT team) already have a username and an SSH key configured for the target machine. The default username for ICJIA Strapi servers is `forge`. If you can already run `ssh forge@<server-ip>` and get a prompt, you're ready. If not, you'll need your server administrator to set this up before running the audit.
+2. **SSH access to the remote server.** This means you (or your IT team) already have a username and an SSH key configured for the target machine. Use the SSH username your server administrator assigned for the target machine (each site's username lives in `sites.json`). If you can already run `ssh deploy@<server-ip>` and get a prompt, you're ready. If not, you'll need your server administrator to set this up before running the audit.
 
 3. **Node.js 20 or newer installed on your local machine.** Node is the JavaScript runtime the tool uses; it's free and widely used. Check whether it's already installed by opening a terminal and typing `node --version`. If you see `v20.x.x` or higher, you're done. If not:
    - macOS: `brew install node` (if you have Homebrew) or download the installer from https://nodejs.org
@@ -1208,7 +1208,7 @@ Email the contents of `id_ed25519.pub` to ICJIA's IDS team and ask them to add i
 Once IDS confirms the key is installed, test it:
 
 ```
-ssh forge@<server-ip> "echo OK"
+ssh deploy@<server-ip> "echo OK"
 ```
 
 If it prints `OK` without prompting for a password, you're set up. If it prompts for a password, the key isn't installed yet — follow up with IDS.
@@ -1274,7 +1274,7 @@ When the JWT rotates (every 15 days for ICJIA's intranet token), update the one 
   "name": "intranet-api-prod",
   "siteName": "Intranet",
   "user": "forge",
-  "host": "192.241.146.85",
+  "host": "203.0.113.10",
   "remotePath": "/home/forge/intranet.icjia-api.cloud/intranet-api/public/uploads",
   "publicUrlBase": "https://intranet.icjia.cloud/uploads",
   "requiresBearerToken": true
@@ -1322,7 +1322,7 @@ Mixed fleets work in one run — `sites.json` can have any mix of strapi and git
 Three commands. The first downloads the script, the second makes it executable, the third runs it:
 
 ```bash
-curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
 chmod +x audit-remote.sh
 ./audit-remote.sh
 ```
@@ -1332,7 +1332,7 @@ The script walks you through the rest interactively. It asks a few questions (se
 If you already know all the details and want to skip the prompts, you can pass them directly:
 
 ```bash
-./audit-remote.sh forge 192.241.146.85 ~/dvfr.icjia-api.cloud/strapi_v4/public/uploads dvfr-strapi-prod
+./audit-remote.sh deploy 203.0.113.10 ~/example-site/strapi/public/uploads dvfr-strapi-prod
 ```
 
 ### What you'll be asked
@@ -1341,11 +1341,11 @@ In interactive mode, the script asks a few questions. Here's what each one means
 
 - **(If saved sites exist, you'll see a menu first — pick a number to skip the per-field prompts.)**
 - **SSH username** — The login name on the remote server. Defaults to `forge` (the ICJIA Strapi convention). Press Enter to accept the default, or type a different name if your server uses one.
-- **Server IP or hostname** — The address of the server you're auditing. Examples: `192.241.146.85` or `strapi-prod-01.example.com`. Required — empty values are not accepted.
-- **Full path to the uploads folder on the remote** — Where the files live on the server. Example: `~/dvfr.icjia-api.cloud/strapi_v4/public/uploads`. Your server administrator can confirm this path. Required — empty values are not accepted.
+- **Server IP or hostname** — The address of the server you're auditing. Examples: `203.0.113.10` or `strapi-prod-01.example.com`. Required — empty values are not accepted.
+- **Full path to the uploads folder on the remote** — Where the files live on the server. Example: `~/example-site/strapi/public/uploads`. Your server administrator can confirm this path. Required — empty values are not accepted.
 - **Friendly server name** — A human-readable label (the technical identifier) used in report headings. Defaults to `strapi-<IP-with-dashes>` (e.g., `strapi-192-241-146-85`). Optional — press Enter to accept the default, or type something like `dvfr-strapi-prod`.
 - **Website nickname** — An optional short name managers and vendors use to identify the site (e.g., `DVFR`, `i2i`, `vpp`, `infonet`). Different from the server name — this is the business-facing identity. Press Enter to skip if you don't have one.
-- **Public URL prefix** — The base URL where uploaded files are *actually served from*, not the user-facing site URL. For a Strapi-backed Nuxt fleet (the ICJIA pattern), files live on the API/CMS host (`<site>.icjia-api.cloud/uploads`), **not** on the public frontend (`<site>.illinois.gov/uploads`) — the frontend doesn't proxy `/uploads/*` to the backend, so a link to the frontend resolves to the catch-all 404 page (returning HTTP 200 with `text/html`, which silently breaks vendor verification later). Examples: `https://dvfr.icjia-api.cloud/uploads`, `https://agency.icjia-api.cloud/uploads` (for `icjia.illinois.gov` content), `https://archive.icjia.cloud/files` (for the standalone Archive site). Test before saving — paste the URL plus a known filename into a browser; if you see the actual file (Excel download, PDF, etc.), it's right; if you see the website's homepage or a 404 page, you've got the wrong host.
+- **Public URL prefix** — The base URL where uploaded files are *actually served from*, not the user-facing site URL. For a Strapi-backed Nuxt fleet (the ICJIA pattern), files live on the API/CMS host (`<site>.icjia-api.cloud/uploads`), **not** on the public frontend (`<site>.illinois.gov/uploads`) — the frontend doesn't proxy `/uploads/*` to the backend, so a link to the frontend resolves to the catch-all 404 page (returning HTTP 200 with `text/html`, which silently breaks vendor verification later). Examples: `https://files.example.org/uploads`, `https://agency.icjia-api.cloud/uploads` (for `icjia.illinois.gov` content), `https://archive.icjia.cloud/files` (for the standalone Archive site). Test before saving — paste the URL plus a known filename into a browser; if you see the actual file (Excel download, PDF, etc.), it's right; if you see the website's homepage or a 404 page, you've got the wrong host.
 
 ### What you get
 
@@ -1379,8 +1379,8 @@ On startup, the script offers a menu:
 
 ```
 Saved sites:
-  1. DVFR (dvfr-strapi-prod) — forge@192.241.146.85
-  2. i2i (i2i-strapi-prod) — forge@10.0.0.5
+  1. DVFR (dvfr-strapi-prod) — deploy@203.0.113.10
+  2. i2i (i2i-strapi-prod) — deploy@10.0.0.5
 
   Type a number 1-2 to select a saved site
     a  →  add a new site
@@ -1409,7 +1409,7 @@ The `p` option in the saved-sites menu runs a quick health check across every sa
 ```
   Nickname           Server name            Host               SSH      Path     Files    Notes
   ------------------ ---------------------- ------------------ -------- -------- -------- ----------------
-  DVFR               dvfr-strapi-prod       192.241.146.85     OK       OK       102
+  DVFR               dvfr-strapi-prod       203.0.113.10     OK       OK       102
   i2i                i2i-strapi-prod        10.0.0.5           FAIL     -        -        SSH connect failed
   VPP                vpp-strapi-prod        10.0.0.6           OK       OK       0        directory is empty
 ```
@@ -1464,8 +1464,8 @@ mkdir -p ~/.filecap
 mv /path/to/sites.json ~/.filecap/
 
 # Download both scripts
-curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-fleet.sh
-curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-fleet.sh
+curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
 chmod +x audit-fleet.sh audit-remote.sh
 
 # Run the fleet audit — sites.json is auto-detected
@@ -1486,7 +1486,7 @@ If you don't have a sites.json bundle and prefer to provide the server list inli
 
 ```
 # server_name,user,host,remote_path[,site_name[,public_url_base]]
-dvfr-strapi-prod,forge,192.241.146.85,~/dvfr.icjia-api.cloud/strapi_v4/public/uploads,DVFR,https://dvfr.icjia-api.cloud/uploads
+dvfr-strapi-prod,deploy,203.0.113.10,~/example-site/strapi/public/uploads,DVFR,https://files.example.org/uploads
 i2i-strapi-prod,forge,10.0.0.5,/var/strapi/uploads,i2i
 vpp-strapi-prod,forge,10.0.0.6,/var/strapi/uploads
 # (4-, 5-, and 6-column rows all work — trailing columns are optional)
@@ -1531,7 +1531,7 @@ Practical implications:
 Pre-1.2.2 audit dirs at `~/filecap-audits/<server-ip>/` are orphaned but not deleted. Migrate manually with `mv`:
 
 ```
-mv ~/filecap-audits/192.241.146.85 ~/filecap-audits/dvfr-strapi-prod
+mv ~/filecap-audits/203.0.113.10 ~/filecap-audits/dvfr-strapi-prod
 ```
 
 The fleet script (`audit-fleet.sh`) follows the same pattern: each fleet run goes to `~/filecap-audits/_fleet/<timestamp>/` and a `~/filecap-audits/_fleet/latest` symlink points to the most recent run.
@@ -1614,7 +1614,7 @@ sudo apt install -y nodejs
 node --version    # should print v20.x.x
 
 # Now run the audit exactly as you would on a Mac or Linux machine:
-curl -O https://raw.githubusercontent.com/ICJIA/filecap-cli/main/examples/audit-remote.sh
+curl -O https://raw.githubusercontent.com/ICJIA/icjia-fleet-audit/main/examples/audit-remote.sh
 chmod +x audit-remote.sh
 ./audit-remote.sh
 ```
@@ -1646,7 +1646,7 @@ You have a couple of options. First, another team member on a Mac or Linux machi
 
 A native Windows/PowerShell version of the audit scripts is possible, but it's a meaningful engineering project rather than a quick port. The work involved: approximately 1,500 lines of net-new PowerShell, a replacement for `rsync` over SSH (likely `robocopy` + `scp` with resumption logic), replacements for the inline Python helpers, full path-translation between Windows and Unix conventions, and a separate test matrix across PowerShell 5.1 and 7 on both Windows 10 and Windows 11. Estimated effort: 2–3 focused days of development plus ongoing maintenance as Windows tooling evolves.
 
-We'll prioritize this if there's clear demand from organizations that genuinely cannot use WSL2. If that's your team, please open an issue at https://github.com/ICJIA/filecap-cli/issues with a brief description of why WSL2 isn't viable — that information directly informs our roadmap.
+We'll prioritize this if there's clear demand from organizations that genuinely cannot use WSL2. If that's your team, please open an issue at https://github.com/ICJIA/icjia-fleet-audit/issues with a brief description of why WSL2 isn't viable — that information directly informs our roadmap.
 
 ---
 

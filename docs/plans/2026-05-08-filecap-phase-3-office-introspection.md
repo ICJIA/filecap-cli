@@ -15,7 +15,7 @@
 ## File Structure
 
 ```
-filecap-cli/
+icjia-fleet-audit/
 ├── package.json                          ← modify (add deps; bump to 0.3.0 in Task 11)
 ├── package-lock.json                     ← regenerated
 ├── src/
@@ -48,7 +48,7 @@ filecap-cli/
 - [ ] **Step 1.1: Install runtime + dev deps**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npm install jszip@^3 fast-xml-parser@^4 exceljs@^4
 npm install --save-dev docx@^9
 ```
@@ -943,7 +943,7 @@ This is synchronous — no file I/O needed since we only emit a marker.
 - [ ] **Step 5.2: Quick sanity check via Node**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 node -e "
 import('./src/introspect/office-legacy.js').then(m => {
   console.log(m.introspectLegacyOffice('doc'));
@@ -1616,7 +1616,7 @@ Read current CHANGELOG.md. Insert a new section ABOVE the existing `## [0.2.0]` 
 - DOCX language detection reads `word/styles.xml` first; some documents place language declarations elsewhere (e.g., `word/document.xml` `sectPr`). Coverage is best-effort; rare DOCX variants may report no language even when one is declared.
 - XLSX chart detection uses `worksheet.model.charts`, which is populated inconsistently across `exceljs` versions. False negatives are possible for files with charts.
 
-[0.3.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v0.3.0
+[0.3.0]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v0.3.0
 ```
 
 (Inserted ABOVE `## [0.2.0]`.)
@@ -1666,7 +1666,7 @@ Change `"version": "0.2.0"` to `"version": "0.3.0"`.
 - [ ] **Step 11.2: Sync `package-lock.json`**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npm install --package-lock-only
 ```
 
@@ -1707,7 +1707,7 @@ This is the user-driven task. The implementer reports the prep is done; the user
 - [ ] **Step 12.1: Pre-publish checklist**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npm test
 node -p "require('./package.json').version"
 git status
@@ -1762,7 +1762,7 @@ import('docx').then(async ({Document, Packer, Paragraph, HeadingLevel}) => {
 "
 npx --yes @icjia/filecap@0.3.0 scan . -o smoke.ndjson --no-hash
 cat smoke.ndjson | sed -n '2p' | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).introspection)"
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 rm -rf /tmp/v030-smoke
 ```
 

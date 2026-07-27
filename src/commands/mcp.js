@@ -1,7 +1,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { TOOL_DEFINITIONS, dispatchTool } from "../mcp/tools.js";
+import { TOOL_DEFINITIONS, dispatchTool, allowedPathsWarning } from "../mcp/tools.js";
 import { FILECAP_VERSION } from "../version.js";
 
 /**
@@ -12,6 +12,10 @@ import { FILECAP_VERSION } from "../version.js";
  * MCP client disconnects (typically by closing stdin).
  */
 export async function runMcp() {
+  // v1.40.0 — never run silently unrestricted (stderr is safe: MCP speaks
+  // JSON-RPC over stdout only).
+  const warning = allowedPathsWarning();
+  if (warning) process.stderr.write(warning + "\n");
   const server = new Server(
     { name: "filecap", version: FILECAP_VERSION },
     { capabilities: { tools: {} } },

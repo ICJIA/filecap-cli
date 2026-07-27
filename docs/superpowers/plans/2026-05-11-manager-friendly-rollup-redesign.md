@@ -139,7 +139,7 @@ it("falls back to siteName when siteFullName is not provided", async () => {
 - [ ] **Step 2: Run the new tests to verify they FAIL**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npx vitest run test/report-html.test.js -t "siteFullName"
 ```
 
@@ -577,7 +577,7 @@ git commit -m "feat(index-page): rewrite renderCard with infographic anatomy + e
 Run:
 
 ```bash
-sed -n '710,790p' /Volumes/satechi/webdev/filecap-cli/src/report/html.js
+sed -n '710,790p' /Volumes/satechi/webdev/icjia-fleet-audit/src/report/html.js
 ```
 
 Identify the `<h1>` line (~718) and the surrounding meta-grid / summary-bar block (~751+). Keep the meta-grid (it has useful "scanned at" / "scanned path" / "filecap version" rows for auditors); only the title block above it changes.
@@ -707,7 +707,7 @@ This task is visual styling. No TDD; verification is via running `web-rollup` an
 Run:
 
 ```bash
-grep -n "\.site-card\|\.site-url\|\.big-stat\|\.remediation-summary\|\.actions\|\.btn-primary\|\.btn-secondary" /Volumes/satechi/webdev/filecap-cli/src/web/index-page.js | head -30
+grep -n "\.site-card\|\.site-url\|\.big-stat\|\.remediation-summary\|\.actions\|\.btn-primary\|\.btn-secondary" /Volumes/satechi/webdev/icjia-fleet-audit/src/web/index-page.js | head -30
 ```
 
 Note the line ranges (probably one contiguous block ~lines 370-540 based on the earlier survey).
@@ -891,7 +891,7 @@ Find the existing `.site-card { ... }` ruleset and following sibling rules (`.si
 Search for the current grid container in the same file:
 
 ```bash
-grep -n "site-grid\|cards-grid\|class=\"grid" /Volumes/satechi/webdev/filecap-cli/src/web/index-page.js | head -10
+grep -n "site-grid\|cards-grid\|class=\"grid" /Volumes/satechi/webdev/icjia-fleet-audit/src/web/index-page.js | head -10
 ```
 
 If the existing class name is different (e.g., `.cards-grid`), either rename it to `.site-grid` in both places or change the CSS selector above. Goal: cards render in a 2-col grid.
@@ -907,7 +907,7 @@ Expected: all pass — CSS changes don't affect markup tests.
 - [ ] **Step 5: Generate a local bundle and eyeball it**
 
 ```bash
-node /Volumes/satechi/webdev/filecap-cli/bin/filecap.js web-rollup -o /tmp/filecap-preview
+node /Volumes/satechi/webdev/icjia-fleet-audit/bin/filecap.js web-rollup -o /tmp/filecap-preview
 open /tmp/filecap-preview/index.html
 ```
 
@@ -930,7 +930,7 @@ git commit -m "feat(index-page): new card CSS — two-up tiles, donut, 2-col gri
 - [ ] **Step 1: Locate the existing detail-page `<style>` block**
 
 ```bash
-grep -n "<style>\|h1 {\|\.summary-bar\|\.meta-grid" /Volumes/satechi/webdev/filecap-cli/src/report/html.js | head -10
+grep -n "<style>\|h1 {\|\.summary-bar\|\.meta-grid" /Volumes/satechi/webdev/icjia-fleet-audit/src/report/html.js | head -10
 ```
 
 - [ ] **Step 2: Add the new `dp-*` hero rules to the style block**
@@ -1059,7 +1059,7 @@ Expected: all pass.
 - [ ] **Step 4: Eyeball a per-site report**
 
 ```bash
-node /Volumes/satechi/webdev/filecap-cli/bin/filecap.js web-rollup -o /tmp/filecap-preview
+node /Volumes/satechi/webdev/icjia-fleet-audit/bin/filecap.js web-rollup -o /tmp/filecap-preview
 open /tmp/filecap-preview/dvfr-*.html
 ```
 
@@ -1117,7 +1117,7 @@ Inside the `:root { ... }` declaration emitted by `darkModeCss()`, add:
 - [ ] **Step 3: Run any tests that touch styles.js**
 
 ```bash
-grep -l "styles.js\|DESIGN_TOKENS\|darkModeCss" /Volumes/satechi/webdev/filecap-cli/test/*.js
+grep -l "styles.js\|DESIGN_TOKENS\|darkModeCss" /Volumes/satechi/webdev/icjia-fleet-audit/test/*.js
 npm test
 ```
 
@@ -1170,7 +1170,7 @@ to:
 - **Design tokens added to `src/web/styles.js`** for the new palette: `total` (#4dabf7), `audit` (#ffa84d), `totalTileBg`, `auditTileBg`, `nickname` (#c0cdda), `cardBgTop` / `cardBgBot`, `ctaBg`, `ctaFg`. Emitted as `--fc-*` CSS custom properties from `darkModeCss()`.
 - **`renderCard` is now exported** from `src/web/index-page.js` so it can be unit-tested directly. Was previously a local helper.
 
-[1.7.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v1.7.0
+[1.7.0]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v1.7.0
 ```
 
 - [ ] **Step 3: Run the full test suite to make sure everything is still green before the release commit**
@@ -1229,7 +1229,7 @@ Expected: one line with the v1.7.0 SHA + `refs/tags/v1.7.0`.
 - [ ] **Step 1: Rebuild bundle and deploy via the existing `--deploy` flag**
 
 ```bash
-node /Volumes/satechi/webdev/filecap-cli/bin/filecap.js web-rollup --deploy --deploy-site 9a079a16-be6d-4ccd-8f2b-074444baef39
+node /Volumes/satechi/webdev/icjia-fleet-audit/bin/filecap.js web-rollup --deploy --deploy-site 9a079a16-be6d-4ccd-8f2b-074444baef39
 ```
 
 Expected: bundle written under `~/filecap-audits/_web-rollup/2026-…/`, Netlify CLI uploads, deploy goes live. Final lines include `✔ Deploy is live!` and `Production URL: https://icjia-fleet-audit.netlify.app`.
@@ -1287,7 +1287,7 @@ This section is the final gate before the plan ships. Run through each item belo
 Search the plan for any TBD / TODO / "implement appropriately" / "similar to Task N":
 
 ```bash
-grep -nE "TBD|TODO|FIXME|XXX|similar to Task|add appropriate|fill in" /Volumes/satechi/webdev/filecap-cli/docs/superpowers/plans/2026-05-11-manager-friendly-rollup-redesign.md || echo "clean"
+grep -nE "TBD|TODO|FIXME|XXX|similar to Task|add appropriate|fill in" /Volumes/satechi/webdev/icjia-fleet-audit/docs/superpowers/plans/2026-05-11-manager-friendly-rollup-redesign.md || echo "clean"
 ```
 
 Expected: `clean`.

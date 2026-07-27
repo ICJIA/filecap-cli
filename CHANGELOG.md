@@ -10,6 +10,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.40.0] — 2026-07-27
+
+A review-fix release: a full-app review (deployed bundle + source + repo
+hygiene, run with Lighthouse/axe-core/contrastcap against a byte-identical
+local copy of the production bundle) produced ~20 findings; all were fixed
+test-first. Suite grew from 83 files / 1,259 tests to 89 files / 1,328.
+Verified on the rebuilt bundle: Lighthouse accessibility 100 / performance
+100, axe-core (WCAG A + AA) 0 violations on the fleet index, /sites,
+/accessibility, a per-site detail page, and audit-pdfs; SEO 66 (up from 58,
+noindex is intentional); mobile 390px layout-viewport overflow 0px (was 87px).
+
+### Fixed — mobile layout
+
+- **The phone layout no longer clips text.** At 390px the layout viewport
+  expanded to 477px and every text block (including the hero H1 — "Fleet"
+  rendered as "Fle") was cut at the screen edge. Three grid track specs
+  carried min-content floors wider than a phone (`minmax(360px, 1fr)` on the
+  explainer/by-type grids, bare `1fr` on the card stat tiles and site grid),
+  and `<main>` — a column-flexbox item via the shared footer CSS — grew to
+  match. Tracks now use `minmax(0/min(360px,100%), 1fr)` and `body > main`
+  is pinned with `min-width: 0; width: 100%` (regression-tested in
+  `test/index-css.test.js` + `test/site-footer.test.js`).
+- **The sticky footer returns to normal flow on phones** (≤700px). It cost
+  ~9% of a phone viewport and overlapped the hero on load; desktop keeps the
+  documented sticky rationale.
+
+### Fixed — accessibility (WCAG)
+
+- **Skip-to-content link on every page** (2.4.1): first focusable element,
+  targeting `<main id="main">`; visually hidden until keyboard focus.
+- **Keyboard-sortable table headers** (2.1.1): sortable `<th>`s now wrap
+  their label in a real `<button>` (Enter/Space work natively) and carry
+  `aria-sort` state; non-sortable placeholders get `scope="col"` only.
+- **Filter/pagination changes are announced** (4.1.3): both paginator
+  status lines ("Showing 1–25 of N files") are `role="status"
+  aria-live="polite"` regions.
+- **Active sort-button contrast** (1.4.3): hover state darkened to #2563eb
+  (5.17:1 with white; was 3.83:1) and the active glyph pill now darkens
+  instead of lightening (was blending to 3.45:1).
+
+### Fixed — product
+
+- **The "Website accessibility" section now actually renders.** The
+  SiteImprove-depth per-site section (page score + grade, severity and
+  WCAG-level breakdowns, per-page table) was fully built and tested in
+  v1.35.0-era work but never imported by the detail-page generator — the
+  whole `site-audit` pipeline stage was invisible in the product. Wired
+  end-to-end (web-rollup already passed the data; `writeHtml` now accepts
+  and renders it) and restyled to the detail page's dark idiom. Note: it
+  renders only for sites with a `site-audit.json` sidecar — none exist in
+  the current cache, so run `filecap site-audit` (or the fleet script's
+  score stage) to light it up.
+- **Uptime chips no longer call an erroring origin "Site live"**: a 5xx
+  response now counts as down (network error/timeout unchanged; 2xx/3xx/4xx
+  still live — a gated 401 is an answering site).
+- **Thin-data caption explains itself**: "Not enough scored PDFs yet (1 / 1)"
+  read like a bug; it now says "Only 1 PDF on this site — too few for a
+  reliable score (needs 5)." (shared `fileA11yThinDataText()` in the band
+  module).
+- **/sites no longer over-claims the audit's reach**: the content-sites lede
+  distinguishes the directory size from the audited subset ("The 13 ICJIA
+  content sites — 12 of them under file accessibility audit"), fed by the
+  actual bundled-site count.
+- **The footer's "contact the audit administrator" is now a mailto link**;
+  every page gained a `<meta name="description">` (fleet SEO 58 → 66).
+
+### Changed — page weight
+
+- **The embedded row-values blob is gone** (May review P1, first half).
+  Detail and by-type pages shipped every row's data twice: rendered `<tr>`s
+  plus a JSON array for sort/search. The client now projects sort/search
+  values from the rendered cells (`data-num` for numerics) plus a hidden
+  per-row `data-search` attribute carrying path/serverName. audit-pdfs.html
+  5,052→4,720 KB; the ICJIA detail page 4,116→3,832 KB; audit-images
+  2,432→2,104 KB. (Second half — client-rendering rows from compact data,
+  worth another ~60% on big pages — needs the Page-References cell builder
+  ported to client JS plus a DOM test harness; deliberately deferred.)
+
+### Security / repo hygiene
+
+- **Origin IPs, SSH usernames, and real server paths scrubbed** from
+  README, examples, docs, and test fixtures (TEST-NET placeholders;
+  `docs/security/audit-2026-06-06.md` self-redacted with a note). The
+  repo's own security doc said these must stay hidden behind Netlify —
+  now the repo complies with it. Real values live only in
+  `~/.filecap/sites.json`.
+- **`filecap mcp` warns on startup when `FILECAP_MCP_ALLOWED_PATHS` is
+  unset** — the default is unrestricted filesystem access and should never
+  be silent.
+- **New tests for the security surfaces that had none**: netlify-config
+  (every header + CSP pinned, `_headers`/`netlify.toml` parity), the
+  password gate (plaintext never embedded), the shared footer, INDEX_CSS
+  regression guards.
+
+### Internal
+
+- **One HTML-safety module** (`src/util/html.js`): the identical escape
+  function existed under five names in five files; `safeUrl` existed twice
+  with different normalization. All generators now import the shared
+  `escapeHtml`/`safeUrl`/`safeUrlNormalized`/`copyableValue`/`COPY_ICON_SVG`;
+  `accessibility-band.js` now escapes its own interpolations (hostile-input
+  tested) instead of trusting callers.
+- **`REMEDIABLE_CATEGORIES` single-sourced** from `scanner/category.js` —
+  the five copies had drifted (one still carried the phantom
+  `office-legacy` synonym removed in v1.39.0); the detail page's client
+  script array is now generated from the canonical set.
+- Byte formatting unified on `humanizeBytes`; repo renamed
+  `ICJIA/filecap-cli` → `ICJIA/icjia-fleet-audit` everywhere (package.json,
+  emitted footers, README, docs); stray local scan NDJSON + stale 1.5.7
+  tarball deleted from the working tree.
+
 ## [1.39.0] — 2026-07-02
 
 A fix-all release: a full-application review (seven parallel domain reviewers)

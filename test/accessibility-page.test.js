@@ -55,3 +55,10 @@ describe("generateAccessibilityPage", () => {
     expect(html).toContain("z &amp; w");
   });
 });
+
+describe("meta description (v1.40.0)", () => {
+  it("ships a description for the accessibility log page", () => {
+    const html = generateAccessibilityPage({ currentStatus: sampleStatus, log: sampleLog });
+    expect(html).toMatch(/<meta name="description" content="[^"]{40,}"/);
+  });
+});

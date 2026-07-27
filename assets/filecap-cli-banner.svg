@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360"
      font-family="Menlo, 'SF Mono', monospace" role="img"
-     aria-label="filecap-cli — file inventory CLI for accessibility audit scoping">
-  <title>filecap-cli — file inventory CLI for accessibility audit scoping</title>
+     aria-label="icjia-fleet-audit — file inventory CLI for accessibility audit scoping">
+  <title>icjia-fleet-audit — file inventory CLI for accessibility audit scoping</title>
   <defs>
     <!-- warm deep-ink background, a touch lighter up top -->
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
@@ -49,7 +49,7 @@
 
   <!-- wordmark: amber phosphor bloom, then crisp two-tone -->
   <text x="667" y="178" text-anchor="middle" font-size="74" font-weight="700" letter-spacing="1.5"
-        fill="#ff9d00" opacity="0.45" filter="url(#glow)">filecap-cli</text>
+        fill="#ff9d00" opacity="0.45" filter="url(#glow)">icjia-fleet-audit</text>
   <text x="667" y="178" text-anchor="middle" font-size="74" font-weight="700" letter-spacing="1.5">
     <tspan fill="#f5efe3">filecap</tspan><tspan fill="#ffb000">-cli</tspan>
   </text>

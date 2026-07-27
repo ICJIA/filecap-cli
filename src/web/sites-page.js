@@ -127,8 +127,23 @@ const CLIPBOARD_SCRIPT = `<script>
  *   tooling-sites-only workbook, or null to omit its button.
  * @param {string} args.title         - page <title>.
  * @param {string} args.generatedAt   - preformatted "generated at" string (optional).
+ * @param {number|null} args.auditedCount - v1.40.0: how many content sites are
+ *   actually in the current fleet audit (have inventories). The roster can be
+ *   larger (a registered site not yet scanned), and claiming the whole roster
+ *   is "under accessibility audit" contradicted the fleet snapshot's count.
  * @returns {string} full HTML document
  */
+// v1.40.0 — first sentence of the content-sites lede. Kept as a helper so the
+// three claims (roster size, audited subset, no-data) can't blur together: the
+// old copy said the whole roster was "under accessibility audit", which
+// conflicted with the fleet snapshot's smaller scanned count.
+function contentLede(n, auditedCount) {
+  const sites = `The ${he(String(n))} ICJIA content site${n !== 1 ? "s" : ""}`;
+  if (auditedCount === null || auditedCount === undefined) return `${sites}.`;
+  if (auditedCount >= n) return `${sites}, all under file accessibility audit.`;
+  return `${sites} &mdash; ${he(String(auditedCount))} of them under file accessibility audit.`;
+}
+
 export function generateSitesHtml({
   contentRoster = [],
   tools = [],
@@ -138,6 +153,7 @@ export function generateSitesHtml({
   title = "ICJIA site directory",
   generatedAt = "",
   ogImage = null, // v1.25.0: absolute URL for the bundle's own og:image meta
+  auditedCount = null, // v1.40.0
 } = {}) {
   const content = [...contentRoster].sort((a, b) => nameKey(a.site).localeCompare(nameKey(b.site), undefined, { sensitivity: "base" }));
   const toolList = [...tools].sort((a, b) => nameKey(a).localeCompare(nameKey(b), undefined, { sensitivity: "base" }));
@@ -185,6 +201,7 @@ ${toolCards}
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Directory of every ICJIA content and tooling site — titles, live URLs, statuses, and roster spreadsheet downloads.">
 <meta name="robots" content="noindex, nofollow">
 ${ogImage ? `<meta property="og:type" content="website">
 <meta property="og:title" content="${pageTitle}">
@@ -196,6 +213,7 @@ ${ogImage ? `<meta property="og:type" content="website">
 <style>${INDEX_CSS}${siteFooterCss()}</style>
 </head>
 <body id="top">
+<a class="skip-link" href="#main">Skip to content</a>
 
 <header class="site-header">
   <div class="site-header-left">
@@ -226,7 +244,7 @@ ${ogImage ? `<meta property="og:type" content="website">
   </div>
 </header>
 
-<main>
+<main id="main">
 
   <div class="fleet-section-banner" role="presentation">
     <p class="fleet-section-eyebrow">ICJIA site directory</p>
@@ -247,7 +265,7 @@ ${ogImage ? `<meta property="og:type" content="website">
   <div class="fleet-section-banner" role="presentation">
     <p class="fleet-section-eyebrow">Section · Content sites</p>
     <h2 class="fleet-section-headline">Content sites</h2>
-    <p class="fleet-section-lede">The ${he(String(content.length))} ICJIA website${content.length !== 1 ? "s" : ""} under accessibility audit. File and page counts live on the <a href="index.html">fleet snapshot</a>.</p>
+    <p class="fleet-section-lede">${contentLede(content.length, auditedCount)} File and page counts live on the <a href="index.html">fleet snapshot</a>.</p>
   </div>
   <section class="content-sites" aria-label="Content sites">
     <div class="site-grid">

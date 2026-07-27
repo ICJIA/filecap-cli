@@ -11,6 +11,8 @@
 // callers label it as such. This is a directional gauge, NOT a fleet-wide
 // compliance grade (no fleet aggregate is derived here).
 
+import { escapeHtml } from "../util/html.js";
+
 // Bands ordered high → low so bandForScore() can return the first match.
 // `color` is an abstract token ("green"/"yellow"/"red"); each surface maps it
 // to its own CSS class.
@@ -104,6 +106,23 @@ export function fileA11yCoverageText(a) {
 }
 
 /**
+ * Caption for the thin-data state (fewer than MIN_SCORED_PDFS scored). The old
+ * "(1 / 1)" ratio read like a bug — all PDFs scored, yet "not enough" — so this
+ * spells out the reason: the site simply has too few PDFs for a stable average.
+ * Shared by the homepage card and the detail-page banner. Plain text.
+ * @param {{scored:number, pdfs:number}} a - summarizeFileA11y() result
+ * @returns {string}
+ */
+export function fileA11yThinDataText(a) {
+  if (!a.pdfs) return "No PDFs on this site to score.";
+  const tail = `too few for a reliable score (needs ${MIN_SCORED_PDFS}).`;
+  if (a.scored >= a.pdfs) {
+    return `Only ${a.pdfs.toLocaleString()} PDF${a.pdfs === 1 ? "" : "s"} on this site — ${tail}`;
+  }
+  return `Only ${a.scored.toLocaleString()} of ${a.pdfs.toLocaleString()} PDFs scored so far — ${tail}`;
+}
+
+/**
  * Infographic gauge markup for the score: a fixed red→amber→green track (the
  * band thresholds as colored zones, painted in CSS) with a marker dropped at
  * the score, so a manager reads the far→closer position at a glance without
@@ -115,7 +134,7 @@ export function fileA11yCoverageText(a) {
  */
 export function fileA11yGaugeHtml(a) {
   const pct = Math.max(0, Math.min(100, Math.round(a.avg)));
-  const label = a.band ? a.band.label : "";
+  const label = escapeHtml(a.band ? a.band.label : "");
   return `<div class="a11y-gauge" role="img" aria-label="Score ${pct} of 100 — ${label}">`
     + `<div class="a11y-gauge-track"><span class="a11y-gauge-marker" style="left:${pct}%"></span></div></div>`;
 }
@@ -132,8 +151,8 @@ export function fileA11yTrendChipHtml(trend) {
   if (!trend) return "";
   const { delta, dir, sinceText } = trend;
   if (dir === "flat") {
-    return `<span class="a11y-trend a11y-trend-flat">no change since ${sinceText}</span>`;
+    return `<span class="a11y-trend a11y-trend-flat">no change since ${escapeHtml(sinceText)}</span>`;
   }
   const arrow = dir === "up" ? "▲" : "▼";
-  return `<span class="a11y-trend a11y-trend-${dir}">${arrow} ${Math.abs(delta)} since ${sinceText}</span>`;
+  return `<span class="a11y-trend a11y-trend-${dir}">${arrow} ${Math.abs(delta)} since ${escapeHtml(sinceText)}</span>`;
 }

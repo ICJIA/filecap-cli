@@ -227,16 +227,23 @@ describe("writeOrphansHtml", () => {
 
   it("wraps the page body in exactly one <main> landmark", () => {
     const html = writeOrphansHtml({ orphans: [orphan()], sources, siteTotals });
-    expect((html.match(/<main>/g) ?? []).length).toBe(1);
+    expect((html.match(/<main\b/g) ?? []).length).toBe(1);
     expect((html.match(/<\/main>/g) ?? []).length).toBe(1);
     // <main> opens right after <body>; </main> closes before </body> (the
     // trailing <script> may sit between </main> and </body>).
-    expect(html).toMatch(/<body>\s*<main>/);
+    expect(html).toMatch(/<body>\s*<a class="skip-link" href="#main">Skip to content<\/a>\s*<main id="main">/);
     expect(html.indexOf("</main>")).toBeLessThan(html.indexOf("</body>"));
     // The page content (h1, table) lives inside the landmark.
-    expect(html.indexOf("<main>")).toBeLessThan(html.indexOf("<h1>"));
+    expect(html.indexOf("<main id=\"main\">")).toBeLessThan(html.indexOf("<h1>"));
     expect(html.indexOf('<table id="orphan-table">')).toBeLessThan(
       html.indexOf("</main>"),
     );
+  });
+});
+
+describe("meta description (v1.40.0)", () => {
+  it("ships a description for the orphaned-files page", () => {
+    const html = writeOrphansHtml({ orphans: [], sources: [], siteTotals: new Map() });
+    expect(html).toMatch(/<meta name="description" content="[^"]{40,}"/);
   });
 });

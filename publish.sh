@@ -91,4 +91,4 @@ fi
 echo
 echo "==> Done."
 echo "    npm:    https://www.npmjs.com/package/@icjia/filecap"
-echo "    GitHub: https://github.com/ICJIA/filecap-cli"
+echo "    GitHub: https://github.com/ICJIA/icjia-fleet-audit"

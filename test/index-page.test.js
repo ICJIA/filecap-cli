@@ -158,6 +158,35 @@ describe("renderCard", () => {
   });
 });
 
+describe("access modal keeps the native <dialog> pattern (v1.40.0 pin)", () => {
+  // showModal() supplies the focus trap, Escape handling, implicit
+  // role=dialog/aria-modal, backdrop inertness, AND focus restore to the
+  // trigger. A div-based "modal" would need all of that reimplemented —
+  // these assertions keep anyone from quietly downgrading the pattern.
+  it("renders access modals as <dialog> with a labelled title", () => {
+    const html = generateIndexHtml({ siteResults: [], password: null });
+    expect(html).toMatch(/<dialog class="access-modal[^"]*" id="access-modal-github" aria-labelledby="access-modal-github-title">/);
+    expect(html).toContain('<form method="dialog"');
+  });
+
+  it("opens via native showModal()", () => {
+    const html = generateIndexHtml({ siteResults: [], password: null });
+    expect(html).toContain("dlg.showModal()");
+  });
+});
+
+describe("renderCard thin-data file-accessibility caption (v1.40.0)", () => {
+  it("explains WHY there is no score instead of a bare (n / N) ratio", () => {
+    const sr = {
+      ...baseSr,
+      summary: { ...baseSr.summary, byCategory: { pdf: 1 }, remediable: 1, auditScoreSum: 90, auditedPdfCount: 1 },
+    };
+    const html = renderCard(sr);
+    expect(html).toContain("Only 1 PDF on this site — too few for a reliable score (needs 5).");
+    expect(html).not.toContain("Not enough scored PDFs yet");
+  });
+});
+
 describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
   const sr = {
     site: {
@@ -173,7 +202,7 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
     scannedAt: "2026-05-11T14:00:00.000Z",
     header: {
       metadata: {
-        serverIp: "192.241.146.85",
+        serverIp: "203.0.113.10",
         hostname: "dvfr.example.com",
         scannedPath: "/home/forge/dvfr.icjia-api.cloud/dvfr-api/public/uploads",
       },
@@ -189,7 +218,7 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
     expect(html).not.toMatch(/<span class="tech-label">IP:<\/span>/);
     expect(html).not.toMatch(/<span class="tech-label">Path:<\/span>/);
     // the origin IP + Forge scanned path must not leak anywhere on the card
-    expect(html).not.toContain("192.241.146.85");
+    expect(html).not.toContain("203.0.113.10");
     expect(html).not.toContain("/home/forge/");
   });
 
@@ -214,8 +243,8 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
   it("hides the Hostname row when it equals the IP (v1.21.2)", () => {
     const srHostEqIp = {
       ...sr,
-      site: { ...sr.site, host: "192.241.146.85" },
-      header: { metadata: { serverIp: "192.241.146.85", hostname: "192.241.146.85" } },
+      site: { ...sr.site, host: "203.0.113.10" },
+      header: { metadata: { serverIp: "203.0.113.10", hostname: "203.0.113.10" } },
     };
     const html = renderCard(srHostEqIp);
     expect(html).not.toMatch(/<span class="tech-label">Hostname:<\/span>/);
@@ -700,5 +729,12 @@ describe("renderScorecards", () => {
     const html = renderScorecards({ auditedPdfCount: 0 }, null);
     expect(html).toContain("No PDFs scored yet");
     expect(html).toContain("Site not scored yet");
+  });
+});
+
+describe("meta description (v1.40.0)", () => {
+  it("ships a description for the fleet index", () => {
+    const html = generateIndexHtml({ siteResults: [], password: null });
+    expect(html).toMatch(/<meta name="description" content="[^"]{40,}"/);
   });
 });

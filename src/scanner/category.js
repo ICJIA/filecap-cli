@@ -63,7 +63,10 @@ const EXTENSION_MAP = {
   webm: "audio-video",
 };
 
-const REMEDIABLE_CATEGORIES = new Set([
+// v1.40.0 — THE canonical set. summary.js, web-rollup, and the detail page's
+// client script all import/emit this — the five hand-kept copies had already
+// drifted (one still carried the phantom "office-legacy" synonym).
+export const REMEDIABLE_CATEGORIES = new Set([
   "pdf",
   "office-document",
   "spreadsheet",

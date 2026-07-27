@@ -256,3 +256,31 @@ describe("dispatchTool", () => {
     await fs.rm(outDir, { recursive: true, force: true });
   });
 });
+
+
+describe("unrestricted-filesystem warning (v1.40.0)", () => {
+  it("returns a warning when FILECAP_MCP_ALLOWED_PATHS is unset", async () => {
+    const { allowedPathsWarning } = await import("../src/mcp/tools.js");
+    const prev = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+    try {
+      const w = allowedPathsWarning();
+      expect(w).toMatch(/unrestricted/i);
+      expect(w).toContain("FILECAP_MCP_ALLOWED_PATHS");
+    } finally {
+      if (prev !== undefined) process.env.FILECAP_MCP_ALLOWED_PATHS = prev;
+    }
+  });
+
+  it("returns null when the allowlist is configured", async () => {
+    const { allowedPathsWarning } = await import("../src/mcp/tools.js");
+    const prev = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    process.env.FILECAP_MCP_ALLOWED_PATHS = "/tmp";
+    try {
+      expect(allowedPathsWarning()).toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+      else process.env.FILECAP_MCP_ALLOWED_PATHS = prev;
+    }
+  });
+});

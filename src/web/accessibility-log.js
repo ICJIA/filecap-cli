@@ -10,7 +10,7 @@
 
 /** Current verified accessibility standing — shown in the page's status panel. */
 export const currentStatus = {
-  asOf: "2026-07-02",
+  asOf: "2026-07-27",
   lighthouse: 100,
   axeCore: "0 violations (WCAG A + AA)",
   axeDevTools: "0 serious — pending live re-verification",
@@ -32,6 +32,18 @@ export const currentStatus = {
  *   notes    optional, e.g. the version it shipped in
  */
 export const accessibilityLog = [
+  {
+    date: "2026-07-27",
+    source: "backend",
+    tool: "axecap (axe-core) + lightcap (Lighthouse) + contrastcap",
+    scope:
+      "v1.40.0 review-fix release — full-app review run against a byte-identical local copy of the production bundle, then re-verified on the rebuilt bundle: fleet index, /sites, /accessibility, a per-site detail page, and audit-pdfs",
+    viewport: "desktop + mobile",
+    status: "fixed",
+    result:
+      "Found and fixed during the review: (1) the 390px layout viewport expanded to 477px — grid tracks with min-content floors (minmax(360px,1fr) explainers, 1fr stat tiles) inflated <main> and every text block clipped at the screen edge, including the hero H1 (\"Fleet\" rendered as \"Fle\"); tracks now use minmax(0/min(360px,100%),1fr) and main is pinned to the page width — mobile overflow re-measured at 0px. (2) No skip link (WCAG 2.4.1) — added on every page, first focusable, targeting main#main. (3) Table column sort was mouse-only (2.1.1) — sortable headers are real <button>s with aria-sort state. (4) Filter/pagination results changed silently for screen readers (4.1.3) — both paginator status lines are now polite live regions. (5) Active sort-button hover was 3.83:1 and its glyph pill blended to 3.45:1 (1.4.3) — darkened to 5.17:1 and ≥7:1. (6) The sticky footer overlapped content on phones — static under 700px. After the fixes, on the rebuilt bundle: 0 axe-core violations (WCAG A + AA) on all five page types, Lighthouse accessibility 100 and performance 100 (desktop), SEO 66 (up from 58 via new meta descriptions; noindex is intentional). Browser (axe DevTools) re-verification on the deployed bundle pending the next deploy. The four contrastcap \"failures\" that remain are pixel-sampler artifacts against lazy-loading card thumbnails — the sampled backgrounds change every run and the rendered pairs measure 6:1-9:1 once images are settled.",
+    notes: "v1.40.0",
+  },
   {
     date: "2026-07-02",
     source: "backend",

@@ -24,7 +24,7 @@
 ## File Structure
 
 ```
-filecap-cli/
+icjia-fleet-audit/
 ├── src/
 │   ├── flag/
 │   │   └── filename.js                   ← create
@@ -139,7 +139,7 @@ describe("computeFilenameFlags", () => {
 - [ ] **Step 1.2: Run tests, verify failure**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npx vitest run test/flag-filename.test.js
 ```
 
@@ -400,7 +400,7 @@ The new export vs Phase 3: `computeFilenameFlags`.
 - [ ] **Step 3.2: Verify exports**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 node -e "import('./src/index.js').then(m => console.log('exports:', Object.keys(m).sort().join(',')))"
 ```
 
@@ -563,7 +563,7 @@ Actually correcting: use `filename-non-ascii` (lowercase) in the table.
 - [ ] **Step 5.3: Run tests**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npm test
 ```
 
@@ -607,7 +607,7 @@ Read current `CHANGELOG.md`. Insert a new section ABOVE the existing `## [0.3.0]
 
 - The orchestrator's entry construction switches `flags: []` to `flags: computeFilenameFlags(filename)`. Phase 1–3 entries had empty `flags[]` arrays; Phase 4 entries populate them. Backward-compatible at the schema level (still `z.array(z.string())`).
 
-[0.4.0]: https://github.com/ICJIA/filecap-cli/releases/tag/v0.4.0
+[0.4.0]: https://github.com/ICJIA/icjia-fleet-audit/releases/tag/v0.4.0
 ```
 
 (Inserted ABOVE the existing `## [0.3.0]` section.)
@@ -658,7 +658,7 @@ Change `"version": "0.3.0"` to `"version": "0.4.0"`.
 - [ ] **Step 7.2: Sync `package-lock.json`**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npm install --package-lock-only
 ```
 
@@ -697,7 +697,7 @@ User-driven release.
 - [ ] **Step 8.1: Pre-publish checklist**
 
 ```bash
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 npm test
 node -p "require('./package.json').version"
 git status
@@ -742,7 +742,7 @@ touch "Scan_001.pdf" "regular.pdf" "spaced name.txt"
 npx --yes @icjia/filecap@0.4.0 scan . -o smoke.ndjson --no-hash --no-introspect
 echo "--- entries ---"
 sed -n '2,$p' smoke.ndjson | head -5
-cd /Volumes/satechi/webdev/filecap-cli
+cd /Volumes/satechi/webdev/icjia-fleet-audit
 rm -rf /tmp/v040-smoke
 ```
 

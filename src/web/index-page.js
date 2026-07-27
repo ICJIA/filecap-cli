@@ -3,37 +3,25 @@ import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../ut
 import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 import { INDEX_CSS } from "./index-css.js";
 import { gradeForScore } from "../site-audit/aggregate.js";
-import { summarizeFileA11y, fileA11yCoverageText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "../report/accessibility-band.js";
+import { summarizeFileA11y, fileA11yCoverageText,
+  fileA11yThinDataText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "../report/accessibility-band.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
 import { uptimeClientScript } from "./uptime-client.js";
 
-/**
- * Escape a value for safe insertion into HTML.
- * @param {*} s
- * @returns {string}
- */
-export function he(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+// v1.40.0 — the escape helper moved to src/util/html.js (one implementation
+// for all generators). `he` stays exported: sites-page + tests import it.
+export { escapeHtml as he } from "../util/html.js";
+import { escapeHtml as he } from "../util/html.js";
+import { copyableValue } from "../util/html.js";
+import { humanizeBytes } from "../report/format.js";
 
 /**
  * Format bytes as human-readable string (e.g. 38.1 MB).
  * @param {number} bytes
  * @returns {string}
  */
-function humanBytes(bytes) {
-  if (!bytes || bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const val = bytes / Math.pow(1024, i);
-  return `${i === 0 ? val : val.toFixed(1)} ${units[i]}`;
-}
+// (byte formatting → report/format.js humanizeBytes — one formatter everywhere)
+const humanBytes = (b) => humanizeBytes(b ?? 0) || "0 B";
 
 // 1.7.37 — Time formatting delegated to src/util/time.js. All
 // user-visible timestamps now display in Chicago time (America/Chicago,
@@ -404,7 +392,7 @@ function renderTodoSection() {
       </li>
     </ul>
 
-    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/filecap-cli/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">filecap CHANGELOG</a> — the next major release will roll these out.</p>
+    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">filecap CHANGELOG</a> — the next major release will roll these out.</p>
   </section>`;
 }
 
@@ -538,30 +526,8 @@ const ACCESS_MODAL_COPY = {
   },
 };
 
-// Same clipboard-outline icon as src/report/html.js's COPY_ICON_SVG — kept
-// in lock-step visually. Duplicated rather than imported so the two pages
-// stay decoupled (changes to one don't risk regressing the other).
-const COPY_ICON_SVG = '<svg class="meta-copy-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4.25" y="3.25" width="8.5" height="10.5" rx="1.25"/><path d="M10.75 3.25V2.75a1 1 0 0 0-1-1h-2.5a1 1 0 0 0-1 1v0.5"/></svg>';
 
-/**
- * Wrap a value in a flex container with the value text + a copy-to-clipboard
- * button on the right. Used inside the per-card <details class="tech-details">
- * disclosure so a remediator can copy the site's website nickname, IP,
- * hostname, scanned path, and public URL straight from the index page
- * without first opening the detail page. The button copies the *raw* value
- * (passed verbatim to data-copy); displayHtml lets the rendered cell be
- * richer (e.g. an <a> wrapping the URL) without affecting what gets copied.
- *
- * @param {string} value - raw text that goes on the clipboard
- * @param {string|null} displayHtml - HTML to render (defaults to escaped value)
- * @param {string} label - aria-label suffix, e.g. "IP address"
- * @returns {string}
- */
-function copyableValue(value, displayHtml, label) {
-  if (value === undefined || value === null || value === "") return "<span></span>";
-  const display = displayHtml ?? he(value);
-  return `<span class="meta-value">${display}<button type="button" class="meta-copy" data-copy="${he(value)}" aria-label="Copy ${he(label || "value")} to clipboard" title="Copy to clipboard">${COPY_ICON_SVG}<span class="meta-copy-feedback" aria-hidden="true">Copied</span></button></span>`;
-}
+// (copyableValue + COPY_ICON_SVG → src/util/html.js — shared with the detail page)
 
 // v1.21.0 — strip scheme + trailing slash for a cleaner on-card URL display.
 // The href keeps the full URL; only the visible text is shortened.
@@ -720,7 +686,7 @@ function renderFileA11y(a, trend) {
     return `<div class="a11y-strip a11y-na">${head}<span class="a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
   }
   if (!a.enoughData) {
-    return `<div class="a11y-strip a11y-na">${head}<span class="a11y-note">Not enough scored PDFs yet (${a.scored.toLocaleString()} / ${a.pdfs.toLocaleString()})</span></div>`;
+    return `<div class="a11y-strip a11y-na">${head}<span class="a11y-note">${he(fileA11yThinDataText(a))}</span></div>`;
   }
   const key = a.band?.key ?? "na";
   const label = he(a.band?.label ?? "");
@@ -1049,6 +1015,7 @@ export function generateIndexHtml({
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Fleet-wide inventory of files that may need accessibility remediation across ICJIA's websites, with per-site detail, spreadsheets, and a live snapshot.">
 <meta name="robots" content="noindex, nofollow">
 ${ogImage ? `<meta property="og:type" content="website">
 <meta property="og:title" content="${pageTitle}">
@@ -1060,6 +1027,7 @@ ${ogImage ? `<meta property="og:type" content="website">
 <style>${INDEX_CSS}${siteFooterCss()}</style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -1099,7 +1067,7 @@ ${ogImage ? `<meta property="og:type" content="website">
   </div>
 </header>
 
-<main>
+<main id="main">
 
   <!-- v1.7.23: top section banner — mirrors the v1.7.22 "Cross-Server Duplicates"
        banner so the page reads as TWO clearly-marked sections (Fleet snapshot

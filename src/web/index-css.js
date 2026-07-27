@@ -552,7 +552,7 @@ main {
 }
 .explanation-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
   gap: 2em;
   margin-top: 1.5em;
 }
@@ -588,7 +588,7 @@ main {
 }
 .by-type-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
   gap: 2em;
 }
 .by-type-column {
@@ -848,7 +848,9 @@ main {
 
 .site-card .nums {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* v1.40.0 — minmax(0,…) so the tiles can shrink below their label width on
+     phones; bare 1fr floors at min-content and inflates <main> (see test). */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin: 0 0 18px;
 }
@@ -1204,14 +1206,15 @@ main {
 /* 2-col grid: desktop 2-up, mobile 1-up */
 .site-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* v1.40.0 — minmax(0,…) for the same phone-width reason as .nums. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   /* Roomy gutters so the image-heavy cards have breathing space and the
      two-across grid doesn't read as dense. At the 1200px container this
      only trims each card by a few px while opening up the whitespace. */
   gap: 48px 40px;
 }
 @media (max-width: 820px) {
-  .site-grid { grid-template-columns: 1fr; }
+  .site-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* v1.7.39 — big, visible sort toolbar above the site grid. Three
@@ -1283,7 +1286,7 @@ main {
 }
 .sort-btn.is-active:hover,
 .sort-btn[aria-pressed="true"]:hover {
-  background: #2c7eff;
+  background: #2563eb; /* v1.40.0 — 5.17:1 with white; the old lighter hover was 3.83:1 */
   color: #ffffff;
   border-color: #79b8ff;
 }
@@ -1303,7 +1306,9 @@ main {
 }
 .sort-btn.is-active .sort-btn-glyph,
 .sort-btn[aria-pressed="true"] .sort-btn-glyph {
-  background: rgba(255,255,255,0.18);
+  /* v1.40.0 — darken, don't lighten: the white ★ on the lightened pill blended
+     to #4789ee (3.45:1). Black overlay keeps it ≥7:1 on the active blue. */
+  background: rgba(0, 0, 0, 0.25);
 }
 .sort-btn-label { white-space: nowrap; }
 @media (max-width: 600px) {

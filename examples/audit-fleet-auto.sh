@@ -39,6 +39,7 @@
 #    SKIP_ROLLUP=1 ./audit-fleet-auto.sh          # skip web-rollup bundle build
 #    SKIP_SITE_AUDIT=1 ./audit-fleet-auto.sh      # skip the website accessibility scoring (v1.35.0)
 #    FILECAP_NO_DEPLOY=1 ./audit-fleet-auto.sh    # build but don't deploy to Netlify
+#    FILECAP_AUDITS_FORCE=1 ./audit-fleet-auto.sh  # re-score every PDF fresh (skip caches)
 #
 #  EXIT CODE
 #    Mirrors audit-fleet.sh's exit code if scan fails; otherwise reflects
@@ -59,7 +60,7 @@ AUDITS_BASE="${AUDITS_BASE:-${HOME}/filecap-audits}"
 FILECAP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/bin/filecap.js"
 if [[ ! -f "$FILECAP_BIN" ]]; then
   echo "ERROR: filecap CLI not found at $FILECAP_BIN" >&2
-  echo "       Run this script from inside a filecap-cli checkout." >&2
+  echo "       Run this script from inside a icjia-fleet-audit checkout." >&2
   exit 1
 fi
 
@@ -300,7 +301,10 @@ for s in d.get('sites', []):
     [[ -f "$inv" ]] || inv="$site_dir/latest/inventory.ndjson"
     out="$site_dir/latest/inventory.audited.ndjson"
     if [[ -f "$inv" ]]; then
+      # v1.40.0: FILECAP_AUDITS_FORCE=1 re-scores every PDF fresh (ignores the
+      # local cache AND sends force=true so audit.icjia.app bypasses its own).
       if node "$FILECAP_BIN" audits "$inv" \
+           ${FILECAP_AUDITS_FORCE:+--force} \
            -o "$out" >/tmp/filecap-audit-"$site".log 2>&1; then
         result=$(tail -1 /tmp/filecap-audit-"$site".log)
         echo "[fleet-auto]   ✓ audits $site: $result"

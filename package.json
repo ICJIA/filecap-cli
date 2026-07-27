@@ -1,6 +1,6 @@
 {
   "name": "@icjia/filecap",
-  "version": "1.39.0",
+  "version": "1.40.0",
   "description": "File inventory CLI for accessibility audit scoping",
   "keywords": [
     "accessibility",
@@ -15,10 +15,10 @@
   "author": "Illinois Criminal Justice Information Authority (ICJIA)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ICJIA/filecap-cli.git"
+    "url": "git+https://github.com/ICJIA/icjia-fleet-audit.git"
   },
-  "homepage": "https://github.com/ICJIA/filecap-cli#readme",
-  "bugs": "https://github.com/ICJIA/filecap-cli/issues",
+  "homepage": "https://github.com/ICJIA/icjia-fleet-audit#readme",
+  "bugs": "https://github.com/ICJIA/icjia-fleet-audit/issues",
   "type": "module",
   "bin": {
     "filecap": "./bin/filecap.js"
