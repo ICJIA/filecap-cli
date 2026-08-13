@@ -10,6 +10,140 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.41.0] — 2026-08-12
+
+An incident-response release. The 2026-07-27 fleet run was killed mid-Stage 3.5
+and left no error in its transcript: the scan had already repointed every
+site's `latest/` at a fresh run dir, the PDF-grading stage never produced a
+single `inventory.audited.ndjson`, and nothing downstream noticed. The deployed
+report silently went six weeks stale while the on-disk state sat one
+`web-rollup` away from publishing a fleet report with every Remediation Score
+blank. This release makes that state impossible to ship by accident, and makes
+the run less likely to die in the first place.
+
+Also removes the document archive from the audit roster.
+
+### Added — privileged-tier credential + throttle visibility
+
+- **`AUDIT_ICJIA_TOKEN` / `secrets.json` resolves the audit.icjia.app service
+  token** (`src/config/audit-token.js`). audit.icjia.app runs two tiers:
+  anonymous is 500/hour + 100/min per IP; the token raises that 10× to
+  5,000/hour + 1,000/min. A fleet-sized pass exhausts the anonymous budget in
+  minutes and spends the rest of the run honoring `Retry-After` — which from
+  the outside is indistinguishable from the server being down. The token buys
+  rate limit and the non-ICJIA URL allowlist bypass only; it never bypasses the
+  SSRF/private-IP block, the upload size caps, or the concurrency semaphores.
+- **The tier is announced at run start** (`describeAuditTier`) so a run that
+  silently fell back to anonymous is visible immediately, rather than inferred
+  from throttling an hour later.
+- **End-of-run throttle summary** (`formatThrottleSummary`) reports requests,
+  429s, server-directed waits and total time parked. Counted at the shared
+  fetcher — the single choke point both scorers pass through.
+
+### Fixed — Retry-After was clamped, turning rate limits into permanent errors
+
+- **`retrying-fetcher` now honors `Retry-After` in full.** The module's own
+  docs claimed it "honor[s] it exactly"; the code did
+  `Math.min(maxDelayMs, afterHeader)` — 60s. audit.icjia.app's real policy is
+  `ratelimit-policy: 500;w=3600` (**500/hour**, not the 100/min this module was
+  written against), so an exhausted budget answers `retry-after: 820`. We slept
+  60s, retried into the same closed window, and after six retries threw —
+  marking that PDF permanently errored. Six 60s retries can never outlast a
+  window up to an hour. Observed live on 2026-08-12: the agency site (918 PDFs)
+  logged 18 × 429 in 24 lines with both workers stuck at retry 4/6.
+- **Server-directed waits get their own budget** (`maxRateLimitWaits`,
+  default 12) instead of drawing on `maxRetries`. Complying with a limiter is
+  not evidence of a stuck endpoint, and a cold fleet-sized batch *must* pace
+  across several hourly windows — ~1,800 PDFs cannot be graded inside one.
+- **`maxRetryAfterMs`** (default 15 min) bounds a malformed or hostile header
+  so the run still can't be parked indefinitely.
+- A 429 *without* a `Retry-After` header has no server guidance and keeps the
+  old exponential-backoff behavior on the `maxRetries` budget.
+
+### Added — pipeline resume point
+
+- **`SKIP_SCAN=1`** in `audit-fleet-auto.sh` reuses the scans already in
+  `<AUDITS_BASE>/<site>/latest/` instead of re-rsyncing the fleet. The audit
+  stage is network-bound for hours against the limiter and is by far the
+  likeliest to be interrupted; without a resume point, recovering from that
+  meant re-scanning every host and repointing every `latest/` for no benefit.
+
+### Added — unscored-inventory deploy guard
+
+- **`web-rollup` now refuses to deploy a bundle whose sites have no PDF
+  grades** (`src/web/unscored-guard.js`, exit code 3). The inventory chain
+  (`audited → cross-ref → raw`) is a silent fallback by design; when the
+  audits stage does not run, that fallback quietly yields a scoreless report.
+  The guard flags any site with PDFs but *zero* graded PDFs — a partial score
+  is the normal steady state (files land between runs) and is not flagged.
+  - build-only run → loud warning naming each degraded site and its PDF
+    count, exit 0 (this is the diagnostic path)
+  - real deploy → refuses, netlify never spawned, bundle still written
+  - `FILECAP_NO_DEPLOY=1` → warning only; a deploy that was never going to
+    happen must not fail the build
+  - `--allow-unscored` → operator override, still warns
+
+### Changed — run-full-audit.sh survivability
+
+- **The pipeline runs under `caffeinate -i -m -s`.** A fleet run is mostly
+  spent waiting on the network (rsync, then the audit API), so an idle machine
+  will suspend in the middle of it — the most likely cause of the 07-27 abort.
+  Falls back to a no-op `env` prefix where `caffeinate` is unavailable (bash
+  3.2 cannot expand an empty array under `set -u`).
+- **SIGINT / SIGTERM / SIGHUP now leave an `[ABORTED]` breadcrumb** naming the
+  partial-state risk and the recovery step. SIGKILL still cannot be trapped —
+  that is what the deploy guard backstops.
+
+### Removed — document archive out of audit scope
+
+- **`archive-prod` removed from the roster.** Files that land in the archive
+  are archived, not remediated, so the site is out of audit scope: no scan, no
+  card, no detail page, and it no longer contributes to fleet counts
+  (−2,405 files, ~940 PDFs of grading work per run). Its cached scan data is
+  left on disk untouched.
+  - Consequence: `archive.icjia.cloud` / `archive.icjia-api.cloud` leave the
+    fleet domain whitelist, so other sites' pages no longer surface links to
+    archived documents as cross-site references.
+  - `A11Y_SCORE_EXCLUDE_SLUGS` keeps its `archive-prod` entry — inert today,
+    retained as the mechanism (and because per-file Remediation Score cells
+    band by score regardless of site) should the archive ever return.
+
+### Fixed — false-perfect website score
+
+- **`aggregateSite` no longer reports a perfect 100 for a site with known
+  violations.** `summarizeFileA11y()` has clamped a rounded-up 100 to 99 since
+  v1.39.0 ("showing 100 for a set that still contains a failing PDF is a false
+  perfect"); the SITE score never got the same guard. The first fleet-wide
+  site-audit run exposed it immediately: infonet averaged 99.6218 over 156
+  pages with **19 outstanding violations** and rendered a flat "100 (A)" —
+  directly above its own "19 outstanding issues" breakdown. Two independent
+  signals now block a perfect score: any page below 100, or any outstanding
+  violation at all (per-page rounding can hide one inside a 100). Affected
+  agency (100→99, 5 outstanding), ilfvcc (100→99, 2) and infonet (100→99, 19);
+  dvfr / i2i / r3 / sfs / vpp are genuinely 100 and unchanged — independently
+  confirmed against a direct axe-core run.
+
+### Tests
+
+- +43 (1,328 → 1,371, 89 → 93 files): `unscored-guard`, `audit-token`,
+  `throttle-summary`, and `skip-scan` (a shell probe of both branches, in the
+  style of the existing purge probe). `web-rollup-fixes` gains end-to-end cover
+  for refuse-on-deploy, `--allow-unscored`, build-only warn, and the
+  `FILECAP_NO_DEPLOY=1` downgrade; `site-audit-aggregate` covers the
+  false-perfect clamp; `audits-retrying-fetcher` covers full-window
+  `Retry-After` honoring and the split budgets. The v1.39.0 deploy-outcome
+  fixture now carries a scored PDF so it exercises a healthy bundle.
+
+### Operational note — 2026-08-12/13 fleet run
+
+First complete fleet audit since 2026-07-02. Graded **1,966 of 1,981 PDFs
+(99.2%)**, fleet average 64; the 15 failures are content errors (6 × HTTP 413
+on PDFs ≥17.3 MB — the server's body cap sits between 14.3 and 17.3 MB;
+8 × HTTP 422 on ~0.2 MB agency NOFO/Q&A documents; 1 server-unavailable), not
+rate-limit casualties. Produced the first 11 `site-audit.json` sidecars this
+fleet has ever had. Run took 8h07m on the anonymous tier — the motivation for
+the token support above.
+
 ## [1.40.0] — 2026-07-27
 
 A review-fix release: a full-app review (deployed bundle + source + repo

@@ -77,6 +77,24 @@ exec > >(tee -a "$LOG") 2>&1
 printf 'filecap full fleet audit — %s\n' "$TS"
 printf 'transcript: %s\n' "$LOG"
 
+# ── abnormal-termination breadcrumb ──────────────────────────────────────────
+# The 2026-07-27 run died mid-Stage 3.5 and left NO error in the transcript —
+# the log simply stopped, which made the failure invisible until someone
+# noticed the deployed report was six weeks stale. A trap can't catch SIGKILL,
+# but it catches the common ones (closed terminal, Ctrl-C, `kill`) and turns a
+# silent stop into a diagnosable one.
+on_signal() {
+  printf '\n[ABORTED] run-full-audit.sh received %s — pipeline stopped early.\n' "$1" >&2
+  printf '          The last "Stage ..." line above is where it stopped.\n' >&2
+  printf '          State may be partial: latest/ can point at a fresh scan with no PDF\n' >&2
+  printf '          scores. Re-run ./run-full-audit.sh to finish — web-rollup now refuses\n' >&2
+  printf '          to deploy an unscored bundle, so a partial state cannot reach production.\n' >&2
+  exit 130
+}
+trap 'on_signal SIGINT'  INT
+trap 'on_signal SIGTERM' TERM
+trap 'on_signal SIGHUP'  HUP
+
 # ── 1. pre-flight ────────────────────────────────────────────────────────────
 say "Pre-flight"
 
@@ -113,6 +131,20 @@ fi
 FC_VER=$(node "$FILECAP_BIN" --version 2>/dev/null || echo "?")
 ok "filecap CLI v$FC_VER"
 
+# Hold off sleep for the duration. A fleet run is 15-40 min and mostly spent
+# waiting on the network (rsync, then the audit API), so an idle machine will
+# happily suspend in the middle of it — the most likely cause of the silent
+# 2026-07-27 abort. `env` is a no-op prefix when caffeinate is unavailable
+# (bash 3.2 can't expand an empty array under `set -u`).
+KEEPAWAKE="env"
+if command -v caffeinate >/dev/null 2>&1; then
+  KEEPAWAKE="caffeinate -i -m -s"
+  ok "caffeinate present — idle/disk/system sleep held off for the run"
+  warn "closing the lid still sleeps the machine regardless — leave it open"
+else
+  warn "caffeinate not found — the machine may sleep and kill this run"
+fi
+
 if [ "$DEPLOY" -eq 1 ]; then
   command -v netlify >/dev/null 2>&1 \
     || die "netlify CLI not found. Install: npm i -g netlify-cli  (or rerun with --no-deploy)"
@@ -136,9 +168,9 @@ echo "  Watching progress:  tail -f \"$LOG\""
 
 START=$(date +%s)
 if [ "$DEPLOY" -eq 1 ]; then
-  "$AUTO"
+  $KEEPAWAKE "$AUTO"
 else
-  FILECAP_NO_DEPLOY=1 "$AUTO"
+  FILECAP_NO_DEPLOY=1 $KEEPAWAKE "$AUTO"
 fi
 RC=$?
 ELAPSED=$(( $(date +%s) - START ))

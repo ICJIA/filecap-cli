@@ -23,7 +23,7 @@ import {
 } from "../audits/cache.js";
 import { fetchAuditScore } from "../audits/score-fetcher.js";
 import { fetchPageAuditScore } from "../audits/page-scorer.js";
-import { createRetryingJsonFetcher } from "../audits/retrying-fetcher.js";
+import { createRetryingJsonFetcher, formatThrottleSummary } from "../audits/retrying-fetcher.js";
 
 const DEFAULT_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url";
 const DEFAULT_PAGE_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url-page";
@@ -375,6 +375,15 @@ export async function runAudits({
       `pages: ${pagesTotalUnique} unique, ${pagesAuditedCount} freshly audited, ${pagesCachedCount} cached, ${pagesErrorCount} errors)`,
   );
 
+  // Throttling is reported LAST and unconditionally when it happened, so a run
+  // that spent its wall-clock waiting on 429s says so in its own output instead
+  // of looking like the audit server was failing. Only present when the shared
+  // retrying fetcher was used (an injected test fetcher carries no stats).
+  const throttleSummary = formatThrottleSummary(httpFetcher.stats, {
+    authenticated: typeof bearerToken === "string" && bearerToken.length > 0,
+  });
+  if (throttleSummary) log(throttleSummary);
+
   return {
     totalRecords: records.length,
     audited: auditedCount,
@@ -383,5 +392,6 @@ export async function runAudits({
     pagesAudited: pagesAuditedCount,
     pagesCached: pagesCachedCount,
     pagesErrors: pagesErrorCount,
+    throttle: httpFetcher.stats ?? null,
   };
 }

@@ -26,6 +26,7 @@ import { injectPasswordGate, computeHash } from "../web/password-gate.js";
 import { generateRobotsTxt } from "../web/robots.js";
 import { generateNetlifyToml, generateNetlifyRedirects, generateNetlifyHeaders } from "../web/netlify-config.js";
 import { generateUptimeFunction } from "../web/uptime-function.js";
+import { findUnscoredSites, unscoredGuardDecision, formatUnscoredWarning } from "../web/unscored-guard.js";
 import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
 import { generateSitesHtml } from "../web/sites-page.js";
@@ -1051,6 +1052,7 @@ async function computeSiteSummary(inventoryPath) {
  * @param {Array<string>} args.includeSite - Only bundle these nicknames
  * @param {Array<string>} args.excludeSite - Skip these nicknames
  * @param {string|null} args.sitesFile     - Path to sites.json
+ * @param {boolean} args.allowUnscored     - Deploy even when sites have no PDF grades (v1.41.0)
  * @param {string|null} args._auditsBase   - Override for the ~/filecap-audits root (for tests)
  * @returns {Promise<{exitCode: number, summary?: object, error?: string}>}
  */
@@ -1064,6 +1066,9 @@ export async function runWebRollup({
   includeSite = [],
   excludeSite = [],
   sitesFile = null,
+  // v1.41.0 — override for the unscored-inventory deploy guard. See
+  // src/web/unscored-guard.js for why the guard exists.
+  allowUnscored = false,
   _auditsBase = null,
   // v1.21.0 — OG enrichment is injectable + skippable so tests never hit the
   // network. noOg skips fetching entirely (config description + ICJIA-logo
@@ -2229,6 +2234,34 @@ export async function runWebRollup({
     passwordEnabled: !!password,
     clientGateEnabled: useClientGateForIndex,
   };
+
+  // 9.5 (v1.41.0) — unscored-inventory guard. A rollup whose sites carry PDFs
+  // but no grades means the `filecap audits` stage never produced its output;
+  // shipping that would blank every Remediation Score on the live report. Warn
+  // always, and refuse the deploy unless the operator opted in. The bundle is
+  // already written either way, so the degraded output stays inspectable.
+  // The guard keys off whether a deploy will ACTUALLY run, not the flag:
+  // FILECAP_NO_DEPLOY=1 turns an autoDeploy config into a build-only run, and
+  // blocking one of those would just break local rebuilds. Same env check
+  // runNetlifyDeploy() makes, read here so the decision stays pure.
+  const deployWillRun = deploy && process.env.FILECAP_NO_DEPLOY !== "1";
+  const unscored = findUnscoredSites(siteResults);
+  const guard = unscoredGuardDecision({ unscored, deploy: deployWillRun, allowUnscored });
+  if (guard.level !== "none") {
+    process.stderr.write(`\nWARN: ${formatUnscoredWarning(unscored)}\n`);
+  }
+  if (guard.block) {
+    process.stderr.write(
+      "\nweb-rollup: REFUSING to deploy — publishing this bundle would replace the live\n"
+      + `  report with one that has no PDF grades. The bundle IS written to ${output}\n`
+      + "  so you can inspect it. Re-run the audits stage, or pass --allow-unscored.\n",
+    );
+    return {
+      exitCode: 3,
+      error: "refusing to deploy: site inventories have no PDF accessibility scores",
+      summary,
+    };
+  }
 
   // 10. Optionally deploy via netlify CLI. v1.39.0 (E1): a REQUESTED deploy
   // that fails must fail the whole run — pre-v1.39.0 the helper printed the

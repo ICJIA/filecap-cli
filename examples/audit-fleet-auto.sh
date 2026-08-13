@@ -34,6 +34,7 @@
 #    ./audit-fleet-auto.sh                # full pipeline (scan → references → audits → rollup → deploy)
 #    AUDIT_HTML=0 ./audit-fleet-auto.sh   # skip HTML report generation
 #    SKIP_VERSION_CHECK=0 ./audit-fleet-auto.sh   # keep the npm version check
+#    SKIP_SCAN=1 ./audit-fleet-auto.sh            # reuse existing scans (resume after a failed later stage)
 #    SKIP_REFERENCES=1 ./audit-fleet-auto.sh      # skip references + cross-references
 #    SKIP_AUDITS=1 ./audit-fleet-auto.sh          # skip the PDF accessibility scoring (v1.9.0)
 #    SKIP_ROLLUP=1 ./audit-fleet-auto.sh          # skip web-rollup bundle build
@@ -103,7 +104,19 @@ export AUDIT_HTML="${AUDIT_HTML:-1}"
 
 # ────────────────────────────────────────────────────────────────────────────
 #  Stage 1: scan + report (existing expect-driven audit-fleet.sh)
+#
+#  v1.41.0 — SKIP_SCAN=1 reuses the scans already sitting in
+#  <AUDITS_BASE>/<site>/latest/ instead of re-rsyncing the fleet. This is the
+#  resume point: when a later stage dies (the audit stage is network-bound for
+#  hours against a 500-req/hour limiter, so it is by far the likeliest to be
+#  interrupted), re-running the whole pipeline would re-scan every host and
+#  repoint every latest/ for no benefit. Skipping straight to the enrichment
+#  stages picks up exactly where the run left off.
 # ────────────────────────────────────────────────────────────────────────────
+if [[ "${SKIP_SCAN:-0}" == "1" ]]; then
+  echo "[fleet-auto] SKIP_SCAN=1 — reusing existing scans under $AUDITS_BASE/*/latest/"
+  FLEET_EXIT=0
+else
 expect <<'EXPECT_EOF'
 # Allow any single rsync to take as long as it needs (no overall timeout).
 set timeout -1
@@ -154,6 +167,7 @@ if {[lindex $result 2] == -1} { exit 1 }
 exit [lindex $result 3]
 EXPECT_EOF
 FLEET_EXIT=$?
+fi
 
 if [[ $FLEET_EXIT -ne 0 ]]; then
   echo "[fleet-auto] audit-fleet.sh exited with code $FLEET_EXIT — skipping references/rollup" >&2

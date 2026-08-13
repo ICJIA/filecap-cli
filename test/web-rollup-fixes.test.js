@@ -105,8 +105,12 @@ describe("deploy failures fail the run (v1.39.0 E1)", () => {
 
   async function fixture() {
     const auditsBase = path.join(tmpDir, "filecap-audits");
+    // v1.41.0 — the PDF carries a score so these deploy-outcome tests exercise
+    // a HEALTHY bundle. An unscored inventory now trips the unscored-guard and
+    // returns exit 3 before the deploy is ever attempted (by design); that path
+    // has its own coverage below.
     await writeInv(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), {
-      serverName: "dvfr", entries: [pdfEntry(0)],
+      serverName: "dvfr", entries: [pdfEntry(0, 80)],
     });
     const sitesFile = await writeSites([
       { name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" },
@@ -189,6 +193,97 @@ describe("deploy failures fail the run (v1.39.0 E1)", () => {
     expect(result.exitCode).toBe(0);
     expect(calls).toHaveLength(0);
     expect(cap.text()).toContain("FILECAP_NO_DEPLOY=1");
+  });
+
+  // ── v1.41.0 — unscored-inventory deploy guard ───────────────────────────────
+  // Regression cover for the 2026-07-27 incident: the audits stage died, every
+  // inventory lost its PDF scores, and nothing stood between that and a push to
+  // production. An unscored PDF here stands in for "Stage 3.5 never ran".
+
+  async function unscoredFixture() {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    await writeInv(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), {
+      serverName: "dvfr", entries: [pdfEntry(0)], // no score
+    });
+    const sitesFile = await writeSites([
+      { name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" },
+    ]);
+    return { sitesFile, auditsBase, outputDir: path.join(tmpDir, "out-unscored") };
+  }
+
+  it("refuses to deploy an unscored bundle: exit 3, netlify never spawned", async () => {
+    const { sitesFile, auditsBase, outputDir } = await unscoredFixture();
+    const calls = [];
+    const cap = captureStderr();
+    let result;
+    try {
+      result = await runWebRollup({
+        output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true,
+        deploy: true, deploySite: BOGUS_SITE, _netlifySpawn: fakeSpawn({ code: 0 }, calls),
+      });
+    } finally {
+      cap.restore();
+    }
+    expect(result.exitCode).toBe(3);
+    expect(calls).toHaveLength(0);
+    expect(cap.text()).toContain("REFUSING to deploy");
+    expect(cap.text()).toContain("DVFR");
+    // The bundle is still written — that is how you diagnose the failure.
+    expect((await fs.stat(path.join(outputDir, "index.html"))).isFile()).toBe(true);
+  });
+
+  it("--allow-unscored lets the deploy through (still warns)", async () => {
+    const { sitesFile, auditsBase, outputDir } = await unscoredFixture();
+    const calls = [];
+    const cap = captureStderr();
+    let result;
+    try {
+      result = await runWebRollup({
+        output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true,
+        allowUnscored: true,
+        deploy: true, deploySite: BOGUS_SITE, _netlifySpawn: fakeSpawn({ code: 0 }, calls),
+      });
+    } finally {
+      cap.restore();
+    }
+    expect(result.exitCode).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(cap.text()).toContain("0 scored");
+  });
+
+  it("a build-only run warns but succeeds", async () => {
+    const { sitesFile, auditsBase, outputDir } = await unscoredFixture();
+    const cap = captureStderr();
+    let result;
+    try {
+      result = await runWebRollup({
+        output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true, deploy: false,
+      });
+    } finally {
+      cap.restore();
+    }
+    expect(result.exitCode).toBe(0);
+    expect(cap.text()).toContain("NO accessibility scores");
+    expect(cap.text()).not.toContain("REFUSING to deploy");
+  });
+
+  it("FILECAP_NO_DEPLOY=1 downgrades the guard to a warning, not exit 3", async () => {
+    const { sitesFile, auditsBase, outputDir } = await unscoredFixture();
+    process.env.FILECAP_NO_DEPLOY = "1";
+    const calls = [];
+    const cap = captureStderr();
+    let result;
+    try {
+      result = await runWebRollup({
+        output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true,
+        deploy: true, deploySite: BOGUS_SITE, _netlifySpawn: fakeSpawn({ code: 0 }, calls),
+      });
+    } finally {
+      cap.restore();
+    }
+    expect(result.exitCode).toBe(0);
+    expect(calls).toHaveLength(0);
+    expect(cap.text()).toContain("NO accessibility scores");
   });
 });
 

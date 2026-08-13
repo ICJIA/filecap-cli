@@ -28,6 +28,12 @@ export const MIN_SCORED_PDFS = 5;
 
 // The long-term archive is exempt: many of its files are intentional ADA Title
 // II exceptions, so it will always score abysmally. Hardcoded by site slug.
+//
+// 2026-08-12: archive-prod was removed from the roster entirely (archived files
+// don't need remediation, so the site is out of audit scope), which makes this
+// entry inert today. Kept as the mechanism — and because the per-file
+// Remediation Score cells still band by score — so the exemption is already in
+// place if the archive is ever re-added.
 export const A11Y_SCORE_EXCLUDE_SLUGS = ["archive-prod"];
 
 /**

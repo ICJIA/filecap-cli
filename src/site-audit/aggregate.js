@@ -48,7 +48,15 @@ export function aggregateSite(scoredPages) {
   });
 
   const total = bySeverity.critical + bySeverity.serious + bySeverity.moderate + bySeverity.minor;
-  const score = scoredCount ? Math.round(scoreSum / scoredCount) : null;
+  let score = scoredCount ? Math.round(scoreSum / scoredCount) : null;
+  // v1.41.0 — no false perfect. Mirrors the guard summarizeFileA11y() has had
+  // since v1.39.0. A large mostly-clean site rounds up trivially: infonet
+  // averaged 99.6218 over 156 pages with 19 outstanding violations and
+  // rendered a flat "100 (A)" directly above its own "19 outstanding issues"
+  // breakdown. Two independent signals block the perfect score — a page that
+  // scored below 100, or any outstanding violation at all (per-page rounding
+  // can hide one inside a 100).
+  if (score === 100 && (scoreSum < scoredCount * 100 || total > 0)) score = 99;
   return {
     score,
     grade: gradeForScore(score),

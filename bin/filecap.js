@@ -13,6 +13,7 @@ import { runCrossReferences } from "../src/commands/cross-references.js";
 import { runAudits } from "../src/commands/audits.js";
 import { runSiteAudit } from "../src/commands/site-audit.js";
 import { loadConfig } from "../src/config/load.js";
+import { resolveAuditToken, describeAuditTier } from "../src/config/audit-token.js";
 import { resolveSite } from "../src/config/resolve-site.js";
 import { getHostname } from "../src/util/server-id.js";
 import { FILECAP_VERSION } from "../src/version.js";
@@ -141,6 +142,7 @@ program
   .option("--include-site <name...>", "Only bundle these site nicknames")
   .option("--exclude-site <name...>", "Skip these site nicknames")
   .option("--sites-file <path>", "Override saved-sites JSON path")
+  .option("--allow-unscored", "Deploy even when sites have PDFs but no accessibility grades (normally refused — it means the `filecap audits` stage did not run)")
   .option("--no-og", "Skip fetching og:image / og:description for the /sites roster (offline or fast rebuilds; cards fall back to the ICJIA logo)")
   .action(async (opts) => {
     const output = opts.output ?? path.join(
@@ -179,6 +181,7 @@ program
         includeSite: opts.includeSite ?? [],
         excludeSite: opts.excludeSite ?? [],
         sitesFile: opts.sitesFile ?? null,
+        allowUnscored: opts.allowUnscored === true,
         // Commander sets opts.og = false when --no-og is passed.
         noOg: opts.og === false,
       });
@@ -330,18 +333,13 @@ program
   )
   .action(async (inventory, opts) => {
     try {
-      // 1.8.0-era bearer-token in secrets.json: if present under
-      // credentials.audit-icjia-app.bearerToken, send it as Authorization
-      // Bearer. With audit.icjia.app currently running anonymous (auth
-      // off), no token is needed — but this stays forward-compatible.
-      let bearerToken;
-      try {
-        const secretsPath = path.join(os.homedir(), ".filecap", "secrets.json");
-        const s = JSON.parse(fs.readFileSync(secretsPath, "utf8"));
-        bearerToken = s?.credentials?.["audit-icjia-app"]?.bearerToken;
-      } catch {
-        // Secrets file missing or malformed — fine in anonymous mode.
-      }
+      // Privileged-tier credential for audit.icjia.app. Without it the run is
+      // anonymous: 500 requests/hour and 100/min, which a fleet-sized pass
+      // exhausts almost immediately and then spends its wall-clock backing
+      // off — indistinguishable, from the outside, from the audit server
+      // being down (this is what happened on 2026-08-12).
+      const bearerToken = resolveAuditToken();
+      process.stderr.write(`${describeAuditTier(bearerToken)}\n`);
       // v1.9.0-alpha.2: read pathPrefix from sites.json so old Vue 2 ARI
       // Summit sites get the right URL (/static/foo.pdf instead of
       // /foo.pdf). Match the inventory header's serverName against
@@ -401,14 +399,8 @@ program
   .option("--force", "ignore cache; re-score every page")
   .action(async (siteName, opts) => {
     try {
-      let bearerToken;
-      try {
-        const secretsPath = path.join(os.homedir(), ".filecap", "secrets.json");
-        const s = JSON.parse(fs.readFileSync(secretsPath, "utf8"));
-        bearerToken = s?.credentials?.["audit-icjia-app"]?.bearerToken;
-      } catch {
-        /* anonymous mode — no token needed */
-      }
+      const bearerToken = resolveAuditToken();
+      process.stderr.write(`${describeAuditTier(bearerToken)}\n`);
       const res = await runSiteAudit({
         siteName,
         sitesFile: opts.sitesFile,
