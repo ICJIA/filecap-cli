@@ -73,6 +73,16 @@ export const CSV_COLUMNS = [
   // unchanged; display position is set per-format (HTML_TABLE_COLUMNS,
   // XLSX_COLUMN_ORDER).
   { name: "remediationScore", label: "Remediation Score" },
+  // v1.43.0 — the combined "B/88" cell above reads well but SORTS as text
+  // (Excel puts "B/100" before "B/9"), so the number and the letter each
+  // get a machine-sortable column of their own. Score is a real number
+  // (0-100); Grade is the bare letter (A-F). Both are blank for non-PDFs,
+  // errors, and pending audits — blanks sort to the bottom in Excel, so
+  // "sort ascending by Score" surfaces the least accessible files first.
+  // Same placement rationale as remediationScore: before the csvOnly
+  // action columns; display position per-format (XLSX_COLUMN_ORDER).
+  { name: "auditScoreNum", label: "Score (0-100)" },
+  { name: "auditGrade",    label: "Grade" },
   // v1.7.16: CSV-only "action" columns that staff fills in. The HTML
   // table view skips these (filtered by `csvOnly`) because the web view is
   // informational — the actionable artefact is the CSV.
@@ -194,6 +204,22 @@ export function formatRemediationScore(entry) {
   return "";
 }
 
+// v1.43.0 — the sortable split of the cell above. Deliberately narrower than
+// formatRemediationScore: no "N/A (Office)" / "Not scored" text markers here
+// (those stay in Remediation Score) — any non-score state is a blank cell so
+// Excel's numeric/alpha sort never chokes on prose.
+export function formatAuditScoreNum(entry) {
+  if (!entry || typeof entry !== "object" || entry.category !== "pdf") return "";
+  const score = entry.audit?.score;
+  return typeof score === "number" ? score : "";
+}
+
+export function formatAuditGrade(entry) {
+  if (!entry || typeof entry !== "object" || entry.category !== "pdf") return "";
+  const grade = entry.audit?.grade;
+  return typeof grade === "string" && grade.length > 0 ? grade : "";
+}
+
 export function buildPublicUrl({ entry, sourceHeader, sourceMap, isConsolidated }) {
   // v1.7.40 — Always build the Public URL from publicUrlBase + entry.path
   // so every link lands on the deployed public site, regardless of site
@@ -277,6 +303,8 @@ export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
   const referenced = formatReferenced(entry.references);
   const auditScore = formatAuditScore(entry.audit);
   const remediationScore = formatRemediationScore(entry);
+  const auditScoreNum = formatAuditScoreNum(entry); // v1.43.0
+  const auditGrade = formatAuditGrade(entry);       // v1.43.0
   const pageCount = formatPageCount(entry);
 
   return [
@@ -305,6 +333,8 @@ export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     })(),
     duplicateOf,
     remediationScore,
+    auditScoreNum, // v1.43.0
+    auditGrade,    // v1.43.0
     // v1.7.16 csvOnly columns. The labels stay aligned with CSV_COLUMNS
     // entries; defaults come from the column descriptor so a future column
     // addition just needs the descriptor update. v1.7.28: deleteFlag

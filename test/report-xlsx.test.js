@@ -187,14 +187,16 @@ describe("writeXlsx column order, sort, and hyperlinks (v1.20.0)", () => {
   // v1.42.1 — the Audit Report cell holds the audit.icjia.app report URL; a
   // plain string is NOT clickable in a real .xlsx (Excel only auto-links as
   // you type, not on open), so it must be a hyperlink cell like Public URL.
+  // v1.43.0 — Audit Report moved from col 9 to col 11 (Score + Grade sit
+  // between Remediation Score and the report link).
   it("makes the Audit Report cell a clickable hyperlink (v1.42.1)", async () => {
     const audited = { ...pdfEntry, audit: { score: 88, reportUrl: "https://audit.icjia.app/report/abc123" } };
     const out = path.join(tmpDir, "audit-link.xlsx");
     await writeXlsx({ sourceHeader: baseHeader, entries: [audited], sources: null, outputPath: out });
     const wb = await load(out);
     const sheet = wb.worksheets[0];
-    expect(sheet.getRow(1).getCell(9).value).toBe("Audit Report");
-    expect(sheet.getRow(2).getCell(9).value).toEqual({
+    expect(sheet.getRow(1).getCell(11).value).toBe("Audit Report");
+    expect(sheet.getRow(2).getCell(11).value).toEqual({
       text: "https://audit.icjia.app/report/abc123",
       hyperlink: "https://audit.icjia.app/report/abc123",
     });
@@ -205,7 +207,49 @@ describe("writeXlsx column order, sort, and hyperlinks (v1.20.0)", () => {
     const out = path.join(tmpDir, "audit-unavailable.xlsx");
     await writeXlsx({ sourceHeader: baseHeader, entries: [errored], sources: null, outputPath: out });
     const wb = await load(out);
-    expect(wb.worksheets[0].getRow(2).getCell(9).value).toBe("Unavailable");
+    expect(wb.worksheets[0].getRow(2).getCell(11).value).toBe("Unavailable");
+  });
+
+  // v1.43.0 — sortable per-file score columns. The combined "B/88" string
+  // can't sort numerically in Excel, so the number and the letter each get
+  // their own column: "Score (0-100)" as a REAL numeric cell and "Grade" as
+  // a plain letter. Unscored rows (Office, errored, pending) stay blank so
+  // Excel pushes them to the bottom of either sort direction.
+  describe("sortable Score + Grade columns (v1.43.0)", () => {
+    const scored = { ...pdfEntry, audit: { score: 88, grade: "B", reportUrl: "https://audit.icjia.app/report/abc123" } };
+
+    it("orders the columns: Remediation Score, Score (0-100), Grade, Audit Report", async () => {
+      const out = path.join(tmpDir, "score-cols.xlsx");
+      await writeXlsx({ sourceHeader: baseHeader, entries: [scored], sources: null, outputPath: out });
+      const wb = await load(out);
+      const header = wb.worksheets[0].getRow(1);
+      expect(header.getCell(8).value).toBe("Remediation Score");
+      expect(header.getCell(9).value).toBe("Score (0-100)");
+      expect(header.getCell(10).value).toBe("Grade");
+      expect(header.getCell(11).value).toBe("Audit Report");
+    });
+
+    it("writes the score as a real number and the grade as its letter", async () => {
+      const out = path.join(tmpDir, "score-num.xlsx");
+      await writeXlsx({ sourceHeader: baseHeader, entries: [scored], sources: null, outputPath: out });
+      const wb = await load(out);
+      const row = wb.worksheets[0].getRow(2);
+      expect(row.getCell(9).value).toBe(88);
+      expect(typeof row.getCell(9).value).toBe("number");
+      expect(row.getCell(10).value).toBe("B");
+    });
+
+    it("leaves Score and Grade blank for Office files and errored PDFs", async () => {
+      const errored = { ...pdfEntry, path: "b.pdf", filename: "b.pdf", audit: { error: "http 413" } };
+      const out = path.join(tmpDir, "score-blank.xlsx");
+      await writeXlsx({ sourceHeader: baseHeader, entries: [docxEntry, errored], sources: null, outputPath: out });
+      const wb = await load(out);
+      const sheet = wb.worksheets[0];
+      for (const r of [2, 3]) {
+        expect(sheet.getRow(r).getCell(9).value).toBeNull();
+        expect(sheet.getRow(r).getCell(10).value).toBeNull();
+      }
+    });
   });
 
   it("Total SUM row uses the new Page Count column position (C)", async () => {

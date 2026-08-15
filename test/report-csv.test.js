@@ -133,7 +133,11 @@ describe("CSV_COLUMNS", () => {
     expect(names).not.toContain("xlsxSheetNames");
     expect(names).not.toContain("xlsxTotalCells");
     expect(names).not.toContain("auditLink");  // 1.9.0 uses auditScore + auditReport instead
-    expect(names).not.toContain("auditGrade"); // grade is folded into the auditScore cell
+    // v1.43.0 — auditGrade is BACK as its own sortable column (management
+    // asked to sort by the bare letter), reversing the 1.9.0 fold-into-
+    // auditScore decision, so it is no longer asserted absent here.
+    expect(names).toContain("auditGrade");
+    expect(names).toContain("auditScoreNum");
     expect(names).not.toContain("flags");
     // 1.9.0 NOTE: auditScore + auditReport ARE present (added for the
     // audit.icjia.app integration). See the position assertions above.
@@ -444,7 +448,8 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     // File name. 1.10.2 prior count: 15 file-descriptor + Page References +
     // Audit Score + Delete? + Notes = 18. With Page Count: 19.
     // 1.34.0: + Remediation Score = 20.
-    expect(headerRow.split(",").length).toBe(20);
+    // 1.43.0: + Score (0-100) + Grade = 22.
+    expect(headerRow.split(",").length).toBe(22);
   });
 
   it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {

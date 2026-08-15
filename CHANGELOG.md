@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.43.0] — 2026-08-15
+
+### Added — sortable per-file Score and Grade columns in every workbook
+
+- **Two new columns in the inventory-shaped workbooks** (each scanned site's
+  `<slug>-<ts>.xlsx`, `audit.xlsx`, `audit-file-list-master.xlsx`), placed
+  between "Remediation Score" and "Audit Report": **"Score (0-100)"** — the
+  audit.icjia.app numeric score as a REAL numeric cell — and **"Grade"** —
+  the bare letter (A–F). The combined "B/88" cell sorts as text (Excel puts
+  "B/100" before "B/9"); the new columns sort properly, so *sort ascending
+  by Score* surfaces a site's least accessible files first.
+- Unscored rows (Office files, errored and pending audits) leave both cells
+  truly blank — Excel pushes blanks to the bottom of either sort direction,
+  so they never pollute the ranking. The "N/A (Office)" / "Not scored"
+  prose markers stay in "Remediation Score".
+- The CSV output gains the same two columns (before the Delete?/Notes
+  action columns), reversing the 1.9.0 decision that folded the grade into
+  a combined cell.
+
 ## [1.42.1] — 2026-08-15
 
 ### Fixed — Audit Report links are now clickable in every workbook

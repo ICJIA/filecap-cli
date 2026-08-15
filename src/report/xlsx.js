@@ -182,6 +182,8 @@ export const XLSX_COLUMN_ORDER = [
   "category",
   "sizeBytes",
   "remediationScore", // v1.34.0: "B/88" grade/score, left of the report link
+  "auditScoreNum",    // v1.43.0: bare numeric score — the sortable column
+  "auditGrade",       // v1.43.0: bare letter grade — sortable for non-technical readers
   "auditScore",
   "siteName",
   "serverName",
@@ -234,6 +236,8 @@ function writeSheetContents({ sheet, sourceHeader, entries, sources, totals }) {
   // Source-row index lookups
   const SHA_IDX = CSV_COLUMNS.findIndex((c) => c.name === "sha256");
   const PAGE_COUNT_IDX = CSV_COLUMNS.findIndex((c) => c.name === "pageCount");
+  const SCORE_NUM_IDX = CSV_COLUMNS.findIndex((c) => c.name === "auditScoreNum"); // v1.43.0
+  const GRADE_IDX = CSV_COLUMNS.findIndex((c) => c.name === "auditGrade");        // v1.43.0
   const PUBLIC_URL_COL = XLSX_COL_BY_NAME.get("publicUrl");
   const REFERENCED_COL = XLSX_COL_BY_NAME.get("referenced");
   const AUDIT_SCORE_COL = XLSX_COL_BY_NAME.get("auditScore");
@@ -254,6 +258,15 @@ function writeSheetContents({ sheet, sourceHeader, entries, sources, totals }) {
     // Page Count: empty string → null so exceljs leaves the cell blank.
     if (PAGE_COUNT_IDX >= 0 && csvRow[PAGE_COUNT_IDX] === "") {
       csvRow[PAGE_COUNT_IDX] = null;
+    }
+
+    // v1.43.0 — Score / Grade: empty string → null so unscored rows are
+    // truly blank cells (Excel sorts blanks last in either direction).
+    if (SCORE_NUM_IDX >= 0 && csvRow[SCORE_NUM_IDX] === "") {
+      csvRow[SCORE_NUM_IDX] = null;
+    }
+    if (GRADE_IDX >= 0 && csvRow[GRADE_IDX] === "") {
+      csvRow[GRADE_IDX] = null;
     }
 
     // Reproject CSV row → XLSX order.
