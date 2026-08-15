@@ -184,6 +184,30 @@ describe("writeXlsx column order, sort, and hyperlinks (v1.20.0)", () => {
     expect(urlCell.value.text).toMatch(/^https?:\/\//);
   });
 
+  // v1.42.1 — the Audit Report cell holds the audit.icjia.app report URL; a
+  // plain string is NOT clickable in a real .xlsx (Excel only auto-links as
+  // you type, not on open), so it must be a hyperlink cell like Public URL.
+  it("makes the Audit Report cell a clickable hyperlink (v1.42.1)", async () => {
+    const audited = { ...pdfEntry, audit: { score: 88, reportUrl: "https://audit.icjia.app/report/abc123" } };
+    const out = path.join(tmpDir, "audit-link.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [audited], sources: null, outputPath: out });
+    const wb = await load(out);
+    const sheet = wb.worksheets[0];
+    expect(sheet.getRow(1).getCell(9).value).toBe("Audit Report");
+    expect(sheet.getRow(2).getCell(9).value).toEqual({
+      text: "https://audit.icjia.app/report/abc123",
+      hyperlink: "https://audit.icjia.app/report/abc123",
+    });
+  });
+
+  it("leaves a non-URL Audit Report value ('Unavailable') as plain text (v1.42.1)", async () => {
+    const errored = { ...pdfEntry, audit: { error: "http 422" } };
+    const out = path.join(tmpDir, "audit-unavailable.xlsx");
+    await writeXlsx({ sourceHeader: baseHeader, entries: [errored], sources: null, outputPath: out });
+    const wb = await load(out);
+    expect(wb.worksheets[0].getRow(2).getCell(9).value).toBe("Unavailable");
+  });
+
   it("Total SUM row uses the new Page Count column position (C)", async () => {
     const out = path.join(tmpDir, "sum-c.xlsx");
     const entries = [

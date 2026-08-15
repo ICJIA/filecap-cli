@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.42.1] — 2026-08-15
+
+### Fixed — Audit Report links are now clickable in every workbook
+
+- **The "Audit Report" column in the inventory-shaped workbooks (per-site
+  `<slug>-<ts>.xlsx`, `audit.xlsx`, `audit-file-list-master.xlsx`) now writes
+  the audit.icjia.app report URL as a real hyperlink cell** — click it in
+  Excel/Numbers/Sheets and the report opens. The cell used to hold a plain
+  string on the assumption that "Excel + Sheets auto-hyperlink it", which is
+  only true while typing, not for strings in an opened .xlsx
+  (`src/report/xlsx.js`). Non-URL values ("Unavailable", blank) stay plain
+  text. The rows-based workbooks (orphans, file errors, Pages tab, site
+  rosters) already declared their URL columns `type: "url"` and were
+  clickable.
+
 ## [1.42.0] — 2026-08-15
 
 ### Added — per-site file-audit downloads on the /sites directory

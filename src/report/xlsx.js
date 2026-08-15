@@ -236,6 +236,7 @@ function writeSheetContents({ sheet, sourceHeader, entries, sources, totals }) {
   const PAGE_COUNT_IDX = CSV_COLUMNS.findIndex((c) => c.name === "pageCount");
   const PUBLIC_URL_COL = XLSX_COL_BY_NAME.get("publicUrl");
   const REFERENCED_COL = XLSX_COL_BY_NAME.get("referenced");
+  const AUDIT_SCORE_COL = XLSX_COL_BY_NAME.get("auditScore");
 
   let lastDataRow = 1;
   sorted.forEach((entry, i) => {
@@ -265,6 +266,19 @@ function writeSheetContents({ sheet, sourceHeader, entries, sources, totals }) {
     // opens the file's public URL. Skip when the cell is empty.
     if (PUBLIC_URL_COL) {
       const cell = dataRow.getCell(PUBLIC_URL_COL);
+      const v = typeof cell.value === "string" ? cell.value : "";
+      if (/^https?:\/\//i.test(v)) {
+        cell.value = { text: v, hyperlink: v };
+        cell.font = HYPERLINK_FONT;
+      }
+    }
+
+    // v1.42.1 — Linkify Audit Report. The cell holds the audit.icjia.app
+    // report URL (or "Unavailable"/blank — the URL test skips those). The
+    // CSV writer's "Excel auto-hyperlinks it" behavior does not apply to
+    // .xlsx string cells, so make it a real hyperlink like Public URL.
+    if (AUDIT_SCORE_COL) {
+      const cell = dataRow.getCell(AUDIT_SCORE_COL);
       const v = typeof cell.value === "string" ? cell.value : "";
       if (/^https?:\/\//i.test(v)) {
         cell.value = { text: v, hyperlink: v };

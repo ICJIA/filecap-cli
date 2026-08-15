@@ -42,7 +42,9 @@ export const CSV_COLUMNS = [
   //   audit.skipped (e.g. no URL)   → "" (we tried but couldn't)
   //   audit.error                   → "Unavailable"
   //   audited PDF with a report     → the audit.icjia.app report URL
-  //                                    (Excel + Sheets auto-hyperlink it)
+  //                                    (v1.42.1: the XLSX writer turns it
+  //                                    into a real hyperlink cell — plain
+  //                                    strings are NOT clickable in .xlsx)
   //   non-PDF entries               → "" (audits step doesn't touch them)
   { name: "auditScore",   label: "Audit Report" },
   { name: "modifiedAt",   label: "Date published" },
