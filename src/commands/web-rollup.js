@@ -1521,7 +1521,10 @@ export async function runWebRollup({
     const scanned = scannedByServerName.get(site.name);
     const accessKind = scanned?.site?.accessKind ?? deriveAccessKind(site);
     if (scanned) {
-      contentRoster.push({ site: scanned.site, header: scanned.header, accessKind });
+      // v1.42.0 — csvFile (the per-site audit workbook, or null when no
+      // workbook was written) rides along so the /sites roster card can offer
+      // the same download as the home-page card.
+      contentRoster.push({ site: scanned.site, header: scanned.header, accessKind, csvFile: scanned.csvFile });
     } else {
       const header = await readLatestHeaderBestEffort(site.name, auditsBaseForRoster);
       contentRoster.push({ site: { ...site, accessKind }, header, accessKind });

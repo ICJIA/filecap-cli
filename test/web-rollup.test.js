@@ -1418,6 +1418,9 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     expect(sitesHtml).toContain("status-dot status-live");
     // server identity scrubbed from the roster: the origin IP must not appear
     expect(sitesHtml).not.toContain("10.0.0.1");
+    // v1.42.0 — scanned site's workbook download threaded onto its roster card
+    // (per-site workbooks are timestamped: <slug>-<scan-ts>.xlsx)
+    expect(sitesHtml).toMatch(/class="roster-card-dl" href="dvfr-[^"]+\.xlsx" download/);
 
     expect((await fs.stat(path.join(outputDir, "assets", "og", "dvfr.png"))).isFile()).toBe(true);
     expect((await fs.stat(path.join(outputDir, "assets", "og", "squish.png"))).isFile()).toBe(true);

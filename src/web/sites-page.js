@@ -31,12 +31,19 @@ function nameKey(o) {
   return (o.siteFullName || o.siteName || o.name || "").toLowerCase();
 }
 
+const DOWNLOAD_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8"/><path d="M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 13h11"/></svg>';
+
 /**
  * A single Content-site roster card: og:image (or ICJIA-logo fallback), title,
  * URL, description, and the collapsed "Technical details" disclosure. No audit
  * numbers. The whole card links to the live site (new tab).
  *
- * @param {object} entry - { site, header, accessKind, image, description }
+ * v1.42.0 — when the site has an audit workbook (csvFile), the card also
+ * carries a download pill for it at the bottom. Additive: the stretched link
+ * still opens the live site; the pill is lifted above it (see .roster-card-dl
+ * in INDEX_CSS) so its click downloads instead.
+ *
+ * @param {object} entry - { site, header, accessKind, image, description, csvFile }
  */
 function renderRosterCard(entry) {
   const site = entry.site;
@@ -48,6 +55,7 @@ function renderRosterCard(entry) {
   const url = site.siteUrl ?? site.publicUrlBase ?? entry.header?.metadata?.publicUrlBase ?? "";
   const desc = entry.description ?? "";
   const accessKind = entry.accessKind && ACCESS_KIND_LABEL[entry.accessKind] ? entry.accessKind : null;
+  const csvFile = entry.csvFile ?? null;
   return `<article class="site-card roster-card">
   <a class="card-stretched-link" href="${he(url)}" target="_blank" rel="noopener noreferrer" aria-label="Visit ${fullName} (opens in a new tab)"></a>
   ${renderCardImage({ image: entry.image, alt: fullNameRaw })}
@@ -60,6 +68,9 @@ function renderRosterCard(entry) {
   ${renderStatusDot(entry.status, entry.site?.name)}
   ${desc ? `<p class="card-desc">${he(desc)}</p>` : ""}
   ${renderTechDetails({ site, header: entry.header })}
+  ${csvFile ? `<div class="actions">
+    <a class="roster-card-dl" href="${he(csvFile)}" download aria-label="Download the file audit spreadsheet for ${fullName} (XLSX)" title="This site's file audit — every inventoried file, one row per file (opens in Excel/Numbers/Sheets)">${DOWNLOAD_ICON}<span>File audit (.xlsx)</span></a>
+  </div>` : ""}
 </article>`;
 }
 
@@ -74,7 +85,6 @@ function renderBreakdown(content) {
   return parts.join(" ");
 }
 
-const DOWNLOAD_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8"/><path d="M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 13h11"/></svg>';
 const HOME_ICON = '<svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 2.5l5.5 5"/><path d="M4 7v6h8V7"/></svg>';
 
 // Minimal clipboard handler for the tech-details copy buttons (.meta-copy).
@@ -116,8 +126,9 @@ const CLIPBOARD_SCRIPT = `<script>
  * Generate the /sites roster page HTML.
  *
  * @param {object} args
- * @param {Array}  args.contentRoster - [{ site, header, accessKind, image, description }, …]
- *   for every registered (filtered) site, scanned or not.
+ * @param {Array}  args.contentRoster - [{ site, header, accessKind, image, description, csvFile }, …]
+ *   for every registered (filtered) site, scanned or not. csvFile (v1.42.0) is
+ *   the site's audit-workbook filename, or null/absent → no card download pill.
  * @param {Array}  args.tools         - enriched tools[] entries ({ …tool, image, description }).
  * @param {string|null} args.sitesListXlsx - filename of the combined roster
  *   workbook (Content + Tooling tabs), or null to omit its button.

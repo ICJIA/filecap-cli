@@ -138,6 +138,30 @@ describe("generateSitesHtml", () => {
     expect(html).not.toContain("Tooling sites only");
   });
 
+  // v1.42.0 — per-card file-audit workbook download. The card click still goes
+  // to the live site; the button is an additive download for <slug>.xlsx.
+  describe("per-card file-audit download (v1.42.0)", () => {
+    const auditedEntry = { ...scannedEntry, csvFile: "dvfr.xlsx" };
+
+    it("renders an icon download button when the entry has a workbook", () => {
+      const html = generateSitesHtml({ contentRoster: [auditedEntry], tools: [] });
+      expect(html).toContain('class="roster-card-dl"');
+      expect(html).toContain('href="dvfr.xlsx" download');
+      expect(html).toContain("File audit (.xlsx)");
+      expect(html).toContain('aria-label="Download the file audit spreadsheet for Domestic Violence Fatality Review (XLSX)"');
+    });
+
+    it("keeps the card's stretched link pointed at the live site", () => {
+      const html = generateSitesHtml({ contentRoster: [auditedEntry], tools: [] });
+      expect(html).toContain('href="https://dvfr.illinois.gov"');
+    });
+
+    it("renders no download button for entries without a workbook (unscanned / tooling)", () => {
+      const html = generateSitesHtml({ contentRoster: [unscannedEntry], tools: [tool] });
+      expect(body(html)).not.toContain("roster-card-dl");
+    });
+  });
+
   it("relabels access chips by kind (Strapi CMS / GitHub)", () => {
     const html = generateSitesHtml({ contentRoster: [scannedEntry, unscannedEntry], tools: [] });
     expect(html).toContain("Strapi CMS");

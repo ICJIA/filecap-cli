@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.42.0] — 2026-08-15
+
+### Added — per-site file-audit downloads on the /sites directory
+
+- **Every audited site's roster card on `/sites` now carries a download pill
+  for its file-audit workbook** — the same per-site `<slug>-<scan-ts>.xlsx`
+  the home-page card offers. The card click still opens the live site; the
+  pill sits at the card bottom, lifted above the stretched-link overlay the
+  same way the home page's action buttons are, so its click downloads instead
+  of navigating (`src/web/sites-page.js`; `.roster-card-dl` in
+  `src/web/index-css.js`).
+- Sites without a workbook — registered-but-unscanned sites and tooling
+  apps — render no pill. The workbook filename rides along on the roster
+  entry from `web-rollup` (`csvFile`, null when no workbook was written).
+
 ## [1.41.0] — 2026-08-12
 
 An incident-response release. The 2026-07-27 fleet run was killed mid-Stage 3.5

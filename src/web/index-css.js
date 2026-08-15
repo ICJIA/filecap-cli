@@ -743,6 +743,7 @@ main {
 }
 .site-card .actions .btn,
 .site-card .tech-details summary,
+.site-card .actions .roster-card-dl,
 .site-card .tech-details .meta-copy,
 .site-card .tech-details .meta-value a,
 .site-card .site-url a,
@@ -2413,6 +2414,38 @@ dialog.access-modal .access-modal-cta a {
 
 /* /sites roster card: static (non-interactive) access chip — no modal here. */
 .roster-card .access-chip { cursor: default; pointer-events: none; }
+
+/* v1.42.0 — per-card file-audit workbook download on /sites. A compact icon
+   pill in the hero .roster-download-btn blue, centered at the card bottom
+   (.actions supplies margin-top:auto pinning + the print-mode hide).
+   position + z-index lift it above the stretched-link overlay so a click
+   downloads the workbook instead of following the card's live-site link —
+   same pattern as the home page's action buttons. */
+.roster-card .actions { padding-top: 14px; }
+.roster-card-dl {
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
+  color: #0c1219;
+  font-weight: 800;
+  font-size: 0.88rem;
+  text-decoration: none;
+  border-radius: 999px;
+  border: 1px solid #2f8de0;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.roster-card-dl:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(77, 171, 247, 0.4);
+  color: #0c1219;
+  text-decoration: none;
+}
+.roster-card-dl svg { width: 16px; height: 16px; flex: none; }
 .tooling-section { margin: 0 0 1.5rem; }
 
 /* v1.22.1 — live/unreachable status as a compact pill pinned to each card's
