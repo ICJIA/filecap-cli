@@ -33,6 +33,16 @@ describe("WHATS_NEW data", () => {
     expect(e.linkHref).toBe("search.html");
   });
 
+  // v1.47.1 — the banner sits above the hero: its totals must equal the
+  // hero's (8,762 / 4,628), with the system-file exclusion stated as an
+  // explicit before→after so the change reads as accounting, not drift.
+  it("banner entry reconciles the post-cleanup totals exactly", () => {
+    const e = WHATS_NEW[0];
+    expect(e.text).toContain("8,762");
+    expect(e.text).toContain("4,628");
+    expect(e.text).toMatch(/from 8,787 to 8,762/);
+  });
+
   // v1.45.1 — the archive's-return entry, with the post-archive fleet
   // numbers reconciled the same way the rubric entry had to be (v1.44.1
   // lesson: every count on the banner must add up against the hero it sits
@@ -43,7 +53,11 @@ describe("WHATS_NEW data", () => {
     expect(e.id).toContain("2026-08-16");
     expect(e.text).toContain("4,628");
     expect(e.text).toContain("3,180");
-    expect(e.text).toContain("8,787");
+    // v1.47.1 — the entry's totals were re-reconciled after the same-day
+    // system-file cleanup (8,787 → 8,762): every number a manager can see
+    // must match the hero, exception language included.
+    expect(e.text).toContain("8,762");
+    expect(e.text).not.toContain("8,787");
     expect(e.text).toMatch(/69 to 54/);
   });
 

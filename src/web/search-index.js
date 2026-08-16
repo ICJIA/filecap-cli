@@ -2,7 +2,7 @@
 // behind the /search page. The full audit-fleet.ndjson is ~12MB of
 // introspection the search UI never reads; this index carries only what a
 // result row renders, as positional arrays with sites + categories folded
-// out to lookup tables (8,787 records × repeated JSON keys is pure
+// out to lookup tables (~8.8k records × repeated JSON keys is pure
 // wire-weight — Netlify compression does the rest).
 //
 // Row positions (keep in sync with search-page.js's client renderer):

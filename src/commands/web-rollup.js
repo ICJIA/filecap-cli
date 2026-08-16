@@ -2233,6 +2233,9 @@ export async function runWebRollup({
     generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
     totalFiles: searchIndex.rows.length,
     siteCount: siteResults.length,
+    // Same source as the hero's remediation-list number (per-site summaries),
+    // so the two surfaces can never drift apart.
+    remediableFiles: siteResults.reduce((n, sr) => n + (sr.summary?.remediable ?? 0), 0),
   });
   if (passwordHash) {
     searchHtml = injectPasswordGate(searchHtml, passwordHash);

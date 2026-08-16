@@ -101,14 +101,18 @@ export function buildHaystack(rec) {
   var ctx = [site, pathf].filter(Boolean).join(" ");
   var combined = name + " " + ctx;
   var squash = squashSearchText(combined);
-  var words = [];
+  // v1.48.0 — the typo tier reads FILENAME words only. Fuzzing site/path
+  // words gave a one-letter miss the blast radius of a whole site ("svfr"
+  // matched every DVFR file); near-misses on site names are now surfaced
+  // as "Did you mean?" suggestions (suggestSiteTerms) instead.
+  var nameWords = [];
   var seen = {};
-  var tokens = combined.split(" ");
+  var tokens = name.split(" ");
   for (var i = 0; i < tokens.length; i++) {
     var w = tokens[i];
-    if (w && !seen[w]) { seen[w] = true; words.push(w); }
+    if (w && !seen[w]) { seen[w] = true; nameWords.push(w); }
   }
-  return { name: name, site: site, pathf: pathf, ctx: ctx, squash: squash, words: words };
+  return { name: name, site: site, pathf: pathf, ctx: ctx, squash: squash, nameWords: nameWords };
 }
 
 /**
@@ -148,8 +152,8 @@ export function runSearch(hays, query) {
         entry = { term: term, src: "squash" };
       } else if (term.length >= 4) {
         var maxD = term.length >= 7 ? 2 : 1;
-        for (var w = 0; w < hay.words.length; w++) {
-          var word = hay.words[w];
+        for (var w = 0; w < hay.nameWords.length; w++) {
+          var word = hay.nameWords[w];
           if (Math.abs(word.length - term.length) > maxD) continue;
           if (editDistanceLe(term, word, maxD)) {
             tier = 1;
@@ -205,12 +209,64 @@ export function highlightRanges(raw, terms) {
 }
 
 /**
+ * "Did you mean dvfr?" — offer a spelling correction when a query term is a
+ * near-miss of a SITE's name. This replaces the old behavior of silently
+ * fuzzy-matching site words (which turned a one-letter typo into that
+ * site's entire inventory): the flood becomes an explicit, clickable
+ * choice. At most two suggestions, deterministic (distance 1 beats 2,
+ * then alphabetical).
+ *
+ * @param {Array<string>} siteNames - raw site labels + full names
+ * @param {string} query
+ * @returns {Array<{term: string, word: string}>}
+ */
+export function suggestSiteTerms(siteNames, query) {
+  var folded = foldSearchText(query);
+  if (!folded) return [];
+  var vocab = [];
+  var seen = {};
+  var names = siteNames || [];
+  for (var n = 0; n < names.length; n++) {
+    var toks = foldSearchText(names[n]).split(" ");
+    for (var t = 0; t < toks.length; t++) {
+      var v = toks[t];
+      if (v && !seen[v]) { seen[v] = true; vocab.push(v); }
+    }
+  }
+  vocab.sort();
+  var out = [];
+  var terms = folded.split(" ");
+  for (var q = 0; q < terms.length && out.length < 2; q++) {
+    var term = terms[q];
+    if (term.length < 4) continue;
+    // A term already inside a site word matches by substring — no help needed.
+    var covered = false;
+    for (var c = 0; c < vocab.length; c++) {
+      if (vocab[c].indexOf(term) !== -1) { covered = true; break; }
+    }
+    if (covered) continue;
+    var best = null;
+    var maxPass = term.length >= 7 ? 2 : 1;
+    for (var d = 1; d <= maxPass && !best; d++) {
+      for (var i = 0; i < vocab.length; i++) {
+        var word = vocab[i];
+        if (term.indexOf(word) !== -1) continue; // site word already in the term
+        if (Math.abs(word.length - term.length) > d) continue;
+        if (editDistanceLe(term, word, d)) { best = word; break; }
+      }
+    }
+    if (best) out.push({ term: term, word: best });
+  }
+  return out;
+}
+
+/**
  * The matcher as inline-<script> source. Embedded verbatim into
  * search.html so the unit-tested functions above are exactly what runs in
  * the browser.
  */
 export function searchMatchClientSource() {
-  return [foldSearchText, squashSearchText, stripUploadHash, editDistanceLe, buildHaystack, runSearch, highlightRanges]
+  return [foldSearchText, squashSearchText, stripUploadHash, editDistanceLe, buildHaystack, runSearch, highlightRanges, suggestSiteTerms]
     .map(function (fn) { return fn.toString(); })
     .join("\n");
 }

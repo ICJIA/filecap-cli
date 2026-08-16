@@ -123,6 +123,9 @@ describe("web-rollup /search wiring", () => {
     expect(html).toContain("search-index.json");
     expect(html).toContain('id="search-input"');
     expect(html).not.toContain("fc-pw"); // ungated without a password
+    // v1.47.1 — the lede qualifies the total against the remediation list
+    // (fixture: 1 pdf entry → both totals are 1).
+    expect(html).toContain("1 document on the remediation list");
   });
 
   it("gates search.html when the bundle has a password", async () => {

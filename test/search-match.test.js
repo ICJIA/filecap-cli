@@ -6,6 +6,7 @@ import {
   buildHaystack,
   runSearch,
   highlightRanges,
+  suggestSiteTerms,
   searchMatchClientSource,
 } from "../src/web/search-match.js";
 
@@ -214,6 +215,61 @@ describe("runSearch match explanations", () => {
       { term: "anual", src: "fuzzy", word: "annual" },
       { term: "report", src: "name" },
     ]);
+  });
+});
+
+// ── fuzzy blast-radius taming (v1.48.0) ──────────────────────────────────────
+// A typo'd SITE nickname used to pull that site's entire inventory ("svfr"
+// → all 109 DVFR files). Typo tolerance now applies to FILENAME words only;
+// a near-miss on a site's name becomes a "Did you mean?" suggestion instead
+// of a silent flood. Near-misses on folder-path words match nothing.
+
+describe("fuzzy tier scope", () => {
+  it("no longer matches records via a typo'd site name", () => {
+    // "svfr" ≈ "dvfr": r0 has dvfr in its FILENAME (stays); r1/r3 are DVFR
+    // files whose names lack it (used to match via the site word — gone).
+    expect(hits("svfr")).toEqual([0]);
+  });
+
+  it("still matches typos against filename words", () => {
+    expect(hits("buget")).toEqual([2]);
+  });
+
+  it("no longer matches records via a typo'd folder-path word", () => {
+    // "finanse" ≈ r2's path dir "finance" (never its filename or site).
+    expect(hits("finanse")).toEqual([]);
+  });
+});
+
+describe("suggestSiteTerms", () => {
+  const SITES = ["DVFR", "Domestic Violence Fatality Review", "ICJIA", "R3", "Restore Reinvest Renew"];
+
+  it("suggests the site word a term nearly spells", () => {
+    expect(suggestSiteTerms(SITES, "svfr")).toEqual([{ term: "svfr", word: "dvfr" }]);
+  });
+
+  it("suggests only for the misspelled term of a multi-word query", () => {
+    expect(suggestSiteTerms(SITES, "svfr report")).toEqual([{ term: "svfr", word: "dvfr" }]);
+  });
+
+  it("stays quiet for exact and substring hits", () => {
+    expect(suggestSiteTerms(SITES, "dvfr")).toEqual([]);
+    expect(suggestSiteTerms(SITES, "dvf")).toEqual([]); // substring of dvfr
+    expect(suggestSiteTerms(SITES, "domesti")).toEqual([]); // substring of domestic
+  });
+
+  it("allows two edits only on longer terms", () => {
+    expect(suggestSiteTerms(SITES, "domestik")).toEqual([{ term: "domestik", word: "domestic" }]);
+    expect(suggestSiteTerms(SITES, "dvxx")).toEqual([]); // 2 edits on a 4-char term
+  });
+
+  it("caps the suggestions at two", () => {
+    const out = suggestSiteTerms(SITES, "svfr icjja restor");
+    expect(out.length).toBeLessThanOrEqual(2);
+  });
+
+  it("returns nothing for an empty query", () => {
+    expect(suggestSiteTerms(SITES, "")).toEqual([]);
   });
 });
 

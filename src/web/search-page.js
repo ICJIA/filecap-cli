@@ -114,6 +114,9 @@ const SEARCH_CSS = `
   border-radius: 3px;
   padding: 0 1px;
 }
+.search-suggest:empty { display: none; }
+.search-suggest-chip { border-color: #ffb000; color: #ffd76a; }
+.search-suggest-chip:hover { background: rgba(255, 176, 0, 0.12); border-color: #ffb000; color: #ffd76a; }
 .search-table .search-file a .search-mark { text-decoration: underline; }
 .search-why { color: #7d8590; font-size: 0.82rem; margin-top: 0.2rem; }
 .search-table .search-site a { color: #d4dae0; text-decoration: none; }
@@ -131,10 +134,16 @@ const SEARCH_CSS = `
  * @param {string} args.generatedAt - preformatted "generated at" string
  * @param {number} args.totalFiles  - fleet-wide inventoried file count
  * @param {number} args.siteCount   - number of audited sites in the bundle
+ * @param {number} args.remediableFiles - fleet-wide remediation-list count,
+ *   quoted beside the total so the two headline numbers a manager sees
+ *   (everything inventoried vs. documents needing work) reconcile in one
+ *   sentence (the v1.44.1 lesson).
  * @returns {string} full HTML document
  */
-export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount = 0 } = {}) {
+export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount = 0, remediableFiles = 0 } = {}) {
   const totalFmt = Number(totalFiles).toLocaleString("en-US");
+  const remFmt = Number(remediableFiles).toLocaleString("en-US");
+  const remNoun = Number(remediableFiles) === 1 ? "document" : "documents";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -187,7 +196,7 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
   <div class="fleet-section-banner" role="presentation">
     <p class="fleet-section-eyebrow">Fleet-wide file search</p>
     <h1 class="fleet-section-headline">Find a file, anywhere on the fleet</h1>
-    <p class="fleet-section-lede">Search all ${totalFmt} files inventoried across ${siteCount} ICJIA websites by full or partial filename. Fragments are fine — <em>dvfr report</em>, <em>annual 2023</em>, a site's name, even a near-miss spelling — and the results show every site that carries a match.${generatedAt ? ` Generated <time>${he(generatedAt)}</time>.` : ""}</p>
+    <p class="fleet-section-lede">Search all ${totalFmt} files inventoried across ${siteCount} ICJIA websites by full or partial filename. That's every file the scan sees — images, web pages, and other reference material included — not just the ${remFmt} ${remNoun} on the remediation list. Fragments are fine — <em>dvfr report</em>, <em>annual 2023</em>, a site's name, even a near-miss spelling — and the results show every site that carries a match.${generatedAt ? ` Generated <time>${he(generatedAt)}</time>.` : ""}</p>
   </div>
 
   <div class="search-wrap">
@@ -198,6 +207,7 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
         Download results (.xlsx)
       </button>
     </div>
+    <div id="did-you-mean" class="search-chips search-suggest" role="group" aria-label="Spelling suggestions"></div>
     <div id="category-chips" class="search-chips" role="group" aria-label="Filter results by file type"></div>
     <p id="search-status" class="search-status" aria-live="polite"></p>
     <div id="site-chips" class="search-chips" role="group" aria-label="Filter results by website"></div>
@@ -228,9 +238,11 @@ ${searchXlsxClientSource()}
 
   var data = null;
   var hays = [];
+  var siteNames = [];
   var activeCat = "";
   var activeSite = -1;
   var lastFiltered = [];
+  var suggestEl = document.getElementById("did-you-mean");
 
   fetch(INDEX_URL)
     .then(function (res) {
@@ -243,6 +255,10 @@ ${searchXlsxClientSource()}
         var site = json.sites[row[2]] || {};
         return buildHaystack({ filename: row[0], path: row[1], siteLabel: site.label, siteFull: site.full });
       });
+      for (var sn = 0; sn < json.sites.length; sn++) {
+        if (json.sites[sn].label) siteNames.push(json.sites[sn].label);
+        if (json.sites[sn].full) siteNames.push(json.sites[sn].full);
+      }
       input.disabled = false;
       input.focus();
       statusEl.textContent = "Type to search " + json.rows.length.toLocaleString("en-US") + " files.";
@@ -325,6 +341,7 @@ ${searchXlsxClientSource()}
       catChipsEl.textContent = "";
       siteChipsEl.textContent = "";
       resultsEl.textContent = "";
+      suggestEl.textContent = "";
       lastFiltered = [];
       downloadBtn.disabled = true;
       statusEl.className = "search-status";
@@ -353,6 +370,48 @@ ${searchXlsxClientSource()}
       return activeSite < 0 || data.rows[mm.i][2] === activeSite;
     });
     lastFiltered = filtered;
+
+    // "Did you mean?" — a near-miss of a SITE's name never floods results
+    // (the typo tier reads filenames only); it becomes a clickable swap.
+    suggestEl.textContent = "";
+    var suggestions = suggestSiteTerms(siteNames, q);
+    for (var sg = 0; sg < suggestions.length; sg++) {
+      (function (s) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "search-chip search-suggest-chip";
+        b.textContent = "Did you mean “" + s.word + "”?";
+        b.addEventListener("click", function () {
+          var toks = input.value.split(/\s+/);
+          for (var ti2 = 0; ti2 < toks.length; ti2++) {
+            if (foldSearchText(toks[ti2]) === s.term) toks[ti2] = s.word;
+          }
+          input.value = toks.filter(Boolean).join(" ");
+          input.focus();
+          update();
+        });
+        suggestEl.appendChild(b);
+      })(suggestions[sg]);
+    }
+
+    // A fuzzy correction shared by EVERY visible result is said once in the
+    // status line instead of stamped on every row.
+    var termCount = filtered.length ? (filtered[0].why || []).length : 0;
+    var hoistTerms = {};
+    var hoistPhrases = [];
+    for (var hi = 0; hi < termCount; hi++) {
+      var word0 = null;
+      var uniformFuzzy = true;
+      for (var fi = 0; fi < filtered.length; fi++) {
+        var we = (filtered[fi].why || [])[hi];
+        if (!we || we.src !== "fuzzy" || (word0 !== null && we.word !== word0)) { uniformFuzzy = false; break; }
+        if (word0 === null) word0 = we.word;
+      }
+      if (uniformFuzzy && word0 !== null) {
+        hoistTerms[hi] = true;
+        hoistPhrases.push("“" + filtered[0].why[hi].term + "” ≈ “" + word0 + "”");
+      }
+    }
 
     // Category chips: All + every category with a hit.
     catChipsEl.textContent = "";
@@ -388,13 +447,14 @@ ${searchXlsxClientSource()}
     statusEl.appendChild(strong);
     statusEl.appendChild(document.createTextNode(
       (activeSite >= 0 ? " on " + data.sites[activeSite].label : " across " + siteTotal + " site" + (siteTotal === 1 ? "" : "s")) +
-      (activeCat ? " (" + catLabel(activeCat) + ")" : "") + " match your search."));
+      (activeCat ? " (" + catLabel(activeCat) + ")" : "") + " match your search." +
+      (hoistPhrases.length ? " All are close-spelling matches: " + hoistPhrases.join(" · ") + "." : "")));
 
     downloadBtn.disabled = filtered.length === 0;
-    renderTable(filtered);
+    renderTable(filtered, hoistTerms);
   }
 
-  function renderTable(filtered) {
+  function renderTable(filtered, hoistTerms) {
     resultsEl.textContent = "";
     if (!filtered.length) return;
     var wrap = document.createElement("div");
@@ -437,7 +497,7 @@ ${searchXlsxClientSource()}
       var whyNotes = [];
       for (var wIdx = 0; wIdx < why.length; wIdx++) {
         if (why[wIdx].src === "name") nameTerms.push(why[wIdx].term);
-        else whyNotes.push(whyPhrase(why[wIdx]));
+        else if (!(hoistTerms && hoistTerms[wIdx])) whyNotes.push(whyPhrase(why[wIdx]));
       }
       var ranges = highlightRanges(row[0], nameTerms);
 

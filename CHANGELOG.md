@@ -10,6 +10,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.48.0] — 2026-08-16
+
+### Changed — fuzzy blast-radius taming ("svfr" incident)
+
+- **Typo tolerance now reads filename words only.** A one-letter miss on a
+  SITE's nickname ("svfr") used to qualify that site's entire inventory
+  (109 files, identical "≈" note on every row). Near-misses on site names
+  now surface as a clickable **"Did you mean “dvfr”?"** chip
+  (`suggestSiteTerms`, max two, deterministic) that swaps the term;
+  near-misses on folder-path words match nothing. Filename-level typo
+  matches ("anual" → annual files) are unchanged.
+- **Uniform corrections hoist to the status line**: when every visible
+  result shares the same close-spelling match, the status says it once
+  ("All are close-spelling matches: “svfr” ≈ “dvfr”") and per-row notes
+  drop it; mixed result sets keep per-row notes. The workbook's
+  "Matched on" column always keeps the full per-row detail.
+
+### Fixed — every visible total reconciles
+
+- **/search lede qualifies its number**: "Search all 8,762 files
+  inventoried … That's every file the scan sees — images, web pages, and
+  other reference material included — not just the 4,628 documents on the
+  remediation list." Fed from the same per-site summaries as the hero, so
+  the two can't drift.
+- **What's New entries re-reconciled** after the v1.47.0 system-file
+  exclusion: the banner states the change as accounting ("removed 25 files
+  and moved the fleet total from 8,787 to 8,762; the remediation list is
+  unchanged at 4,628"), and the same-day archive entry's totals now read
+  8,762 with the cleanup noted. No user-visible surface still says 8,787
+  as a current count.
+
 ## [1.47.0] — 2026-08-16
 
 ### Added — search match transparency + per-file audit report links

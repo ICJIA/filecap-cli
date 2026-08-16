@@ -10,8 +10,9 @@ import { SEARCH_INDEX_FILENAME } from "../src/web/search-index.js";
 function page(overrides = {}) {
   return generateSearchHtml({
     generatedAt: "August 16, 2026, 8:21 AM CDT",
-    totalFiles: 8787,
+    totalFiles: 8762,
     siteCount: 12,
+    remediableFiles: 4628,
     ...overrides,
   });
 }
@@ -52,8 +53,24 @@ describe("generateSearchHtml", () => {
 
   it("advertises the fleet totals in the lede", () => {
     const html = page();
-    expect(html).toContain("8,787");
+    expect(html).toContain("8,762");
     expect(html).toContain("12");
+  });
+
+  // v1.47.1 — the total must be QUALIFIED against the remediation list
+  // (v1.44.1 lesson: an unqualified count above other surfaces invites
+  // "which is it?"). 8,762 = everything inventoried; 4,628 = the
+  // remediation list. Both appear, reconciled in one sentence.
+  it("qualifies the inventoried total against the remediation list", () => {
+    const html = page();
+    expect(html).toContain("4,628");
+    expect(html).toContain("remediation list");
+    expect(html).toMatch(/every file the scan sees/);
+  });
+
+  it("pluralizes the remediation-list phrasing", () => {
+    expect(page({ remediableFiles: 1 })).toContain("1 document on the remediation list");
+    expect(page()).toContain("4,628 documents on the remediation list");
   });
 
   it("carries the standard nav and footer", () => {
@@ -89,5 +106,20 @@ describe("generateSearchHtml", () => {
     expect(html).toContain("View report");
     expect(html).toContain("row[9]");
     expect(html).toContain("matchedOn");
+  });
+
+  // v1.48.0 — fuzzy taming: a near-miss on a site's name renders as a
+  // clickable "Did you mean?" chip instead of silently flooding, and a
+  // correction shared by every result is hoisted into the status line
+  // once instead of stamped on every row.
+  it("carries the Did-you-mean suggestion machinery", () => {
+    const html = page();
+    expect(html).toContain('id="did-you-mean"');
+    expect(html).toContain("Did you mean");
+    expect(html).toContain("function suggestSiteTerms");
+  });
+
+  it("hoists a uniform fuzzy correction into the status line", () => {
+    expect(page()).toContain("hoistTerms");
   });
 });
