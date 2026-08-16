@@ -26,15 +26,15 @@ export const A11Y_BANDS = [
 // show a "not enough data yet" caption instead of a band.
 export const MIN_SCORED_PDFS = 5;
 
-// The long-term archive is exempt: many of its files are intentional ADA Title
-// II exceptions, so it will always score abysmally. Hardcoded by site slug.
+// Site slugs whose file-accessibility score is suppressed (no card gauge, no
+// fleet-average contribution). Kept as the mechanism; currently empty.
 //
-// 2026-08-12: archive-prod was removed from the roster entirely (archived files
-// don't need remediation, so the site is out of audit scope), which makes this
-// entry inert today. Kept as the mechanism — and because the per-file
-// Remediation Score cells still band by score — so the exemption is already in
-// place if the archive is ever re-added.
-export const A11Y_SCORE_EXCLUDE_SLUGS = ["archive-prod"];
+// History: archive-prod sat here from v1.36.0 ("intentional ADA Title II
+// exceptions, will always score abysmally"), was removed from the roster
+// entirely on 2026-08-12, then re-added WITH full scoring on 2026-08-16
+// (v1.45.0) — the archive still serves live files that may need remediation,
+// so its scores count like any other site's.
+export const A11Y_SCORE_EXCLUDE_SLUGS = [];
 
 /**
  * Map a 0-100 score to its band. Returns null for a missing/non-numeric score

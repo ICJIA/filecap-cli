@@ -12,8 +12,18 @@ import {
 } from "../src/report/accessibility-band.js";
 
 describe("constants", () => {
-  it("excludes the long-term archive site by slug", () => {
-    expect(A11Y_SCORE_EXCLUDE_SLUGS).toContain("archive-prod");
+  // v1.45.0 — archive-prod is back in the roster AND in scoring: its files
+  // are live and may need remediation, so its scores count toward the site
+  // gauge and the fleet average. The exclusion mechanism stays (empty list).
+  it("excludes no sites — the archive is back in scoring (v1.45.0)", () => {
+    expect(A11Y_SCORE_EXCLUDE_SLUGS).toEqual([]);
+  });
+
+  it("archive-prod summarizes like any other site (not excluded)", () => {
+    const s = summarizeFileA11y({ auditScoreSum: 400, auditedPdfCount: 10, remediable: 12, siteSlug: "archive-prod" });
+    expect(s.excluded).toBe(false);
+    expect(s.avg).toBe(40);
+    expect(s.band?.key).toBe("far");
   });
 
   it("requires at least 5 scored PDFs for a meaningful average", () => {
@@ -175,16 +185,20 @@ describe("summarizeFileA11y", () => {
     expect(r.pdfs).toBe(21);
   });
 
-  it("marks the archive site excluded and never assigns a band", () => {
+  // v1.45.0 — was "marks the archive site excluded and never assigns a band":
+  // the archive is back in scoring, so the same realistic numbers now band
+  // like any other site (avg 28 → far from accessible).
+  it("bands the archive site like any other now that it is back in scoring (v1.45.0)", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 33572,
       auditedPdfCount: 1199,
       remediable: 1429,
       siteSlug: "archive-prod",
     });
-    expect(r.excluded).toBe(true);
-    expect(r.band).toBeNull();
-    expect(r.remediable).toBe(1429); // count still surfaced for the archive note
+    expect(r.excluded).toBe(false);
+    expect(r.avg).toBe(28);
+    expect(r.band?.key).toBe("far");
+    expect(r.remediable).toBe(1429);
   });
 
   it("treats missing optional counts as zero", () => {

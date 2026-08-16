@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.45.0] — 2026-08-16
+
+### Changed — document archive back in the audit, with full scoring
+
+- **`archive-prod` re-added to the roster** (removed 2026-08-13 on the
+  premise that archived files aren't remediated). Reversed: the archive
+  still serves **live** files that may need remediation, so it is back in
+  audit scope — scanned, inventoried, scored, and listed in the workbooks
+  like every other site. Its `archive.icjia.cloud` /
+  `archive.icjia-api.cloud` domains rejoin the fleet whitelist, so other
+  sites' pages show links to archived documents as cross-site references
+  again.
+- **`A11Y_SCORE_EXCLUDE_SLUGS` no longer lists `archive-prod`** — its
+  file-accessibility gauge shows on its card and its PDF scores count
+  toward the fleet average (the v1.36.0 exemption assumed the archive's
+  low scores were intentional ADA Title II exceptions; with live files in
+  need of remediation, suppressing them would understate the fleet's real
+  posture). The exclusion mechanism itself stays, list now empty.
+- Operational note (no code): stale pre-2026-08-15 entries were pruned
+  from the local score caches so the archive's files and pages fetch fresh
+  new-rubric scores on the next run instead of reusing old-rubric cache
+  hits.
+
 ## [1.44.1] — 2026-08-16
 
 ### Fixed — What's New banner reconciles 1,971 vs 3,199
