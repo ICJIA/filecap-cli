@@ -38,6 +38,12 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "archive-server-re-added-2026-08-16",
+    badge: "Scope change",
+    text: "The ICJIA Document Archive (archive.icjia.cloud) is back in the audit as of August 16, 2026. It was removed on August 13 on the premise that archived files aren't remediated — but the archive still serves live files that may need remediation, so it now counts like every other site. That adds 2,086 files to the inventory (1,429 of them on the remediation list) and 1,209 scored PDFs, all graded under the current rubric. Because the archive's documents score low (site average 28), the fleet-wide average moved from 69 to 54 — the fleet didn't get worse overnight; it now includes documents that were previously out of scope. Today's totals: 8,787 files across 12 audited sites, with 4,628 on the remediation list — 3,180 scored PDFs, 22 PDFs that couldn't be scored, and 1,426 Word, Excel, and PowerPoint files (checked with the Office apps' built-in accessibility checkers).",
+    date: "August 16, 2026",
+  },
+  {
     // v1.44.1 — rev2: the first wording said "1,971 files" directly above the
     // hero's "3,199 files may need audit" and invited "which is it?". Now the
     // entry reconciles the two counts. New id so visitors who dismissed the

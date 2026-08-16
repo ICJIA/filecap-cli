@@ -23,21 +23,27 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("leads with the 2026-08-15 scoring-rubric entry", () => {
-    expect(WHATS_NEW[0].id).toContain("2026-08-15");
-    expect(WHATS_NEW[0].text).toMatch(/rubric|scoring|re-scored/i);
+  // v1.45.1 — newest entry announces the archive's return to the audit, with
+  // the post-archive fleet numbers reconciled the same way the rubric entry
+  // had to be (v1.44.1 lesson: every count on the banner must add up against
+  // the hero it sits above).
+  it("leads with the 2026-08-16 archive-scope entry, numbers reconciled", () => {
+    const e = WHATS_NEW[0];
+    expect(e.id).toContain("archive");
+    expect(e.id).toContain("2026-08-16");
+    expect(e.text).toContain("4,628");
+    expect(e.text).toContain("3,180");
+    expect(e.text).toContain("8,787");
+    expect(e.text).toMatch(/69 to 54/);
   });
 
-  // v1.44.1 — the banner sits directly above the hero's "3,199 files may
-  // need audit", so saying "1,971 files" invited "which is it?". The entry
-  // must reconcile the two counts (1,971 scoreable PDFs vs 3,199 remediable
-  // documents incl. 1,217 unscored Office files), and its id must differ
-  // from the rev-1 id so visitors who dismissed the old wording see the fix.
-  it("reconciles the 1,971-PDF count against the 3,199-document remediation list (v1.44.1)", () => {
-    const e = WHATS_NEW[0];
+  // v1.44.1 — the rubric entry must keep reconciling its (as-of-Aug-15)
+  // counts; it is now history, second in the list.
+  it("keeps the reconciled 2026-08-15 scoring-rubric entry as history", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("scoring-rubric"));
+    expect(e).toBeTruthy();
     expect(e.text).toContain("1,971 scoreable PDFs");
     expect(e.text).toContain("3,199");
-    expect(e.text).toMatch(/Word, Excel, and PowerPoint|Office files/);
     expect(e.text).not.toMatch(/1,971 files/);
     expect(e.id).not.toBe("file-scoring-rubric-update-2026-08-15");
   });

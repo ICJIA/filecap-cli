@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.45.1] — 2026-08-16
+
+### Added — What's New entry for the archive's return
+
+- New leading What's New entry (banner + archive page) announcing the
+  document archive's return to the audit, with the post-archive numbers
+  reconciled in place: 8,787 files across 12 audited sites; 4,628 on the
+  remediation list = 3,180 scored PDFs + 22 unscoreable PDFs + 1,426
+  Office files; fleet average 69 → 54 because the archive's 1,209 scored
+  PDFs average 28 — a scope change, not an overnight regression.
+
 ## [1.45.0] — 2026-08-16
 
 ### Changed — document archive back in the audit, with full scoring
