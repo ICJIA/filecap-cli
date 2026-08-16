@@ -261,12 +261,60 @@ export function suggestSiteTerms(siteNames, query) {
 }
 
 /**
+ * v1.49.0 — order matches by a results-table column. Default is audit
+ * score, highest first; any header re-sorts. Blanks sort last in BOTH
+ * directions (the v1.43.0 workbook rule); ties fall back to match
+ * relevance, then row index, so the ordering is total and stable.
+ *
+ * @param {Array<{i: number, score: number}>} matches - runSearch output
+ * @param {{rows: Array, sites: Array, categories: Array<string>}} ctx -
+ *   the search index plus DISPLAY category labels (sorting must follow
+ *   what the visitor sees, not the internal slugs)
+ * @param {"site"|"filename"|"type"|"score"|"grade"|"size"|"modified"} key
+ * @param {"asc"|"desc"} dir
+ * @returns {Array} a new sorted array; the input is untouched
+ */
+export function sortSearchMatches(matches, ctx, key, dir) {
+  var mul = dir === "desc" ? -1 : 1;
+  function keyOf(m) {
+    var row = ctx.rows[m.i];
+    if (!row) return null;
+    if (key === "site") {
+      var s = ctx.sites[row[2]];
+      return s && s.label ? String(s.label).toLowerCase() : null;
+    }
+    if (key === "filename") return row[0] ? String(row[0]).toLowerCase() : null;
+    if (key === "type") {
+      var c = ctx.categories[row[3]];
+      return c ? String(c).toLowerCase() : null;
+    }
+    if (key === "score") return typeof row[6] === "number" ? row[6] : null;
+    if (key === "grade") return row[7] ? String(row[7]).toLowerCase() : null;
+    if (key === "size") return typeof row[4] === "number" ? row[4] : null;
+    if (key === "modified") return row[5] ? String(row[5]) : null;
+    return null;
+  }
+  var out = matches.slice();
+  out.sort(function (a, b) {
+    var ka = keyOf(a);
+    var kb = keyOf(b);
+    var blankA = ka === null ? 1 : 0;
+    var blankB = kb === null ? 1 : 0;
+    if (blankA !== blankB) return blankA - blankB;
+    if (ka < kb) return -mul;
+    if (ka > kb) return mul;
+    return b.score - a.score || a.i - b.i;
+  });
+  return out;
+}
+
+/**
  * The matcher as inline-<script> source. Embedded verbatim into
  * search.html so the unit-tested functions above are exactly what runs in
  * the browser.
  */
 export function searchMatchClientSource() {
-  return [foldSearchText, squashSearchText, stripUploadHash, editDistanceLe, buildHaystack, runSearch, highlightRanges, suggestSiteTerms]
+  return [foldSearchText, squashSearchText, stripUploadHash, editDistanceLe, buildHaystack, runSearch, highlightRanges, suggestSiteTerms, sortSearchMatches]
     .map(function (fn) { return fn.toString(); })
     .join("\n");
 }

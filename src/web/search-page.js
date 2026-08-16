@@ -119,6 +119,20 @@ const SEARCH_CSS = `
 .search-suggest-chip:hover { background: rgba(255, 176, 0, 0.12); border-color: #ffb000; color: #ffd76a; }
 .search-table .search-file a .search-mark { text-decoration: underline; }
 .search-why { color: #7d8590; font-size: 0.82rem; margin-top: 0.2rem; }
+.search-sort-btn {
+  font: inherit;
+  font-weight: 600;
+  color: #d4dae0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.search-sort-btn:hover { color: #58a6ff; text-decoration: underline; }
+.search-sort-btn:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; border-radius: 2px; }
+.search-table th[aria-sort] .search-sort-btn { color: #ffd76a; }
+.search-sort-arrow { font-size: 0.75em; }
 .search-table .search-site a { color: #d4dae0; text-decoration: none; }
 .search-table .search-site a:hover { color: #58a6ff; text-decoration: underline; }
 @media (max-width: 700px) {
@@ -212,7 +226,7 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
     <p id="search-status" class="search-status" aria-live="polite"></p>
     <div id="site-chips" class="search-chips" role="group" aria-label="Filter results by website"></div>
     <div id="search-results"></div>
-    <p class="search-hint">Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links.</p>
+    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links.</p>
   </div>
 </main>
 
@@ -243,6 +257,23 @@ ${searchXlsxClientSource()}
   var activeSite = -1;
   var lastFiltered = [];
   var suggestEl = document.getElementById("did-you-mean");
+
+  // v1.49.0 — column sorting. Default: audit score, highest first. Each
+  // header's first click uses its natural primary direction; a second
+  // click reverses it.
+  var sortKey = "score";
+  var sortDir = "desc";
+  var SORT_COLUMNS = [
+    { key: "site", label: "Website" },
+    { key: "filename", label: "Filename" },
+    { key: "type", label: "Type" },
+    { key: "score", label: "Score" },
+    { key: "grade", label: "Grade" },
+    { key: "size", label: "Size" },
+    { key: "modified", label: "Modified" },
+    { key: null, label: "Audit report" },
+  ];
+  var SORT_NATURAL_DIR = { site: "asc", filename: "asc", type: "asc", grade: "asc", score: "desc", size: "desc", modified: "desc" };
 
   fetch(INDEX_URL)
     .then(function (res) {
@@ -369,6 +400,12 @@ ${searchXlsxClientSource()}
     var filtered = afterCat.filter(function (mm) {
       return activeSite < 0 || data.rows[mm.i][2] === activeSite;
     });
+    filtered = sortSearchMatches(
+      filtered,
+      { rows: data.rows, sites: data.sites, categories: data.categories.map(catLabel) },
+      sortKey,
+      sortDir,
+    );
     lastFiltered = filtered;
 
     // "Did you mean?" — a near-miss of a SITE's name never floods results
@@ -466,10 +503,36 @@ ${searchXlsxClientSource()}
     table.className = "search-table";
     var thead = document.createElement("thead");
     var hr = document.createElement("tr");
-    ["Website", "Filename", "Type", "Score", "Grade", "Size", "Modified", "Audit report"].forEach(function (h) {
+    SORT_COLUMNS.forEach(function (col) {
       var th = document.createElement("th");
       th.scope = "col";
-      th.textContent = h;
+      if (!col.key) {
+        th.textContent = col.label;
+        hr.appendChild(th);
+        return;
+      }
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "search-sort-btn";
+      btn.title = "Sort by " + col.label.toLowerCase();
+      btn.textContent = col.label;
+      if (sortKey === col.key) {
+        th.setAttribute("aria-sort", sortDir === "asc" ? "ascending" : "descending");
+        var arrow = document.createElement("span");
+        arrow.className = "search-sort-arrow";
+        arrow.textContent = sortDir === "asc" ? " ▲" : " ▼";
+        btn.appendChild(arrow);
+      }
+      btn.addEventListener("click", function () {
+        if (sortKey === col.key) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortKey = col.key;
+          sortDir = SORT_NATURAL_DIR[col.key];
+        }
+        update();
+      });
+      th.appendChild(btn);
       hr.appendChild(th);
     });
     thead.appendChild(hr);

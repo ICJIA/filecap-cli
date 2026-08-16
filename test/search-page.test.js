@@ -123,6 +123,17 @@ describe("generateSearchHtml", () => {
     expect(page()).toContain("hoistTerms");
   });
 
+  // v1.49.0 — sortable results: clickable headers with aria-sort, default
+  // audit-score-descending.
+  it("renders sortable column headers defaulting to score-descending", () => {
+    const html = page();
+    expect(html).toContain("search-sort-btn");
+    expect(html).toContain("aria-sort");
+    expect(html).toContain('sortKey = "score"');
+    expect(html).toContain('sortDir = "desc"');
+    expect(html).toContain("function sortSearchMatches");
+  });
+
   // v1.48.1 — regression pin. The generator emits the controller from a
   // template literal, where `\s` COOKS TO `s`: the shipped page split
   // queries on the letter s ("svfr" → ["", "vfr"]) and the Did-you-mean

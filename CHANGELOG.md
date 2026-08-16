@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.49.0] — 2026-08-16
+
+### Added — sortable search results
+
+- Every column heading on /search (Website, Filename, Type, Score, Grade,
+  Size, Modified) is now a sort button with an aria-sort state and arrow.
+  Default order is audit score, highest first; a heading first click uses
+  its natural direction (text ascending; Score/Size/Modified descending),
+  a second click reverses. Blanks sort last in both directions (the
+  v1.43.0 workbook rule); ties fall back to match relevance. Sorting
+  applies to the full match set, so the 400-row render cap and the
+  downloaded workbook both follow the chosen order (`sortSearchMatches`
+  in search-match.js, unit-tested and shipped verbatim).
+
 ## [1.48.1] — 2026-08-16
 
 ### Fixed — Did-you-mean swap ate a letter

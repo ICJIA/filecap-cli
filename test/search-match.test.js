@@ -7,6 +7,7 @@ import {
   runSearch,
   highlightRanges,
   suggestSiteTerms,
+  sortSearchMatches,
   searchMatchClientSource,
 } from "../src/web/search-match.js";
 
@@ -295,6 +296,64 @@ describe("highlightRanges", () => {
   it("handles empty inputs", () => {
     expect(highlightRanges("", ["x"])).toEqual([]);
     expect(highlightRanges("file.pdf", [])).toEqual([]);
+  });
+});
+
+// ── sortSearchMatches (v1.49.0) ──────────────────────────────────────────────
+// Results default to audit score, highest first; every column header can
+// re-sort. Blanks sort last in BOTH directions (the v1.43.0 workbook rule);
+// ties fall back to match relevance, then index, so ordering is total.
+
+describe("sortSearchMatches", () => {
+  const CTX = {
+    sites: [{ label: "DVFR" }, { label: "ARI" }],
+    categories: ["PDFs", "Word (.docx)"],
+    rows: [
+      ["b.pdf", "b.pdf", 0, 0, 200, "2024-01-05", 79, "C", "u", null],
+      ["a.pdf", "a.pdf", 1, 0, 100, "2026-07-15", 89, "B", "u", null],
+      ["c.docx", "c.docx", 0, 1, 300, "2023-03-14", null, null, "u", null],
+      ["D.pdf", "D.pdf", 1, 0, 50, "2025-12-17", 79, "C", "u", null],
+    ],
+  };
+  const M = (i, score) => ({ i, score, why: [] });
+  const MATCHES = [M(0, 4), M(1, 4), M(2, 4), M(3, 8)];
+  const order = (key, dir) => sortSearchMatches(MATCHES, CTX, key, dir).map((m) => m.i);
+
+  it("defaults: score descending, unscored files last", () => {
+    expect(order("score", "desc")).toEqual([1, 3, 0, 2]);
+  });
+
+  it("keeps blanks last even when ascending", () => {
+    expect(order("score", "asc")).toEqual([3, 0, 1, 2]);
+  });
+
+  it("breaks score ties by match relevance", () => {
+    // r3 and r0 both score 79; r3's match relevance (8) beats r0's (4).
+    expect(order("score", "desc").indexOf(3)).toBeLessThan(order("score", "desc").indexOf(0));
+  });
+
+  it("sorts filenames case-insensitively", () => {
+    expect(order("filename", "asc")).toEqual([1, 0, 2, 3]);
+    expect(order("filename", "desc")).toEqual([3, 2, 0, 1]);
+  });
+
+  it("sorts by website label", () => {
+    expect(order("site", "asc")).toEqual([3, 1, 0, 2]); // ARI before DVFR
+  });
+
+  it("sorts by type label and by modified date", () => {
+    expect(order("type", "asc")).toEqual([3, 0, 1, 2]); // PDFs before Word
+    expect(order("modified", "desc")).toEqual([1, 3, 0, 2]); // newest first
+  });
+
+  it("sorts grades with blanks last", () => {
+    expect(order("grade", "asc")).toEqual([1, 3, 0, 2]); // B, C, C, unscored
+  });
+
+  it("does not mutate its input", () => {
+    const copy = MATCHES.map((m) => m.i);
+    sortSearchMatches(MATCHES, CTX, "filename", "asc");
+    expect(MATCHES.map((m) => m.i)).toEqual(copy);
   });
 });
 
