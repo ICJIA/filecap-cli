@@ -2499,12 +2499,93 @@ dialog.access-modal .access-modal-cta a {
 .site-card .status-dot.status-down .status-glyph { background: transparent; border: 2px solid #f85149; box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.13); }
 
 /* Header "Sites" nav link — internal, so a green accent distinct from the
-   blue external-tool buttons. */
-.audit-tool-link.nav-sites {
+   blue external-tool buttons. v1.44.0: the "What's New" link is internal too
+   and shares the accent. */
+.audit-tool-link.nav-sites,
+.audit-tool-link.nav-whats-new {
   background: linear-gradient(180deg, #3fb950 0%, #2ea043 100%);
   border-color: #2ea043;
 }
-.audit-tool-link.nav-sites:hover { box-shadow: 0 4px 14px rgba(63, 185, 80, 0.35); }
+.audit-tool-link.nav-sites:hover,
+.audit-tool-link.nav-whats-new:hover { box-shadow: 0 4px 14px rgba(63, 185, 80, 0.35); }
+
+/* ── What's New (v1.44.0) ────────────────────────────────────────────────
+   Mirrors the file-accessibility-audit repo's announcements pattern: a
+   dismissible banner on the home page (newest entry only) + the
+   whats-new.html archive listing every entry newest-first. */
+.whats-new-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  max-width: 1200px;
+  margin: 1.4rem auto 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid #2a323d;
+  border-radius: 12px;
+  background: #161c24;
+}
+.whats-new-banner[hidden] { display: none; }
+.whats-new-badge {
+  flex: none;
+  margin-top: 0.1rem;
+  display: inline-block;
+  border-radius: 6px;
+  background: rgba(52, 211, 153, 0.15);
+  color: #6ee7b7;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.whats-new-text {
+  flex: 1;
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #c9d1d9;
+}
+.whats-new-text a { color: #60a5fa; font-weight: 700; }
+.whats-new-meta {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: #8b949e;
+}
+.whats-new-meta a { color: #8b949e; text-decoration: underline; font-weight: 400; }
+.whats-new-meta a:hover { color: #c9d1d9; }
+.whats-new-dismiss {
+  flex: none;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.3rem;
+  color: #8b949e;
+  cursor: pointer;
+}
+.whats-new-dismiss:hover { color: #ffffff; background: #21262d; }
+.whats-new-dismiss svg { width: 15px; height: 15px; display: block; }
+
+/* whats-new.html archive cards */
+.whats-new-list-wrap { max-width: 860px; margin: 0 auto; padding: 0 1rem; }
+.whats-new-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1rem; }
+.whats-new-entry {
+  border: 1px solid #2a323d;
+  border-radius: 12px;
+  background: #161c24;
+  padding: 1rem 1.25rem;
+}
+.whats-new-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.75rem; margin-bottom: 0.5rem; }
+.whats-new-entry-date, .whats-new-current { font-size: 0.78rem; color: #8b949e; }
+.whats-new-current { font-weight: 700; }
+.whats-new-entry-text { margin: 0; font-size: 0.94rem; line-height: 1.6; color: #c9d1d9; }
+.whats-new-entry-text a { color: #60a5fa; font-weight: 700; }
+.whats-new-empty { color: #8b949e; }
+.whats-new-back { margin: 2rem 0 0; }
+.whats-new-back a { color: #60a5fa; text-decoration: none; font-weight: 700; }
+.whats-new-back a:hover { text-decoration: underline; }
+@media print { .whats-new-banner { display: none; } }
 
 /* ── /sites roster hero — bold, count-first ─────────────────────────── */
 .roster-hero { padding-bottom: 1.6rem; }

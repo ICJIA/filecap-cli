@@ -1164,9 +1164,26 @@ describe("writeHtml", () => {
         csvHref: "site.csv",
       });
       const html = await fs.readFile(outputPath, "utf8");
-      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>[\s\S]{0,800}<span>ICJIA PDF Audit Tool<\/span>/);
+      // v1.44.0 — label renamed "ICJIA PDF Audit Tool" → "File Audit Tool".
+      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>[\s\S]{0,800}<span>File Audit Tool<\/span>/);
+      expect(html).not.toContain("PDF Audit Tool");
       // v1.7.28: detail-page sticky bar also carries the FAQ button.
       expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/accessibility\.icjia\.app"[\s\S]{0,800}<span>ICJIA Accessibility FAQs<\/span>/);
+    });
+
+    // v1.44.0 — bundle pages carry a What's New button in the sticky bar; a
+    // standalone report (no backHref → not part of a bundle) must not grow a
+    // nav button to a page that does not exist next to it. (The shared footer
+    // links whats-new.html unconditionally — same as its existing Home/Sites
+    // links, which also assume the bundle.)
+    it("shows the What's New nav button only when part of a bundle (backHref set)", async () => {
+      const inBundle = path.join(tmpDir, "bundled.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: inBundle, backHref: "index.html" });
+      expect(await fs.readFile(inBundle, "utf8")).toContain('class="audit-tool-link nav-whats-new"');
+
+      const standalone = path.join(tmpDir, "standalone.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: standalone });
+      expect(await fs.readFile(standalone, "utf8")).not.toContain('class="audit-tool-link nav-whats-new"');
     });
 
     it("shows the per-site scannedAt date under the CSV download for single-site reports", async () => {

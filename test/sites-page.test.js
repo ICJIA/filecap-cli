@@ -174,6 +174,14 @@ describe("generateSitesHtml", () => {
     expect(html).toContain('href="accessibility.html"');
   });
 
+  // v1.44.0 — What's New nav link + audit-tool label rename.
+  it("links to whats-new.html in the header and uses the 'File Audit Tool' label", () => {
+    const html = generateSitesHtml({ contentRoster: [scannedEntry], tools: [] });
+    expect(html).toMatch(/<a class="audit-tool-link[^"]*" href="whats-new\.html"[\s\S]{0,600}What's New/);
+    expect(html).toContain("<span>File Audit Tool</span>");
+    expect(html).not.toContain("PDF Audit Tool");
+  });
+
   it("reuses the home page stylesheet (INDEX_CSS)", () => {
     const html = generateSitesHtml({ contentRoster: [scannedEntry], tools: [] });
     expect(html).toContain(".site-card {");

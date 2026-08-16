@@ -881,7 +881,7 @@ body {
   /* CSV is the real deliverable — render the link as a prominent button
      so it reads as a primary action, not an afterthought. v1.7.29: green
      CTA so the download button is visibly distinct from the two blue
-     navbar buttons (FAQ + PDF Audit Tool) sitting next to it. Color
+     navbar buttons (FAQ + File Audit Tool) sitting next to it. Color
      register: download / get / "take this artefact away." */
   display: inline-block;
   background: linear-gradient(180deg, #1f7a30 0%, #176127 100%);
@@ -962,6 +962,13 @@ body {
   outline: 3px solid #58a6ff;
   outline-offset: 2px;
 }
+/* v1.44.0 — "What's New" is an internal bundle link; green accent matches the
+   home page's internal-nav buttons (nav-sites / nav-whats-new in INDEX_CSS). */
+.audit-tool-link.nav-whats-new {
+  background: linear-gradient(180deg, #3fb950 0%, #2ea043 100%);
+  border-color: #2ea043;
+}
+.audit-tool-link.nav-whats-new:hover { box-shadow: 0 4px 14px rgba(63, 185, 80, 0.35); }
 .audit-tool-icon { width: 14px; height: 14px; flex: none; }
 @media (max-width: 600px) {
   .audit-tool-link { padding: 0.35rem 0.65rem; font-size: 0.82rem; }
@@ -2109,14 +2116,20 @@ ${(() => {
       </svg>
       <span>ICJIA Accessibility FAQs</span>
     </a>
-    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA PDF Audit Tool (audit.icjia.app, opens in a new tab)">
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="File Audit Tool — score any PDF for accessibility (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>ICJIA PDF Audit Tool</span>
+      <span>File Audit Tool</span>
     </a>
+    ${backHref ? `<a class="audit-tool-link nav-whats-new" href="whats-new.html" title="What's New — updates and improvements to this audit site">
+      <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 1.8 9.6 6l4.4 1.6L9.6 9.2 8 13.4 6.4 9.2 2 7.6 6.4 6z"/>
+      </svg>
+      <span>What's New</span>
+    </a>` : ""}
     ${csvHref ? `<div class="report-csv-block">
       <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
         <span aria-hidden="true">&#x2913;</span> ${/\.csv$/i.test(String(csvHref)) ? "Download CSV" : "Download spreadsheet (XLSX)"}

@@ -1422,6 +1422,14 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     // (per-site workbooks are timestamped: <slug>-<scan-ts>.xlsx)
     expect(sitesHtml).toMatch(/class="roster-card-dl" href="dvfr-[^"]+\.xlsx" download/);
 
+    // v1.44.0 — the bundle ships the What's New archive page, and the home
+    // page carries the dismissible banner for the newest entry.
+    const whatsNewHtml = await fs.readFile(path.join(outputDir, "whats-new.html"), "utf8");
+    expect(whatsNewHtml).toMatch(/<title>[^<]*What/i);
+    expect(whatsNewHtml).toContain('class="site-footer"');
+    const indexForBanner = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(indexForBanner).toContain('data-announcement-id="');
+
     expect((await fs.stat(path.join(outputDir, "assets", "og", "dvfr.png"))).isFile()).toBe(true);
     expect((await fs.stat(path.join(outputDir, "assets", "og", "squish.png"))).isFile()).toBe(true);
     expect((await fs.stat(path.join(outputDir, "sites-list.xlsx"))).isFile()).toBe(true);

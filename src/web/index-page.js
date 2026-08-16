@@ -6,6 +6,7 @@ import { gradeForScore } from "../site-audit/aggregate.js";
 import { summarizeFileA11y, fileA11yCoverageText,
   fileA11yThinDataText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "../report/accessibility-band.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
+import { renderWhatsNewBanner } from "./whats-new.js";
 import { uptimeClientScript } from "./uptime-client.js";
 
 // v1.40.0 — the escape helper moved to src/util/html.js (one implementation
@@ -1056,18 +1057,25 @@ ${ogImage ? `<meta property="og:type" content="website">
       </svg>
       <span>ICJIA Accessibility FAQs</span>
     </a>
-    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA PDF Audit Tool (audit.icjia.app, opens in a new tab)">
+    <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="File Audit Tool — score any PDF for accessibility (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 3h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/>
         <path d="M9 2h5v5"/>
         <path d="M8 8l6-6"/>
       </svg>
-      <span>ICJIA PDF Audit Tool</span>
+      <span>File Audit Tool</span>
+    </a>
+    <a class="audit-tool-link nav-whats-new" href="whats-new.html" title="What's New — updates and improvements to this audit site">
+      <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 1.8 9.6 6l4.4 1.6L9.6 9.2 8 13.4 6.4 9.2 2 7.6 6.4 6z"/>
+      </svg>
+      <span>What's New</span>
     </a>
   </div>
 </header>
 
 <main id="main">
+${renderWhatsNewBanner()}
 
   <!-- v1.7.23: top section banner — mirrors the v1.7.22 "Cross-Server Duplicates"
        banner so the page reads as TWO clearly-marked sections (Fleet snapshot

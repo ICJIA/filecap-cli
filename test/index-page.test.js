@@ -321,8 +321,8 @@ describe("index page audit-tool button (v1.7.16)", () => {
     expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*>/);
   });
 
-  it("the audit-tool link includes an external-link SVG icon and the 'ICJIA PDF Audit Tool' label", () => {
-    expect(html).toMatch(/<a class="audit-tool-link"[^>]*href="https:\/\/audit\.icjia\.app"[\s\S]{0,800}<span>ICJIA PDF Audit Tool<\/span>/);
+  it("the audit-tool link includes an external-link SVG icon and the 'File Audit Tool' label (renamed v1.44.0)", () => {
+    expect(html).toMatch(/<a class="audit-tool-link"[^>]*href="https:\/\/audit\.icjia\.app"[\s\S]{0,800}<span>File Audit Tool<\/span>/);
   });
 
   it("the navbar also has an 'ICJIA Accessibility FAQs' button linked to accessibility.icjia.app (v1.7.28)", () => {
@@ -331,6 +331,26 @@ describe("index page audit-tool button (v1.7.16)", () => {
 
   it("uses rel=\"noopener noreferrer\" to prevent the target page from accessing window.opener", () => {
     expect(html).toMatch(/<a class="audit-tool-link"[^>]*rel="noopener noreferrer"/);
+  });
+});
+
+// v1.44.0 — What's New: dismissible banner (newest entry) + nav link + rename.
+describe("index page What's New (v1.44.0)", () => {
+  const html = generateIndexHtml({ siteResults: [], password: null });
+
+  it("carries the What's New banner with a dismiss button", () => {
+    expect(html).toContain('data-announcement-id="');
+    expect(html).toMatch(/<button[^>]*aria-label="Dismiss announcement"/);
+    expect(html).toContain("fleet-audit:dismissed-whats-new");
+  });
+
+  it("links to whats-new.html from the header nav", () => {
+    expect(html).toMatch(/<a class="audit-tool-link[^"]*" href="whats-new\.html"[\s\S]{0,600}What's New/);
+  });
+
+  it("renames the audit-tool nav label to 'File Audit Tool'", () => {
+    expect(html).toContain("<span>File Audit Tool</span>");
+    expect(html).not.toContain("PDF Audit Tool");
   });
 });
 

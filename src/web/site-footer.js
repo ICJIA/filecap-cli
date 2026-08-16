@@ -38,6 +38,8 @@ export function renderSiteFooter({ generatedAt = "" } = {}) {
       <span aria-hidden="true">&middot;</span>
       <a href="accessibility.html">Accessibility</a>
       <span aria-hidden="true">&middot;</span>
+      <a href="whats-new.html">What's New</a>
+      <span aria-hidden="true">&middot;</span>
       <a href="https://github.com/ICJIA/icjia-fleet-audit" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
       <span aria-hidden="true">&middot;</span>
       <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">CHANGELOG</a>

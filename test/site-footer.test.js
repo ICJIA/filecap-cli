@@ -26,6 +26,12 @@ describe("renderSiteFooter", () => {
     expect(html).toContain("https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md");
     expect(html).not.toContain("filecap-cli");
   });
+
+  // v1.44.0 — the footer status bar links to the What's New archive on every
+  // page (it's the durable route to updates once the home banner is dismissed).
+  it("links to the What's New archive", () => {
+    expect(renderSiteFooter()).toMatch(/<a href="whats-new\.html">What's New<\/a>/);
+  });
 });
 
 describe("siteFooterCss", () => {

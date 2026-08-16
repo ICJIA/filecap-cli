@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.44.0] — 2026-08-16
+
+### Added — What's New system (banner + archive page)
+
+- **A What's New system for the deployed bundle**, mirroring the
+  file-accessibility-audit repo's announcements pattern
+  (`src/web/whats-new.js`): a `WHATS_NEW` config array (newest first —
+  PREPEND an entry to publish an update), a dismissible home-page banner
+  showing only the newest entry (dismissal is permanent per entry `id`,
+  stored in `localStorage`; bump the id to re-show), and a
+  **`whats-new.html` archive page** listing every entry newest-first so a
+  dismissed or superseded update stays reachable.
+- First entry: the **August 15 scoring-rubric update** — every PDF re-scored
+  fresh under the File Audit Tool's refined rubric (fleet average 64 → 69),
+  with the caveat that ▲/▼ trend chips around that date mostly reflect the
+  rubric change, not remediation.
+- **"What's New" links in the chrome**: a green internal-nav button in the
+  header of the home page, /sites, and every per-site detail page (bundle
+  pages only — standalone reports don't grow a link to a page that isn't
+  next to them), plus a link in the shared footer status bar on every page.
+
+### Changed — nav label
+
+- **"ICJIA PDF Audit Tool" → "File Audit Tool"** in the top nav of every
+  page (title text now reads "score any PDF for accessibility").
+
 ## [1.43.0] — 2026-08-15
 
 ### Added — sortable per-file Score and Grade columns in every workbook

@@ -30,6 +30,7 @@ import { findUnscoredSites, unscoredGuardDecision, formatUnscoredWarning } from 
 import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
 import { generateSitesHtml } from "../web/sites-page.js";
+import { generateWhatsNewHtml } from "../web/whats-new.js";
 import { REMEDIABLE_CATEGORIES } from "../scanner/category.js";
 import { fetchOgMeta, fetchImageBytes } from "../references/og-meta.js";
 import { fmtChicagoGeneratedAt, fmtChicagoDate } from "../util/time.js";
@@ -2203,6 +2204,16 @@ export async function runWebRollup({
     sitesHtml = injectPasswordGate(sitesHtml, passwordHash);
   }
   await fs.writeFile(path.join(output, "sites.html"), sitesHtml);
+
+  // v1.44.0 — the What's New archive page (every home-page banner, newest
+  // first). Gated like every other page of the bundle.
+  let whatsNewHtml = generateWhatsNewHtml({
+    generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
+  });
+  if (passwordHash) {
+    whatsNewHtml = injectPasswordGate(whatsNewHtml, passwordHash);
+  }
+  await fs.writeFile(path.join(output, "whats-new.html"), whatsNewHtml);
 
   // 7. Generate robots.txt
   await fs.writeFile(path.join(output, "robots.txt"), generateRobotsTxt());
