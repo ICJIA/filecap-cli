@@ -31,6 +31,8 @@ import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
 import { generateSitesHtml } from "../web/sites-page.js";
 import { generateWhatsNewHtml } from "../web/whats-new.js";
+import { generateSearchHtml } from "../web/search-page.js";
+import { buildSearchIndex, SEARCH_INDEX_FILENAME } from "../web/search-index.js";
 import { REMEDIABLE_CATEGORIES } from "../scanner/category.js";
 import { fetchOgMeta, fetchImageBytes } from "../references/og-meta.js";
 import { fmtChicagoGeneratedAt, fmtChicagoDate } from "../util/time.js";
@@ -2214,6 +2216,21 @@ export async function runWebRollup({
     whatsNewHtml = injectPasswordGate(whatsNewHtml, passwordHash);
   }
   await fs.writeFile(path.join(output, "whats-new.html"), whatsNewHtml);
+
+  // v1.46.0 — /search: fleet-wide filename search. One compact JSON of every
+  // inventoried file (search-index.js documents the row shape) plus the
+  // static page that queries it client-side, gated like every other page.
+  const searchIndex = buildSearchIndex({ allEntries, siteResults });
+  await fs.writeFile(path.join(output, SEARCH_INDEX_FILENAME), JSON.stringify(searchIndex));
+  let searchHtml = generateSearchHtml({
+    generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
+    totalFiles: searchIndex.rows.length,
+    siteCount: siteResults.length,
+  });
+  if (passwordHash) {
+    searchHtml = injectPasswordGate(searchHtml, passwordHash);
+  }
+  await fs.writeFile(path.join(output, "search.html"), searchHtml);
 
   // 7. Generate robots.txt
   await fs.writeFile(path.join(output, "robots.txt"), generateRobotsTxt());

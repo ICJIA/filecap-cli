@@ -38,6 +38,14 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "fleet-file-search-2026-08-16",
+    badge: "New",
+    text: "You can now search every file on every audited site from one page. Type a full or partial filename — fragments are fine, like “dvfr report” or “annual 2023”, and close-enough spellings still match — and the results show each matching file, which site it lives on, its accessibility score, and a link to open it. Filter the results by file type or by website with one click, and download whatever you found as an Excel workbook with clickable links, ready to share. Look for “Search” in the navigation on every page.",
+    linkText: "Try the search page",
+    linkHref: "search.html",
+    date: "August 16, 2026",
+  },
+  {
     id: "archive-server-re-added-2026-08-16",
     badge: "Scope change",
     text: "The ICJIA Document Archive (archive.icjia.cloud) is back in the audit as of August 16, 2026. It was removed on August 13 on the premise that archived files aren't remediated — but the archive still serves live files that may need remediation, so it now counts like every other site. That adds 2,086 files to the inventory (1,429 of them on the remediation list) and 1,209 scored PDFs, all graded under the current rubric. Because the archive's documents score low (site average 28), the fleet-wide average moved from 69 to 54 — the fleet didn't get worse overnight; it now includes documents that were previously out of scope. Today's totals: 8,787 files across 12 audited sites, with 4,628 on the remediation list — 3,180 scored PDFs, 22 PDFs that couldn't be scored, and 1,426 Word, Excel, and PowerPoint files (checked with the Office apps' built-in accessibility checkers).",
@@ -143,6 +151,10 @@ export function generateWhatsNewHtml({ generatedAt = "" } = {}) {
     <a class="audit-tool-link nav-sites" href="index.html" title="Back to the fleet snapshot (home)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 2.5l5.5 5"/><path d="M4 7v6h8V7"/></svg>
       <span>Home</span>
+    </a>
+    <a class="audit-tool-link nav-search" href="search.html" title="Search every file across the fleet by full or partial filename">
+      <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+      <span>Search</span>
     </a>
     <a class="audit-tool-link" href="https://accessibility.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA accessibility FAQs (accessibility.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

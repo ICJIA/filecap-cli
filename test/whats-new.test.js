@@ -23,13 +23,23 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // v1.45.1 — newest entry announces the archive's return to the audit, with
-  // the post-archive fleet numbers reconciled the same way the rubric entry
-  // had to be (v1.44.1 lesson: every count on the banner must add up against
-  // the hero it sits above).
-  it("leads with the 2026-08-16 archive-scope entry, numbers reconciled", () => {
+  // v1.46.0 — newest entry announces the fleet-wide /search page. No counts
+  // on this banner, so nothing to reconcile against the hero (the v1.44.1
+  // lesson); it links straight to the page it announces.
+  it("leads with the 2026-08-16 search-page entry", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("archive");
+    expect(e.id).toContain("search");
+    expect(e.id).toContain("2026-08-16");
+    expect(e.linkHref).toBe("search.html");
+  });
+
+  // v1.45.1 — the archive's-return entry, with the post-archive fleet
+  // numbers reconciled the same way the rubric entry had to be (v1.44.1
+  // lesson: every count on the banner must add up against the hero it sits
+  // above). Now history, second in the list.
+  it("keeps the reconciled 2026-08-16 archive-scope entry as history", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("archive"));
+    expect(e).toBeTruthy();
     expect(e.id).toContain("2026-08-16");
     expect(e.text).toContain("4,628");
     expect(e.text).toContain("3,180");
@@ -76,9 +86,12 @@ describe("generateWhatsNewHtml", () => {
   const html = generateWhatsNewHtml({ generatedAt: "Aug 16, 2026" });
 
   it("lists every entry newest-first with badge and date", () => {
+    // Search from just past the previous hit so entries that legitimately
+    // share a date (two releases on 2026-08-16) each match their own
+    // occurrence.
     let lastIdx = -1;
     for (const e of WHATS_NEW) {
-      const idx = html.indexOf(e.date);
+      const idx = html.indexOf(e.date, lastIdx + 1);
       expect(idx).toBeGreaterThan(lastIdx);
       lastIdx = idx;
       expect(html).toContain(e.badge);

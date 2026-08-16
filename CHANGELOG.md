@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.46.0] — 2026-08-16
+
+### Added — fleet-wide /search page
+
+- **`search.html` + `search-index.json`**: search every inventoried file
+  across the fleet by full or partial filename, client-side, from one page.
+  The rollup emits a compact positional-array index (`src/web/search-index.js`
+  documents the row shape) next to the page; the 12MB `audit-fleet.ndjson`
+  is untouched.
+- **Fragment-friendly tiered matcher** (`src/web/search-match.js`): every
+  query term must land (AND), ranked filename-substring > site/path
+  substring > separator-blind ("annualreport") > typo-tolerant (bounded
+  Damerau-Levenshtein, so "anual"/"buget" still hit). Terms match the SITE
+  name too, so "dvfr report" finds reports on DVFR even when "DVFR" isn't
+  in the filename. Strapi upload hashes are folded out of the match key.
+- **Results workbook download** (`src/web/search-xlsx.js`): a hand-rolled
+  browser-side OOXML writer (STORE-only zip, shared strings, bold frozen
+  header, autofilter, real hyperlink cells for File URL + Audit report)
+  builds `search-results-<query>-<date>.xlsx` from the current matches.
+  ExcelJS round-trip tests pin Excel validity; both client modules ship via
+  the uptime-client `.toString()` pattern — the tested code IS the shipped
+  code.
+- **Category + site filter chips** with live counts; results table caps at
+  400 rendered rows (the workbook always carries every match); summary line
+  answers "which sites carry it" at a glance.
+- **Nav + footer wiring**: a Search link on the home page, /sites,
+  What's New, every per-site report (bundle context only), and the shared
+  footer. New What's New entry announces the page.
+
 ## [1.45.1] — 2026-08-16
 
 ### Added — What's New entry for the archive's return
