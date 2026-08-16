@@ -382,7 +382,10 @@ ${searchXlsxClientSource()}
         b.className = "search-chip search-suggest-chip";
         b.textContent = "Did you mean “" + s.word + "”?";
         b.addEventListener("click", function () {
-          var toks = input.value.split(/\s+/);
+          // \\s, not \s: this code lives inside the generator's template
+          // literal, where \s cooks to a bare "s" (the v1.48.1 bug that
+          // made the swap split queries on the letter s).
+          var toks = input.value.split(/\\s+/);
           for (var ti2 = 0; ti2 < toks.length; ti2++) {
             if (foldSearchText(toks[ti2]) === s.term) toks[ti2] = s.word;
           }

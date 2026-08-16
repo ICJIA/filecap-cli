@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.48.1] — 2026-08-16
+
+### Fixed — Did-you-mean swap ate a letter
+
+- The suggestion chips inline handler lives inside the page generators
+  template literal, where `\s` cooks to a bare `s` — the shipped page
+  split queries on the LETTER s, so accepting "Did you mean dvfr?" for
+  "svfr" produced "vfr". Now emitted as a real whitespace regex, with a
+  test pinning the shipped source.
+
 ## [1.48.0] — 2026-08-16
 
 ### Changed — fuzzy blast-radius taming ("svfr" incident)

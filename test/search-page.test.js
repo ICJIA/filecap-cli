@@ -122,4 +122,14 @@ describe("generateSearchHtml", () => {
   it("hoists a uniform fuzzy correction into the status line", () => {
     expect(page()).toContain("hoistTerms");
   });
+
+  // v1.48.1 — regression pin. The generator emits the controller from a
+  // template literal, where `\s` COOKS TO `s`: the shipped page split
+  // queries on the letter s ("svfr" → ["", "vfr"]) and the Did-you-mean
+  // swap produced "vfr". The emitted JS must carry the real \s regex.
+  it("emits a real whitespace regex in the shipped token splitter", () => {
+    const html = page();
+    expect(html).toContain(String.raw`split(/\s+/)`);
+    expect(html).not.toContain("split(/s+/)");
+  });
 });
