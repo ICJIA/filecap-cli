@@ -38,9 +38,13 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
-    id: "file-scoring-rubric-update-2026-08-15",
+    // v1.44.1 — rev2: the first wording said "1,971 files" directly above the
+    // hero's "3,199 files may need audit" and invited "which is it?". Now the
+    // entry reconciles the two counts. New id so visitors who dismissed the
+    // rev-1 banner see the corrected one once.
+    id: "file-scoring-rubric-update-2026-08-15-rev2",
     badge: "Scoring update",
-    text: "The File Audit Tool refined how it scores documents, and on August 15, 2026 every PDF on every site was re-scored from scratch under the new rubric — 1,971 files, none reused from earlier runs. The fleet-wide average moved from 64 to 69. If a site's file-accessibility number or its ▲/▼ change chip jumped around that date, the movement mostly reflects the improved rubric, not files being fixed or getting worse. Every number shown here — the site cards, the sortable Score and Grade columns in the downloadable spreadsheets, and the fleet master list — comes from that same August 15 re-score, so all surfaces agree.",
+    text: "The File Audit Tool refined how it scores documents, and on August 15, 2026 every PDF on every site was re-scored from scratch under the new rubric — all 1,971 scoreable PDFs, none reused from earlier runs. The fleet-wide average moved from 64 to 69. If a site's file-accessibility number or its ▲/▼ change chip jumped around that date, the movement mostly reflects the improved rubric, not files being fixed or getting worse. (Why 1,971 and not the 3,199 documents on the remediation list? The tool scores PDFs only: that list also counts 1,217 Word, Excel, and PowerPoint files — those are checked with the Office apps' built-in accessibility checkers instead — plus 11 PDFs that couldn't be scored, marked “Not scored” in the spreadsheets.) Every number shown on this site comes from that same August 15 re-score, so all surfaces agree.",
     linkText: "How files are scored",
     linkHref: "https://audit.icjia.app/technical-details",
     date: "August 15, 2026",

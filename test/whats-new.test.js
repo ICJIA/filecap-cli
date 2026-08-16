@@ -27,6 +27,20 @@ describe("WHATS_NEW data", () => {
     expect(WHATS_NEW[0].id).toContain("2026-08-15");
     expect(WHATS_NEW[0].text).toMatch(/rubric|scoring|re-scored/i);
   });
+
+  // v1.44.1 — the banner sits directly above the hero's "3,199 files may
+  // need audit", so saying "1,971 files" invited "which is it?". The entry
+  // must reconcile the two counts (1,971 scoreable PDFs vs 3,199 remediable
+  // documents incl. 1,217 unscored Office files), and its id must differ
+  // from the rev-1 id so visitors who dismissed the old wording see the fix.
+  it("reconciles the 1,971-PDF count against the 3,199-document remediation list (v1.44.1)", () => {
+    const e = WHATS_NEW[0];
+    expect(e.text).toContain("1,971 scoreable PDFs");
+    expect(e.text).toContain("3,199");
+    expect(e.text).toMatch(/Word, Excel, and PowerPoint|Office files/);
+    expect(e.text).not.toMatch(/1,971 files/);
+    expect(e.id).not.toBe("file-scoring-rubric-update-2026-08-15");
+  });
 });
 
 describe("renderWhatsNewBanner", () => {

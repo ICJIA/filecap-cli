@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.44.1] — 2026-08-16
+
+### Fixed — What's New banner reconciles 1,971 vs 3,199
+
+- **The scoring-update banner said "1,971 files" directly above the hero's
+  "3,199 files may need audit"** — the first question an astute reader asks
+  is "which is it?". The entry now says **1,971 scoreable PDFs** and
+  reconciles the two counts in place: the 3,199-document remediation list
+  additionally counts 1,217 Word/Excel/PowerPoint files (the tool scores
+  PDFs only; Office files are checked with the Office apps' built-in
+  accessibility checkers) plus 11 PDFs that couldn't be scored ("Not
+  scored" in the spreadsheets). 1,971 + 1,217 + 11 = 3,199.
+- The entry id is bumped (`…-rev2`), so visitors who dismissed the original
+  wording see the corrected banner once.
+
 ## [1.44.0] — 2026-08-16
 
 ### Added — What's New system (banner + archive page)
