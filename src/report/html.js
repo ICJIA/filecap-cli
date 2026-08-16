@@ -2114,7 +2114,7 @@ ${(() => {
         <path d="M6 6.2a2 2 0 1 1 2.6 1.9c-0.5 0.2-0.6 0.5-0.6 0.9"/>
         <circle cx="8" cy="11.2" r="0.55" fill="currentColor"/>
       </svg>
-      <span>ICJIA Accessibility FAQs</span>
+      <span>Accessibility FAQs</span>
     </a>
     <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="File Audit Tool — score any PDF for accessibility (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

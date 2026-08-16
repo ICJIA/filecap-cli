@@ -47,8 +47,23 @@ async function writeInventory(filePath, { serverName, scannedAt = "2026-05-09T16
     flags: [],
     audit: { audited: true, cached: false, checkedAt: "2026-05-09T16:05:04.000Z", score: 81, grade: "B" },
   });
-  const footer = JSON.stringify({ kind: "filecap-inventory-footer", entryCount: 1, scannedAt });
-  await fs.writeFile(filePath, [header, entry, footer].join("\n") + "\n", "utf8");
+  // v1.47.0 — repo/OS plumbing that must be excluded from every bundle
+  // surface (counts, pages, workbooks, NDJSON, search index).
+  const systemEntries = [".gitkeep", ".env.sample", "Thumbs.db"].map((name) =>
+    JSON.stringify({
+      path: name,
+      absolutePath: `/uploads/${name}`,
+      filename: name,
+      extension: name.includes(".") ? name.split(".").pop().toLowerCase() : "",
+      category: "other",
+      remediable: false,
+      sizeBytes: 5,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "0000",
+      flags: [],
+    }));
+  const footer = JSON.stringify({ kind: "filecap-inventory-footer", entryCount: 4, scannedAt });
+  await fs.writeFile(filePath, [header, entry, ...systemEntries, footer].join("\n") + "\n", "utf8");
 }
 
 async function buildFixture() {
@@ -114,6 +129,41 @@ describe("web-rollup /search wiring", () => {
     const out = await rollup({ password: "hunter2" });
     const html = await fs.readFile(path.join(out, "search.html"), "utf8");
     expect(html).toContain("fc-pw");
+  });
+
+  it("excludes system files from every surface: index, detail page, NDJSON, workbook", async () => {
+    const out = await rollup();
+    const searchIdx = JSON.parse(await fs.readFile(path.join(out, "search-index.json"), "utf8"));
+    expect(searchIdx.rows).toHaveLength(1);
+    expect(searchIdx.rows.some((r) => r[0].startsWith(".") || r[0].toLowerCase() === "thumbs.db")).toBe(false);
+
+    const files = await fs.readdir(out);
+    const detail = files.find((f) => /^dvfr-.*Z\.html$/.test(f));
+    const detailHtml = await fs.readFile(path.join(out, detail), "utf8");
+    expect(detailHtml).not.toContain(".gitkeep");
+    expect(detailHtml).not.toContain("Thumbs.db");
+
+    const ndjson = await fs.readFile(path.join(out, "audit-fleet.ndjson"), "utf8");
+    expect(ndjson).not.toContain(".gitkeep");
+    expect(ndjson).not.toContain(".env.sample");
+
+    // The per-site workbook (all sheets, incl. the Pages tab) must never
+    // mention a system file in any cell.
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(path.join(out, files.find((f) => /^dvfr-.*Z\.xlsx$/.test(f))));
+    const leaked = [];
+    for (const ws of wb.worksheets) {
+      ws.eachRow((row) => {
+        row.eachCell((cell) => {
+          const v = String(cell.value ?? "");
+          if (v.includes(".gitkeep") || v.includes(".env.sample") || v.toLowerCase().includes("thumbs.db")) {
+            leaked.push(`${ws.name}: ${v}`);
+          }
+        });
+      });
+    }
+    expect(leaked).toEqual([]);
   });
 
   it("links Search from the home page, /sites, What's New, and per-site reports", async () => {

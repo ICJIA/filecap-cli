@@ -107,6 +107,17 @@ const SEARCH_CSS = `
 .search-table .search-file a { word-break: break-all; }
 .search-cap-note { color: #7d8590; font-size: 0.88rem; margin: 0.6rem 0 0; }
 .search-error { color: #f85149; margin: 1rem 0; }
+.search-mark {
+  background: rgba(255, 176, 0, 0.18);
+  color: #ffd76a;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.search-table .search-file a .search-mark { text-decoration: underline; }
+.search-why { color: #7d8590; font-size: 0.82rem; margin-top: 0.2rem; }
+.search-table .search-site a { color: #d4dae0; text-decoration: none; }
+.search-table .search-site a:hover { color: #58a6ff; text-decoration: underline; }
 @media (max-width: 700px) {
   .search-wrap { padding: 0 1rem 2rem; }
   .search-box-row { flex-direction: column; align-items: stretch; }
@@ -191,7 +202,7 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
     <p id="search-status" class="search-status" aria-live="polite"></p>
     <div id="site-chips" class="search-chips" role="group" aria-label="Filter results by website"></div>
     <div id="search-results"></div>
-    <p class="search-hint">Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. Spreadsheet downloads include every matching file with clickable links.</p>
+    <p class="search-hint">Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links.</p>
   </div>
 </main>
 
@@ -248,6 +259,47 @@ ${searchXlsxClientSource()}
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
     if (bytes >= 1024) return Math.round(bytes / 1024) + " KB";
     return bytes + " B";
+  }
+
+  // Filename with the matched fragments <mark>ed, built from text nodes —
+  // never markup-injected.
+  function appendHighlighted(el, raw, ranges) {
+    var pos = 0;
+    for (var r = 0; r < ranges.length; r++) {
+      var s = ranges[r][0];
+      var e = ranges[r][1];
+      if (s > pos) el.appendChild(document.createTextNode(raw.slice(pos, s)));
+      var m = document.createElement("mark");
+      m.className = "search-mark";
+      m.textContent = raw.slice(s, e);
+      el.appendChild(m);
+      pos = e;
+    }
+    if (pos < raw.length) el.appendChild(document.createTextNode(raw.slice(pos)));
+  }
+
+  // "Is it a DVFR report, or just ON DVFR?" — plain-language reason for any
+  // term that did NOT land in the filename itself.
+  function whyPhrase(w) {
+    if (w.src === "site") return "“" + w.term + "” = the site's name";
+    if (w.src === "path") return "“" + w.term + "” in the folder path";
+    if (w.src === "squash") return "“" + w.term + "” matches the name with separators removed";
+    if (w.src === "fuzzy") return "“" + w.term + "” ≈ “" + w.word + "”";
+    return "";
+  }
+
+  // Compact per-row summary for the workbook's "Matched on" column.
+  function matchedOnText(why) {
+    var parts = [];
+    for (var i = 0; i < why.length; i++) {
+      var w = why[i];
+      if (w.src === "name") parts.push(w.term + ": filename");
+      else if (w.src === "site") parts.push(w.term + ": site name");
+      else if (w.src === "path") parts.push(w.term + ": folder path");
+      else if (w.src === "squash") parts.push(w.term + ": run-together name");
+      else parts.push(w.term + ": ≈ " + w.word);
+    }
+    return parts.join("; ");
   }
 
   function chip(label, count, pressed, onClick) {
@@ -351,7 +403,7 @@ ${searchXlsxClientSource()}
     table.className = "search-table";
     var thead = document.createElement("thead");
     var hr = document.createElement("tr");
-    ["Website", "Filename", "Type", "Score", "Grade", "Size", "Modified", "Report"].forEach(function (h) {
+    ["Website", "Filename", "Type", "Score", "Grade", "Size", "Modified", "Audit report"].forEach(function (h) {
       var th = document.createElement("th");
       th.scope = "col";
       th.textContent = h;
@@ -362,14 +414,32 @@ ${searchXlsxClientSource()}
     var tbody = document.createElement("tbody");
     var shown = Math.min(filtered.length, RENDER_CAP);
     for (var i = 0; i < shown; i++) {
-      var row = data.rows[filtered[i].i];
+      var match = filtered[i];
+      var row = data.rows[match.i];
       var site = data.sites[row[2]] || {};
+      var why = match.why || [];
       var tr = document.createElement("tr");
 
       var tdSite = document.createElement("td");
       tdSite.className = "search-site";
-      tdSite.textContent = site.label || "";
+      if (site.detail) {
+        var sa = document.createElement("a");
+        sa.href = site.detail;
+        sa.title = "Open the " + (site.label || "site") + " audit report page";
+        sa.textContent = site.label || "";
+        tdSite.appendChild(sa);
+      } else {
+        tdSite.textContent = site.label || "";
+      }
       tr.appendChild(tdSite);
+
+      var nameTerms = [];
+      var whyNotes = [];
+      for (var wIdx = 0; wIdx < why.length; wIdx++) {
+        if (why[wIdx].src === "name") nameTerms.push(why[wIdx].term);
+        else whyNotes.push(whyPhrase(why[wIdx]));
+      }
+      var ranges = highlightRanges(row[0], nameTerms);
 
       var tdFile = document.createElement("td");
       tdFile.className = "search-file";
@@ -378,10 +448,16 @@ ${searchXlsxClientSource()}
         a.href = row[8];
         a.target = "_blank";
         a.rel = "noopener noreferrer";
-        a.textContent = row[0];
+        appendHighlighted(a, row[0], ranges);
         tdFile.appendChild(a);
       } else {
-        tdFile.textContent = row[0];
+        appendHighlighted(tdFile, row[0], ranges);
+      }
+      if (whyNotes.length) {
+        var whyEl = document.createElement("div");
+        whyEl.className = "search-why";
+        whyEl.textContent = whyNotes.join(" · ");
+        tdFile.appendChild(whyEl);
       }
       tr.appendChild(tdFile);
 
@@ -410,10 +486,13 @@ ${searchXlsxClientSource()}
       tr.appendChild(tdMod);
 
       var tdRep = document.createElement("td");
-      if (site.detail) {
+      if (row[9]) {
         var ra = document.createElement("a");
-        ra.href = site.detail;
-        ra.textContent = "Site report";
+        ra.href = row[9];
+        ra.target = "_blank";
+        ra.rel = "noopener noreferrer";
+        ra.title = "Open this file's shareable audit report (what's wrong and how to fix it) in a new tab";
+        ra.textContent = "View report";
         tdRep.appendChild(ra);
       }
       tr.appendChild(tdRep);
@@ -452,7 +531,10 @@ ${searchXlsxClientSource()}
         sizeBytes: row[4],
         modified: row[5] || "",
         fileUrl: row[8] || "",
-        reportUrl: site.detail ? PUBLIC_BASE + "/" + site.detail : "",
+        // The per-file audit.icjia.app report — the house "Audit Report"
+        // column meaning. Blank when the file was never scored.
+        reportUrl: row[9] || "",
+        matchedOn: matchedOnText(mm.why || []),
       };
     });
     var bytes = buildSearchWorkbook(rowsOut);

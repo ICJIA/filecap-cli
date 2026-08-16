@@ -70,6 +70,14 @@ describe("renderWhatsNewBanner", () => {
     }
   });
 
+  // v1.47.0 — the banner names itself so visitors know what they're
+  // looking at before they read the update.
+  it("carries a 'What's New' heading and names the region", () => {
+    expect(banner).toContain('class="whats-new-heading"');
+    expect(banner).toContain(`whats-new-heading">What's New<`);
+    expect(banner).toContain(`aria-label="What's New"`);
+  });
+
   it("links to the archive page and carries a dismiss button", () => {
     expect(banner).toContain('href="whats-new.html"');
     expect(banner).toContain("See all updates");

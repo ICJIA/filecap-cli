@@ -8,6 +8,7 @@
 // Row positions (keep in sync with search-page.js's client renderer):
 //   0 filename   1 path        2 siteIdx (→ sites[])  3 catIdx (→ categories[])
 //   4 sizeBytes  5 modified (YYYY-MM-DD)  6 score|null  7 grade|null  8 publicUrl
+//   9 per-file audit report URL (audit.icjia.app, shareable) | null
 
 import { publicUrlFor } from "../report/format.js";
 
@@ -76,6 +77,7 @@ export function buildSearchIndex({ allEntries, siteResults, generatedAt = new Da
       typeof audit?.score === "number" ? audit.score : null,
       typeof audit?.grade === "string" ? audit.grade : null,
       entryUrl(entry, it.publicUrlBase, it.pathPrefix),
+      typeof audit?.reportUrl === "string" && audit.reportUrl ? audit.reportUrl : null,
     ]);
   }
   rows.sort((a, b) => {

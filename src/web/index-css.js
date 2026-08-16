@@ -2546,6 +2546,17 @@ dialog.access-modal .access-modal-cta a {
   line-height: 1.55;
   color: #c9d1d9;
 }
+/* v1.47.0 — the banner names itself so a first-time visitor knows what
+   they're reading before the update text starts. */
+.whats-new-heading {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6ee7b7;
+  margin-bottom: 0.3rem;
+}
 .whats-new-text a { color: #60a5fa; font-weight: 700; }
 .whats-new-meta {
   display: block;

@@ -12,6 +12,7 @@ import {
 } from "../report/flagged.js";
 import { writeHtml } from "../report/html.js";
 import { FILECAP_VERSION } from "../version.js";
+import { isSystemFile } from "../scanner/system-files.js";
 
 const README_TEMPLATE = `filecap audit deliverable — README
 ==================================
@@ -103,7 +104,9 @@ export async function runReport({ input, outputDir, html = false, backHref = nul
       header = parsed;
     } else if (parsed.kind === "filecap-inventory-footer" || parsed.kind === "filecap-consolidated-footer") {
       // footer encountered; nothing to do here (we already collected what we need)
-    } else {
+    } else if (!isSystemFile(parsed.filename)) {
+      // v1.47.0 — invisible/system files (.gitkeep, .DS_Store, Thumbs.db…)
+      // are repo/OS plumbing, excluded from every report surface and count.
       entries.push(parsed);
     }
   }

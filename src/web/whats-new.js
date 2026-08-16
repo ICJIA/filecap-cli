@@ -40,7 +40,7 @@ export const WHATS_NEW = [
   {
     id: "fleet-file-search-2026-08-16",
     badge: "New",
-    text: "You can now search every file on every audited site from one page. Type a full or partial filename — fragments are fine, like “dvfr report” or “annual 2023”, and close-enough spellings still match — and the results show each matching file, which site it lives on, its accessibility score, and a link to open it. Filter the results by file type or by website with one click, and download whatever you found as an Excel workbook with clickable links, ready to share. Look for “Search” in the navigation on every page.",
+    text: "You can now search every file on every audited site from one page. Type a full or partial filename — fragments are fine, like “dvfr report” or “annual 2023”, and close-enough spellings still match — and the results show each matching file, which site it lives on, its accessibility score, a link to open it, and a “View report” link to that file's shareable audit report (exactly what's wrong and how to fix it, in a new tab). The matched part of each name is highlighted, with a note when a match came from the site's name rather than the filename. Filter by file type or website with one click, and download whatever you found as an Excel workbook with clickable links, ready to share. Look for “Search” in the navigation on every page. Also in this update: invisible system files (like .gitkeep and .DS_Store) no longer count toward any file totals, so overall numbers dipped slightly.",
     linkText: "Try the search page",
     linkHref: "search.html",
     date: "August 16, 2026",
@@ -77,9 +77,9 @@ function renderEntryLink(entry) {
 export function renderWhatsNewBanner() {
   const current = WHATS_NEW[0];
   if (!current) return "";
-  return `<div class="whats-new-banner" id="whats-new-banner" role="region" aria-label="Site announcement" data-announcement-id="${he(current.id)}">
+  return `<div class="whats-new-banner" id="whats-new-banner" role="region" aria-label="What's New" data-announcement-id="${he(current.id)}">
     <span class="whats-new-badge">${he(current.badge)}</span>
-    <p class="whats-new-text">${he(current.text)}${renderEntryLink(current)}
+    <p class="whats-new-text"><span class="whats-new-heading">What's New</span>${he(current.text)}${renderEntryLink(current)}
       <span class="whats-new-meta">Updated ${he(current.date)} &middot; <a href="whats-new.html" aria-label="See all updates — previous announcements">See all updates</a></span>
     </p>
     <button type="button" class="whats-new-dismiss" aria-label="Dismiss announcement" title="Dismiss">
@@ -162,7 +162,7 @@ export function generateWhatsNewHtml({ generatedAt = "" } = {}) {
         <path d="M6 6.2a2 2 0 1 1 2.6 1.9c-0.5 0.2-0.6 0.5-0.6 0.9"/>
         <circle cx="8" cy="11.2" r="0.55" fill="currentColor"/>
       </svg>
-      <span>ICJIA Accessibility FAQs</span>
+      <span>Accessibility FAQs</span>
     </a>
     <a class="audit-tool-link" href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer" title="File Audit Tool — score any PDF for accessibility (audit.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

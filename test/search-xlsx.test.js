@@ -23,6 +23,7 @@ const ROWS = [
     modified: "2024-03-05",
     fileUrl: "https://dvfr.icjia-api.cloud/uploads/2023/Annual%20Report%202023.pdf",
     reportUrl: "https://icjia-fleet-audit.netlify.app/dvfr-20260816-125634Z.html",
+    matchedOn: "dvfr: site name; report: filename",
   },
   {
     site: "ICJIA",
@@ -58,8 +59,15 @@ describe("buildSearchWorkbook", () => {
     const header = sheet.getRow(1).values.slice(1);
     expect(header).toEqual([
       "Website", "Filename", "Category", "Score (0-100)", "Grade",
-      "Size (bytes)", "Date modified", "File URL", "Audit report",
+      "Size (bytes)", "Date modified", "File URL", "Audit report", "Matched on",
     ]);
+  });
+
+  it("carries the per-row match explanation in the Matched on column", async () => {
+    const wb = await load(buildSearchWorkbook(ROWS));
+    const sheet = wb.worksheets[0];
+    expect(sheet.getCell("J2").value).toBe("dvfr: site name; report: filename");
+    expect(sheet.getCell("J3").value).toBeNull();
   });
 
   it("freezes the header row and applies an autofilter", async () => {

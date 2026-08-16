@@ -1168,7 +1168,7 @@ describe("writeHtml", () => {
       expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/audit\.icjia\.app"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>[\s\S]{0,800}<span>File Audit Tool<\/span>/);
       expect(html).not.toContain("PDF Audit Tool");
       // v1.7.28: detail-page sticky bar also carries the FAQ button.
-      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/accessibility\.icjia\.app"[\s\S]{0,800}<span>ICJIA Accessibility FAQs<\/span>/);
+      expect(html).toMatch(/<a class="audit-tool-link" href="https:\/\/accessibility\.icjia\.app"[\s\S]{0,800}<span>Accessibility FAQs<\/span>/);
     });
 
     // v1.44.0 — bundle pages carry a What's New button in the sticky bar; a

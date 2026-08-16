@@ -91,11 +91,14 @@ export function buildHaystack(rec) {
     var foldedStripped = foldSearchText(stripped);
     if (foldedStripped && foldedStripped !== name) name = name + " " + foldedStripped;
   }
-  var ctx = foldSearchText(
-    [rec && rec.siteLabel, rec && rec.siteFull, rec && rec.path]
-      .filter(Boolean)
-      .join(" "),
+  // site + pathf are kept separately so a tier-3 match can be attributed
+  // ("the site's name" vs "the folder path") in the result's `why`; ctx is
+  // their concatenation, unchanged for scoring.
+  var site = foldSearchText(
+    [rec && rec.siteLabel, rec && rec.siteFull].filter(Boolean).join(" "),
   );
+  var pathf = foldSearchText(rec && rec.path);
+  var ctx = [site, pathf].filter(Boolean).join(" ");
   var combined = name + " " + ctx;
   var squash = squashSearchText(combined);
   var words = [];
@@ -105,14 +108,17 @@ export function buildHaystack(rec) {
     var w = tokens[i];
     if (w && !seen[w]) { seen[w] = true; words.push(w); }
   }
-  return { name: name, ctx: ctx, squash: squash, words: words };
+  return { name: name, site: site, pathf: pathf, ctx: ctx, squash: squash, words: words };
 }
 
 /**
  * Rank haystacks against a query. Every folded query term must match some
  * tier (AND); score is the sum of per-term tiers, +2 when the full folded
- * query appears verbatim in the filename. Returns [{i, score}] sorted by
- * score desc, then index asc — deterministic and explainable.
+ * query appears verbatim in the filename. Returns [{i, score, why}] sorted
+ * by score desc, then index asc — deterministic and explainable. `why` has
+ * one entry per query term saying where it landed: src "name" | "site" |
+ * "path" | "squash" | "fuzzy" (fuzzy also carries the matched `word`), so
+ * the page can show whether a hit is IN the filename or merely near it.
  *
  * @param {Array<ReturnType<typeof buildHaystack>>} hays
  * @param {string} query
@@ -126,29 +132,76 @@ export function runSearch(hays, query) {
     var hay = hays[i];
     var score = 0;
     var ok = true;
+    var why = [];
     for (var t = 0; t < terms.length; t++) {
       var term = terms[t];
       var tier = 0;
-      if (hay.name.indexOf(term) !== -1) tier = 4;
-      else if (hay.ctx.indexOf(term) !== -1) tier = 3;
-      else if (term.length >= 4 && hay.squash.indexOf(squashSearchText(term)) !== -1) tier = 2;
-      else if (term.length >= 4) {
+      var entry = null;
+      if (hay.name.indexOf(term) !== -1) {
+        tier = 4;
+        entry = { term: term, src: "name" };
+      } else if (hay.ctx.indexOf(term) !== -1) {
+        tier = 3;
+        entry = { term: term, src: hay.site.indexOf(term) !== -1 ? "site" : "path" };
+      } else if (term.length >= 4 && hay.squash.indexOf(squashSearchText(term)) !== -1) {
+        tier = 2;
+        entry = { term: term, src: "squash" };
+      } else if (term.length >= 4) {
         var maxD = term.length >= 7 ? 2 : 1;
         for (var w = 0; w < hay.words.length; w++) {
           var word = hay.words[w];
           if (Math.abs(word.length - term.length) > maxD) continue;
-          if (editDistanceLe(term, word, maxD)) { tier = 1; break; }
+          if (editDistanceLe(term, word, maxD)) {
+            tier = 1;
+            entry = { term: term, src: "fuzzy", word: word };
+            break;
+          }
         }
       }
       if (tier === 0) { ok = false; break; }
       score += tier;
+      why.push(entry);
     }
     if (!ok) continue;
     if (terms.length > 1 && hay.name.indexOf(folded) !== -1) score += 2;
-    out.push({ i: i, score: score });
+    out.push({ i: i, score: score, why: why });
   }
   out.sort(function (a, b) { return b.score - a.score || a.i - b.i; });
   return out;
+}
+
+/**
+ * Map name-matched terms back onto the RAW filename as merged [start, end)
+ * ranges for <mark> rendering. Case-insensitive; a tier-4 term is always a
+ * contiguous run of the raw name (folding only lowercases and turns
+ * separators into spaces, and terms carry no spaces), so plain indexOf is
+ * exact. Overlapping and adjacent ranges merge so marks never nest.
+ */
+export function highlightRanges(raw, terms) {
+  var lower = String(raw === null || raw === undefined ? "" : raw).toLowerCase();
+  var ranges = [];
+  for (var t = 0; t < (terms ? terms.length : 0); t++) {
+    var term = String(terms[t] || "").toLowerCase();
+    if (!term) continue;
+    var from = 0;
+    var at;
+    while ((at = lower.indexOf(term, from)) !== -1) {
+      ranges.push([at, at + term.length]);
+      from = at + 1;
+    }
+  }
+  ranges.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+  var merged = [];
+  for (var r = 0; r < ranges.length; r++) {
+    var cur = ranges[r];
+    var last = merged[merged.length - 1];
+    if (last && cur[0] <= last[1]) {
+      if (cur[1] > last[1]) last[1] = cur[1];
+    } else {
+      merged.push([cur[0], cur[1]]);
+    }
+  }
+  return merged;
 }
 
 /**
@@ -157,7 +210,7 @@ export function runSearch(hays, query) {
  * the browser.
  */
 export function searchMatchClientSource() {
-  return [foldSearchText, squashSearchText, stripUploadHash, editDistanceLe, buildHaystack, runSearch]
+  return [foldSearchText, squashSearchText, stripUploadHash, editDistanceLe, buildHaystack, runSearch, highlightRanges]
     .map(function (fn) { return fn.toString(); })
     .join("\n");
 }

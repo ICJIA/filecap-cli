@@ -34,6 +34,7 @@ import { generateWhatsNewHtml } from "../web/whats-new.js";
 import { generateSearchHtml } from "../web/search-page.js";
 import { buildSearchIndex, SEARCH_INDEX_FILENAME } from "../web/search-index.js";
 import { REMEDIABLE_CATEGORIES } from "../scanner/category.js";
+import { isSystemFile } from "../scanner/system-files.js";
 import { fetchOgMeta, fetchImageBytes } from "../references/og-meta.js";
 import { fmtChicagoGeneratedAt, fmtChicagoDate } from "../util/time.js";
 import { summarizeFileA11y } from "../report/accessibility-band.js";
@@ -414,6 +415,7 @@ async function readInventoryNdjson(filePath) {
     const kind = obj?.kind ?? "";
     if (kind === "filecap-inventory-footer" || kind === "filecap-consolidated-footer") continue;
     if (kind === "filecap-inventory-header" || kind === "filecap-consolidated-header") continue;
+    if (isSystemFile(obj?.filename)) continue; // v1.47.0 — repo/OS plumbing never surfaces
     entries.push(obj);
   }
   return { siteHeader, entries };
@@ -977,6 +979,7 @@ async function computeSiteSummary(inventoryPath) {
     const kind = obj.kind ?? "";
     if (kind === "filecap-inventory-footer" || kind === "filecap-consolidated-footer") continue;
     if (kind === "filecap-inventory-header" || kind === "filecap-consolidated-header") continue;
+    if (isSystemFile(obj.filename)) continue; // v1.47.0 — excluded from every count
 
     totalFiles++;
     totalBytes += obj.sizeBytes ?? 0;
@@ -1453,6 +1456,10 @@ export async function runWebRollup({
       const kind = obj.kind ?? "";
       if (kind === "filecap-inventory-header" || kind === "filecap-consolidated-header") continue;
       if (kind === "filecap-inventory-footer" || kind === "filecap-consolidated-footer") continue;
+      // v1.47.0 — system files never reach allEntries, so the master
+      // workbook, duplicates, NDJSON, per-type pages, and search index all
+      // exclude them in one place.
+      if (isSystemFile(obj.filename)) continue;
       // Stamp serverName on each entry — the consolidated CSV path in csv.js
       // reads `entry.serverName` to look up the per-site metadata.
       obj.serverName = siteServerName;

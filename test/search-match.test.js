@@ -5,6 +5,7 @@ import {
   editDistanceLe,
   buildHaystack,
   runSearch,
+  highlightRanges,
   searchMatchClientSource,
 } from "../src/web/search-match.js";
 
@@ -164,6 +165,80 @@ describe("runSearch", () => {
     const ranked = runSearch(HAYS, "review");
     const scores = ranked.map((m) => m.score);
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
+  });
+});
+
+// ── match explanations (v1.47.0) ─────────────────────────────────────────────
+// "Is it a DVFR report, or just a report ON DVFR?" Every match carries a
+// per-term `why` so the page can say which: src "name" (in the filename),
+// "site" (the site's name), "path" (the folder), "squash" (separators
+// removed), or "fuzzy" (close-enough spelling, with the word it matched).
+
+describe("runSearch match explanations", () => {
+  function whyFor(query, i) {
+    const m = runSearch(HAYS, query).find((x) => x.i === i);
+    return m ? m.why : null;
+  }
+
+  it("labels a filename hit as src 'name'", () => {
+    expect(whyFor("dvfr report", 0)).toEqual([
+      { term: "dvfr", src: "name" },
+      { term: "report", src: "name" },
+    ]);
+  });
+
+  it("labels a site-name-only hit as src 'site'", () => {
+    // r1's filename has no "dvfr" — the term landed on the site's name.
+    expect(whyFor("dvfr report", 1)).toEqual([
+      { term: "dvfr", src: "site" },
+      { term: "report", src: "name" },
+    ]);
+  });
+
+  it("labels a folder-path hit as src 'path'", () => {
+    // "finance" appears only in r2's path, never its filename or site.
+    expect(whyFor("finance budget", 2)).toEqual([
+      { term: "finance", src: "path" },
+      { term: "budget", src: "name" },
+    ]);
+  });
+
+  it("labels a separator-blind hit as src 'squash'", () => {
+    expect(whyFor("annualreport", 0)).toEqual([
+      { term: "annualreport", src: "squash" },
+    ]);
+  });
+
+  it("labels a typo hit as src 'fuzzy' and names the matched word", () => {
+    expect(whyFor("anual report", 0)).toEqual([
+      { term: "anual", src: "fuzzy", word: "annual" },
+      { term: "report", src: "name" },
+    ]);
+  });
+});
+
+// ── highlightRanges ───────────────────────────────────────────────────────────
+// Maps name-matched terms back onto the RAW filename for <mark> rendering.
+
+describe("highlightRanges", () => {
+  it("finds every case-insensitive occurrence of each term", () => {
+    expect(highlightRanges("DVFR_Annual_Report_2023.pdf", ["dvfr", "report"]))
+      .toEqual([[0, 4], [12, 18]]);
+  });
+
+  it("merges overlapping and adjacent term ranges", () => {
+    expect(highlightRanges("annual_report.pdf", ["annual", "nual"]))
+      .toEqual([[0, 6]]);
+  });
+
+  it("returns no range for terms absent from the raw name", () => {
+    expect(highlightRanges("biennial-report.pdf", ["dvfr", "report"]))
+      .toEqual([[9, 15]]);
+  });
+
+  it("handles empty inputs", () => {
+    expect(highlightRanges("", ["x"])).toEqual([]);
+    expect(highlightRanges("file.pdf", [])).toEqual([]);
   });
 });
 

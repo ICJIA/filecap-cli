@@ -70,4 +70,24 @@ describe("generateSearchHtml", () => {
   it("threads the generated-at stamp", () => {
     expect(page()).toContain("August 16, 2026, 8:21 AM CDT");
   });
+
+  // v1.47.0 — match transparency: matched fragments are <mark>ed inside the
+  // filename, and a per-row note explains any term that landed elsewhere
+  // ("dvfr" = the site's name), so "is it a DVFR report or just ON DVFR?"
+  // is answerable at a glance.
+  it("renders match highlights and per-row why notes", () => {
+    const html = page();
+    expect(html).toContain("search-mark");
+    expect(html).toContain("search-why");
+    expect(html).toContain("the site's name");
+  });
+
+  // v1.47.0 — each result links its file's shareable audit.icjia.app report
+  // (row[9] in the index) in a new tab; blank when the file was never scored.
+  it("links each result's per-file audit report in a new tab", () => {
+    const html = page();
+    expect(html).toContain("View report");
+    expect(html).toContain("row[9]");
+    expect(html).toContain("matchedOn");
+  });
 });

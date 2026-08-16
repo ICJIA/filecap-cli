@@ -25,7 +25,7 @@ function fixture() {
         category: "pdf",
         sizeBytes: 2048,
         modifiedAt: "2024-03-05T10:00:00.000Z",
-        audit: { audited: true, score: 72, grade: "C" },
+        audit: { audited: true, score: 72, grade: "C", reportUrl: "https://audit.icjia.app/report/a64a84ac" },
       },
       serverName: "dvfr",
       siteName: "DVFR",
@@ -90,7 +90,14 @@ describe("buildSearchIndex", () => {
       72,
       "C",
       "https://dvfr.icjia-api.cloud/uploads/2023/Annual%20Report%202023.pdf",
+      "https://audit.icjia.app/report/a64a84ac",
     ]);
+  });
+
+  it("leaves the per-file audit report URL null when the file has none", () => {
+    const idx = buildSearchIndex(fixture());
+    const row = idx.rows.find((r) => r[0] === "logo.png");
+    expect(row[9]).toBeNull();
   });
 
   it("prefers the GitHub blob URL for git-type entries", () => {

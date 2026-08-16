@@ -10,6 +10,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.47.0] — 2026-08-16
+
+### Added — search match transparency + per-file audit report links
+
+- **"Is it a DVFR report, or just ON DVFR?"** Each /search result now shows
+  WHY it matched: the matched fragments are highlighted inside the filename,
+  and a per-row note explains any term that landed elsewhere ("dvfr" = the
+  site's name · "anual" ≈ "annual" · folder path · separators removed).
+  `runSearch` returns per-term `why` data; new `highlightRanges` maps
+  name-hits back onto the raw filename for `<mark>` rendering.
+- **Per-file audit report links**: every scored file's shareable
+  audit.icjia.app report (what's wrong and how to fix it) is one click away —
+  the "Audit report" column opens it in a new tab; blank when the file was
+  never scored. The Website cell now links the site's audit page instead.
+  The downloaded workbook's "Audit report" hyperlink column now carries the
+  per-file report (matching the house workbooks) plus a new "Matched on"
+  column preserving the match explanation.
+
+### Changed — system files excluded from all counts
+
+- **Invisible/system files no longer count**: `.gitkeep`, `.gitignore`,
+  `.env.sample`, `.DS_Store`, `.htaccess`, `Thumbs.db`, `desktop.ini`, and
+  any other dotfile are excluded from every bundle surface — summaries,
+  per-site pages and workbooks, the master workbook, duplicates, the
+  consolidated NDJSON, and the search index — at inventory-read time
+  (`src/scanner/system-files.js`), so cached scans are cleaned retroactively.
+  The 2026-08-16 fleet carried 25 such files (14 `.DS_Store`, 9 `.gitkeep`,
+  2 `.gitignore`): totals move 8,787 → 8,762.
+- **What's New banner names itself**: a "WHAT'S NEW" heading tops the
+  home-page banner so first-time visitors know what they're reading.
+- **Nav label**: "ICJIA Accessibility FAQs" → "Accessibility FAQs" on every
+  page header.
+
 ## [1.46.0] — 2026-08-16
 
 ### Added — fleet-wide /search page
