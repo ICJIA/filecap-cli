@@ -1,4 +1,5 @@
 import { csvCell, boolToYesNo } from "./format.js";
+import { isScoreable, isUnscoreableDocument } from "../scanner/category.js";
 
 // CSV / HTML deliverable columns. Keeps only what a remediator needs to find
 // and price each file. All format-specific introspection (PDF page count,
@@ -30,7 +31,7 @@ export const CSV_COLUMNS = [
   //                          unresolved refs don't silently collide with the
   //                          "" / "not run" state.
   { name: "referenced",   label: "Page References" },
-  // v1.9.0+: the per-PDF audit column. Slot 6 (immediately after Page
+  // v1.9.0+: the per-document audit column. Slot 6 (immediately after Page
   // References) so the file's referrers and its audit report sit side by
   // side. v1.19.0: the column no longer prints the numeric score / letter
   // grade — the audit.icjia.app scoring heuristic is still being refined,
@@ -41,11 +42,11 @@ export const CSV_COLUMNS = [
   //   undefined audit               → "" (audits step not run)
   //   audit.skipped (e.g. no URL)   → "" (we tried but couldn't)
   //   audit.error                   → "Unavailable"
-  //   audited PDF with a report     → the audit.icjia.app report URL
+  //   audited document with a report → the audit.icjia.app report URL
   //                                    (v1.42.1: the XLSX writer turns it
   //                                    into a real hyperlink cell — plain
   //                                    strings are NOT clickable in .xlsx)
-  //   non-PDF entries               → "" (audits step doesn't touch them)
+  //   unscoreable/non-document entries → "" (audits step doesn't touch them)
   { name: "auditScore",   label: "Audit Report" },
   { name: "modifiedAt",   label: "Date published" },
   { name: "scannedPath",  label: "Source folder on server" },
@@ -67,8 +68,8 @@ export const CSV_COLUMNS = [
   // and numeric score rendered together as "B/88". Distinct from the
   // "Audit Report" column (which links the shared report): management asked
   // for the grade itself to be readable in the row without opening the
-  // report. Empty for non-PDFs, skips, and errors (e.g. oversized 413s) —
-  // those have no score. Appended here (before the csvOnly action columns)
+  // report. Empty for unscoreable formats, skips, pendings (errors say
+  // "Not scored"). Appended here (before the csvOnly action columns)
   // so it reaches HTML + XLSX while leaving every existing column index
   // unchanged; display position is set per-format (HTML_TABLE_COLUMNS,
   // XLSX_COLUMN_ORDER).
@@ -76,8 +77,8 @@ export const CSV_COLUMNS = [
   // v1.43.0 — the combined "B/88" cell above reads well but SORTS as text
   // (Excel puts "B/100" before "B/9"), so the number and the letter each
   // get a machine-sortable column of their own. Score is a real number
-  // (0-100); Grade is the bare letter (A-F). Both are blank for non-PDFs,
-  // errors, and pending audits — blanks sort to the bottom in Excel, so
+  // (0-100); Grade is the bare letter (A-F). Both are blank for unscoreable
+  // formats, errors, and pending audits — blanks sort to the bottom in Excel, so
   // "sort ascending by Score" surfaces the least accessible files first.
   // Same placement rationale as remediationScore: before the csvOnly
   // action columns; display position per-format (XLSX_COLUMN_ORDER).
@@ -147,9 +148,11 @@ function formatReferenced(refs) {
 // the spreadsheet links to the report rather than stating a grade. The
 // cell holds only the report URL (Excel + Sheets auto-hyperlink it on
 // open); the score lives in that report.
-//   "<reportUrl>"   — audited PDF that has a report
+// v1.54.0: takes only entry.audit, so this was already format-agnostic —
+// a scored docx/xlsx/pptx with a report URL renders exactly like a PDF's.
+//   "<reportUrl>"   — audited document that has a report
 //   "Unavailable"   — audit.error set
-//   ""              — undefined / skipped / not a PDF / audited but no report
+//   ""              — undefined / skipped / not scoreable / audited but no report
 // v1.20.0: Page Count cell. PDFs get the integer measured by pdfjs during
 // scan (entry.introspection.pageCount). Non-PDFs and PDFs whose introspection
 // failed leave the cell empty. The value is returned as a real number so the
@@ -172,29 +175,18 @@ function formatAuditScore(audit) {
   return "";
 }
 
-// Office categories audit.icjia.app does not score — they have native
-// accessibility checkers in Word / Excel / PowerPoint, so filecap doesn't
-// duplicate that work. The score cell says so explicitly rather than going
-// blank (a blank cell reads as "missing data", not "intentionally N/A").
-const OFFICE_CATEGORIES = new Set([
-  "office-document",
-  "spreadsheet",
-  "presentation",
-  "legacy-office",
-]);
-
-// v1.34.0 / v1.34.1: format the Remediation Score cell from a full entry.
-//   PDF, scored            → "B/88"   (grade/score)
-//   PDF, audit error       → "Not scored"   (e.g. 413 oversized, transient)
-//   Office doc/sheet/slides → "N/A (Office)" (use the authoring-app checker)
-//   PDF pending / skipped / reference file → ""  (no final state to report)
-// Takes the entry (not just entry.audit) because only the category can
-// distinguish an Office file from a not-yet-audited PDF.
+// v1.54.0: format the Remediation Score cell from a full entry.
+//   Scoreable (pdf/docx/xlsx/pptx), scored → "B/88"   (grade/score)
+//   Scoreable, audit error               → "Not scored"  (e.g. 413, corrupt)
+//   Legacy Office / ODF / RTF            → "N/A (legacy format)"  (convert to
+//     .docx/.xlsx/.pptx to make it scoreable — the audit service refuses
+//     pre-2007 binary formats because they can't carry the accessibility
+//     structures it checks)
+//   Scoreable pending/skipped, or not a document → ""  (no final state)
 export function formatRemediationScore(entry) {
   if (!entry || typeof entry !== "object") return "";
-  const category = entry.category;
-  if (OFFICE_CATEGORIES.has(category)) return "N/A (Office)";
-  if (category !== "pdf") return "";
+  if (isUnscoreableDocument(entry)) return "N/A (legacy format)";
+  if (!isScoreable(entry)) return "";
   const audit = entry.audit;
   if (!audit || typeof audit !== "object") return "";
   const hasGrade = typeof audit.grade === "string" && audit.grade.length > 0;
@@ -204,18 +196,17 @@ export function formatRemediationScore(entry) {
   return "";
 }
 
-// v1.43.0 — the sortable split of the cell above. Deliberately narrower than
-// formatRemediationScore: no "N/A (Office)" / "Not scored" text markers here
-// (those stay in Remediation Score) — any non-score state is a blank cell so
-// Excel's numeric/alpha sort never chokes on prose.
+// v1.43.0 — the sortable split of the cell above; v1.54.0 widened to every
+// scoreable document. Any non-score state is a blank cell so Excel's sort
+// never chokes on prose.
 export function formatAuditScoreNum(entry) {
-  if (!entry || typeof entry !== "object" || entry.category !== "pdf") return "";
+  if (!entry || typeof entry !== "object" || !isScoreable(entry)) return "";
   const score = entry.audit?.score;
   return typeof score === "number" ? score : "";
 }
 
 export function formatAuditGrade(entry) {
-  if (!entry || typeof entry !== "object" || entry.category !== "pdf") return "";
+  if (!entry || typeof entry !== "object" || !isScoreable(entry)) return "";
   const grade = entry.audit?.grade;
   return typeof grade === "string" && grade.length > 0 ? grade : "";
 }

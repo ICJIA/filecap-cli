@@ -213,8 +213,9 @@ describe("writeXlsx column order, sort, and hyperlinks (v1.20.0)", () => {
   // v1.43.0 — sortable per-file score columns. The combined "B/88" string
   // can't sort numerically in Excel, so the number and the letter each get
   // their own column: "Score (0-100)" as a REAL numeric cell and "Grade" as
-  // a plain letter. Unscored rows (Office, errored, pending) stay blank so
-  // Excel pushes them to the bottom of either sort direction.
+  // a plain letter. v1.54.0 widened scoring to docx/xlsx/pptx — unscoreable
+  // rows (legacy Office, ODF, RTF), errored rows, and pending rows stay
+  // blank so Excel pushes them to the bottom of either sort direction.
   describe("sortable Score + Grade columns (v1.43.0)", () => {
     const scored = { ...pdfEntry, audit: { score: 88, grade: "B", reportUrl: "https://audit.icjia.app/report/abc123" } };
 
@@ -239,16 +240,25 @@ describe("writeXlsx column order, sort, and hyperlinks (v1.20.0)", () => {
       expect(row.getCell(10).value).toBe("B");
     });
 
-    it("leaves Score and Grade blank for Office files and errored PDFs", async () => {
-      const errored = { ...pdfEntry, path: "b.pdf", filename: "b.pdf", audit: { error: "http 413" } };
-      const out = path.join(tmpDir, "score-blank.xlsx");
-      await writeXlsx({ sourceHeader: baseHeader, entries: [docxEntry, errored], sources: null, outputPath: out });
+    it("fills Score and Grade for scored Office files, blank for legacy", async () => {
+      const scoredDocx = { ...docxEntry, audit: { score: 79, grade: "C" } };
+      const legacyXls = {
+        ...docxEntry,
+        path: "old.xls",
+        filename: "old.xls",
+        extension: "xls",
+        category: "legacy-office",
+        sha256: "cd".repeat(32),
+        modifiedAt: "2026-01-01T00:00:00.000Z", // older than scoredDocx — sorts to row 3
+      };
+      const out = path.join(tmpDir, "score-office.xlsx");
+      await writeXlsx({ sourceHeader: baseHeader, entries: [scoredDocx, legacyXls], sources: null, outputPath: out });
       const wb = await load(out);
       const sheet = wb.worksheets[0];
-      for (const r of [2, 3]) {
-        expect(sheet.getRow(r).getCell(9).value).toBeNull();
-        expect(sheet.getRow(r).getCell(10).value).toBeNull();
-      }
+      expect(sheet.getRow(2).getCell(9).value).toBe(79);
+      expect(sheet.getRow(2).getCell(10).value).toBe("C");
+      expect(sheet.getRow(3).getCell(9).value).toBeNull();
+      expect(sheet.getRow(3).getCell(10).value).toBeNull();
     });
   });
 

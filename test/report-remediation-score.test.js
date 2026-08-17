@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import ExcelJS from "exceljs";
-import { writeCsv, CSV_COLUMNS } from "../src/report/csv.js";
+import { writeCsv, CSV_COLUMNS, formatRemediationScore } from "../src/report/csv.js";
 import { writeHtml } from "../src/report/html.js";
 import { writeXlsx } from "../src/report/xlsx.js";
 
@@ -108,22 +108,6 @@ describe("writeCsv Remediation Score column", () => {
     expect(value).toBe("Not scored");
   });
 
-  it("labels an Office file 'N/A (Office)' so a blank cell isn't read as missing data", () => {
-    const csv = writeCsv({ sourceHeader: header, entries: [docx], sources: null });
-    const { value } = cell(csv, docx, "remediationScore");
-    expect(value).toBe("N/A (Office)");
-  });
-
-  it("labels spreadsheets and presentations 'N/A (Office)' too", () => {
-    const xlsxFile = { ...docx, path: "data.xlsx", filename: "data.xlsx", extension: "xlsx", category: "spreadsheet", sha256: "x1" };
-    const pptxFile = { ...docx, path: "deck.pptx", filename: "deck.pptx", extension: "pptx", category: "presentation", sha256: "x2" };
-    const csv = writeCsv({ sourceHeader: header, entries: [xlsxFile, pptxFile], sources: null });
-    const lines = csv.trim().split("\n");
-    const idx = lines[0].split(",").indexOf("Remediation Score");
-    expect(lines[1].split(",")[idx]).toBe("N/A (Office)");
-    expect(lines[2].split(",")[idx]).toBe("N/A (Office)");
-  });
-
   it("leaves the cell blank for a PDF still pending audit (no audit field yet)", () => {
     const pendingPdf = { ...scoredPdf, path: "pending.pdf", filename: "pending.pdf", sha256: "p1" };
     delete pendingPdf.audit;
@@ -137,6 +121,30 @@ describe("writeCsv Remediation Score column", () => {
     const csv = writeCsv({ sourceHeader: header, entries: [image], sources: null });
     const { value } = cell(csv, image, "remediationScore");
     expect(value).toBe("");
+  });
+});
+
+// v1.54.0 — formatRemediationScore widened to every scoreable document
+// (pdf/docx/xlsx/pptx); legacy Office + ODF/RTF get an explicit
+// "N/A (legacy format)" verdict instead of the old blanket "N/A (Office)".
+// These exercise the formatter directly (not through writeCsv) since the
+// per-format branching is the contract under test here.
+describe("formatRemediationScore — per-format verdicts (v1.54.0)", () => {
+  it("formats a scored docx like a scored PDF", () => {
+    expect(formatRemediationScore({ category: "office-document", extension: "docx", audit: { score: 79, grade: "C" } })).toBe("C/79");
+  });
+
+  it("marks an errored xlsx Not scored", () => {
+    expect(formatRemediationScore({ category: "spreadsheet", extension: "xlsx", audit: { error: "HTTP 413 Payload Too Large for https://x" } })).toBe("Not scored");
+  });
+
+  it("gives legacy Office and ODF/RTF the legacy-format verdict", () => {
+    expect(formatRemediationScore({ category: "legacy-office", extension: "xls" })).toBe("N/A (legacy format)");
+    expect(formatRemediationScore({ category: "office-document", extension: "rtf" })).toBe("N/A (legacy format)");
+  });
+
+  it("leaves a pending docx blank (no final state to report)", () => {
+    expect(formatRemediationScore({ category: "office-document", extension: "docx" })).toBe("");
   });
 });
 
