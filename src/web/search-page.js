@@ -101,7 +101,7 @@ const SEARCH_CSS = `
   position: sticky;
   top: 0;
 }
-.search-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+.search-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; vertical-align: middle; }
 .search-table tr:last-child td { border-bottom: none; }
 .search-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .search-table th.rownum, .search-table td.rownum { text-align: right; color: #7d8590; width: 1%; }
@@ -179,7 +179,7 @@ const SEARCH_CSS = `
 .report-status { color: #d4dae0; font-size: 0.9rem; margin: 0.35rem 0 0; min-height: 1.3em; }
 .report-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.75rem; }
 .search-table th.sel, .search-table td.sel { width: 1.8rem; text-align: center; vertical-align: middle; }
-.search-table input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: #a371f7; cursor: pointer; }
+.search-table input[type="checkbox"] { display: block; width: 1rem; height: 1rem; margin: 0 auto; accent-color: #a371f7; cursor: pointer; }
 .report-remove {
   font: inherit;
   font-size: 0.82rem;

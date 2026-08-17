@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.52.1] — 2026-08-17
+
+### Fixed — /search row contents now center-align
+
+- Table cells were `vertical-align: top` while the checkbox column was
+  `middle`, so on tall rows (wrapped filenames, why-notes) the checkbox
+  drifted out of line with the row number and site name. All `td`s now
+  center (`vertical-align: middle`), and the checkbox renders as a
+  centered block (`display: block; margin: 0 auto`) instead of riding
+  the text baseline a few pixels low — number, box, and text sit on one
+  visual line whatever the row height.
+
 ## [1.52.0] — 2026-08-17
 
 ### Added — row numbers on /search
