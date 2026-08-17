@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import ExcelJS from "exceljs";
-import { writeCsv, CSV_COLUMNS, formatRemediationScore } from "../src/report/csv.js";
+import { writeCsv, CSV_COLUMNS, formatRemediationScore, formatAuditScoreNum, formatAuditGrade } from "../src/report/csv.js";
 import { writeHtml } from "../src/report/html.js";
 import { writeXlsx } from "../src/report/xlsx.js";
 
@@ -145,6 +145,27 @@ describe("formatRemediationScore — per-format verdicts (v1.54.0)", () => {
 
   it("leaves a pending docx blank (no final state to report)", () => {
     expect(formatRemediationScore({ category: "office-document", extension: "docx" })).toBe("");
+  });
+});
+
+// v1.54.0 — fix round 1: formatAuditScoreNum/formatAuditGrade's gate widened
+// from `category !== "pdf"` to `!isScoreable(entry)`, which makes the
+// score/grade lines below the gate newly REACHABLE for Office formats (they
+// were previously dead code for anything but a PDF). These pin that the
+// widened gate still resolves to a blank cell when a scoreable Office file
+// has no usable score — errored or not yet audited — matching
+// formatRemediationScore's "Not scored" / "" outcomes for the same entries.
+describe("formatAuditScoreNum / formatAuditGrade — blank for unscored Office (v1.54.0)", () => {
+  it("returns blank for an errored xlsx (scoreable format, no score to sort by)", () => {
+    const entry = { category: "spreadsheet", extension: "xlsx", audit: { error: "HTTP 413 Payload Too Large for https://x" } };
+    expect(formatAuditScoreNum(entry)).toBe("");
+    expect(formatAuditGrade(entry)).toBe("");
+  });
+
+  it("returns blank for a pending docx (scoreable format, no audit yet)", () => {
+    const entry = { category: "office-document", extension: "docx" };
+    expect(formatAuditScoreNum(entry)).toBe("");
+    expect(formatAuditGrade(entry)).toBe("");
   });
 });
 
