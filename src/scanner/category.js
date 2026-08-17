@@ -82,3 +82,26 @@ export function categorize(extension) {
 export function isRemediable(category) {
   return REMEDIABLE_CATEGORIES.has(category);
 }
+
+// v1.54.0 — THE canonical scoring gate, the REMEDIABLE_CATEGORIES lesson
+// applied to scoring. audit.icjia.app scores PDFs and modern OOXML Office
+// files (docx/xlsx/pptx); legacy binaries (.doc/.xls/.ppt) and ODF/RTF are
+// remediable but cannot be machine-scored (confirmed live 2026-08-17: the
+// service 422s them with "re-save in a modern format" guidance).
+//
+// Extension-based on purpose: `office-document` also holds .rtf/.odt,
+// `spreadsheet` holds .ods, `presentation` holds .odp, and pre-v1.39.0
+// cached inventories can still carry .doc under the modern slugs — category
+// alone would send unsupported formats to the API.
+export const SCOREABLE_EXTENSIONS = new Set(["pdf", "docx", "xlsx", "pptx"]);
+
+export function isScoreable(entry) {
+  return SCOREABLE_EXTENSIONS.has((entry?.extension ?? "").toLowerCase());
+}
+
+// Remediable but not machine-scoreable: legacy Office plus ODF/RTF. Named
+// for the tallies — these files get an honest "N/A (legacy format)" verdict
+// and a conversion nudge instead of API calls.
+export function isUnscoreableDocument(entry) {
+  return isRemediable(entry?.category) && !isScoreable(entry);
+}

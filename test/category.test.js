@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { categorize, isRemediable } from "../src/scanner/category.js";
+import {
+  categorize,
+  isRemediable,
+  REMEDIABLE_CATEGORIES,
+  SCOREABLE_EXTENSIONS,
+  isScoreable,
+  isUnscoreableDocument,
+} from "../src/scanner/category.js";
 
 describe("categorize", () => {
   it("buckets PDFs as 'pdf'", () => {
@@ -102,5 +109,37 @@ describe("REMEDIABLE_CATEGORIES is the single canonical set (v1.40.0)", () => {
     expect([...REMEDIABLE_CATEGORIES].sort()).toEqual(
       ["legacy-office", "office-document", "pdf", "presentation", "spreadsheet"],
     );
+  });
+});
+
+describe("isScoreable / isUnscoreableDocument (v1.54.0)", () => {
+  it("scores pdf, docx, xlsx, pptx by extension", () => {
+    for (const extension of ["pdf", "docx", "xlsx", "pptx", "PDF", "DocX"]) {
+      expect(isScoreable({ extension, category: categorize(extension) })).toBe(true);
+    }
+  });
+
+  it("does not score legacy binaries, ODF, rtf, or non-documents", () => {
+    for (const extension of ["doc", "xls", "ppt", "rtf", "odt", "ods", "odp", "jpg", "html", ""]) {
+      expect(isScoreable({ extension, category: categorize(extension) })).toBe(false);
+    }
+  });
+
+  it("tolerates pre-v1.39.0 category drift — a .doc filed under office-document is still unscoreable", () => {
+    expect(isScoreable({ extension: "doc", category: "office-document" })).toBe(false);
+    expect(isUnscoreableDocument({ extension: "doc", category: "office-document" })).toBe(true);
+  });
+
+  it("isUnscoreableDocument = remediable but not machine-scoreable", () => {
+    expect(isUnscoreableDocument({ extension: "xls", category: "legacy-office" })).toBe(true);
+    expect(isUnscoreableDocument({ extension: "rtf", category: "office-document" })).toBe(true);
+    expect(isUnscoreableDocument({ extension: "odp", category: "presentation" })).toBe(true);
+    expect(isUnscoreableDocument({ extension: "docx", category: "office-document" })).toBe(false);
+    expect(isUnscoreableDocument({ extension: "pdf", category: "pdf" })).toBe(false);
+    expect(isUnscoreableDocument({ extension: "jpg", category: "image" })).toBe(false);
+  });
+
+  it("SCOREABLE_EXTENSIONS is exactly the four OOXML-era formats", () => {
+    expect([...SCOREABLE_EXTENSIONS].sort()).toEqual(["docx", "pdf", "pptx", "xlsx"]);
   });
 });
