@@ -629,18 +629,19 @@ export function renderToolCard(tool, { showStatus = false } = {}) {
 // pairing is the point: a site's DOCUMENT accessibility and its WEB-PAGE
 // accessibility are separate measures that do not correlate.
 //
-// File score = average axe score of the site's SCORED PDFs
-//   (summary.auditScoreSum / summary.auditedPdfCount). Office files are never
-//   auto-scored, so it is labeled "scored PDFs".
+// File score = average score of the site's SCORED documents
+//   (summary.auditScoreSum / summary.auditedDocCount) — every machine-
+//   scoreable document (PDF + modern Office); legacy Office can't be
+//   machine-scored, so it is labeled "scored documents".
 // Site score = the page-audit sidecar's score (sr.siteAudit.score).
 // Either side shows a "not scored yet" placeholder independently when absent.
 export function renderScorecards(summary, siteAudit) {
-  const auditedPdfCount = summary?.auditedPdfCount ?? 0;
-  const fileScore = auditedPdfCount > 0
-    ? Math.round((summary?.auditScoreSum ?? 0) / auditedPdfCount)
+  const auditedDocCount = summary?.auditedDocCount ?? 0;
+  const fileScore = auditedDocCount > 0
+    ? Math.round((summary?.auditScoreSum ?? 0) / auditedDocCount)
     : null;
-  const fileCov = auditedPdfCount > 0
-    ? `avg of ${auditedPdfCount.toLocaleString()} scored PDF${auditedPdfCount === 1 ? "" : "s"}`
+  const fileCov = auditedDocCount > 0
+    ? `avg of ${auditedDocCount.toLocaleString()} scored document${auditedDocCount === 1 ? "" : "s"}`
     : "";
 
   const siteScore = typeof siteAudit?.score === "number" ? siteAudit.score : null;
@@ -650,7 +651,7 @@ export function renderScorecards(summary, siteAudit) {
     : "";
 
   return `<div class="scorecards">
-    ${renderScoreDonut({ score: fileScore, label: "File accessibility", tag: "documents", coverage: fileCov, empty: "No PDFs scored yet" })}
+    ${renderScoreDonut({ score: fileScore, label: "File accessibility", tag: "documents", coverage: fileCov, empty: "No documents scored yet" })}
     ${renderScoreDonut({ score: siteScore, label: "Website accessibility", tag: "web pages", coverage: siteCov, empty: "Site not scored yet" })}
   </div>
   <p class="scorecards-note">Two separate measures — a site can score well on its <strong>pages</strong> and still publish inaccessible <strong>files</strong> (or the reverse). They don&#39;t correlate.</p>`;
@@ -675,14 +676,14 @@ function renderScoreDonut({ score, label, tag, coverage, empty }) {
   </div>`;
 }
 
-// v1.36.0 — compact "File accessibility (PDFs)" indicator for the site card.
-// `a` is the object returned by summarizeFileA11y(): the average of the site's
-// scored-PDF audit reports + its far/partial/closer band. Three states: the
+// v1.36.0 — compact "File accessibility (documents)" indicator for the site
+// card. `a` is the object returned by summarizeFileA11y(): the average of the
+// site's scored documents + its far/partial/closer band. Three states: the
 // archive is excluded (note only), thin data shows an "n/N" caption, otherwise
 // the score + colored band. The remediable count already shows in the audit
 // tile + donut caption, so this strip adds the *quality* read, not the count.
 function renderFileA11y(a, trend) {
-  const head = `<span class="a11y-head">File accessibility <small>(PDFs)</small></span>`;
+  const head = `<span class="a11y-head">File accessibility <small>(documents)</small></span>`;
   if (a.excluded) {
     return `<div class="a11y-strip a11y-na">${head}<span class="a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
   }
@@ -772,15 +773,16 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   // path, public URL — each copy-to-clipboard, collapsed by default).
   const techDetailsHtml = renderTechDetails({ site, header: sr.header });
 
-  // v1.36.0 — file-accessibility read: the average of this site's scored-PDF
-  // audit reports (auditScoreSum / auditedPdfCount), banded far→closer. Derived
+  // v1.36.0 — file-accessibility read: the average of this site's scored
+  // documents (auditScoreSum / auditedDocCount), banded far→closer. Derived
   // only from the files' own audit scores — nothing about the website itself.
   // archive-prod is excluded by slug inside summarizeFileA11y().
   const fileA11yHtml = renderFileA11y(summarizeFileA11y({
     auditScoreSum: summary?.auditScoreSum,
-    auditedPdfCount: summary?.auditedPdfCount,
+    auditedDocCount: summary?.auditedDocCount,
     auditErrorCount: summary?.auditErrorCount,
     auditPending: summary?.auditPending,
+    unscoreable: summary?.unscoreableCount,
     remediable,
     siteSlug: site.name,
   }), sr.fileA11yTrend ?? null);

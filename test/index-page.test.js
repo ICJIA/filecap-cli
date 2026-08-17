@@ -179,10 +179,10 @@ describe("renderCard thin-data file-accessibility caption (v1.40.0)", () => {
   it("explains WHY there is no score instead of a bare (n / N) ratio", () => {
     const sr = {
       ...baseSr,
-      summary: { ...baseSr.summary, byCategory: { pdf: 1 }, remediable: 1, auditScoreSum: 90, auditedPdfCount: 1 },
+      summary: { ...baseSr.summary, byCategory: { pdf: 1 }, remediable: 1, auditScoreSum: 90, auditedDocCount: 1 },
     };
     const html = renderCard(sr);
-    expect(html).toContain("Only 1 PDF on this site — too few for a reliable score (needs 5).");
+    expect(html).toContain("Only 1 document on this site — too few for a reliable score (needs 5).");
     expect(html).not.toContain("Not enough scored PDFs yet");
   });
 });
@@ -506,7 +506,7 @@ describe("index page — PDF scoring panel removed (v1.19.0)", () => {
     ...baseSr,
     summary: {
       ...baseSr.summary,
-      auditedPdfCount: 40, auditScoreSum: 3000, auditErrorCount: 2, auditPending: 1,
+      auditedDocCount: 40, auditScoreSum: 3000, auditErrorCount: 2, auditPending: 1,
     },
   };
   const html = generateIndexHtml({ siteResults: [auditedSr], password: null });
@@ -737,7 +737,7 @@ describe("SSR card order matches the pressed 'Most recently added' button (v1.39
 });
 
 describe("renderScorecards", () => {
-  const summary = { auditScoreSum: 340, auditedPdfCount: 5 }; // avg 68 → D
+  const summary = { auditScoreSum: 340, auditedDocCount: 5 }; // avg 68 → D
   const siteAudit = { score: 94, grade: "A", coverage: { scored: 150, pagesInSet: 412 } };
 
   it("renders both donuts with scores, grades, coverage, and the separation note", () => {
@@ -746,7 +746,7 @@ describe("renderScorecards", () => {
     expect(html).toContain("Website accessibility");
     expect(html).toContain(">68<");                       // file score value
     expect(html).toContain(">94<");                       // site score value
-    expect(html).toContain("5 scored PDFs");              // file coverage
+    expect(html).toContain("5 scored documents");         // file coverage
     expect(html).toContain("150 / 412 pages scored");     // site coverage
     expect(html).toContain("grade-d");                    // 68 → D band class
     expect(html).toContain("grade-a");                    // 94 → A band class
@@ -755,9 +755,9 @@ describe("renderScorecards", () => {
     expect(html).toContain("web pages");
   });
 
-  it("placeholders the file side when no PDFs are scored", () => {
-    const html = renderScorecards({ auditedPdfCount: 0 }, siteAudit);
-    expect(html).toContain("No PDFs scored yet");
+  it("placeholders the file side when no documents are scored", () => {
+    const html = renderScorecards({ auditedDocCount: 0 }, siteAudit);
+    expect(html).toContain("No documents scored yet");
     expect(html).toContain(">94<"); // site still scored
   });
 
@@ -768,8 +768,8 @@ describe("renderScorecards", () => {
   });
 
   it("placeholders both when neither is scored", () => {
-    const html = renderScorecards({ auditedPdfCount: 0 }, null);
-    expect(html).toContain("No PDFs scored yet");
+    const html = renderScorecards({ auditedDocCount: 0 }, null);
+    expect(html).toContain("No documents scored yet");
     expect(html).toContain("Site not scored yet");
   });
 });

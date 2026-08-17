@@ -8,7 +8,7 @@ import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
 import { renderSiteAccessibilitySection } from "./site-accessibility-section.js";
 import { escapeHtml as htmlEscape, safeUrl } from "../util/html.js";
-import { REMEDIABLE_CATEGORIES } from "../scanner/category.js";
+import { REMEDIABLE_CATEGORIES, isScoreable, isUnscoreableDocument } from "../scanner/category.js";
 import { copyableValue as copyableMetaCell } from "../util/html.js";
 import { summarizeFileA11y, bandForScore, fileA11yCoverageText,
   fileA11yThinDataText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "./accessibility-band.js";
@@ -445,12 +445,12 @@ const ACCESS_PANEL_COPY = {
   },
 };
 
-// v1.36.0 — detail-page "File accessibility (PDFs)" hero banner. Mirrors the
-// homepage card's renderFileA11y() (same summarizeFileA11y() input) so the two
-// surfaces never disagree: excluded archive, thin data, or score + band. The
-// average is the site's scored-PDF audit reports only — nothing site-level.
+// v1.36.0 — detail-page "File accessibility (documents)" hero banner. Mirrors
+// the homepage card's renderFileA11y() (same summarizeFileA11y() input) so the
+// two surfaces never disagree: excluded archive, thin data, or score + band.
+// The average is the site's scored documents only — nothing site-level.
 function renderFileA11yBanner(a, trend) {
-  const head = `<span class="dp-a11y-head">File accessibility <small>(PDFs)</small></span>`;
+  const head = `<span class="dp-a11y-head">File accessibility <small>(documents)</small></span>`;
   if (a.excluded) {
     return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
   }
@@ -480,13 +480,15 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const categoryCounts = {};
   let imageOnlyCount = 0;
   let flaggedCount = 0;
-  // v1.36.0 — per-file PDF audit tally, mirroring computeSiteSummary() so the
-  // detail-page file-accessibility banner agrees with the homepage card. Only
-  // PDFs carry a numeric score; Office files are remediable but unscored.
+  // v1.36.0 — per-file document audit tally, mirroring computeSiteSummary() so
+  // the detail-page file-accessibility banner agrees with the homepage card.
+  // Every machine-scoreable document (PDF + modern Office) carries a numeric
+  // score when audited; legacy Office is remediable but unscoreable.
   let auditScoreSum = 0;
-  let auditedPdfCount = 0;
+  let auditedDocCount = 0;
   let auditErrorCount = 0;
   let auditPending = 0;
+  let unscoreableCount = 0;
 
   for (const entry of entries) {
     totalBytes += entry.sizeBytes ?? 0;
@@ -499,11 +501,11 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     if ((entry.flags ?? []).length > 0) {
       flaggedCount++;
     }
-    if (cat === "pdf") {
+    if (isScoreable(entry)) {
       const audit = entry.audit;
       if (audit && typeof audit === "object") {
         if (typeof audit.score === "number") {
-          auditedPdfCount++;
+          auditedDocCount++;
           auditScoreSum += audit.score;
         } else if (audit.error) {
           auditErrorCount++;
@@ -513,6 +515,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
       } else {
         auditPending++;
       }
+    } else if (isUnscoreableDocument(entry)) {
+      unscoreableCount++;
     }
   }
 
@@ -800,12 +804,13 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   const heroNick = htmlEscape(siteName ?? "");
 
   // v1.36.0 — file-accessibility read for the hero: the average of this site's
-  // scored-PDF audit reports, banded far→closer (archive excluded by slug).
+  // scored documents, banded far→closer (archive excluded by slug).
   const fileA11yBannerHtml = renderFileA11yBanner(summarizeFileA11y({
     auditScoreSum,
-    auditedPdfCount,
+    auditedDocCount,
     auditErrorCount,
     auditPending,
+    unscoreable: unscoreableCount,
     remediable: remediableCount,
     siteSlug,
   }), fileA11yTrend);
@@ -1229,7 +1234,7 @@ a.page-audit-chip:hover {
 }
 .dp-hero .dp-snapshot-note strong { color: #9aa5b1; font-weight: 600; }
 /* v1.36.0 — file-accessibility banner in the hero: the average of the site's
-   scored-PDF audit reports + a far/partial/closer band. Band class sets
+   scored documents + a far/partial/closer band. Band class sets
    --dpa-accent (bar/dot/score/pill) and --dpa-tint (pill bg). dp-a11y-na covers
    the excluded archive + thin-data sites (note only). */
 .dp-a11y {

@@ -5,11 +5,13 @@
 // archive exclusion in one pure module means those three surfaces can never
 // drift apart.
 //
-// Scope note: the only per-file numeric score that exists is the PDF audit
-// score (audit.icjia.app, 0-100, higher = more accessible). Office files are
-// counted as remediable but never scored, so the average is a *PDF* average —
-// callers label it as such. This is a directional gauge, NOT a fleet-wide
-// compliance grade (no fleet aggregate is derived here).
+// Scope note: the per-file numeric score is the audit.icjia.app document
+// score (0-100, higher = more accessible) and covers every machine-scoreable
+// document — PDFs plus modern Office (docx/xlsx/pptx). Legacy Office
+// binaries and ODF/RTF are counted as remediable but cannot be
+// machine-scored, so the average is over scored documents — callers surface
+// the unscoreable count beside it. This is a directional gauge, NOT a
+// fleet-wide compliance grade.
 
 import { escapeHtml } from "../util/html.js";
 
@@ -22,9 +24,9 @@ export const A11Y_BANDS = [
   { key: "far", label: "Far from accessible", min: 0, color: "red" },
 ];
 
-// An average over a handful of PDFs is noise — below this many scored PDFs we
-// show a "not enough data yet" caption instead of a band.
-export const MIN_SCORED_PDFS = 5;
+// An average over a handful of documents is noise — below this many scored
+// documents we show a "not enough data yet" caption instead of a band.
+export const MIN_SCORED_DOCS = 5;
 
 // Site slugs whose file-accessibility score is suppressed (no card gauge, no
 // fleet-average contribution). Kept as the mechanism; currently empty.
@@ -55,77 +57,73 @@ export function bandForScore(score) {
  * (the same fields computeSiteSummary() produces). Pure — takes plain numbers.
  *
  * @param {object} args
- * @param {number} [args.auditScoreSum]   sum of scored-PDF scores
- * @param {number} [args.auditedPdfCount] count of PDFs with a numeric score
- * @param {number} [args.auditErrorCount] PDFs that failed to score
- * @param {number} [args.auditPending]    PDFs not yet scored
+ * @param {number} [args.auditScoreSum]   sum of scored-document scores
+ * @param {number} [args.auditedDocCount] documents with a numeric score
+ * @param {number} [args.auditErrorCount] documents that failed to score
+ * @param {number} [args.auditPending]    documents not yet scored
+ * @param {number} [args.unscoreable]     remediable files that can't be machine-scored (legacy Office, ODF/RTF)
  * @param {number} [args.remediable]      total remediable files (PDF + Office)
  * @param {string} [args.siteSlug]        site `name` slug (for archive exclusion)
- * @returns {{excluded:boolean, avg:number|null, scored:number, pdfs:number,
- *   remediable:number, band:object|null, enoughData:boolean}}
+ * @returns {{excluded:boolean, avg:number|null, scored:number, docs:number,
+ *   remediable:number, unscoreable:number, band:object|null, enoughData:boolean}}
  */
 export function summarizeFileA11y({
   auditScoreSum = 0,
-  auditedPdfCount = 0,
+  auditedDocCount = 0,
   auditErrorCount = 0,
   auditPending = 0,
+  unscoreable = 0,
   remediable = 0,
   siteSlug = "",
 } = {}) {
-  const scored = auditedPdfCount;
-  const pdfs = scored + auditErrorCount + auditPending;
-  // v1.39.0: clamp a rounded-up 100 to 99 unless every scored PDF really is
-  // a 100 (sum === scored × 100). 19×100 + 1×95 averages 99.75, and showing
-  // "100" for a set that still contains a failing PDF is a false perfect.
+  const scored = auditedDocCount;
+  const docs = scored + auditErrorCount + auditPending;
+  // v1.39.0: clamp a rounded-up 100 to 99 unless every scored document
+  // really is a 100 (sum === scored × 100).
   let avg = scored > 0 ? Math.round(auditScoreSum / scored) : null;
   if (avg === 100 && auditScoreSum < scored * 100) avg = 99;
   const excluded = A11Y_SCORE_EXCLUDE_SLUGS.includes(siteSlug);
-  const enoughData = scored >= MIN_SCORED_PDFS;
-  // Non-PDF remediable files (Office: docx/xlsx/pptx/legacy) — counted as
-  // remediable but never scored, so the average can't cover them. Surfaced so
-  // the UI can say "X of Y scored; Z non-PDF files have no score".
-  const office = Math.max(0, remediable - pdfs);
-  // band is suppressed for excluded sites and for thin data even though `avg`
-  // may be computable — surfaces branch on `excluded`/`enoughData` for those.
+  const enoughData = scored >= MIN_SCORED_DOCS;
   const band = !excluded && enoughData && avg !== null ? bandForScore(avg) : null;
-  return { excluded, avg, scored, pdfs, remediable, office, band, enoughData };
+  return { excluded, avg, scored, docs, remediable, unscoreable, band, enoughData };
 }
 
 /**
  * One-line coverage caption for the average: how many remediable files actually
- * carry a score, how many are non-PDF (Office, unscoreable), and the explicit
+ * carry a score, how many are legacy Office (unscoreable), and the explicit
  * "remediable files only, not all files" scope. Shared by the homepage card and
  * the detail-page banner so both read identically. Plain text — callers escape.
- * @param {{scored:number, remediable:number, office:number}} a
+ * @param {{scored:number, remediable:number, unscoreable:number}} a
  * @returns {string}
  */
 export function fileA11yCoverageText(a) {
   const parts = [
     `${a.scored.toLocaleString()} of ${a.remediable.toLocaleString()} remediable files scored`,
   ];
-  if (a.office > 0) {
+  if (a.unscoreable > 0) {
     parts.push(
-      `${a.office.toLocaleString()} non-PDF ${a.office === 1 ? "file has" : "files have"} no score`,
+      `${a.unscoreable.toLocaleString()} legacy Office ${a.unscoreable === 1 ? "file" : "files"} can't be machine-scored (re-save as .docx/.xlsx/.pptx to score them)`,
     );
   }
   return `${parts.join(" · ")} — remediable files only, not all files.`;
 }
 
 /**
- * Caption for the thin-data state (fewer than MIN_SCORED_PDFS scored). The old
- * "(1 / 1)" ratio read like a bug — all PDFs scored, yet "not enough" — so this
- * spells out the reason: the site simply has too few PDFs for a stable average.
- * Shared by the homepage card and the detail-page banner. Plain text.
- * @param {{scored:number, pdfs:number}} a - summarizeFileA11y() result
+ * Caption for the thin-data state (fewer than MIN_SCORED_DOCS scored). The old
+ * "(1 / 1)" ratio read like a bug — all documents scored, yet "not enough" — so
+ * this spells out the reason: the site simply has too few documents for a
+ * stable average. Shared by the homepage card and the detail-page banner.
+ * Plain text.
+ * @param {{scored:number, docs:number}} a - summarizeFileA11y() result
  * @returns {string}
  */
 export function fileA11yThinDataText(a) {
-  if (!a.pdfs) return "No PDFs on this site to score.";
-  const tail = `too few for a reliable score (needs ${MIN_SCORED_PDFS}).`;
-  if (a.scored >= a.pdfs) {
-    return `Only ${a.pdfs.toLocaleString()} PDF${a.pdfs === 1 ? "" : "s"} on this site — ${tail}`;
+  if (!a.docs) return "No scoreable documents on this site.";
+  const tail = `too few for a reliable score (needs ${MIN_SCORED_DOCS}).`;
+  if (a.scored >= a.docs) {
+    return `Only ${a.docs.toLocaleString()} document${a.docs === 1 ? "" : "s"} on this site — ${tail}`;
   }
-  return `Only ${a.scored.toLocaleString()} of ${a.pdfs.toLocaleString()} PDFs scored so far — ${tail}`;
+  return `Only ${a.scored.toLocaleString()} of ${a.docs.toLocaleString()} documents scored so far — ${tail}`;
 }
 
 /**

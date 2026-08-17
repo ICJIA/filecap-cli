@@ -33,7 +33,7 @@ import { generateSitesHtml } from "../web/sites-page.js";
 import { generateWhatsNewHtml } from "../web/whats-new.js";
 import { generateSearchHtml } from "../web/search-page.js";
 import { buildSearchIndex, SEARCH_INDEX_FILENAME } from "../web/search-index.js";
-import { REMEDIABLE_CATEGORIES } from "../scanner/category.js";
+import { REMEDIABLE_CATEGORIES, isScoreable, isUnscoreableDocument } from "../scanner/category.js";
 import { isSystemFile } from "../scanner/system-files.js";
 import { fetchOgMeta, fetchImageBytes } from "../references/og-meta.js";
 import { fmtChicagoGeneratedAt, fmtChicagoDate } from "../util/time.js";
@@ -727,8 +727,8 @@ file entry each. Each entry has:
 ### Conditional fields (present when applicable)
 
 - \`duplicateOf\` — \`{ serverName, path }\` pointing at the canonical copy when this entry is a cross-server duplicate (omitted on canonicals)
-- \`__auditUrl\` — string. Public URL the audit.icjia.app PDF-scoring service was asked to score (PDFs only; v1.9.0+).
-- \`audit\` — object on PDFs that went through the audit step:
+- \`__auditUrl\` — string. Public URL the audit.icjia.app scoring service was asked to score (scoreable documents; PDFs-only before v1.54.0).
+- \`audit\` — object on machine-scoreable documents (PDF/docx/xlsx/pptx) that went through the audit step:
   - \`audited\`: bool (true if the score request completed)
   - \`cached\`: bool (true if we read the result from the local audit cache instead of calling the service)
   - \`checkedAt\`: ISO timestamp of the score
@@ -933,16 +933,20 @@ async function computeSiteSummary(inventoryPath) {
   let withRefs = 0;
   let withoutRefs = 0;
   let refsUnknown = 0;
-  // v1.9.0: audit stats for the fleet-hero accessibility band.
-  //   auditedPdfCount: PDFs with a numeric score
+  // v1.9.0: audit stats for the fleet-hero accessibility band. v1.54.0: spans
+  // every machine-scoreable document (PDF + modern Office), not just PDFs.
+  //   auditedDocCount: documents with a numeric score
   //   auditScoreSum:   sum of scores for averaging
-  //   auditErrorCount: PDFs we tried but couldn't score (5xx / 4xx)
-  //   auditPending:    PDFs we haven't audited yet (no entry.audit field
-  //                    AND category is pdf)
-  let auditedPdfCount = 0;
+  //   auditErrorCount: documents we tried but couldn't score (5xx / 4xx)
+  //   auditPending:    documents we haven't audited yet (no entry.audit
+  //                    field AND category is scoreable)
+  //   unscoreableCount: remediable but not machine-scoreable (legacy Office,
+  //                    ODF/RTF) — never enters the audit tally at all
+  let auditedDocCount = 0;
   let auditScoreSum = 0;
   let auditErrorCount = 0;
   let auditPending = 0;
+  let unscoreableCount = 0;
   // v1.34.1: A–F grade distribution for the scores-by-site summary.
   const byGrade = { A: 0, B: 0, C: 0, D: 0, F: 0 };
   // v1.20.0: inclusive page-count estimate so the hero can advertise
@@ -998,12 +1002,14 @@ async function computeSiteSummary(inventoryPath) {
       refsUnknown++;
     }
 
-    // v1.9.0 audit stats — only PDFs are scored by the audits step.
-    if (cat === "pdf") {
+    // v1.54.0 audit stats — every machine-scoreable document (PDF + modern
+    // Office) is scored by the audits step; legacy Office / ODF / RTF are
+    // counted as unscoreable so the coverage caption can say so.
+    if (isScoreable(obj)) {
       const audit = obj.audit;
       if (audit && typeof audit === "object") {
         if (typeof audit.score === "number") {
-          auditedPdfCount++;
+          auditedDocCount++;
           auditScoreSum += audit.score;
           const gr = typeof audit.grade === "string" ? audit.grade.toUpperCase() : null;
           if (gr && byGrade[gr] !== undefined) byGrade[gr]++;
@@ -1017,6 +1023,10 @@ async function computeSiteSummary(inventoryPath) {
       } else {
         auditPending++;
       }
+    } else if (isUnscoreableDocument(obj)) {
+      unscoreableCount++;
+    }
+    if (cat === "pdf") {
       const pc = obj.introspection?.pageCount;
       if (typeof pc === "number" && pc >= 0) pdfPagesMeasured += pc;
     } else if (cat === "office-document") {
@@ -1037,7 +1047,7 @@ async function computeSiteSummary(inventoryPath) {
   return {
     totalFiles, totalBytes, remediable, byCategory,
     withRefs, withoutRefs, refsUnknown,
-    auditedPdfCount, auditScoreSum, auditErrorCount, auditPending, byGrade,
+    auditedDocCount, auditScoreSum, auditErrorCount, auditPending, unscoreableCount, byGrade,
     pdfPagesMeasured, remediablePages,
     remediablePageCounts: { docxCount, pptxCount, xlsxCount, legacyOfficeCount },
   };
@@ -1058,7 +1068,7 @@ async function computeSiteSummary(inventoryPath) {
  * @param {Array<string>} args.includeSite - Only bundle these nicknames
  * @param {Array<string>} args.excludeSite - Skip these nicknames
  * @param {string|null} args.sitesFile     - Path to sites.json
- * @param {boolean} args.allowUnscored     - Deploy even when sites have no PDF grades (v1.41.0)
+ * @param {boolean} args.allowUnscored     - Deploy even when sites have no document grades (v1.41.0)
  * @param {string|null} args._auditsBase   - Override for the ~/filecap-audits root (for tests)
  * @returns {Promise<{exitCode: number, summary?: object, error?: string}>}
  */
@@ -1182,9 +1192,10 @@ export async function runWebRollup({
     }
     const a = summarizeFileA11y({
       auditScoreSum: summary.auditScoreSum,
-      auditedPdfCount: summary.auditedPdfCount,
+      auditedDocCount: summary.auditedDocCount,
       auditErrorCount: summary.auditErrorCount,
       auditPending: summary.auditPending,
+      unscoreable: summary.unscoreableCount,
       remediable: summary.remediable,
       siteSlug: slug,
     });
@@ -1195,7 +1206,7 @@ export async function runWebRollup({
     // and the write is atomic (tmp + rename).
     const { histPath, history } = await loadA11yHistory(auditsBase, slug);
     const updated = appendA11yPoint(history, {
-      at: a11yNowIso, avg: a.avg, scored: a.scored, pdfs: a.pdfs,
+      at: a11yNowIso, avg: a.avg, scored: a.scored, pdfs: a.docs,
       remediable: a.remediable, band: a.band?.key ?? null,
     });
     try {
@@ -2276,11 +2287,12 @@ export async function runWebRollup({
     clientGateEnabled: useClientGateForIndex,
   };
 
-  // 9.5 (v1.41.0) — unscored-inventory guard. A rollup whose sites carry PDFs
-  // but no grades means the `filecap audits` stage never produced its output;
-  // shipping that would blank every Remediation Score on the live report. Warn
-  // always, and refuse the deploy unless the operator opted in. The bundle is
-  // already written either way, so the degraded output stays inspectable.
+  // 9.5 (v1.41.0) — unscored-inventory guard. A rollup whose sites carry
+  // scoreable documents but no grades means the `filecap audits` stage never
+  // produced its output; shipping that would blank every Remediation Score on
+  // the live report. Warn always, and refuse the deploy unless the operator
+  // opted in. The bundle is already written either way, so the degraded
+  // output stays inspectable.
   // The guard keys off whether a deploy will ACTUALLY run, not the flag:
   // FILECAP_NO_DEPLOY=1 turns an autoDeploy config into a build-only run, and
   // blocking one of those would just break local rebuilds. Same env check
@@ -2294,12 +2306,12 @@ export async function runWebRollup({
   if (guard.block) {
     process.stderr.write(
       "\nweb-rollup: REFUSING to deploy — publishing this bundle would replace the live\n"
-      + `  report with one that has no PDF grades. The bundle IS written to ${output}\n`
+      + `  report with one that has no document grades. The bundle IS written to ${output}\n`
       + "  so you can inspect it. Re-run the audits stage, or pass --allow-unscored.\n",
     );
     return {
       exitCode: 3,
-      error: "refusing to deploy: site inventories have no PDF accessibility scores",
+      error: "refusing to deploy: site inventories have no document accessibility scores",
       summary,
     };
   }

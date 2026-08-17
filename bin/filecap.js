@@ -142,7 +142,7 @@ program
   .option("--include-site <name...>", "Only bundle these site nicknames")
   .option("--exclude-site <name...>", "Skip these site nicknames")
   .option("--sites-file <path>", "Override saved-sites JSON path")
-  .option("--allow-unscored", "Deploy even when sites have PDFs but no accessibility grades (normally refused — it means the `filecap audits` stage did not run)")
+  .option("--allow-unscored", "Deploy even when sites have scoreable documents but no accessibility grades (normally refused — it means the `filecap audits` stage did not run)")
   .option("--no-og", "Skip fetching og:image / og:description for the /sites roster (offline or fast rebuilds; cards fall back to the ICJIA logo)")
   .action(async (opts) => {
     const output = opts.output ?? path.join(

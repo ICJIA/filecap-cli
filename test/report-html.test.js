@@ -525,7 +525,7 @@ describe("writeHtml", () => {
       ];
       await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toContain("Only 1 of 2 PDFs scored so far — too few for a reliable score (needs 5).");
+      expect(html).toContain("Only 1 of 2 documents scored so far — too few for a reliable score (needs 5).");
       expect(html).not.toContain("Not enough scored PDFs yet");
     });
   });

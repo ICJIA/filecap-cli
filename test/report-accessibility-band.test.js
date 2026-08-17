@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   A11Y_BANDS,
-  MIN_SCORED_PDFS,
+  MIN_SCORED_DOCS,
   A11Y_SCORE_EXCLUDE_SLUGS,
   bandForScore,
   summarizeFileA11y,
@@ -20,14 +20,14 @@ describe("constants", () => {
   });
 
   it("archive-prod summarizes like any other site (not excluded)", () => {
-    const s = summarizeFileA11y({ auditScoreSum: 400, auditedPdfCount: 10, remediable: 12, siteSlug: "archive-prod" });
+    const s = summarizeFileA11y({ auditScoreSum: 400, auditedDocCount: 10, remediable: 12, siteSlug: "archive-prod" });
     expect(s.excluded).toBe(false);
     expect(s.avg).toBe(40);
     expect(s.band?.key).toBe("far");
   });
 
-  it("requires at least 5 scored PDFs for a meaningful average", () => {
-    expect(MIN_SCORED_PDFS).toBe(5);
+  it("requires at least 5 scored documents for a meaningful average", () => {
+    expect(MIN_SCORED_DOCS).toBe(5);
   });
 
   it("defines three ordered bands far/partial/closer", () => {
@@ -68,43 +68,36 @@ describe("bandForScore", () => {
 });
 
 describe("summarizeFileA11y", () => {
-  it("averages scored PDFs and assigns a band", () => {
+  it("averages scored documents and assigns a band", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 350,
-      auditedPdfCount: 5,
+      auditedDocCount: 5,
       auditErrorCount: 1,
       auditPending: 2,
+      unscoreable: 12,
       remediable: 20,
       siteSlug: "dvfr-strapi-prod",
     });
     expect(r.excluded).toBe(false);
     expect(r.scored).toBe(5);
-    expect(r.pdfs).toBe(8); // 5 scored + 1 error + 2 pending
+    expect(r.docs).toBe(8); // 5 scored + 1 error + 2 pending
     expect(r.avg).toBe(70);
     expect(r.enoughData).toBe(true);
     expect(r.band.key).toBe("partial");
     expect(r.remediable).toBe(20);
-    expect(r.office).toBe(12); // 20 remediable - 8 PDFs (5 scored + 1 err + 2 pending)
+    expect(r.unscoreable).toBe(12); // passed straight through, no longer derived
   });
 
-  it("derives the non-PDF (office) remediable count as remediable minus PDFs", () => {
-    const r = summarizeFileA11y({
-      auditScoreSum: 300, auditedPdfCount: 5, remediable: 11, siteSlug: "x",
-    });
-    expect(r.office).toBe(6); // 11 remediable - 5 PDFs
-  });
-
-  it("never reports a negative office count", () => {
-    const r = summarizeFileA11y({
-      auditScoreSum: 300, auditedPdfCount: 5, remediable: 0, siteSlug: "x",
-    });
-    expect(r.office).toBe(0);
+  it("carries the explicit unscoreable count through (no more derived office subtraction)", () => {
+    const r = summarizeFileA11y({ auditScoreSum: 400, auditedDocCount: 5, unscoreable: 748, remediable: 4628 });
+    expect(r.unscoreable).toBe(748);
+    expect(r.scored).toBe(5);
   });
 
   it("rounds the average to the nearest whole number", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 199,
-      auditedPdfCount: 3,
+      auditedDocCount: 3,
       remediable: 3,
       siteSlug: "x",
     });
@@ -117,7 +110,7 @@ describe("summarizeFileA11y", () => {
   it("clamps a rounded-up 100 to 99 when not every PDF scored 100", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 19 * 100 + 95, // = 1995, /20 = 99.75 → rounds to 100
-      auditedPdfCount: 20,
+      auditedDocCount: 20,
       remediable: 20,
       siteSlug: "x",
     });
@@ -128,7 +121,7 @@ describe("summarizeFileA11y", () => {
   it("still reports 100 when every scored PDF is a 100", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 20 * 100,
-      auditedPdfCount: 20,
+      auditedDocCount: 20,
       remediable: 20,
       siteSlug: "x",
     });
@@ -138,7 +131,7 @@ describe("summarizeFileA11y", () => {
   it("does not disturb ordinary rounding at band thresholds (79.5 → 80)", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 159, // /2 = 79.5 → rounds to 80
-      auditedPdfCount: 2,
+      auditedDocCount: 2,
       auditPending: 3,
       remediable: 5,
       siteSlug: "x",
@@ -149,7 +142,7 @@ describe("summarizeFileA11y", () => {
   it("applies the 80 boundary inclusively (avg 80 = closer)", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 480,
-      auditedPdfCount: 6,
+      auditedDocCount: 6,
       remediable: 6,
       siteSlug: "x",
     });
@@ -160,7 +153,7 @@ describe("summarizeFileA11y", () => {
   it("suppresses the band when fewer than 5 PDFs are scored", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 240,
-      auditedPdfCount: 4,
+      auditedDocCount: 4,
       remediable: 10,
       siteSlug: "x",
     });
@@ -170,10 +163,10 @@ describe("summarizeFileA11y", () => {
     expect(r.avg).toBe(60); // avg still computed for the "n/N" caption context
   });
 
-  it("handles a site with zero scored PDFs", () => {
+  it("handles a site with zero scored documents", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 0,
-      auditedPdfCount: 0,
+      auditedDocCount: 0,
       auditPending: 21,
       remediable: 21,
       siteSlug: "ari-summit-2019-git",
@@ -182,7 +175,7 @@ describe("summarizeFileA11y", () => {
     expect(r.avg).toBeNull();
     expect(r.band).toBeNull();
     expect(r.enoughData).toBe(false);
-    expect(r.pdfs).toBe(21);
+    expect(r.docs).toBe(21);
   });
 
   // v1.45.0 — was "marks the archive site excluded and never assigns a band":
@@ -191,7 +184,7 @@ describe("summarizeFileA11y", () => {
   it("bands the archive site like any other now that it is back in scoring (v1.45.0)", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 33572,
-      auditedPdfCount: 1199,
+      auditedDocCount: 1199,
       remediable: 1429,
       siteSlug: "archive-prod",
     });
@@ -204,54 +197,38 @@ describe("summarizeFileA11y", () => {
   it("treats missing optional counts as zero", () => {
     const r = summarizeFileA11y({
       auditScoreSum: 455,
-      auditedPdfCount: 7,
+      auditedDocCount: 7,
       siteSlug: "x",
     });
-    expect(r.pdfs).toBe(7);
+    expect(r.docs).toBe(7);
     expect(r.remediable).toBe(0);
     expect(r.avg).toBe(65);
   });
 });
 
 describe("fileA11yCoverageText", () => {
-  it("states scored-of-remediable coverage, the non-PDF gap, and the remediable-only scope", () => {
-    const a = summarizeFileA11y({
-      auditScoreSum: 4480, auditedPdfCount: 64, auditPending: 6, remediable: 70, siteSlug: "x",
-    });
-    // 64 scored, 70 remediable, 70 PDFs? no: pdfs = 64 + 6 = 70 → office = 0
-    const a2 = summarizeFileA11y({
-      auditScoreSum: 4480, auditedPdfCount: 64, auditPending: 0, remediable: 70, siteSlug: "x",
-    });
-    const txt = fileA11yCoverageText(a2);
-    expect(txt).toMatch(/64 of 70 remediable files scored/);
-    expect(txt).toMatch(/6 non-PDF/);
-    expect(txt).toMatch(/remediable files only, not all files/i);
-    void a;
+  it("names the legacy files and the conversion fix in the coverage caption", () => {
+    const text = fileA11yCoverageText({ scored: 3854, remediable: 4628, unscoreable: 748 });
+    expect(text).toBe(
+      "3,854 of 4,628 remediable files scored · 748 legacy Office files can't be machine-scored (re-save as .docx/.xlsx/.pptx to score them) — remediable files only, not all files.",
+    );
   });
 
-  it("omits the non-PDF clause when every remediable file is a PDF", () => {
-    const a = summarizeFileA11y({
-      auditScoreSum: 480, auditedPdfCount: 6, remediable: 6, siteSlug: "x",
-    });
-    const txt = fileA11yCoverageText(a);
-    expect(txt).toMatch(/6 of 6 remediable files scored/);
-    expect(txt).not.toMatch(/non-PDF/);
-    expect(txt).toMatch(/remediable files only, not all files/i);
+  it("singularizes the legacy clause", () => {
+    const text = fileA11yCoverageText({ scored: 5, remediable: 6, unscoreable: 1 });
+    expect(text).toContain("1 legacy Office file can't be machine-scored");
   });
 
-  it("uses singular grammar for a single non-PDF file", () => {
-    const a = summarizeFileA11y({
-      auditScoreSum: 400, auditedPdfCount: 5, remediable: 6, siteSlug: "x",
-    });
-    const txt = fileA11yCoverageText(a);
-    expect(txt).toMatch(/1 non-PDF file has no score/);
+  it("omits the legacy clause when there are none", () => {
+    const text = fileA11yCoverageText({ scored: 5, remediable: 5, unscoreable: 0 });
+    expect(text).toBe("5 of 5 remediable files scored — remediable files only, not all files.");
   });
 });
 
 describe("fileA11yGaugeHtml", () => {
   it("renders a gauge track with the marker at the rounded score and a labelled aria", () => {
     const a = summarizeFileA11y({
-      auditScoreSum: 350, auditedPdfCount: 5, remediable: 10, siteSlug: "x",
+      auditScoreSum: 350, auditedDocCount: 5, remediable: 10, siteSlug: "x",
     }); // avg 70 → partial
     const html = fileA11yGaugeHtml(a);
     expect(html).toMatch(/a11y-gauge-track/);
@@ -295,27 +272,14 @@ describe("fileA11yTrendChipHtml", () => {
 });
 
 describe("fileA11yThinDataText", () => {
-  it("names the too-few-PDFs reason instead of a bare ratio when everything scorable is scored", () => {
-    expect(fileA11yThinDataText({ scored: 1, pdfs: 1 })).toBe(
-      "Only 1 PDF on this site — too few for a reliable score (needs 5).",
-    );
-    expect(fileA11yThinDataText({ scored: 2, pdfs: 2 })).toBe(
-      "Only 2 PDFs on this site — too few for a reliable score (needs 5).",
-    );
+  it("explains thin data in document terms", () => {
+    expect(fileA11yThinDataText({ scored: 0, docs: 0 })).toBe("No scoreable documents on this site.");
+    expect(fileA11yThinDataText({ scored: 1, docs: 1 })).toBe("Only 1 document on this site — too few for a reliable score (needs 5).");
+    expect(fileA11yThinDataText({ scored: 1, docs: 3 })).toBe("Only 1 of 3 documents scored so far — too few for a reliable score (needs 5).");
   });
 
-  it("shows scored-of-total when some PDFs are still unscored", () => {
-    expect(fileA11yThinDataText({ scored: 1, pdfs: 3 })).toBe(
-      "Only 1 of 3 PDFs scored so far — too few for a reliable score (needs 5).",
-    );
-  });
-
-  it("handles a site with no PDFs at all", () => {
-    expect(fileA11yThinDataText({ scored: 0, pdfs: 0 })).toBe("No PDFs on this site to score.");
-  });
-
-  it("stays in sync with MIN_SCORED_PDFS", () => {
-    expect(fileA11yThinDataText({ scored: 1, pdfs: 1 })).toContain(`needs ${MIN_SCORED_PDFS}`);
+  it("stays in sync with MIN_SCORED_DOCS", () => {
+    expect(fileA11yThinDataText({ scored: 1, docs: 1 })).toContain(`needs ${MIN_SCORED_DOCS}`);
   });
 });
 

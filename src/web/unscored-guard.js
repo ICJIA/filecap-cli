@@ -18,37 +18,39 @@
 // Pure module: plain data in, plain data + strings out. No I/O.
 
 /**
- * A PDF "carries a grade" only when it has a numeric score. Both the pending
- * PDFs (never sent to the audit API) and the errored ones (sent, no score
- * back) render as blank Remediation Score cells, so both count as unscored.
+ * A document "carries a grade" only when it has a numeric score. Both the
+ * pending documents (never sent to the audit API) and the errored ones (sent,
+ * no score back) render as blank Remediation Score cells, so both count as
+ * unscored.
  *
  * @param {object} summary - computeSiteSummary() result
- * @returns {{pdfs: number, scored: number}}
+ * @returns {{docs: number, scored: number}}
  */
-function pdfTally(summary) {
-  const scored = Number(summary?.auditedPdfCount) || 0;
+function docTally(summary) {
+  const scored = Number(summary?.auditedDocCount) || 0;
   const errored = Number(summary?.auditErrorCount) || 0;
   const pending = Number(summary?.auditPending) || 0;
-  return { pdfs: scored + errored + pending, scored };
+  return { docs: scored + errored + pending, scored };
 }
 
 /**
- * Find sites that have PDFs but not one single graded PDF between them.
+ * Find sites that have scoreable documents but not one single graded
+ * document between them.
  *
  * A PARTIAL score is deliberately not flagged: files land between audit runs,
- * so "68 PDFs, 61 scored" is the normal steady state. Zero-of-many is the
- * signature of a stage that never ran.
+ * so "68 documents, 61 scored" is the normal steady state. Zero-of-many is
+ * the signature of a stage that never ran.
  *
  * @param {Array<{site: object, summary: object}>} siteResults
- * @returns {Array<{name: string, label: string, pdfs: number}>}
+ * @returns {Array<{name: string, label: string, docs: number}>}
  */
 export function findUnscoredSites(siteResults) {
   const out = [];
   for (const sr of siteResults ?? []) {
-    const { pdfs, scored } = pdfTally(sr?.summary);
-    if (pdfs > 0 && scored === 0) {
+    const { docs, scored } = docTally(sr?.summary);
+    if (docs > 0 && scored === 0) {
       const name = sr?.site?.name ?? "(unnamed)";
-      out.push({ name, label: sr?.site?.siteName ?? name, pdfs });
+      out.push({ name, label: sr?.site?.siteName ?? name, docs });
     }
   }
   return out;
@@ -74,19 +76,19 @@ export function unscoredGuardDecision({ unscored, deploy, allowUnscored }) {
  * Operator-facing explanation. Names every degraded site so the fix is
  * copy-pasteable, and says which stage to re-run.
  *
- * @param {Array<{name: string, label: string, pdfs: number}>} unscored
+ * @param {Array<{name: string, label: string, docs: number}>} unscored
  * @returns {string}
  */
 export function formatUnscoredWarning(unscored) {
   const width = Math.max(...unscored.map((u) => u.label.length), 0);
   const lines = unscored.map(
-    (u) => `    ${u.label.padEnd(width)}  ${String(u.pdfs).padStart(5)} PDFs, 0 scored`,
+    (u) => `    ${u.label.padEnd(width)}  ${String(u.docs).padStart(5)} documents, 0 scored`,
   );
   return [
-    `${unscored.length} site(s) have PDFs but NO accessibility scores:`,
+    `${unscored.length} site(s) have scoreable documents but NO accessibility scores:`,
     ...lines,
     "  The `filecap audits` stage did not produce inventory.audited.ndjson for",
-    "  these sites, so every PDF will render with a blank Remediation Score.",
+    "  these sites, so every document will render with a blank Remediation Score.",
     "  Re-run:  ./run-full-audit.sh   (or `filecap audits` per site)",
   ].join("\n");
 }
