@@ -222,7 +222,17 @@ describe("generateSearchHtml", () => {
     const html = page();
     expect(html).toContain("rownum");
     expect(html).toContain('"Row number"');
-    expect(html).toContain('["#", "Website"');
+  });
+
+  // v1.53.0 — the custom-report view sorts like the results table, so a
+  // manager can group a site's files (Website column) before downloading;
+  // the report workbook follows the view's sort.
+  it("makes the report view sortable with Website as the first sort column", () => {
+    const html = page();
+    expect(html).toContain("REPORT_SORT_COLUMNS");
+    expect(html).toContain('{ key: "site", label: "Website" }');
+    expect(html).toContain("function sortedReport()");
+    expect(html).toContain('buildSearchWorkbook(sortedReport(), { queryColumn: true');
   });
 
   // The whole controller ships inside the generator's template literal,

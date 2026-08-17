@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.53.0] — 2026-08-17
+
+### Added — sortable custom-report view on /search
+
+- The custom report's in-page view now sorts like the results table:
+  every data column header (Website, Filename, Type, Score, Grade, Size,
+  Modified, Found by search) is a click-to-sort button with the same
+  natural first-click directions, ▲/▼ arrows, and `aria-sort` semantics —
+  so a site's files (r3, i2i, …) group together on one click. Blank and
+  unscored values always sort last; the `#` column renumbers with the
+  order. The report's Excel download follows the view's current sort
+  (insertion order when unsorted), mirroring how the results download
+  follows the results sort. Stored order stays insertion order, so
+  removal, dedupe, and the return banner are unaffected.
+
 ## [1.52.1] — 2026-08-17
 
 ### Fixed — /search row contents now center-align

@@ -308,7 +308,7 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
     </div>
     <div id="search-results"></div>
     <div id="report-view" hidden></div>
-    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links. To build a <strong>custom report</strong>, tick the box on any result — or add every match at once — then search for something else and keep adding. The report bar above shows what you've collected, with its own view, Excel download, and clear buttons. A custom report lasts for this browser tab only: it survives leaving and returning to this page, and is gone when the tab closes.</p>
+    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links. To build a <strong>custom report</strong>, tick the box on any result — or add every match at once — then search for something else and keep adding. The report bar above shows what you've collected, with its own view, Excel download, and clear buttons — the report view sorts like the results (click <em>Website</em> to group a site's files together), and the downloaded report follows the current sort. A custom report lasts for this browser tab only: it survives leaving and returning to this page, and is gone when the tab closes.</p>
   </div>
 </main>
 
@@ -831,6 +831,56 @@ ${searchReportClientSource()}
   var selected = {};
   var lastQueryKey = "";
 
+  // v1.53.0 — the report view sorts like the results table (the user's ask:
+  // group a site's files together before downloading). null key = insertion
+  // order, exactly what the report looked like before sorting existed.
+  var reportSortKey = null;
+  var reportSortDir = "asc";
+  var REPORT_SORT_COLUMNS = [
+    { key: "site", label: "Website" },
+    { key: "filename", label: "Filename" },
+    { key: "category", label: "Type" },
+    { key: "score", label: "Score" },
+    { key: "grade", label: "Grade" },
+    { key: "sizeBytes", label: "Size" },
+    { key: "modified", label: "Modified" },
+    { key: "query", label: "Found by search" },
+    { key: null, label: "Audit report" },
+    { key: null, label: "" },
+  ];
+  var REPORT_SORT_NATURAL = { site: "asc", filename: "asc", category: "asc", score: "desc", grade: "asc", sizeBytes: "desc", modified: "desc", query: "asc" };
+
+  // Stored order stays insertion order (removal keys, dedupe, and the
+  // return-banner count all rely on it); sorting works on a copy. Blank /
+  // unscored values always sort last, matching the results table's rule.
+  function sortedReport() {
+    if (!reportSortKey) return report.slice();
+    var key = reportSortKey;
+    var dir = reportSortDir === "asc" ? 1 : -1;
+    var numeric = key === "score" || key === "sizeBytes";
+    var rows = report.slice();
+    rows.sort(function (a, b) {
+      var av = a[key];
+      var bv = b[key];
+      if (numeric) {
+        var an = typeof av === "number";
+        var bn = typeof bv === "number";
+        if (an && bn) return (av - bv) * dir;
+        if (an) return -1;
+        if (bn) return 1;
+        return 0;
+      }
+      var as = String(av === null || av === undefined ? "" : av).toLowerCase();
+      var bs = String(bv === null || bv === undefined ? "" : bv).toLowerCase();
+      if (as === "" && bs !== "") return 1;
+      if (bs === "" && as !== "") return -1;
+      if (as < bs) return -1 * dir;
+      if (as > bs) return 1 * dir;
+      return 0;
+    });
+    return rows;
+  }
+
   function fileNoun(n) { return n === 1 ? " file" : " files"; }
 
   // One search hit as a stored report / workbook row. "reportUrl" is the
@@ -929,21 +979,49 @@ ${searchReportClientSource()}
     table.className = "search-table";
     var thead = document.createElement("thead");
     var hr = document.createElement("tr");
-    var labels = ["#", "Website", "Filename", "Type", "Score", "Grade", "Size", "Modified", "Found by search", "Audit report", ""];
-    for (var h = 0; h < labels.length; h++) {
+    var thNum = document.createElement("th");
+    thNum.scope = "col";
+    thNum.className = "rownum";
+    thNum.textContent = "#";
+    thNum.setAttribute("aria-label", "Row number");
+    hr.appendChild(thNum);
+    REPORT_SORT_COLUMNS.forEach(function (col) {
       var th = document.createElement("th");
       th.scope = "col";
-      th.textContent = labels[h];
-      if (labels[h] === "#") {
-        th.className = "rownum";
-        th.setAttribute("aria-label", "Row number");
+      if (!col.key) {
+        th.textContent = col.label;
+        hr.appendChild(th);
+        return;
       }
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "search-sort-btn";
+      btn.title = "Sort the report by " + col.label.toLowerCase();
+      btn.textContent = col.label;
+      if (reportSortKey === col.key) {
+        th.setAttribute("aria-sort", reportSortDir === "asc" ? "ascending" : "descending");
+        var arrow = document.createElement("span");
+        arrow.className = "search-sort-arrow";
+        arrow.textContent = reportSortDir === "asc" ? " ▲" : " ▼";
+        btn.appendChild(arrow);
+      }
+      btn.addEventListener("click", function () {
+        if (reportSortKey === col.key) {
+          reportSortDir = reportSortDir === "asc" ? "desc" : "asc";
+        } else {
+          reportSortKey = col.key;
+          reportSortDir = REPORT_SORT_NATURAL[col.key];
+        }
+        renderReportView();
+      });
+      th.appendChild(btn);
       hr.appendChild(th);
-    }
+    });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tbody = document.createElement("tbody");
-    for (var i = 0; i < report.length; i++) {
+    var sorted = sortedReport();
+    for (var i = 0; i < sorted.length; i++) {
       (function (rr) {
         var tr = document.createElement("tr");
         var tdNum = document.createElement("td");
@@ -1016,7 +1094,7 @@ ${searchReportClientSource()}
         tdRm.appendChild(rm);
         tr.appendChild(tdRm);
         tbody.appendChild(tr);
-      })(report[i]);
+      })(sorted[i]);
     }
     table.appendChild(tbody);
     wrap.appendChild(table);
@@ -1065,7 +1143,9 @@ ${searchReportClientSource()}
   });
   reportDownloadBtn.addEventListener("click", function () {
     if (!report.length) return;
-    var bytes = buildSearchWorkbook(report, { queryColumn: true, sheetName: "Custom report" });
+    // The workbook follows the view's sort (insertion order when unsorted),
+    // mirroring how the results download follows the results sort.
+    var bytes = buildSearchWorkbook(sortedReport(), { queryColumn: true, sheetName: "Custom report" });
     triggerXlsxDownload(bytes, srReportXlsxName(new Date().toISOString()));
   });
   reportClearBtn.addEventListener("click", function () {
