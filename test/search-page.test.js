@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { generateSearchHtml } from "../src/web/search-page.js";
 import { SEARCH_INDEX_FILENAME } from "../src/web/search-index.js";
+import { SEARCH_REPORT_STORAGE_KEY } from "../src/web/search-report.js";
 
 // The /search page shell. The matcher and the xlsx builder have their own
 // suites — this one pins the page contract: the input, the chips, the
@@ -142,5 +143,64 @@ describe("generateSearchHtml", () => {
     const html = page();
     expect(html).toContain(String.raw`split(/\s+/)`);
     expect(html).not.toContain("split(/s+/)");
+  });
+
+  // v1.51.0 — custom reports: tick results (from any number of searches)
+  // into a session-only report, view it in place, download it as its own
+  // workbook. sessionStorage lifetime; keep-or-clear prompt on return.
+  it("carries the custom-report bar, return banner, and report view shell", () => {
+    const html = page();
+    expect(html).toContain('id="report-bar"');
+    expect(html).toContain('id="report-banner"');
+    expect(html).toContain('id="report-view"');
+    expect(html).toContain('id="report-status"');
+  });
+
+  it("offers add-selected and add-all-matches actions", () => {
+    const html = page();
+    expect(html).toContain('id="add-selected"');
+    expect(html).toContain('id="add-all"');
+  });
+
+  it("renders a selection checkbox per result row with a select-all header", () => {
+    const html = page();
+    expect(html).toContain('"checkbox"');
+    expect(html).toContain("Select all");
+  });
+
+  it("embeds the tested report-store source inline", () => {
+    const html = page();
+    expect(html).toContain("function srAddRows");
+    expect(html).toContain("function srRemoveRow");
+    expect(html).toContain("function srParseStored");
+    expect(html).toContain("function srSerializeReport");
+    expect(html).toContain("function srReportXlsxName");
+  });
+
+  it("persists the report in sessionStorage under the shared key", () => {
+    const html = page();
+    expect(html).toContain("sessionStorage");
+    expect(html).toContain(SEARCH_REPORT_STORAGE_KEY);
+  });
+
+  it("asks keep-or-clear when returning with a report in progress", () => {
+    const html = page();
+    expect(html).toContain('id="report-banner-keep"');
+    expect(html).toContain('id="report-banner-clear"');
+    expect(html).toContain("Keep adding");
+  });
+
+  it("downloads the report as its own workbook with the found-by column", () => {
+    const html = page();
+    expect(html).toContain("queryColumn: true");
+    expect(html).toContain("Custom report");
+    expect(html).toContain("srReportXlsxName");
+  });
+
+  it("two-steps the Clear action instead of a blocking dialog", () => {
+    const html = page();
+    expect(html).toContain('id="report-clear"');
+    expect(html).toContain('id="report-clear-yes"');
+    expect(html).not.toContain("confirm(");
   });
 });

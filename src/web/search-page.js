@@ -16,6 +16,7 @@ import { ICJIA_LOGO_SVG } from "./index-page.js";
 import { searchMatchClientSource } from "./search-match.js";
 import { searchXlsxClientSource } from "./search-xlsx.js";
 import { SEARCH_INDEX_FILENAME } from "./search-index.js";
+import { searchReportClientSource, SEARCH_REPORT_STORAGE_KEY } from "./search-report.js";
 
 // Deployed bundle URL — used for the ABSOLUTE audit-report links inside the
 // downloaded workbook (a spreadsheet opened on someone's desktop has no
@@ -139,6 +140,63 @@ const SEARCH_CSS = `
   .search-wrap { padding: 0 1rem 2rem; }
   .search-box-row { flex-direction: column; align-items: stretch; }
 }
+
+/* ── v1.51.0: custom report ──────────────────────────────────── */
+/* Several report elements are flex containers; a bare hidden attribute
+   loses to "display: flex", so make it always win on this page. */
+[hidden] { display: none !important; }
+.report-bar, .report-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  margin: 0.9rem 0 0.35rem;
+}
+.report-bar { background: #161b22; border: 1px solid #30363d; }
+.report-banner { background: rgba(255, 176, 0, 0.08); border: 1px solid #ffb000; color: #e5e5e5; }
+.report-count { font-weight: 600; color: #ffd76a; }
+.report-btn {
+  font: inherit;
+  font-size: 0.88rem;
+  color: #d4dae0;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+.report-btn:hover { border-color: #58a6ff; color: #e5e5e5; }
+.report-btn:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+.report-btn[disabled] { color: #7d8590; border-color: #21262d; cursor: not-allowed; }
+.report-btn-primary { background: #ffb000; border-color: #ffb000; color: #0d1117; font-weight: 600; }
+.report-btn-primary:hover { background: #ffc23d; border-color: #ffc23d; color: #0d1117; }
+.report-btn-primary[disabled] { background: #30363d; border-color: #30363d; color: #7d8590; }
+.report-status { color: #d4dae0; font-size: 0.9rem; margin: 0.35rem 0 0; min-height: 1.3em; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.75rem; }
+.search-table th.sel, .search-table td.sel { width: 1.8rem; text-align: center; vertical-align: middle; }
+.search-table input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: #ffb000; cursor: pointer; }
+.report-remove {
+  font: inherit;
+  font-size: 0.82rem;
+  color: #f85149;
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.15rem 0.55rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.report-remove:hover { border-color: #f85149; }
+.report-remove:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+/* Report view swaps in where the results live; everything results-only hides. */
+.search-wrap.report-open #did-you-mean,
+.search-wrap.report-open #category-chips,
+.search-wrap.report-open #site-chips,
+.search-wrap.report-open #search-status,
+.search-wrap.report-open #report-actions,
+.search-wrap.report-open #search-results { display: none; }
 `;
 
 /**
@@ -221,12 +279,33 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
         Download results (.xlsx)
       </button>
     </div>
+    <div id="report-banner" class="report-banner" hidden>
+      <span id="report-banner-text"></span>
+      <button id="report-banner-keep" class="report-btn report-btn-primary" type="button">Keep adding to it</button>
+      <button id="report-banner-clear" class="report-btn" type="button">Clear it</button>
+    </div>
+    <div id="report-bar" class="report-bar" hidden>
+      <span id="report-count" class="report-count"></span>
+      <button id="report-view-toggle" class="report-btn" type="button">View report</button>
+      <button id="report-download" class="report-btn report-btn-primary" type="button" title="Download the custom report as an Excel workbook (with links)">Download report (.xlsx)</button>
+      <button id="report-clear" class="report-btn" type="button">Clear…</button>
+      <span id="report-clear-confirm" hidden>Clear the whole report?
+        <button id="report-clear-yes" class="report-btn" type="button">Yes, clear it</button>
+        <button id="report-clear-keep" class="report-btn" type="button">Keep it</button>
+      </span>
+    </div>
+    <p id="report-status" class="report-status" aria-live="polite"></p>
     <div id="did-you-mean" class="search-chips search-suggest" role="group" aria-label="Spelling suggestions"></div>
     <div id="category-chips" class="search-chips" role="group" aria-label="Filter results by file type"></div>
     <p id="search-status" class="search-status" aria-live="polite"></p>
     <div id="site-chips" class="search-chips" role="group" aria-label="Filter results by website"></div>
+    <div id="report-actions" class="report-actions" hidden>
+      <button id="add-selected" class="report-btn report-btn-primary" type="button" disabled>Add selected to report</button>
+      <button id="add-all" class="report-btn" type="button">Add all matches to report</button>
+    </div>
     <div id="search-results"></div>
-    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links.</p>
+    <div id="report-view" hidden></div>
+    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links. To build a <strong>custom report</strong>, tick the box on any result — or add every match at once — then search for something else and keep adding. The report bar above shows what you've collected, with its own view, Excel download, and clear buttons. A custom report lasts for this browser tab only: it survives leaving and returning to this page, and is gone when the tab closes.</p>
   </div>
 </main>
 
@@ -235,6 +314,7 @@ ${renderSiteFooter({ generatedAt })}
 <script>
 ${searchMatchClientSource()}
 ${searchXlsxClientSource()}
+${searchReportClientSource()}
 (function () {
   "use strict";
   var INDEX_URL = ${JSON.stringify(SEARCH_INDEX_FILENAME)};
@@ -367,6 +447,10 @@ ${searchXlsxClientSource()}
 
   function update() {
     var q = input.value;
+    // A NEW search means a fresh selection; re-sorting or chip-filtering
+    // the same search keeps your ticks.
+    var qk = foldSearchText(q);
+    if (qk !== lastQueryKey) { lastQueryKey = qk; selected = {}; }
     var matches = data ? runSearch(hays, q) : [];
     if (!foldSearchText(q)) {
       catChipsEl.textContent = "";
@@ -375,6 +459,7 @@ ${searchXlsxClientSource()}
       suggestEl.textContent = "";
       lastFiltered = [];
       downloadBtn.disabled = true;
+      reportActionsEl.hidden = true;
       statusEl.className = "search-status";
       statusEl.textContent = data ? "Type to search " + data.rows.length.toLocaleString("en-US") + " files." : "";
       return;
@@ -407,6 +492,15 @@ ${searchXlsxClientSource()}
       sortDir,
     );
     lastFiltered = filtered;
+
+    // Selection only exists on rendered rows — prune ticks that a chip
+    // filter (or a shrinking match set) just removed from view.
+    var visIdx = {};
+    var visLim = Math.min(filtered.length, RENDER_CAP);
+    for (var pv = 0; pv < visLim; pv++) visIdx[filtered[pv].i] = true;
+    for (var pk in selected) { if (!visIdx[pk]) delete selected[pk]; }
+    reportActionsEl.hidden = filtered.length === 0;
+    refreshAddButtons();
 
     // "Did you mean?" — a near-miss of a SITE's name never floods results
     // (the typo tier reads filenames only); it becomes a clickable swap.
@@ -503,6 +597,25 @@ ${searchXlsxClientSource()}
     table.className = "search-table";
     var thead = document.createElement("thead");
     var hr = document.createElement("tr");
+    var thSel = document.createElement("th");
+    thSel.scope = "col";
+    thSel.className = "sel";
+    var selAll = document.createElement("input");
+    selAll.type = "checkbox";
+    selAll.setAttribute("aria-label", "Select all shown results");
+    selAll.title = "Select all shown results";
+    selAll.addEventListener("change", function () {
+      var boxes = tbody.querySelectorAll("input");
+      for (var bi = 0; bi < boxes.length; bi++) {
+        boxes[bi].checked = selAll.checked;
+        var di = Number(boxes[bi].getAttribute("data-i"));
+        if (selAll.checked) selected[di] = true;
+        else delete selected[di];
+      }
+      refreshAddButtons();
+    });
+    thSel.appendChild(selAll);
+    hr.appendChild(thSel);
     SORT_COLUMNS.forEach(function (col) {
       var th = document.createElement("th");
       th.scope = "col";
@@ -545,6 +658,23 @@ ${searchXlsxClientSource()}
       var site = data.sites[row[2]] || {};
       var why = match.why || [];
       var tr = document.createElement("tr");
+
+      var tdSel = document.createElement("td");
+      tdSel.className = "sel";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.setAttribute("data-i", String(match.i));
+      cb.setAttribute("aria-label", "Select " + row[0]);
+      cb.checked = !!selected[match.i];
+      cb.addEventListener("change", (function (idx, box) {
+        return function () {
+          if (box.checked) selected[idx] = true;
+          else delete selected[idx];
+          refreshAddButtons();
+        };
+      })(match.i, cb));
+      tdSel.appendChild(cb);
+      tr.appendChild(tdSel);
 
       var tdSite = document.createElement("td");
       tdSite.className = "search-site";
@@ -625,6 +755,11 @@ ${searchXlsxClientSource()}
 
       tbody.appendChild(tr);
     }
+    var allSel = shown > 0;
+    for (var as = 0; as < shown; as++) {
+      if (!selected[filtered[as].i]) { allSel = false; break; }
+    }
+    selAll.checked = allSel;
     table.appendChild(tbody);
     wrap.appendChild(table);
     resultsEl.appendChild(wrap);
@@ -639,6 +774,7 @@ ${searchXlsxClientSource()}
 
   var timer = null;
   input.addEventListener("input", function () {
+    if (reportOpen) closeReportView();
     if (timer) clearTimeout(timer);
     timer = setTimeout(update, DEBOUNCE_MS);
   });

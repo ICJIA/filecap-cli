@@ -120,6 +120,35 @@ describe("buildSearchWorkbook", () => {
   });
 });
 
+// v1.51.0 — the custom-report download reuses this builder with a "Found by
+// search" column recording which query captured each row, and its own sheet
+// name. The default results workbook must be byte-for-byte unaffected.
+describe("buildSearchWorkbook custom-report options", () => {
+  const QROWS = ROWS.map((r, i) => ({ ...r, query: i === 0 ? "annual 2023" : "memo" }));
+
+  it("adds a Found by search column when queryColumn is set", async () => {
+    const wb = await load(buildSearchWorkbook(QROWS, { queryColumn: true }));
+    const sheet = wb.worksheets[0];
+    const header = sheet.getRow(1).values.slice(1);
+    expect(header).toHaveLength(11);
+    expect(header[10]).toBe("Found by search");
+    expect(sheet.getCell("K2").value).toBe("annual 2023");
+    expect(sheet.getCell("K3").value).toBe("memo");
+  });
+
+  it("names the sheet when sheetName is set", async () => {
+    const wb = await load(buildSearchWorkbook(QROWS, { queryColumn: true, sheetName: "Custom report" }));
+    expect(wb.worksheets[0].name).toBe("Custom report");
+  });
+
+  it("leaves the default results workbook unchanged", async () => {
+    const wb = await load(buildSearchWorkbook(ROWS));
+    const header = wb.worksheets[0].getRow(1).values.slice(1);
+    expect(header).toHaveLength(10);
+    expect(wb.worksheets[0].name).toBe("Search results");
+  });
+});
+
 describe("xlsxDownloadName", () => {
   it("slugs the query into the filename with the date", () => {
     expect(xlsxDownloadName("Annual Report!", "2026-08-16T13:00:00.000Z"))
