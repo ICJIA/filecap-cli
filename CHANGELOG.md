@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.54.0] — 2026-08-17
+
+### Added — Office documents are scored and blended into the averages
+
+- Modern Office documents (`.docx`/`.xlsx`/`.pptx`) now go through the same
+  audit.icjia.app scoring as PDFs and carry the same score, grade, and
+  shareable audit-report link on every surface (search, site pages,
+  workbooks). One canonical gate (`isScoreable` / `isUnscoreableDocument`
+  in `src/scanner/category.js`) replaces every PDF-only filter; the gate is
+  extension-based because ODF/RTF share categories with OOXML and old
+  cached inventories carry drifted categories.
+- Site and fleet file-accessibility averages blend all scored documents
+  (`auditedDocCount` + new `unscoreableCount` through
+  `summarizeFileA11y` / both tallies / the deploy guard /
+  scores-by-site, whose columns are now "Documents scoreable/scored",
+  "Avg score", "Legacy Office (not scoreable)"). Bands and the min-5
+  rule unchanged (now min-5 scored *documents*). Measured at release:
+  3,843 scored documents (was 3,180 scored PDFs), fleet average 61 → 63.
+- Legacy Office files (`.doc`/`.xls`/`.ppt`, plus ODF/RTF — 752 fleet-wide)
+  are never sent to the API (the service refuses pre-OOXML formats);
+  their cells read "N/A (legacy format)" and coverage captions carry a
+  re-save-to-score nudge. Confirmed live before building: the API 422s
+  legacy files with exactly that guidance.
+
+### Changed — format-aware audit errors
+
+- The fetcher appends the API's own JSON `error` reason to thrown HTTP
+  errors (status stays first for the categorizer's regexes), and the
+  5xx null-vs-throw check is anchored to the message start so appended
+  third-party text can't misclassify a 4xx as retryable.
+- New `invalid-document` error kind for corrupt/mislabeled OOXML (422)
+  with Word/Excel/PowerPoint-specific wording; non-PDF 413s get
+  size-reduction advice instead of PDF-specific split/OCR guidance;
+  timeout copy says "large or complex documents". PDF wording unchanged.
+- Copy sweep: the "Scores cover PDFs only" flagship section, donut
+  captions, card/banner heads ("File accessibility (documents)"),
+  error-page lede, operator-script prose.
+
 ## [1.53.0] — 2026-08-17
 
 ### Added — sortable custom-report view on /search

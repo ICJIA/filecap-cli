@@ -38,6 +38,14 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "office-files-scored-2026-08-17",
+    badge: "Scope change",
+    text: "Word, Excel, and PowerPoint files are now scored. Until today, only PDFs received an accessibility score; now every modern Office document (.docx, .xlsx, .pptx) goes through the same File Audit Tool check and carries the same 0–100 score, letter grade, and shareable audit report as PDFs — in search results, on every site page, and in every spreadsheet download. That widened the measurement: the fleet-wide average now covers 3,843 scored documents instead of 3,180 scored PDFs, and it moved from 61 to 63 — the files didn't change overnight; the measurement covers more of them. The same goes for any site whose ▲/▼ “since last audit” chip moved on August 17: that's the wider measurement, not remediation. One honest exception: 752 older Office files in legacy formats (mostly .doc and .xls) can't be machine-scored, because those formats can't carry the accessibility information the audit checks — they're marked “N/A (legacy format)” until they're re-saved in a modern format. A few corrupt or oversized files couldn't be scored either; the File errors page lists each one with the exact reason.",
+    linkText: "See scores on the search page",
+    linkHref: "search.html",
+    date: "August 17, 2026",
+  },
+  {
     id: "numbered-results-purple-report-2026-08-17",
     badge: "Improved",
     text: "Two search-page improvements. Search results are now numbered, so it's easy to point a colleague to “row 12” instead of reading out a filename — the numbers follow whatever order you've sorted the results in, and the custom report view is numbered the same way. And everything that belongs to the custom report — the bar showing what you've collected, its buttons, and the checkboxes you tick — now appears in purple, so your report can't be mistaken for the gray-and-amber search filters sitting beside it.",

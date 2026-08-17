@@ -23,13 +23,29 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // v1.52.0 — newest entry announces numbered results + the purple report
-  // system. No counts on this banner, so nothing to reconcile against the
-  // hero (the v1.44.1 lesson); it links straight to the page it announces.
-  it("leads with the 2026-08-17 numbering + purple-report entry", () => {
+  // v1.54.0 — newest entry announces Office scoring (scope change). Its
+  // counts were reconciled against the built bundle before publishing:
+  // 3,843 scored documents (scores-by-site TOTAL row), 3,180 prior scored
+  // PDFs, 61→63 fleet average, and 752 legacy files (per-card clauses sum
+  // to the workbook TOTAL exactly). The v1.44.1 rule: every number on a
+  // banner must agree with the surfaces it sits above.
+  it("leads with the 2026-08-17 office-scoring scope-change entry", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("numbered");
+    expect(e.id).toContain("office-files-scored");
     expect(e.id).toContain("2026-08-17");
+    expect(e.linkHref).toBe("search.html");
+    expect(e.badge).toBe("Scope change");
+    expect(e.text).toContain("3,843");
+    expect(e.text).toContain("3,180");
+    expect(e.text).toContain("752");
+    expect(e.text).toContain("from 61 to 63");
+    expect(e.text).toContain("not remediation");
+  });
+
+  // v1.52.0 — the numbering + purple-report entry, now history.
+  it("keeps the 2026-08-17 numbering + purple-report entry as history", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("numbered"));
+    expect(e).toBeTruthy();
     expect(e.linkHref).toBe("search.html");
   });
 
