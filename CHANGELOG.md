@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.55.0] — 2026-08-17
+
+### Changed — download button front and center, pagination at both table ends
+
+- The per-site / by-type report pages' green **Download spreadsheet (XLSX)**
+  button (and its "Last audit" caption) moved out of the sticky nav bar's
+  right-edge button cluster into the hero header, directly under the
+  headline number — it is the page's primary deliverable and kept being
+  missed among four look-alike nav buttons. Styled one size up as the hero's
+  call to action (`.dp-hero-download`); hidden in print like the rest of the
+  page chrome.
+- Every paginated table now renders its paginator **above and below** the
+  table: report file view, report Page view, the fleet index duplicates
+  table, and the orphans report. Previously the controls existed only above
+  the table, so a reader who scrolled to the end of a 25-row page got no
+  hint that more pages existed. The copies stay in sync (info text, page
+  numbers, prev/next disabled state, rows-per-page selects); interacting
+  with the bottom copy snaps the view back to the top of the table so the
+  reader lands at the start of the page they asked for. Markup comes from
+  one shared builder (`src/web/paginator-nav.js`); bottom-copy ids carry a
+  `-b` suffix, and only the top copy is an `aria-live` region so screen
+  readers don't hear every page change twice.
+- What's New entry announcing both changes; suite grows to 1,576 tests
+  (new `paginator-nav` unit tests, both-ends + hero-CTA pins for all four
+  tables, and an inline-`<script>` compile guard for the report pages).
+
 ## [1.54.0] — 2026-08-17
 
 ### Added — Office documents are scored and blended into the averages

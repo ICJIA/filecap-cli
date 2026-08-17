@@ -2100,6 +2100,11 @@ dialog.access-modal .access-modal-cta a {
 }
 .pag-pages { display: inline-flex; gap: 0.25rem; align-items: center; }
 .pag-gap { color: #6b7280; padding: 0 1px; }
+/* v1.55.0 — a second copy of the paginator renders below the table. The
+   scroll-margin keeps the sticky navbar from covering the top copy when a
+   bottom-copy click snaps the view back up to it. */
+.paginator { scroll-margin-top: 4.5rem; }
+.paginator-bottom { margin-top: 0.8rem; }
 /* Mirror the per-site report table styling exactly (src/report/html.js)
    so every data table in the app looks the same: 12px tabular type, tight
    padding, alternating dark stripes, brighter hover row, sticky thead +

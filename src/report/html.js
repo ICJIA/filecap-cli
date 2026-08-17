@@ -6,6 +6,7 @@ import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
+import { paginatorNav } from "../web/paginator-nav.js";
 import { renderSiteAccessibilitySection } from "./site-accessibility-section.js";
 import { escapeHtml as htmlEscape, safeUrl } from "../util/html.js";
 import { REMEDIABLE_CATEGORIES, isScoreable, isUnscoreableDocument } from "../scanner/category.js";
@@ -302,21 +303,7 @@ function buildPageViewSection(pages, ctx) {
   const rows = pages.map((p) => buildPageRow(p, ctx)).join("\n");
   return `<div id="page-view" hidden>
   <p class="page-view-note">One row per page. <strong>Files</strong> are the documents the page links to. Each file is listed once — under the first page that links it; a page whose other linked files already appear above shows them as a count ("listed under other pages") instead of repeating them. Rows tagged <span class="page-sitemap-tag">sitemap</span> or <span class="page-cms-tag">cms</span> are pages with no files linked from them — sourced from the site's sitemap.xml and CMS respectively. A file a page links that is hosted on another fleet site (for example the CMS) appears in a muted <span class="page-xsite">hosted on another site</span> group that links to that site's report.</p>
-  <nav class="paginator" aria-label="Page table pagination">
-    <span class="pag-info" id="pv-page-info" role="status" aria-live="polite"></span>
-    <span class="pag-controls">
-      <label class="pag-size">Rows per page
-        <select id="pv-page-size">
-          <option value="25" selected>25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
-      </label>
-      <button type="button" id="pv-pag-prev" class="pag-btn">&larr; Prev</button>
-      <span class="pag-pages" id="pv-pag-pages"></span>
-      <button type="button" id="pv-pag-next" class="pag-btn">Next &rarr;</button>
-    </span>
-  </nav>
+  ${paginatorNav({ idPrefix: "pv-", ariaLabel: "Page table pagination", live: true })}
   <div class="table-wrap table-scroll">
     <table id="page-table" aria-label="Page inventory">
       <thead><tr>
@@ -329,6 +316,7 @@ ${rows}
       </tbody>
     </table>
   </div>
+  ${paginatorNav({ idPrefix: "pv-", ariaLabel: "Page table pagination", live: true, bottom: true })}
 </div>`;
 }
 
@@ -945,6 +933,21 @@ body {
   letter-spacing: 0.02em;
 }
 .report-csv-date strong { color: #c9d1d9; font-weight: 700; }
+/* v1.55.0 — the download block now renders inside the hero, not the sticky
+   bar. In the hero it lays out as a row (big button, "Last audit" caption
+   beside it) and the button steps up a size: it's the page's primary
+   deliverable, so it reads as the hero's call to action. */
+.dp-hero-download {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 1.05rem 0 0.15rem;
+}
+.dp-hero-download .report-csv-link {
+  font-size: 0.95rem;
+  padding: 0.55rem 1.15rem;
+}
 /* Mirror of .audit-tool-link styling on the index page so the affordance
    reads the same across surfaces. v1.7.28: font dropped to 0.8rem
    (matched against the index navbar variant) to leave more horizontal
@@ -1737,6 +1740,11 @@ thead th {
 }
 .pag-pages { display: inline-flex; gap: 0.25rem; align-items: center; }
 .pag-gap { color: #6b7280; padding: 0 1px; }
+/* v1.55.0 — a second copy of each paginator renders below its table. The
+   scroll-margin keeps the sticky nav bar from covering the top copy when a
+   bottom-copy click snaps the view back up to it. */
+.paginator { scroll-margin-top: 3.4rem; }
+.paginator-bottom { margin-top: 0.8rem; }
 
 /* ── File / Page view toggle (v1.13.0) ──────────────────────── */
 .view-toggle { margin: 1.2rem 0 0.5rem; }
@@ -2065,6 +2073,7 @@ ${siteFooterCss()}
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
   .report-back-bar { display: none; }
+  .dp-hero-download { display: none; }
   body { background: #fff; color: #000; padding: 0; font-size: 10px; }
   h1, h2 { color: #000; }
   .controls { display: none; }
@@ -2107,15 +2116,12 @@ ${siteFooterCss()}
 <main id="main">
 
 ${(() => {
-  // v1.7.16: sticky nav now also surfaces the audit-tool button (visible on
-  // every per-site + by-type detail page) and shows the last-audit date under
-  // the CSV download so staff can tell whether their downloaded CSV is
-  // current. The audit-tool button uses the same visual style as the index
-  // navbar variant — managers see identical affordances across pages.
-  const lastAuditIso = (isConsolidated ? meta?.consolidatedAt : meta?.scannedAt) ?? "";
-  // 1.7.37 — Chicago time (DST-aware) so the date matches what an
-  // ICJIA reader would call "today" rather than a UTC day boundary.
-  const lastAuditFmt = fmtChicagoDate(lastAuditIso);
+  // v1.7.16: sticky nav surfaces the audit-tool buttons on every per-site +
+  // by-type detail page — managers see identical affordances across pages.
+  // v1.55.0: the XLSX download button + "Last audit" caption moved out of
+  // this bar into the hero (.dp-hero-download): the download is the page's
+  // primary deliverable and kept being missed at the right edge of a
+  // four-button nav cluster.
   return `<nav class="report-back-bar" aria-label="Report navigation">
   ${backHref ? `<a class="report-back-link" href="${htmlEscape(backHref)}">
     <span aria-hidden="true">&larr;</span> Back to fleet index
@@ -2147,12 +2153,6 @@ ${(() => {
       </svg>
       <span>What's New</span>
     </a>` : ""}
-    ${csvHref ? `<div class="report-csv-block">
-      <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
-        <span aria-hidden="true">&#x2913;</span> ${/\.csv$/i.test(String(csvHref)) ? "Download CSV" : "Download spreadsheet (XLSX)"}
-      </a>
-      ${lastAuditFmt ? `<p class="report-csv-date">Last audit: <strong>${htmlEscape(lastAuditFmt)}</strong></p>` : ""}
-    </div>` : ""}
   </div>
 </nav>`;
 })()}
@@ -2169,6 +2169,12 @@ ${(() => {
       <div class="dp-ring-pct">${heroPct}%<small>audit</small></div>
     </div>
   </div>
+  ${csvHref ? `<div class="report-csv-block dp-hero-download">
+    <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
+      <span aria-hidden="true">&#x2913;</span> ${/\.csv$/i.test(String(csvHref)) ? "Download CSV" : "Download spreadsheet (XLSX)"}
+    </a>
+    ${heroDateFmt ? `<p class="report-csv-date">Last audit: <strong>${htmlEscape(heroDateFmt)}</strong></p>` : ""}
+  </div>` : ""}
   ${fileA11yBannerHtml}
   <p class="dp-metaline"><strong>${heroTotal.toLocaleString()}</strong> file${heroTotal === 1 ? "" : "s"} &middot; <strong>${htmlEscape(humanizeBytes(totalBytes))}</strong>${heroDateFmt ? ` &middot; scanned <strong>${htmlEscape(heroDateFmt)}</strong>` : ""}</p>
   ${remediablePages > 0 ? `<p class="dp-snapshot-note"><strong>Snapshot as of ${htmlEscape(heroDateFmt || "the latest scan")}.</strong> These counts are a point-in-time view — they may change as files are added, edited, or removed from the site.</p>` : ""}
@@ -2269,21 +2275,7 @@ ${filterBarHtml}
     </tbody>
   </table>
 </details>
-<nav class="paginator" aria-label="Table pagination">
-  <span class="pag-info" id="page-info" role="status" aria-live="polite"></span>
-  <span class="pag-controls">
-    <label class="pag-size">Rows per page
-      <select id="page-size">
-        <option value="25" selected>25</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-      </select>
-    </label>
-    <button type="button" id="pag-prev" class="pag-btn">&larr; Prev</button>
-    <span class="pag-pages" id="pag-pages"></span>
-    <button type="button" id="pag-next" class="pag-btn">Next &rarr;</button>
-  </span>
-</nav>
+${paginatorNav({ live: true })}
 <div class="table-wrap table-scroll">
   <table id="inventory-table" aria-label="File inventory">
     <thead><tr>${headerCells}</tr></thead>
@@ -2292,6 +2284,7 @@ ${rowsHtml}
     </tbody>
   </table>
 </div>
+${paginatorNav({ live: true, bottom: true })}
 </div>
 ${pageViewSectionHtml}
 </main>
@@ -2326,11 +2319,26 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
   let currentPage = 1;
   let matched = [];  // matching <tr>, in current (sorted) DOM order
 
-  const pageInfoEl = document.getElementById("page-info");
-  const pagPrev = document.getElementById("pag-prev");
-  const pagNext = document.getElementById("pag-next");
-  const pagPagesEl = document.getElementById("pag-pages");
-  const pageSizeSel = document.getElementById("page-size");
+  // v1.55.0 — every paginator control exists twice: a copy above the table
+  // and a copy below it (bottom ids end in "-b"). All updates fan out to
+  // both copies so they never disagree.
+  function pagEls(id) {
+    return [document.getElementById(id), document.getElementById(id + "-b")]
+      .filter(function (el) { return el; });
+  }
+  const pageInfoEls = pagEls("page-info");
+  const pagPrevEls = pagEls("pag-prev");
+  const pagNextEls = pagEls("pag-next");
+  const pagPagesEls = pagEls("pag-pages");
+  const pageSizeSels = pagEls("page-size");
+
+  // Interacting with the BOTTOM copy re-renders rows above the viewport, so
+  // snap back up to the top paginator — the reader lands at the start of the
+  // page they asked for instead of staring at its tail.
+  function snapToTableTop() {
+    const nav = pageInfoEls[0] && pageInfoEls[0].closest(".paginator");
+    if (nav && nav.scrollIntoView) nav.scrollIntoView();
+  }
 
   function updateRowCount(visible) {
     if (!rowCountEl) return;
@@ -2374,42 +2382,47 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
     for (let i = startIdx; i < endIdx; i++) matched[i].style.display = "";
 
     updateRowCount(total);
-    if (pageInfoEl) {
-      pageInfoEl.textContent = total === 0
-        ? "No matching files"
-        : "Showing " + (startIdx + 1).toLocaleString() + "–" +
-          endIdx.toLocaleString() + " of " + total.toLocaleString() + " files";
-    }
-    if (pagPrev) pagPrev.disabled = currentPage <= 1;
-    if (pagNext) pagNext.disabled = currentPage >= totalPages;
+    const infoText = total === 0
+      ? "No matching files"
+      : "Showing " + (startIdx + 1).toLocaleString() + "–" +
+        endIdx.toLocaleString() + " of " + total.toLocaleString() + " files";
+    pageInfoEls.forEach(function (el) { el.textContent = infoText; });
+    pagPrevEls.forEach(function (b) { b.disabled = currentPage <= 1; });
+    pagNextEls.forEach(function (b) { b.disabled = currentPage >= totalPages; });
     renderPageButtons(totalPages);
   }
 
   // Windowed page-number buttons: 1 ... (cur-1) cur (cur+1) ... last.
+  // Rebuilt per copy — buttons can't be shared between the two containers.
   function renderPageButtons(totalPages) {
-    if (!pagPagesEl) return;
-    pagPagesEl.textContent = "";
-    if (totalPages <= 1) return;
-    const want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
-    const pages = [];
-    for (let p = 1; p <= totalPages; p++) {
-      if (want.indexOf(p) >= 0) pages.push(p);
-    }
-    let prev = 0;
-    pages.forEach(function (p) {
-      if (p - prev > 1) {
-        const gap = document.createElement("span");
-        gap.className = "pag-gap";
-        gap.textContent = "…";
-        pagPagesEl.appendChild(gap);
+    pagPagesEls.forEach(function (container, ci) {
+      container.textContent = "";
+      if (totalPages <= 1) return;
+      const want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+      const pages = [];
+      for (let p = 1; p <= totalPages; p++) {
+        if (want.indexOf(p) >= 0) pages.push(p);
       }
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
-      b.textContent = String(p);
-      b.addEventListener("click", function () { currentPage = p; renderPage(); });
-      pagPagesEl.appendChild(b);
-      prev = p;
+      let prev = 0;
+      pages.forEach(function (p) {
+        if (p - prev > 1) {
+          const gap = document.createElement("span");
+          gap.className = "pag-gap";
+          gap.textContent = "…";
+          container.appendChild(gap);
+        }
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
+        b.textContent = String(p);
+        b.addEventListener("click", function () {
+          currentPage = p;
+          renderPage();
+          if (ci > 0) snapToTableTop();
+        });
+        container.appendChild(b);
+        prev = p;
+      });
     });
   }
 
@@ -2453,14 +2466,22 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
     searchInput.addEventListener("input", applyFilters);
   }
 
-  // ── paginator controls ───────────────────────────────────────────────────────
-  if (pagPrev) pagPrev.addEventListener("click", function () { currentPage--; renderPage(); });
-  if (pagNext) pagNext.addEventListener("click", function () { currentPage++; renderPage(); });
-  if (pageSizeSel) pageSizeSel.addEventListener("change", function () {
-    const n = parseInt(pageSizeSel.value, 10);
-    if (!isNaN(n) && n > 0) pageSize = n;
-    currentPage = 1;
-    renderPage();
+  // ── paginator controls (both copies; bottom-copy clicks snap back up) ────────
+  pagPrevEls.forEach(function (b, i) {
+    b.addEventListener("click", function () { currentPage--; renderPage(); if (i > 0) snapToTableTop(); });
+  });
+  pagNextEls.forEach(function (b, i) {
+    b.addEventListener("click", function () { currentPage++; renderPage(); if (i > 0) snapToTableTop(); });
+  });
+  pageSizeSels.forEach(function (sel, i) {
+    sel.addEventListener("change", function () {
+      const n = parseInt(sel.value, 10);
+      if (!isNaN(n) && n > 0) pageSize = n;
+      pageSizeSels.forEach(function (other) { if (other !== sel) other.value = sel.value; });
+      currentPage = 1;
+      renderPage();
+      if (i > 0) snapToTableTop();
+    });
   });
 
   // ── sort ────────────────────────────────────────────────────────────────────
@@ -2570,36 +2591,53 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
   var matched = allRows.slice();
   var pageSize = 25;
   var currentPage = 1;
-  var pageInfo = document.getElementById("pv-page-info");
-  var pagPrev = document.getElementById("pv-pag-prev");
-  var pagNext = document.getElementById("pv-pag-next");
-  var pagPages = document.getElementById("pv-pag-pages");
-  var pageSizeSel = document.getElementById("pv-page-size");
+  // v1.55.0 — the Page view paginator also renders above AND below its
+  // table; ids of the bottom copy end in "-b". Same fan-out pattern as the
+  // file-view script above.
+  function pagEls(id) {
+    return [document.getElementById(id), document.getElementById(id + "-b")]
+      .filter(function (el) { return el; });
+  }
+  var pageInfoEls = pagEls("pv-page-info");
+  var pagPrevEls = pagEls("pv-pag-prev");
+  var pagNextEls = pagEls("pv-pag-next");
+  var pagPagesEls = pagEls("pv-pag-pages");
+  var pageSizeSels = pagEls("pv-page-size");
+
+  function snapToTableTop() {
+    var nav = pageInfoEls[0] && pageInfoEls[0].closest(".paginator");
+    if (nav && nav.scrollIntoView) nav.scrollIntoView();
+  }
 
   function renderPageButtons(totalPages) {
-    if (!pagPages) return;
-    pagPages.textContent = "";
-    if (totalPages <= 1) return;
-    var want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
-    var prev = 0;
-    for (var p = 1; p <= totalPages; p++) {
-      if (want.indexOf(p) < 0) continue;
-      if (p - prev > 1) {
-        var gap = document.createElement("span");
-        gap.className = "pag-gap";
-        gap.textContent = "…";
-        pagPages.appendChild(gap);
+    pagPagesEls.forEach(function (container, ci) {
+      container.textContent = "";
+      if (totalPages <= 1) return;
+      var want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+      var prev = 0;
+      for (var p = 1; p <= totalPages; p++) {
+        if (want.indexOf(p) < 0) continue;
+        if (p - prev > 1) {
+          var gap = document.createElement("span");
+          gap.className = "pag-gap";
+          gap.textContent = "…";
+          container.appendChild(gap);
+        }
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
+        b.textContent = String(p);
+        (function (target) {
+          b.addEventListener("click", function () {
+            currentPage = target;
+            renderPage();
+            if (ci > 0) snapToTableTop();
+          });
+        })(p);
+        container.appendChild(b);
+        prev = p;
       }
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
-      b.textContent = String(p);
-      (function (target) {
-        b.addEventListener("click", function () { currentPage = target; renderPage(); });
-      })(p);
-      pagPages.appendChild(b);
-      prev = p;
-    }
+    });
   }
 
   function renderPage() {
@@ -2611,14 +2649,13 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
     var end = Math.min(start + pageSize, total);
     allRows.forEach(function (r) { r.style.display = "none"; });
     for (var i = start; i < end; i++) matched[i].style.display = "";
-    if (pageInfo) {
-      pageInfo.textContent = total === 0
-        ? "No pages"
-        : "Showing " + (start + 1).toLocaleString() + "–" + end.toLocaleString() +
-          " of " + total.toLocaleString() + " pages";
-    }
-    if (pagPrev) pagPrev.disabled = currentPage <= 1;
-    if (pagNext) pagNext.disabled = currentPage >= totalPages;
+    var infoText = total === 0
+      ? "No pages"
+      : "Showing " + (start + 1).toLocaleString() + "–" + end.toLocaleString() +
+        " of " + total.toLocaleString() + " pages";
+    pageInfoEls.forEach(function (el) { el.textContent = infoText; });
+    pagPrevEls.forEach(function (b) { b.disabled = currentPage <= 1; });
+    pagNextEls.forEach(function (b) { b.disabled = currentPage >= totalPages; });
     renderPageButtons(totalPages);
   }
 
@@ -2652,13 +2689,21 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
     });
   });
 
-  if (pagPrev) pagPrev.addEventListener("click", function () { currentPage--; renderPage(); });
-  if (pagNext) pagNext.addEventListener("click", function () { currentPage++; renderPage(); });
-  if (pageSizeSel) pageSizeSel.addEventListener("change", function () {
-    var n = parseInt(pageSizeSel.value, 10);
-    if (!isNaN(n) && n > 0) pageSize = n;
-    currentPage = 1;
-    renderPage();
+  pagPrevEls.forEach(function (b, i) {
+    b.addEventListener("click", function () { currentPage--; renderPage(); if (i > 0) snapToTableTop(); });
+  });
+  pagNextEls.forEach(function (b, i) {
+    b.addEventListener("click", function () { currentPage++; renderPage(); if (i > 0) snapToTableTop(); });
+  });
+  pageSizeSels.forEach(function (sel, i) {
+    sel.addEventListener("change", function () {
+      var n = parseInt(sel.value, 10);
+      if (!isNaN(n) && n > 0) pageSize = n;
+      pageSizeSels.forEach(function (other) { if (other !== sel) other.value = sel.value; });
+      currentPage = 1;
+      renderPage();
+      if (i > 0) snapToTableTop();
+    });
   });
 
   renderPage();

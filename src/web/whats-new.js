@@ -38,6 +38,14 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "easier-download-and-paging-2026-08-17",
+    badge: "Improved",
+    text: "Two ease-of-use fixes. First, the green spreadsheet-download button on every site report now sits front and center in the summary header at the top of the page, with the “Last audit” date right beside it — no more hunting for a small button tucked into the navigation bar. Second, the table page controls (Prev / Next and the page numbers) now appear both above and below every long table — site reports, the page-by-page view, the duplicates list, and the orphaned-files report. Before, they existed only above the table, so scrolling to the end of a page of rows showed nothing telling you more pages existed. Clicking a control at the bottom of a table also jumps you back to the top of that table, so you land at the start of the rows you asked for.",
+    linkText: "Open the site reports",
+    linkHref: "sites.html",
+    date: "August 17, 2026",
+  },
+  {
     id: "office-files-scored-2026-08-17",
     badge: "Scope change",
     text: "Word, Excel, and PowerPoint files are now scored. Until today, only PDFs received an accessibility score; now every modern Office document (.docx, .xlsx, .pptx) goes through the same File Audit Tool check and carries the same 0–100 score, letter grade, and shareable audit report as PDFs — in search results, on every site page, and in every spreadsheet download. That widened the measurement: the fleet-wide average now covers 3,843 scored documents instead of 3,180 scored PDFs, and it moved from 61 to 63 — the files didn't change overnight; the measurement covers more of them. The same goes for any site whose ▲/▼ “since last audit” chip moved on August 17: that's the wider measurement, not remediation. One honest exception: 752 older Office files in legacy formats (mostly .doc and .xls) can't be machine-scored, because those formats can't carry the accessibility information the audit checks — they're marked “N/A (legacy format)” until they're re-saved in a modern format. A few corrupt or oversized files couldn't be scored either; the File errors page lists each one with the exact reason.",

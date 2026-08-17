@@ -69,6 +69,18 @@ describe("writeOrphansHtml", () => {
     expect(html).toContain('id="page-size"');
   });
 
+  // v1.55.0 — the paginator renders at both ends of the orphan table.
+  it("renders a bottom paginator with -b ids after the orphan table", () => {
+    const html = writeOrphansHtml({ orphans: [orphan()], sources, siteTotals });
+    expect(html).toContain('id="pag-prev-b"');
+    expect(html).toContain('id="pag-next-b"');
+    expect(html).toContain('id="page-size-b"');
+    const tableIdx = html.indexOf('<table id="orphan-table">');
+    expect(tableIdx).toBeGreaterThan(-1);
+    expect(html.indexOf('id="pag-prev-b"')).toBeGreaterThan(tableIdx);
+    expect(html).toContain("getElementById(id + '-b')");
+  });
+
   it("escapes HTML-special characters in an orphan filename", () => {
     const html = writeOrphansHtml({
       orphans: [orphan({ entry: { filename: "<script>alert(1)</script>.pdf", path: "uploads/x.pdf", serverName: "icjia-agency-prod", extension: "pdf", sizeBytes: 1, modifiedAt: "2021-01-01T00:00:00.000Z" } })],

@@ -432,6 +432,17 @@ describe("index page duplicates table (v1.12.1 paginator + trimmed columns)", ()
     expect(html).toContain('id="dup-page-size"');
   });
 
+  // v1.55.0 — the paginator renders at both ends of the duplicates table.
+  it("renders a bottom paginator with -b ids after the duplicates table", () => {
+    expect(html).toContain('id="dup-pag-prev-b"');
+    expect(html).toContain('id="dup-pag-next-b"');
+    expect(html).toContain('id="dup-page-size-b"');
+    expect(html).toContain('<span class="pag-info" id="dup-page-info-b"></span>');
+    const tableIdx = html.indexOf('<table class="dup-table">');
+    expect(tableIdx).toBeGreaterThan(-1);
+    expect(html.indexOf('id="dup-pag-prev-b"')).toBeGreaterThan(tableIdx);
+  });
+
   it("trims the HTML table to essential columns (dates + size columns dropped)", () => {
     expect(html).toMatch(/<th[^>]*class="dup-col-filename"/);
     expect(html).toMatch(/<th[^>]*class="dup-col-match"/);

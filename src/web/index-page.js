@@ -6,6 +6,7 @@ import { gradeForScore } from "../site-audit/aggregate.js";
 import { summarizeFileA11y, fileA11yCoverageText,
   fileA11yThinDataText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "../report/accessibility-band.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
+import { paginatorNav } from "./paginator-nav.js";
 import { renderWhatsNewBanner } from "./whats-new.js";
 import { uptimeClientScript } from "./uptime-client.js";
 
@@ -329,21 +330,7 @@ function renderDuplicatesSection(groups, _duplicatesCsv) {
           <button type="button" class="dup-filter-chip" data-dup-filter="all" aria-pressed="false">All <span class="dup-filter-count">${he(groups.length.toLocaleString())}</span></button>
         </div>
       </div>
-      <nav class="paginator" aria-label="Duplicate table pagination">
-        <span class="pag-info" id="dup-page-info"></span>
-        <span class="pag-controls">
-          <label class="pag-size">Rows per page
-            <select id="dup-page-size">
-              <option value="25" selected>25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select>
-          </label>
-          <button type="button" id="dup-pag-prev" class="pag-btn">&larr; Prev</button>
-          <span class="pag-pages" id="dup-pag-pages"></span>
-          <button type="button" id="dup-pag-next" class="pag-btn">Next &rarr;</button>
-        </span>
-      </nav>
+      ${paginatorNav({ idPrefix: "dup-", ariaLabel: "Duplicate table pagination" })}
       <div class="dup-pan-wrap" data-dup-pan data-dup-active-filter="remediable">
         <table class="dup-table">
           <thead>
@@ -359,6 +346,7 @@ function renderDuplicatesSection(groups, _duplicatesCsv) {
           </tbody>
         </table>
       </div>
+      ${paginatorNav({ idPrefix: "dup-", ariaLabel: "Duplicate table pagination", bottom: true })}
     </details>
   </section>`;
 }
@@ -1381,36 +1369,52 @@ ${renderSiteFooter({ generatedAt })}
   var currentPage = 1;
   var matched = [];
 
-  var pageInfo = document.getElementById("dup-page-info");
-  var pagPrev = document.getElementById("dup-pag-prev");
-  var pagNext = document.getElementById("dup-pag-next");
-  var pagPages = document.getElementById("dup-pag-pages");
-  var pageSizeSel = document.getElementById("dup-page-size");
+  // v1.55.0 — the duplicates paginator renders above AND below the table;
+  // bottom-copy ids end in "-b". All updates fan out to both copies.
+  function pagEls(id) {
+    return [document.getElementById(id), document.getElementById(id + "-b")]
+      .filter(function (el) { return el; });
+  }
+  var pageInfoEls = pagEls("dup-page-info");
+  var pagPrevEls = pagEls("dup-pag-prev");
+  var pagNextEls = pagEls("dup-pag-next");
+  var pagPagesEls = pagEls("dup-pag-pages");
+  var pageSizeSels = pagEls("dup-page-size");
+
+  function snapToTableTop() {
+    var nav = pageInfoEls[0] && pageInfoEls[0].closest(".paginator");
+    if (nav && nav.scrollIntoView) nav.scrollIntoView();
+  }
 
   function renderPageButtons(totalPages) {
-    if (!pagPages) return;
-    pagPages.textContent = "";
-    if (totalPages <= 1) return;
-    var want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
-    var prev = 0;
-    for (var p = 1; p <= totalPages; p++) {
-      if (want.indexOf(p) < 0) continue;
-      if (p - prev > 1) {
-        var gap = document.createElement("span");
-        gap.className = "pag-gap";
-        gap.textContent = "…";
-        pagPages.appendChild(gap);
+    pagPagesEls.forEach(function (container, ci) {
+      container.textContent = "";
+      if (totalPages <= 1) return;
+      var want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+      var prev = 0;
+      for (var p = 1; p <= totalPages; p++) {
+        if (want.indexOf(p) < 0) continue;
+        if (p - prev > 1) {
+          var gap = document.createElement("span");
+          gap.className = "pag-gap";
+          gap.textContent = "…";
+          container.appendChild(gap);
+        }
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
+        b.textContent = String(p);
+        (function (target) {
+          b.addEventListener("click", function () {
+            currentPage = target;
+            renderPage();
+            if (ci > 0) snapToTableTop();
+          });
+        })(p);
+        container.appendChild(b);
+        prev = p;
       }
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "pag-num" + (p === currentPage ? " pag-num-active" : "");
-      b.textContent = String(p);
-      (function (target) {
-        b.addEventListener("click", function () { currentPage = target; renderPage(); });
-      })(p);
-      pagPages.appendChild(b);
-      prev = p;
-    }
+    });
   }
 
   function renderPage() {
@@ -1422,14 +1426,13 @@ ${renderSiteFooter({ generatedAt })}
     var end = Math.min(start + pageSize, total);
     allRows.forEach(function (r) { r.style.display = "none"; });
     for (var i = start; i < end; i++) matched[i].style.display = "";
-    if (pageInfo) {
-      pageInfo.textContent = total === 0
-        ? "No duplicates in this view"
-        : "Showing " + (start + 1).toLocaleString() + "–" + end.toLocaleString() +
-          " of " + total.toLocaleString() + " duplicate groups";
-    }
-    if (pagPrev) pagPrev.disabled = currentPage <= 1;
-    if (pagNext) pagNext.disabled = currentPage >= totalPages;
+    var infoText = total === 0
+      ? "No duplicates in this view"
+      : "Showing " + (start + 1).toLocaleString() + "–" + end.toLocaleString() +
+        " of " + total.toLocaleString() + " duplicate groups";
+    pageInfoEls.forEach(function (el) { el.textContent = infoText; });
+    pagPrevEls.forEach(function (b) { b.disabled = currentPage <= 1; });
+    pagNextEls.forEach(function (b) { b.disabled = currentPage >= totalPages; });
     renderPageButtons(totalPages);
   }
 
@@ -1487,13 +1490,21 @@ ${renderSiteFooter({ generatedAt })}
     });
   }
 
-  if (pagPrev) pagPrev.addEventListener("click", function () { currentPage--; renderPage(); });
-  if (pagNext) pagNext.addEventListener("click", function () { currentPage++; renderPage(); });
-  if (pageSizeSel) pageSizeSel.addEventListener("change", function () {
-    var n = parseInt(pageSizeSel.value, 10);
-    if (!isNaN(n) && n > 0) pageSize = n;
-    currentPage = 1;
-    renderPage();
+  pagPrevEls.forEach(function (b, i) {
+    b.addEventListener("click", function () { currentPage--; renderPage(); if (i > 0) snapToTableTop(); });
+  });
+  pagNextEls.forEach(function (b, i) {
+    b.addEventListener("click", function () { currentPage++; renderPage(); if (i > 0) snapToTableTop(); });
+  });
+  pageSizeSels.forEach(function (sel, i) {
+    sel.addEventListener("change", function () {
+      var n = parseInt(sel.value, 10);
+      if (!isNaN(n) && n > 0) pageSize = n;
+      pageSizeSels.forEach(function (other) { if (other !== sel) other.value = sel.value; });
+      currentPage = 1;
+      renderPage();
+      if (i > 0) snapToTableTop();
+    });
   });
 
   apply();

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import vm from "node:vm";
 import { writeHtml } from "../src/report/html.js";
 
 let tmpDir;
@@ -1198,9 +1199,106 @@ describe("writeHtml", () => {
       // The CSS class definitions remain in the stylesheet; the rendered
       // anchor/block must not.
       expect(html).not.toContain('<a class="report-csv-link"');
-      expect(html).not.toContain('<div class="report-csv-block">');
+      expect(html).not.toContain('<div class="report-csv-block');
       expect(html).not.toContain("Download CSV");
       expect(html).not.toContain("Download spreadsheet (XLSX)");
+    });
+  });
+
+  // v1.55.0 — pagination controls render at BOTH ends of every paginated
+  // table. With controls only above the table, a reader who scrolls to the
+  // bottom of a 25-row page finds nothing telling them 11 more pages exist
+  // and concludes the list ends there.
+  describe("paginator at both ends of the table (v1.55.0)", () => {
+    const referencedEntries = () => [{
+      ...sampleEntries[0],
+      references: [{ siteName: "test-server", contentType: "meeting", entryId: 1, pageUrl: "https://example.org/p1/" }],
+    }];
+
+    it("renders a bottom paginator with -b ids after the file inventory table", async () => {
+      const out = path.join(tmpDir, "pag-both.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('id="pag-prev-b"');
+      expect(html).toContain('id="pag-next-b"');
+      expect(html).toContain('id="page-size-b"');
+      expect(html).toContain('id="pag-pages-b"');
+      expect(html).toContain('class="paginator paginator-bottom"');
+      // Top copy above the table, bottom copy below it, both inside the
+      // toggleable .file-view block (before the hidden Page view section).
+      const tableIdx = html.indexOf('<table id="inventory-table"');
+      const tableEnd = html.indexOf("</table>", tableIdx);
+      expect(html.indexOf('id="pag-prev"')).toBeLessThan(tableIdx);
+      const bottomIdx = html.indexOf('id="pag-prev-b"');
+      expect(bottomIdx).toBeGreaterThan(tableEnd);
+      expect(bottomIdx).toBeLessThan(html.indexOf('id="page-view"'));
+    });
+
+    it("keeps the polite live region on the top copy only (no double announcements)", async () => {
+      const out = path.join(tmpDir, "pag-live.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: referencedEntries(), sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('<span class="pag-info" id="page-info" role="status" aria-live="polite">');
+      expect(html).toContain('<span class="pag-info" id="page-info-b"></span>');
+      expect(html).toContain('<span class="pag-info" id="pv-page-info-b"></span>');
+    });
+
+    it("renders the bottom paginator for the Page view table too", async () => {
+      const out = path.join(tmpDir, "pag-pv.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: referencedEntries(), sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('id="pv-pag-prev-b"');
+      expect(html).toContain('id="pv-pag-next-b"');
+      const pvTableIdx = html.indexOf('<table id="page-table"');
+      expect(html.indexOf('id="pv-pag-prev-b"')).toBeGreaterThan(pvTableIdx);
+    });
+
+    it("wires both copies in the inline script and snaps back to the table top from the bottom copy", async () => {
+      const out = path.join(tmpDir, "pag-wire.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('document.getElementById(id + "-b")');
+      expect(html).toContain("scrollIntoView");
+    });
+
+    it("compiles every inline <script> (template-literal cooking guard)", async () => {
+      const out = path.join(tmpDir, "pag-compile.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: referencedEntries(), sources: [sampleHeader], outputPath: out, backHref: "index.html", csvHref: "audit.xlsx" });
+      const html = await fs.readFile(out, "utf8");
+      const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+      expect(scripts.length).toBeGreaterThan(0);
+      // Compile-only (never run): vm.Script throws on any syntax error.
+      for (const m of scripts) expect(() => new vm.Script(m[1])).not.toThrow();
+    });
+  });
+
+  // v1.55.0 — the XLSX download moved from the sticky nav's right-edge
+  // cluster into the hero: it is the page's primary deliverable and kept
+  // being missed among four look-alike nav buttons.
+  describe("download CTA lives in the hero (v1.55.0)", () => {
+    it("renders the download button + last-audit date inside the hero header", async () => {
+      const out = path.join(tmpDir, "cta-hero.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out, csvHref: "audit.xlsx" });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('<div class="report-csv-block dp-hero-download">');
+      const heroStart = html.indexOf('<header class="dp-hero">');
+      const heroEnd = html.indexOf("</header>", heroStart);
+      const ctaIdx = html.indexOf('class="report-csv-link"');
+      expect(heroStart).toBeGreaterThan(-1);
+      expect(ctaIdx).toBeGreaterThan(heroStart);
+      expect(ctaIdx).toBeLessThan(heroEnd);
+      expect(html).toMatch(/<p class="report-csv-date">Last audit: <strong>May 9, 2026<\/strong><\/p>/);
+    });
+
+    it("no longer renders the download block inside the sticky nav bar", async () => {
+      const out = path.join(tmpDir, "cta-nav.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out, backHref: "index.html", csvHref: "audit.xlsx" });
+      const html = await fs.readFile(out, "utf8");
+      const barStart = html.indexOf('<nav class="report-back-bar"');
+      expect(barStart).toBeGreaterThan(-1);
+      const barEnd = html.indexOf("</nav>", barStart);
+      expect(html.slice(barStart, barEnd)).not.toContain("report-csv-link");
+      expect(html.slice(barStart, barEnd)).not.toContain("Last audit:");
     });
   });
 

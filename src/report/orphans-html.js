@@ -6,6 +6,7 @@
 import { humanizeBytes, publicUrlFor } from "./format.js";
 import { escapeHtml as htmlEscape, safeUrlNormalized as safeUrl } from "../util/html.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
+import { paginatorNav } from "../web/paginator-nav.js";
 
 
 // (safeUrl → src/util/html.js safeUrlNormalized — encoded form, links must resolve)
@@ -331,36 +332,52 @@ const TABLE_SCRIPT = `
     let pageSize = 25;
     let currentPage = 1;
 
-    const pageInfo = document.getElementById('page-info');
-    const pagPrev = document.getElementById('pag-prev');
-    const pagNext = document.getElementById('pag-next');
-    const pagPages = document.getElementById('pag-pages');
-    const pageSizeSel = document.getElementById('page-size');
+    // v1.55.0 — the paginator renders above AND below the table; bottom-copy
+    // ids end in "-b". All updates fan out to both copies.
+    function pagEls(id) {
+      return [document.getElementById(id), document.getElementById(id + '-b')]
+        .filter((el) => el);
+    }
+    const pageInfoEls = pagEls('page-info');
+    const pagPrevEls = pagEls('pag-prev');
+    const pagNextEls = pagEls('pag-next');
+    const pagPagesEls = pagEls('pag-pages');
+    const pageSizeSels = pagEls('page-size');
     const filterInput = document.getElementById('orphan-filter');
 
+    function snapToTableTop() {
+      const nav = pageInfoEls[0] && pageInfoEls[0].closest('.paginator');
+      if (nav && nav.scrollIntoView) nav.scrollIntoView();
+    }
+
     function renderPageButtons(totalPages) {
-      if (!pagPages) return;
-      pagPages.textContent = '';
-      if (totalPages <= 1) return;
-      const want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
-      let prev = 0;
-      for (let p = 1; p <= totalPages; p++) {
-        if (want.indexOf(p) < 0) continue;
-        if (p - prev > 1) {
-          const gap = document.createElement('span');
-          gap.className = 'pag-gap';
-          gap.textContent = '…';
-          pagPages.appendChild(gap);
+      pagPagesEls.forEach((container, ci) => {
+        container.textContent = '';
+        if (totalPages <= 1) return;
+        const want = [1, totalPages, currentPage, currentPage - 1, currentPage + 1];
+        let prev = 0;
+        for (let p = 1; p <= totalPages; p++) {
+          if (want.indexOf(p) < 0) continue;
+          if (p - prev > 1) {
+            const gap = document.createElement('span');
+            gap.className = 'pag-gap';
+            gap.textContent = '…';
+            container.appendChild(gap);
+          }
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'pag-num' + (p === currentPage ? ' pag-num-active' : '');
+          b.textContent = String(p);
+          const target = p;
+          b.addEventListener('click', () => {
+            currentPage = target;
+            renderPage();
+            if (ci > 0) snapToTableTop();
+          });
+          container.appendChild(b);
+          prev = p;
         }
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'pag-num' + (p === currentPage ? ' pag-num-active' : '');
-        b.textContent = String(p);
-        const target = p;
-        b.addEventListener('click', () => { currentPage = target; renderPage(); });
-        pagPages.appendChild(b);
-        prev = p;
-      }
+      });
     }
 
     function renderPage() {
@@ -372,14 +389,13 @@ const TABLE_SCRIPT = `
       const end = Math.min(start + pageSize, total);
       allRows.forEach((r) => { r.style.display = 'none'; });
       for (let i = start; i < end; i++) matched[i].style.display = '';
-      if (pageInfo) {
-        pageInfo.textContent = total === 0
-          ? 'No matching files'
-          : 'Showing ' + (start + 1).toLocaleString() + '–' + end.toLocaleString() +
-            ' of ' + total.toLocaleString() + ' orphans';
-      }
-      if (pagPrev) pagPrev.disabled = currentPage <= 1;
-      if (pagNext) pagNext.disabled = currentPage >= totalPages;
+      const infoText = total === 0
+        ? 'No matching files'
+        : 'Showing ' + (start + 1).toLocaleString() + '–' + end.toLocaleString() +
+          ' of ' + total.toLocaleString() + ' orphans';
+      pageInfoEls.forEach((el) => { el.textContent = infoText; });
+      pagPrevEls.forEach((b) => { b.disabled = currentPage <= 1; });
+      pagNextEls.forEach((b) => { b.disabled = currentPage >= totalPages; });
       renderPageButtons(totalPages);
     }
 
@@ -411,13 +427,21 @@ const TABLE_SCRIPT = `
     });
 
     if (filterInput) filterInput.addEventListener('input', applyFilter);
-    if (pagPrev) pagPrev.addEventListener('click', () => { currentPage--; renderPage(); });
-    if (pagNext) pagNext.addEventListener('click', () => { currentPage++; renderPage(); });
-    if (pageSizeSel) pageSizeSel.addEventListener('change', () => {
-      const n = parseInt(pageSizeSel.value, 10);
-      if (!isNaN(n) && n > 0) pageSize = n;
-      currentPage = 1;
-      renderPage();
+    pagPrevEls.forEach((b, i) => {
+      b.addEventListener('click', () => { currentPage--; renderPage(); if (i > 0) snapToTableTop(); });
+    });
+    pagNextEls.forEach((b, i) => {
+      b.addEventListener('click', () => { currentPage++; renderPage(); if (i > 0) snapToTableTop(); });
+    });
+    pageSizeSels.forEach((sel, i) => {
+      sel.addEventListener('change', () => {
+        const n = parseInt(sel.value, 10);
+        if (!isNaN(n) && n > 0) pageSize = n;
+        pageSizeSels.forEach((other) => { if (other !== sel) other.value = sel.value; });
+        currentPage = 1;
+        renderPage();
+        if (i > 0) snapToTableTop();
+      });
     });
 
     applyFilter();
@@ -464,21 +488,7 @@ export function writeOrphansHtml({
   <div class="toolbar">
     <input id="orphan-filter" type="search" placeholder="Filter by site, filename, status, reason…" autocomplete="off" />
   </div>
-  <nav class="paginator" aria-label="Table pagination">
-    <span class="pag-info" id="page-info"></span>
-    <span class="pag-controls">
-      <label class="pag-size">Rows per page
-        <select id="page-size">
-          <option value="25" selected>25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
-      </label>
-      <button type="button" id="pag-prev" class="pag-btn">&larr; Prev</button>
-      <span class="pag-pages" id="pag-pages"></span>
-      <button type="button" id="pag-next" class="pag-btn">Next &rarr;</button>
-    </span>
-  </nav>
+  ${paginatorNav()}
   <table id="orphan-table">
     <thead>
       <tr>
@@ -497,6 +507,7 @@ export function writeOrphansHtml({
       ${rows}
     </tbody>
   </table>
+  ${paginatorNav({ bottom: true })}
 </main>
 ${renderSiteFooter()}
   <script>${TABLE_SCRIPT}</script>
