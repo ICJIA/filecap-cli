@@ -1,6 +1,6 @@
 # Office scoring — design spec
 
-**Date:** 2026-08-17 · **Target release:** v1.53.0 · **Status:** approved design, pre-implementation
+**Date:** 2026-08-17 · **Target release:** v1.54.0 · **Status:** approved design, pre-implementation
 
 ## Goal
 
@@ -188,7 +188,7 @@ blurb updated to mention document (not just PDF) errors.
   helpers).
 - New coverage: search-index Office-row-with-score fixture (existing gap).
 
-### 8. Release (v1.53.0)
+### 8. Release (v1.54.0)
 
 1. Implement + full suite green.
 2. Score run: per-site `filecap audits` over existing inventories (no
