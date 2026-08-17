@@ -1,16 +1,16 @@
-// `filecap audits` — walks an inventory NDJSON and scores every PDF via
-// audit.icjia.app's /api/audit-url endpoint. Other file types (docx, xlsx,
-// pptx, image, etc.) pass through unchanged — they have their own in-app
-// remediation checkers and aren't in scope for this scorer.
+// `filecap audits` — walks an inventory NDJSON and scores every machine-scoreable document
+// (PDF + modern Office: docx/xlsx/pptx) via audit.icjia.app's /api/audit-url endpoint.
+// Legacy Office binaries (.doc/.xls/.ppt), ODF/RTF, images, and other file types pass
+// through unchanged — legacy formats can't carry the accessibility structures the audit
+// checks (the service refuses them), so the reports mark them for conversion instead.
 //
 // Pipeline placement (v1.9.0):
 //   scan → references → cross-references → audits → web-rollup
 //
-// Each PDF gets `entry.audit = { score, grade, reportUrl, reportId,
-// reportExpiresAt, audited, checkedAt, cached }` attached. Errors / skips
-// surface as `entry.audit = { error: "..." }` or `{ skipped: "..." }` so
-// the report layer can render an explicit cell instead of pretending the
-// audit never ran.
+// Each scoreable document gets `entry.audit = { score, grade, reportUrl, reportId,
+// reportExpiresAt, audited, checkedAt, cached }` attached. Errors / skips surface as
+// `entry.audit = { error: "..." }` or `{ skipped: "..." }` so the report layer can
+// render an explicit cell instead of pretending the audit never ran.
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -21,6 +21,7 @@ import {
   isCacheEntryFresh,
   DEFAULT_CACHE_PATH,
 } from "../audits/cache.js";
+import { isScoreable } from "../scanner/category.js";
 import { fetchAuditScore } from "../audits/score-fetcher.js";
 import { fetchPageAuditScore } from "../audits/page-scorer.js";
 import { createRetryingJsonFetcher, formatThrottleSummary } from "../audits/retrying-fetcher.js";
@@ -34,13 +35,6 @@ const DEFAULT_PAGE_CACHE_PATH = path.join(
   ".filecap",
   "page-audit-cache.json",
 );
-
-// PDF is the only category we score. The others have native checkers in
-// their authoring tools (Word, Excel, PowerPoint) — duplicating that work
-// here adds noise without value.
-function isScoreableEntry(entry) {
-  return entry && entry.extension === "pdf" && entry.category === "pdf";
-}
 
 // The default HTTP layer retries 429 (audit.icjia.app's 100/min per-IP rate
 // limit) and transient 5xx, honoring Retry-After. Without this a big batch
@@ -149,12 +143,11 @@ export async function runAudits({
   const httpFetcher = fetcher ?? defaultJsonFetcher(log);
   const now = new Date();
 
-  // Identify the PDFs we need to actually call the endpoint for. Entries
-  // with a fresh cache hit short-circuit before any HTTP.
-  const pdfsToAudit = [];
+  // Identify the documents we need to actually call the endpoint for.
+  const docsToAudit = [];
   for (let i = 0; i < records.length; i++) {
     const entry = records[i];
-    if (!isScoreableEntry(entry)) continue;
+    if (!isScoreable(entry)) continue;
     const url = resolveEntryUrl(entry);
     if (!url) {
       entry.audit = { skipped: "no-public-url" };
@@ -178,17 +171,17 @@ export async function runAudits({
       };
       continue;
     }
-    pdfsToAudit.push(i);
+    docsToAudit.push(i);
   }
 
   log(
-    `[audits] ${records.length} records total; ${pdfsToAudit.length} PDFs to audit ` +
-      `(others cached or non-PDF)`,
+    `[audits] ${records.length} records total; ${docsToAudit.length} documents to audit ` +
+      `(others cached or not machine-scoreable)`,
   );
 
   let auditedCount = 0;
   let errorCount = 0;
-  await mapWithConcurrency(pdfsToAudit, concurrency, async (recordIdx) => {
+  await mapWithConcurrency(docsToAudit, concurrency, async (recordIdx) => {
     const entry = records[recordIdx];
     try {
       const result = await fetchAuditScore({
@@ -371,7 +364,7 @@ export async function runAudits({
     `[audits] wrote ${records.length} records → ${outputPath} ` +
       // v1.39.0: the count is unconditional — the old ternary printed "0"
       // exactly when EVERYTHING was served from the local cache.
-      `(PDFs: ${auditedCount} freshly audited, ${errorCount} errors, ${records.filter((r) => r.audit?.cached).length} from cache; ` +
+      `(documents: ${auditedCount} freshly audited, ${errorCount} errors, ${records.filter((r) => r.audit?.cached).length} from cache; ` +
       `pages: ${pagesTotalUnique} unique, ${pagesAuditedCount} freshly audited, ${pagesCachedCount} cached, ${pagesErrorCount} errors)`,
   );
 

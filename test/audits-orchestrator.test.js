@@ -5,17 +5,17 @@ import path from "node:path";
 import { runAudits } from "../src/commands/audits.js";
 
 // 1.9.0: the audits orchestrator walks an inventory NDJSON, scores every
-// PDF entry via the score-fetcher (with the local cache short-circuiting
+// scoreable document (pdf/docx/xlsx/pptx) entry via the score-fetcher (with the local cache short-circuiting
 // fresh hashes), writes inventory.audited.ndjson with entry.audit
-// populated. Non-PDF entries pass through unchanged. Behavior under test:
-//   - PDF entries get audit data attached
+// populated. Legacy Office (.doc/.xls/.ppt), ODF/RTF, and non-document entries pass through unchanged. Behavior under test:
+//   - PDF/OOXML entries get audit data attached
 //   - Cache hits skip the HTTP call
 //   - Cache misses call the fetcher and persist the result
-//   - Non-PDF entries (docx, xlsx, image) are emitted unchanged with no
+//   - Legacy Office (.doc/.xls/.ppt), ODF/RTF, and non-document entries are emitted unchanged with no
 //     entry.audit field
 //   - Header / footer lines pass through unchanged
 //   - Force refresh option skips the cache (re-audits everything)
-//   - Network errors on a single PDF don't fail the whole run
+//   - Network errors on a single document don't fail the whole run
 
 const baseHeader = {
   schemaVersion: 1,
@@ -151,12 +151,20 @@ describe("runAudits", () => {
     expect(records[1].audit.score).toBe(60);
   });
 
-  it("does NOT score xlsx/docx/pptx/image entries — they pass through with no audit field", async () => {
-    writeInventory(invPath, [pdfEntry(), xlsxEntry(), { ...xlsxEntry({ extension: "docx", category: "office-document" }) }, { ...xlsxEntry({ extension: "pptx", category: "presentation" }) }, { ...xlsxEntry({ extension: "jpg", category: "image" }) }]);
-    let calls = 0;
-    const fetcher = async () => {
-      calls++;
-      return { strict: { score: 80, grade: "B" }, reportUrl: "https://r/", reportId: "r", reportExpiresAt: "2027-01-01T00:00:00Z", pageCount: 1, audited: "2026-05-19T00:00:00Z", cached: false };
+  it("scores docx/xlsx/pptx alongside PDFs; legacy and non-documents pass through unscored", async () => {
+    writeInventory(invPath, [
+      pdfEntry(),
+      xlsxEntry(),
+      xlsxEntry({ path: "memo.docx", filename: "memo.docx", extension: "docx", category: "office-document", sha256: "ddd4444444444444444444444444444444444444444444444444444444444444", publicUrl: "https://icjia-api.cloud/uploads/memo.docx" }),
+      xlsxEntry({ path: "deck.pptx", filename: "deck.pptx", extension: "pptx", category: "presentation", sha256: "eee5555555555555555555555555555555555555555555555555555555555555", publicUrl: "https://icjia-api.cloud/uploads/deck.pptx" }),
+      xlsxEntry({ path: "old.xls", filename: "old.xls", extension: "xls", category: "legacy-office", sha256: "fff6666666666666666666666666666666666666666666666666666666666666", publicUrl: "https://icjia-api.cloud/uploads/old.xls" }),
+      xlsxEntry({ path: "notes.rtf", filename: "notes.rtf", extension: "rtf", category: "office-document", sha256: "abc7777777777777777777777777777777777777777777777777777777777777", publicUrl: "https://icjia-api.cloud/uploads/notes.rtf" }),
+      xlsxEntry({ path: "logo.jpg", filename: "logo.jpg", extension: "jpg", category: "image", sha256: "abc8888888888888888888888888888888888888888888888888888888888888", publicUrl: "https://icjia-api.cloud/uploads/logo.jpg" }),
+    ]);
+    const urls = [];
+    const fetcher = async (url, init) => {
+      urls.push(JSON.parse(init.body).url);
+      return { strict: { score: 80, grade: "B" }, reportUrl: "https://r/", reportId: "r", reportExpiresAt: "2027-01-01T00:00:00Z", pageCount: 1, audited: "2026-08-17T00:00:00Z", cached: false };
     };
     await runAudits({
       inventoryPath: invPath,
@@ -166,15 +174,32 @@ describe("runAudits", () => {
       fetcher,
       log: () => {},
     });
-    // Only the PDF should be scored.
-    expect(calls).toBe(1);
+    // pdf + xlsx + docx + pptx are sent; xls/rtf/jpg never are.
+    expect(urls).toHaveLength(4);
+    expect(urls.some((u) => u.endsWith("old.xls"))).toBe(false);
+    expect(urls.some((u) => u.endsWith("notes.rtf"))).toBe(false);
     const records = readNdjson(outPath);
-    // records[0] = header, [1..5] = entries, [6] = footer
-    expect(records[1].extension).toBe("pdf");
-    expect(records[1].audit).toBeDefined();
-    for (let i = 2; i <= 5; i++) {
-      expect(records[i].audit).toBeUndefined();
-    }
+    // records[0] header, [1..7] entries, [8] footer.
+    for (const i of [1, 2, 3, 4]) expect(records[i].audit?.score).toBe(80);
+    for (const i of [5, 6, 7]) expect(records[i].audit).toBeUndefined();
+  });
+
+  it("records an Office audit error exactly like a PDF one", async () => {
+    writeInventory(invPath, [xlsxEntry()]);
+    const fetcher = async () => {
+      throw new Error("HTTP 422 Unprocessable Entity for https://icjia-api.cloud/uploads/data.xlsx — The fetched Excel file could not be read.");
+    };
+    await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher,
+      log: () => {},
+    });
+    const records = readNdjson(outPath);
+    expect(records[1].audit.error).toMatch(/HTTP 422/);
+    expect(records[1].audit.score).toBeUndefined();
   });
 
   it("preserves the inventory header and footer unchanged", async () => {

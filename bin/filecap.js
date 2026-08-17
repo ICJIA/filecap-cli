@@ -286,7 +286,7 @@ program
 program
   .command("audits <inventory>")
   .description(
-    "Score every PDF in an inventory via audit.icjia.app's /api/audit-url endpoint. Writes an augmented NDJSON with entry.audit populated for each PDF (score, grade, reportUrl). Only PDFs are scored — docx/xlsx/pptx/image files pass through unchanged. Caches by SHA-256 (default 30-day TTL) so subsequent runs short-circuit on unchanged files.",
+    "Score every machine-scoreable document (PDF, Word .docx, Excel .xlsx, PowerPoint .pptx) in an inventory via audit.icjia.app. Legacy Office binaries (.doc/.xls/.ppt) and other file types pass through unchanged. Caches by SHA-256 (default 30-day TTL) so subsequent runs short-circuit on unchanged files.",
   )
   .requiredOption(
     "-o, --output <path>",
@@ -308,7 +308,7 @@ program
   )
   .option(
     "--force",
-    "ignore the cache and re-audit every PDF (also sends force=true to the server)",
+    "ignore the cache and re-audit every document (also sends force=true to the server)",
   )
   .option(
     "--cache-path <path>",
