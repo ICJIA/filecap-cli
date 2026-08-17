@@ -530,6 +530,39 @@ describe("writeHtml", () => {
     });
   });
 
+  // v1.54.0 regression cover: unscoreableCount flows html.js's own tally →
+  // summarizeFileA11y({unscoreable}) → fileA11yCoverageText — a chain that
+  // fails SILENTLY (renders 0 unscoreable, no error) if a key along the way
+  // is dropped or misspelled. Five scored PDFs clear MIN_SCORED_DOCS so the
+  // banner takes the banded branch (the thin-data branch never renders the
+  // coverage clause at all).
+  describe("file-accessibility banner names legacy Office in the coverage clause (v1.54.0)", () => {
+    it("surfaces the unscoreable count once the site has a full score band", async () => {
+      const out = path.join(tmpDir, "legacy-a11y.html");
+      const scoredPdfs = [0, 1, 2, 3, 4].map((i) => ({
+        ...sampleEntries[0],
+        sha256: `scored-${i}`,
+        path: `doc${i}.pdf`,
+        filename: `doc${i}.pdf`,
+        audit: { score: 80, grade: "B" },
+      }));
+      const legacyEntry = {
+        ...sampleEntries[0],
+        sha256: "legacy-1",
+        path: "old.ppt",
+        filename: "old.ppt",
+        extension: "ppt",
+        category: "legacy-office",
+        introspection: { kind: "office-legacy", format: "ppt" },
+      };
+      const entries = [...scoredPdfs, legacyEntry];
+      await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("legacy Office");
+      expect(html).toContain("be machine-scored"); // "can't" is HTML-entity-escaped (&#39;) in the rendered banner
+    });
+  });
+
   describe("placeholder columns are not sortable (v1.39.0)", () => {
     it("marks Page References and Audit Report headers data-nosort; others stay sortable", async () => {
       const out = path.join(tmpDir, "nosort.html");

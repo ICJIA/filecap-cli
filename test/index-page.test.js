@@ -187,6 +187,30 @@ describe("renderCard thin-data file-accessibility caption (v1.40.0)", () => {
   });
 });
 
+// v1.54.0 regression cover: unscoreableCount flows summary → renderCard's own
+// summarizeFileA11y({unscoreable}) call → fileA11yCoverageText — a chain that
+// fails SILENTLY (renders 0 unscoreable, no error) if a key along the way is
+// dropped or misspelled. Five scored documents clear MIN_SCORED_DOCS so the
+// card takes the banded branch (the thin-data branch above never renders the
+// coverage clause at all).
+describe("renderCard file-accessibility coverage clause names legacy Office (v1.54.0)", () => {
+  it("surfaces the unscoreable count once the site has a full score band", () => {
+    const sr = {
+      ...baseSr,
+      summary: {
+        ...baseSr.summary,
+        remediable: 7,
+        auditScoreSum: 400,
+        auditedDocCount: 5,
+        unscoreableCount: 2,
+      },
+    };
+    const html = renderCard(sr);
+    expect(html).toContain("legacy Office");
+    expect(html).toContain("re-save as .docx/.xlsx/.pptx");
+  });
+});
+
 describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
   const sr = {
     site: {
