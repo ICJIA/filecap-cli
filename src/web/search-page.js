@@ -16,6 +16,7 @@ import { ICJIA_LOGO_SVG } from "./index-page.js";
 import { searchMatchClientSource } from "./search-match.js";
 import { searchXlsxClientSource } from "./search-xlsx.js";
 import { SEARCH_INDEX_FILENAME } from "./search-index.js";
+import { searchReportClientSource, SEARCH_REPORT_STORAGE_KEY } from "./search-report.js";
 
 // Deployed bundle URL — used for the ABSOLUTE audit-report links inside the
 // downloaded workbook (a spreadsheet opened on someone's desktop has no
@@ -139,6 +140,63 @@ const SEARCH_CSS = `
   .search-wrap { padding: 0 1rem 2rem; }
   .search-box-row { flex-direction: column; align-items: stretch; }
 }
+
+/* ── v1.51.0: custom report ──────────────────────────────────── */
+/* Several report elements are flex containers; a bare hidden attribute
+   loses to "display: flex", so make it always win on this page. */
+[hidden] { display: none !important; }
+.report-bar, .report-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  margin: 0.9rem 0 0.35rem;
+}
+.report-bar { background: #161b22; border: 1px solid #30363d; }
+.report-banner { background: rgba(255, 176, 0, 0.08); border: 1px solid #ffb000; color: #e5e5e5; }
+.report-count { font-weight: 600; color: #ffd76a; }
+.report-btn {
+  font: inherit;
+  font-size: 0.88rem;
+  color: #d4dae0;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+.report-btn:hover { border-color: #58a6ff; color: #e5e5e5; }
+.report-btn:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+.report-btn[disabled] { color: #7d8590; border-color: #21262d; cursor: not-allowed; }
+.report-btn-primary { background: #ffb000; border-color: #ffb000; color: #0d1117; font-weight: 600; }
+.report-btn-primary:hover { background: #ffc23d; border-color: #ffc23d; color: #0d1117; }
+.report-btn-primary[disabled] { background: #30363d; border-color: #30363d; color: #7d8590; }
+.report-status { color: #d4dae0; font-size: 0.9rem; margin: 0.35rem 0 0; min-height: 1.3em; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.75rem; }
+.search-table th.sel, .search-table td.sel { width: 1.8rem; text-align: center; vertical-align: middle; }
+.search-table input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: #ffb000; cursor: pointer; }
+.report-remove {
+  font: inherit;
+  font-size: 0.82rem;
+  color: #f85149;
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.15rem 0.55rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.report-remove:hover { border-color: #f85149; }
+.report-remove:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+/* Report view swaps in where the results live; everything results-only hides. */
+.search-wrap.report-open #did-you-mean,
+.search-wrap.report-open #category-chips,
+.search-wrap.report-open #site-chips,
+.search-wrap.report-open #search-status,
+.search-wrap.report-open #report-actions,
+.search-wrap.report-open #search-results { display: none; }
 `;
 
 /**
@@ -221,12 +279,33 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
         Download results (.xlsx)
       </button>
     </div>
+    <div id="report-banner" class="report-banner" hidden>
+      <span id="report-banner-text"></span>
+      <button id="report-banner-keep" class="report-btn report-btn-primary" type="button">Keep adding to it</button>
+      <button id="report-banner-clear" class="report-btn" type="button">Clear it</button>
+    </div>
+    <div id="report-bar" class="report-bar" hidden>
+      <span id="report-count" class="report-count"></span>
+      <button id="report-view-toggle" class="report-btn" type="button">View report</button>
+      <button id="report-download" class="report-btn report-btn-primary" type="button" title="Download the custom report as an Excel workbook (with links)">Download report (.xlsx)</button>
+      <button id="report-clear" class="report-btn" type="button">Clear…</button>
+      <span id="report-clear-confirm" hidden>Clear the whole report?
+        <button id="report-clear-yes" class="report-btn" type="button">Yes, clear it</button>
+        <button id="report-clear-keep" class="report-btn" type="button">Keep it</button>
+      </span>
+    </div>
+    <p id="report-status" class="report-status" aria-live="polite"></p>
     <div id="did-you-mean" class="search-chips search-suggest" role="group" aria-label="Spelling suggestions"></div>
     <div id="category-chips" class="search-chips" role="group" aria-label="Filter results by file type"></div>
     <p id="search-status" class="search-status" aria-live="polite"></p>
     <div id="site-chips" class="search-chips" role="group" aria-label="Filter results by website"></div>
+    <div id="report-actions" class="report-actions" hidden>
+      <button id="add-selected" class="report-btn report-btn-primary" type="button" disabled>Add selected to report</button>
+      <button id="add-all" class="report-btn" type="button">Add all matches to report</button>
+    </div>
     <div id="search-results"></div>
-    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links.</p>
+    <div id="report-view" hidden></div>
+    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links. To build a <strong>custom report</strong>, tick the box on any result — or add every match at once — then search for something else and keep adding. The report bar above shows what you've collected, with its own view, Excel download, and clear buttons. A custom report lasts for this browser tab only: it survives leaving and returning to this page, and is gone when the tab closes.</p>
   </div>
 </main>
 
@@ -235,6 +314,7 @@ ${renderSiteFooter({ generatedAt })}
 <script>
 ${searchMatchClientSource()}
 ${searchXlsxClientSource()}
+${searchReportClientSource()}
 (function () {
   "use strict";
   var INDEX_URL = ${JSON.stringify(SEARCH_INDEX_FILENAME)};
@@ -367,6 +447,10 @@ ${searchXlsxClientSource()}
 
   function update() {
     var q = input.value;
+    // A NEW search means a fresh selection; re-sorting or chip-filtering
+    // the same search keeps your ticks.
+    var qk = foldSearchText(q);
+    if (qk !== lastQueryKey) { lastQueryKey = qk; selected = {}; }
     var matches = data ? runSearch(hays, q) : [];
     if (!foldSearchText(q)) {
       catChipsEl.textContent = "";
@@ -375,6 +459,7 @@ ${searchXlsxClientSource()}
       suggestEl.textContent = "";
       lastFiltered = [];
       downloadBtn.disabled = true;
+      reportActionsEl.hidden = true;
       statusEl.className = "search-status";
       statusEl.textContent = data ? "Type to search " + data.rows.length.toLocaleString("en-US") + " files." : "";
       return;
@@ -407,6 +492,15 @@ ${searchXlsxClientSource()}
       sortDir,
     );
     lastFiltered = filtered;
+
+    // Selection only exists on rendered rows — prune ticks that a chip
+    // filter (or a shrinking match set) just removed from view.
+    var visIdx = {};
+    var visLim = Math.min(filtered.length, RENDER_CAP);
+    for (var pv = 0; pv < visLim; pv++) visIdx[filtered[pv].i] = true;
+    for (var pk in selected) { if (!visIdx[pk]) delete selected[pk]; }
+    reportActionsEl.hidden = filtered.length === 0;
+    refreshAddButtons();
 
     // "Did you mean?" — a near-miss of a SITE's name never floods results
     // (the typo tier reads filenames only); it becomes a clickable swap.
@@ -503,6 +597,25 @@ ${searchXlsxClientSource()}
     table.className = "search-table";
     var thead = document.createElement("thead");
     var hr = document.createElement("tr");
+    var thSel = document.createElement("th");
+    thSel.scope = "col";
+    thSel.className = "sel";
+    var selAll = document.createElement("input");
+    selAll.type = "checkbox";
+    selAll.setAttribute("aria-label", "Select all shown results");
+    selAll.title = "Select all shown results";
+    selAll.addEventListener("change", function () {
+      var boxes = tbody.querySelectorAll("input");
+      for (var bi = 0; bi < boxes.length; bi++) {
+        boxes[bi].checked = selAll.checked;
+        var di = Number(boxes[bi].getAttribute("data-i"));
+        if (selAll.checked) selected[di] = true;
+        else delete selected[di];
+      }
+      refreshAddButtons();
+    });
+    thSel.appendChild(selAll);
+    hr.appendChild(thSel);
     SORT_COLUMNS.forEach(function (col) {
       var th = document.createElement("th");
       th.scope = "col";
@@ -545,6 +658,23 @@ ${searchXlsxClientSource()}
       var site = data.sites[row[2]] || {};
       var why = match.why || [];
       var tr = document.createElement("tr");
+
+      var tdSel = document.createElement("td");
+      tdSel.className = "sel";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.setAttribute("data-i", String(match.i));
+      cb.setAttribute("aria-label", "Select " + row[0]);
+      cb.checked = !!selected[match.i];
+      cb.addEventListener("change", (function (idx, box) {
+        return function () {
+          if (box.checked) selected[idx] = true;
+          else delete selected[idx];
+          refreshAddButtons();
+        };
+      })(match.i, cb));
+      tdSel.appendChild(cb);
+      tr.appendChild(tdSel);
 
       var tdSite = document.createElement("td");
       tdSite.className = "search-site";
@@ -625,6 +755,11 @@ ${searchXlsxClientSource()}
 
       tbody.appendChild(tr);
     }
+    var allSel = shown > 0;
+    for (var as = 0; as < shown; as++) {
+      if (!selected[filtered[as].i]) { allSel = false; break; }
+    }
+    selAll.checked = allSel;
     table.appendChild(tbody);
     wrap.appendChild(table);
     resultsEl.appendChild(wrap);
@@ -639,41 +774,301 @@ ${searchXlsxClientSource()}
 
   var timer = null;
   input.addEventListener("input", function () {
+    if (reportOpen) closeReportView();
     if (timer) clearTimeout(timer);
     timer = setTimeout(update, DEBOUNCE_MS);
   });
 
   downloadBtn.addEventListener("click", function () {
     if (!lastFiltered.length || !data) return;
-    var rowsOut = lastFiltered.map(function (mm) {
-      var row = data.rows[mm.i];
-      var site = data.sites[row[2]] || {};
-      return {
-        site: site.label || "",
-        filename: row[0],
-        category: catLabel(data.categories[row[3]] || ""),
-        score: typeof row[6] === "number" ? row[6] : null,
-        grade: row[7] || null,
-        sizeBytes: row[4],
-        modified: row[5] || "",
-        fileUrl: row[8] || "",
-        // The per-file audit.icjia.app report — the house "Audit Report"
-        // column meaning. Blank when the file was never scored.
-        reportUrl: row[9] || "",
-        matchedOn: matchedOnText(mm.why || []),
-      };
-    });
-    var bytes = buildSearchWorkbook(rowsOut);
+    // Results workbook and custom report share the row shape; the builder
+    // ignores the extra "query" field unless asked for the column.
+    var bytes = buildSearchWorkbook(lastFiltered.map(toReportRow));
+    triggerXlsxDownload(bytes, xlsxDownloadName(input.value, new Date().toISOString()));
+  });
+
+  // ── v1.51.0: custom report ───────────────────────────────────────
+  // A session-only report the visitor assembles across any number of
+  // searches: tick rows (or add every match), keep searching, download
+  // when done. sessionStorage = per-tab lifetime — it survives leaving
+  // and returning to this page (a banner asks keep-or-clear on return)
+  // and disappears when the tab closes. srAddRows / srParseStored & co.
+  // are the unit-tested store functions embedded above.
+  var REPORT_KEY = ${JSON.stringify(SEARCH_REPORT_STORAGE_KEY)};
+  var REPORT_MAX = 5000;
+
+  var reportBannerEl = document.getElementById("report-banner");
+  var reportBannerText = document.getElementById("report-banner-text");
+  var reportBarEl = document.getElementById("report-bar");
+  var reportCountEl = document.getElementById("report-count");
+  var reportToggleBtn = document.getElementById("report-view-toggle");
+  var reportDownloadBtn = document.getElementById("report-download");
+  var reportClearBtn = document.getElementById("report-clear");
+  var reportClearConfirmEl = document.getElementById("report-clear-confirm");
+  var reportStatusEl = document.getElementById("report-status");
+  var reportActionsEl = document.getElementById("report-actions");
+  var addSelectedBtn = document.getElementById("add-selected");
+  var addAllBtn = document.getElementById("add-all");
+  var reportViewEl = document.getElementById("report-view");
+  var wrapEl = document.querySelector(".search-wrap");
+
+  var report = [];
+  var reportOpen = false;
+  var selected = {};
+  var lastQueryKey = "";
+
+  function fileNoun(n) { return n === 1 ? " file" : " files"; }
+
+  // One search hit as a stored report / workbook row. "reportUrl" is the
+  // per-file audit.icjia.app report — the house "Audit report" column
+  // meaning; blank when the file was never scored (row[9]). "query"
+  // records which search captured the row.
+  function toReportRow(mm) {
+    var row = data.rows[mm.i];
+    var site = data.sites[row[2]] || {};
+    return {
+      site: site.label || "",
+      filename: row[0],
+      category: catLabel(data.categories[row[3]] || ""),
+      score: typeof row[6] === "number" ? row[6] : null,
+      grade: row[7] || null,
+      sizeBytes: row[4],
+      modified: row[5] || "",
+      fileUrl: row[8] || "",
+      reportUrl: row[9] || "",
+      matchedOn: matchedOnText(mm.why || []),
+      query: input.value,
+    };
+  }
+
+  function selectedCount() {
+    var n = 0;
+    for (var k in selected) { if (selected[k]) n++; }
+    return n;
+  }
+
+  function refreshAddButtons() {
+    var n = selectedCount();
+    addSelectedBtn.disabled = n === 0;
+    addSelectedBtn.textContent = n
+      ? "Add " + n.toLocaleString("en-US") + " selected to report"
+      : "Add selected to report";
+    addAllBtn.disabled = lastFiltered.length === 0;
+    addAllBtn.textContent = "Add all " + lastFiltered.length.toLocaleString("en-US") +
+      (lastFiltered.length === 1 ? " match" : " matches") + " to report";
+  }
+
+  function saveReport() {
+    try {
+      sessionStorage.setItem(REPORT_KEY, srSerializeReport(report));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function renderReportBar() {
+    reportCountEl.textContent = "Custom report: " + report.length.toLocaleString("en-US") + fileNoun(report.length);
+    reportBarEl.hidden = report.length === 0;
+    if (!report.length) {
+      reportBannerEl.hidden = true;
+      if (reportOpen) closeReportView();
+    }
+  }
+
+  function dismissBanner() { reportBannerEl.hidden = true; }
+
+  function revertClearConfirm() {
+    reportClearConfirmEl.hidden = true;
+    reportClearBtn.hidden = false;
+  }
+
+  function wipeReport() {
+    report = [];
+    try { sessionStorage.removeItem(REPORT_KEY); } catch (e) { /* nothing stored */ }
+    renderReportBar();
+    reportStatusEl.textContent = "Report cleared.";
+  }
+
+  function openReportView() {
+    if (!report.length) return;
+    reportOpen = true;
+    wrapEl.classList.add("report-open");
+    reportToggleBtn.textContent = "Back to results";
+    renderReportView();
+    reportViewEl.hidden = false;
+  }
+
+  function closeReportView() {
+    reportOpen = false;
+    wrapEl.classList.remove("report-open");
+    reportToggleBtn.textContent = "View report";
+    reportViewEl.hidden = true;
+  }
+
+  function renderReportView() {
+    reportViewEl.textContent = "";
+    if (!report.length) return;
+    var wrap = document.createElement("div");
+    wrap.className = "search-table-wrap";
+    var table = document.createElement("table");
+    table.className = "search-table";
+    var thead = document.createElement("thead");
+    var hr = document.createElement("tr");
+    var labels = ["Website", "Filename", "Type", "Score", "Grade", "Size", "Modified", "Found by search", "Audit report", ""];
+    for (var h = 0; h < labels.length; h++) {
+      var th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = labels[h];
+      hr.appendChild(th);
+    }
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    for (var i = 0; i < report.length; i++) {
+      (function (rr) {
+        var tr = document.createElement("tr");
+        var tdSite = document.createElement("td");
+        tdSite.className = "search-site";
+        tdSite.textContent = rr.site || "";
+        tr.appendChild(tdSite);
+        var tdFile = document.createElement("td");
+        tdFile.className = "search-file";
+        if (rr.fileUrl) {
+          var fa = document.createElement("a");
+          fa.href = rr.fileUrl;
+          fa.target = "_blank";
+          fa.rel = "noopener noreferrer";
+          fa.textContent = rr.filename || "";
+          tdFile.appendChild(fa);
+        } else {
+          tdFile.textContent = rr.filename || "";
+        }
+        tr.appendChild(tdFile);
+        var tdCat = document.createElement("td");
+        tdCat.textContent = rr.category || "";
+        tr.appendChild(tdCat);
+        var tdScore = document.createElement("td");
+        tdScore.className = "num";
+        tdScore.textContent = typeof rr.score === "number" ? String(rr.score) : "";
+        tr.appendChild(tdScore);
+        var tdGrade = document.createElement("td");
+        tdGrade.className = "num";
+        tdGrade.textContent = rr.grade || "";
+        tr.appendChild(tdGrade);
+        var tdSize = document.createElement("td");
+        tdSize.className = "num";
+        tdSize.textContent = fmtSize(rr.sizeBytes);
+        tr.appendChild(tdSize);
+        var tdMod = document.createElement("td");
+        tdMod.className = "num";
+        tdMod.textContent = rr.modified || "";
+        tr.appendChild(tdMod);
+        var tdQ = document.createElement("td");
+        tdQ.textContent = rr.query || "";
+        tr.appendChild(tdQ);
+        var tdRep = document.createElement("td");
+        if (rr.reportUrl) {
+          var ra = document.createElement("a");
+          ra.href = rr.reportUrl;
+          ra.target = "_blank";
+          ra.rel = "noopener noreferrer";
+          ra.title = "Open this file's shareable audit report (what's wrong and how to fix it) in a new tab";
+          ra.textContent = "View report";
+          tdRep.appendChild(ra);
+        }
+        tr.appendChild(tdRep);
+        var tdRm = document.createElement("td");
+        var rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "report-remove";
+        rm.textContent = "Remove";
+        rm.setAttribute("aria-label", "Remove " + (rr.filename || "this file") + " from the report");
+        rm.addEventListener("click", function () {
+          report = srRemoveRow(report, srRowKey(rr));
+          saveReport();
+          renderReportBar();
+          renderReportView();
+          reportStatusEl.textContent = "Removed. " + report.length.toLocaleString("en-US") + fileNoun(report.length) + " in the report.";
+        });
+        tdRm.appendChild(rm);
+        tr.appendChild(tdRm);
+        tbody.appendChild(tr);
+      })(report[i]);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    reportViewEl.appendChild(wrap);
+  }
+
+  function addMatches(list) {
+    if (!list.length || !data) return;
+    var res = srAddRows(report, list.map(toReportRow), REPORT_MAX);
+    report = res.rows;
+    var savedOk = saveReport();
+    dismissBanner();
+    renderReportBar();
+    if (reportOpen) renderReportView();
+    var parts = [];
+    parts.push(res.added
+      ? "Added " + res.added.toLocaleString("en-US") + fileNoun(res.added)
+      : "Added no new files");
+    if (res.duplicates) parts.push(res.duplicates.toLocaleString("en-US") + " already in the report");
+    if (res.dropped) parts.push(res.dropped.toLocaleString("en-US") + " dropped at the " + REPORT_MAX.toLocaleString("en-US") + "-row cap");
+    if (!savedOk) parts.push("storage is full, so this report will not survive leaving the page");
+    reportStatusEl.textContent = parts.join(" · ") + " — " + report.length.toLocaleString("en-US") + fileNoun(report.length) + " in the report.";
+    selected = {};
+    update();
+  }
+
+  function triggerXlsxDownload(bytes, name) {
     var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = xlsxDownloadName(input.value, new Date().toISOString());
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  addSelectedBtn.addEventListener("click", function () {
+    addMatches(lastFiltered.filter(function (mm) { return !!selected[mm.i]; }));
   });
+  addAllBtn.addEventListener("click", function () { addMatches(lastFiltered); });
+  reportToggleBtn.addEventListener("click", function () {
+    if (reportOpen) closeReportView();
+    else openReportView();
+  });
+  reportDownloadBtn.addEventListener("click", function () {
+    if (!report.length) return;
+    var bytes = buildSearchWorkbook(report, { queryColumn: true, sheetName: "Custom report" });
+    triggerXlsxDownload(bytes, srReportXlsxName(new Date().toISOString()));
+  });
+  reportClearBtn.addEventListener("click", function () {
+    reportClearBtn.hidden = true;
+    reportClearConfirmEl.hidden = false;
+  });
+  document.getElementById("report-clear-yes").addEventListener("click", function () {
+    revertClearConfirm();
+    wipeReport();
+  });
+  document.getElementById("report-clear-keep").addEventListener("click", revertClearConfirm);
+  document.getElementById("report-banner-keep").addEventListener("click", dismissBanner);
+  document.getElementById("report-banner-clear").addEventListener("click", function () {
+    dismissBanner();
+    wipeReport();
+  });
+
+  // Returning with a report from earlier in this session: ask before
+  // anything is added — keep building on it, or start fresh?
+  try { report = srParseStored(sessionStorage.getItem(REPORT_KEY)); } catch (e) { report = []; }
+  if (report.length) {
+    reportBannerText.textContent = "A custom report with " + report.length.toLocaleString("en-US") + fileNoun(report.length) + " from this session is still open.";
+    reportBannerEl.hidden = false;
+  }
+  renderReportBar();
 })();
 </script>
 </body>

@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.51.0] — 2026-08-17
+
+### Added — custom search reports on /search
+
+- Search results now carry a selection column: tick one, a few, or all (a
+  select-all header box covers the shown rows; "Add all N matches" covers
+  every match, past the 400-row render cap) and add them to a running
+  **custom report** that persists across any number of different searches.
+  A report bar above the results shows the running count with View /
+  Download / Clear actions; the in-place report view lists every collected
+  row with the search that found it, a per-row Remove, and the same file +
+  audit-report links as the results table.
+- Session-only by design: the report lives in sessionStorage
+  (`fleet-audit:custom-report`, versioned envelope) — it survives leaving
+  and returning to /search in the same tab, with an inline banner asking
+  "keep adding or clear?" on return (never a blocking dialog), and
+  vanishes when the tab closes. Re-adding a file another search already
+  captured dedupes silently (first-found search keeps the provenance); a
+  5,000-row cap plus a storage-quota fallback keep sessionStorage inside
+  budget; Clear is a two-step inline confirm.
+- The report downloads as `custom-report-<date>.xlsx` through the same
+  hand-rolled OOXML builder as results — `buildSearchWorkbook` gained
+  optional `queryColumn` ("Found by search" column) and `sheetName`
+  options, with the default results workbook byte-for-byte unchanged. The
+  store logic is a new unit-tested module (`src/web/search-report.js`)
+  shipped verbatim via the `.toString()` embed pattern, and a new page
+  test compiles the emitted inline script so template-literal cooking
+  bugs (the v1.48.1 class) now fail in CI as syntax errors.
+
 ## [1.50.1] — 2026-08-17
 
 ### Changed — canonical URL is fleet.icjia.app

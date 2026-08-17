@@ -38,6 +38,14 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "custom-search-reports-2026-08-17",
+    badge: "New",
+    text: "The search page can now build a custom report. Tick the box next to any result — or add every match at once — then search for something else and keep adding: your picks from every search collect into one running report. A bar above the results shows how many files you've gathered and lets you view the list, remove single rows, download everything as an Excel workbook (with clickable links and a column showing which search found each file), or clear it and start over. The report is private to your browser tab: it survives leaving and returning to the search page — you'll be asked whether to keep or clear it — and it clears itself when the tab closes.",
+    linkText: "Try it on the search page",
+    linkHref: "search.html",
+    date: "August 17, 2026",
+  },
+  {
     id: "fleet-file-search-2026-08-16",
     badge: "New",
     text: "You can now search every file on every audited site from one page. Type a full or partial filename — fragments are fine, like “dvfr report” or “annual 2023”, and close-enough spellings still match — and the results show each matching file, which site it lives on, its accessibility score, a link to open it, and a “View report” link to that file's shareable audit report (exactly what's wrong and how to fix it, in a new tab). The matched part of each name is highlighted, with a note when a match came from the site's name rather than the filename. Filter by file type or website with one click, and download whatever you found as an Excel workbook with clickable links, ready to share. Look for “Search” in the navigation on every page. Also in this update: invisible system files (like .gitkeep and .DS_Store) no longer count toward any file totals — that removed 25 files and moved the fleet total from 8,787 to 8,762. The remediation list is unchanged at 4,628, since none of those files were documents.",

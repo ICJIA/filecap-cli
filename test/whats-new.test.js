@@ -23,21 +23,24 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // v1.46.0 — newest entry announces the fleet-wide /search page. No counts
-  // on this banner, so nothing to reconcile against the hero (the v1.44.1
+  // v1.51.0 — newest entry announces custom search reports. No counts on
+  // this banner, so nothing to reconcile against the hero (the v1.44.1
   // lesson); it links straight to the page it announces.
-  it("leads with the 2026-08-16 search-page entry", () => {
+  it("leads with the 2026-08-17 custom-report entry", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("search");
-    expect(e.id).toContain("2026-08-16");
+    expect(e.id).toContain("custom");
+    expect(e.id).toContain("2026-08-17");
     expect(e.linkHref).toBe("search.html");
   });
 
-  // v1.47.1 — the banner sits above the hero: its totals must equal the
-  // hero's (8,762 / 4,628), with the system-file exclusion stated as an
-  // explicit before→after so the change reads as accounting, not drift.
-  it("banner entry reconciles the post-cleanup totals exactly", () => {
-    const e = WHATS_NEW[0];
+  // v1.46.0/v1.47.1 — the search-page entry, now history. Its totals were
+  // reconciled against the hero when it led (8,762 / 4,628, with the
+  // system-file exclusion stated as an explicit before→after); the archive
+  // page still shows them, so they must keep adding up.
+  it("keeps the reconciled 2026-08-16 search-page entry as history", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("file-search"));
+    expect(e).toBeTruthy();
+    expect(e.linkHref).toBe("search.html");
     expect(e.text).toContain("8,762");
     expect(e.text).toContain("4,628");
     expect(e.text).toMatch(/from 8,787 to 8,762/);
