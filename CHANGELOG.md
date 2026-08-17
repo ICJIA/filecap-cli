@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.50.1] — 2026-08-17
+
+### Changed — canonical URL is fleet.icjia.app
+
+- The fleet report's canonical URL is now **https://fleet.icjia.app**
+  (custom domain configured in Netlify). Every occurrence of the old
+  `icjia-fleet-audit.netlify.app` URL moved to the canonical domain:
+  `FLEET_PUBLIC_URL` in web-rollup and search-page (og:image URLs and the
+  search page's `PUBLIC_BASE`), README, dated docs, test pins, and the
+  operator's local `sites.json` tools entry (backed up first).
+- `_redirects` now opens with a forced 301 from the old `*.netlify.app`
+  host to the canonical domain — observed 2026-08-17 that Netlify serves
+  the password page on the old hostname *without* redirecting, so old
+  bookmarks and previously shared links would otherwise stay on the old
+  host indefinitely. First rule in the file (first-match) and forced
+  (`301!`) so it fires even though every file also exists at the old host.
+
 ## [1.50.0] — 2026-08-17
 
 ### Added — honest "Too large" verdicts for oversized PDFs
@@ -1621,7 +1638,7 @@ The user-reinforced check: every Strapi content type with an `attachments` field
 
 ### End-to-end fleet audit deployed
 
-The full pipeline (`scan → references → cross-references → web-rollup --deploy`) ran against all 18 fleet sites and pushed the resulting bundle to https://icjia-fleet-audit.netlify.app:
+The full pipeline (`scan → references → cross-references → web-rollup --deploy`) ran against all 18 fleet sites and pushed the resulting bundle to https://fleet.icjia.app:
 
 | Site | Entries | With cross-site refs |
 | --- | --- | --- |

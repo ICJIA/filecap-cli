@@ -108,7 +108,7 @@ Add optional `description` to `siteEntrySchema`. Add `toolEntrySchema` +
     { "name": "icjia-qr", "siteName": "QR Generator", "siteFullName": "ICJIA QR Code Generator",
       "siteUrl": "https://icjia-qr.netlify.app", "description": "QR code generator" },
     { "name": "icjia-fleet-audit", "siteName": "Fleet Audit", "siteFullName": "ICJIA Accessibility Fleet Audit",
-      "siteUrl": "https://icjia-fleet-audit.netlify.app", "description": "This fleet-wide file accessibility audit dashboard" }
+      "siteUrl": "https://fleet.icjia.app", "description": "This fleet-wide file accessibility audit dashboard" }
   ]
 }
 ```

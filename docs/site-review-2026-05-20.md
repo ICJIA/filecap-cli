@@ -1,7 +1,7 @@
 # filecap fleet-audit site — red / blue team review
 
 **Date:** 2026-05-20
-**Reviewed:** the deployed fleet-audit site — `https://icjia-fleet-audit.netlify.app`
+**Reviewed:** the deployed fleet-audit site — `https://fleet.icjia.app`
 (bundle `2026-05-20T20-14-26Z`, filecap v1.15.0) — the 13-site fleet index, the
 per-site reports, and the orphaned-files / duplicates / category sub-reports.
 **Method:** Lighthouse (lightcap) + axe-core (axecap) on the fleet index, a large

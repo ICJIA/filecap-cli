@@ -5,7 +5,7 @@ to answer every question a manager will ask, in the order they'll ask it,
 with one click per answer. Three layers of accessibility data, all
 data-driven, all clickable.
 
-The deliverable lives at **https://icjia-fleet-audit.netlify.app** (Netlify
+The deliverable lives at **https://fleet.icjia.app** (Netlify
 Pro Site Password — request from IDS if you don't have it).
 
 ---
@@ -36,7 +36,7 @@ anchor in column 2 will also carry a small grade chip ("(B)") — answering
 
 ### 1. Set the headline
 
-Open https://icjia-fleet-audit.netlify.app. Pause on the fleet hero.
+Open https://fleet.icjia.app. Pause on the fleet hero.
 
 > "Across 18 ICJIA websites we found N files. The amber number on the
 > left is what may need accessibility audit — that's the actionable

@@ -20,7 +20,7 @@ import { SEARCH_INDEX_FILENAME } from "./search-index.js";
 // Deployed bundle URL — used for the ABSOLUTE audit-report links inside the
 // downloaded workbook (a spreadsheet opened on someone's desktop has no
 // relative-URL context). Same constant as web-rollup.js's FLEET_PUBLIC_URL.
-const FLEET_PUBLIC_URL = "https://icjia-fleet-audit.netlify.app";
+const FLEET_PUBLIC_URL = "https://fleet.icjia.app";
 
 // Human labels for the scanner's category slugs, chip + workbook order.
 const CATEGORY_LABELS = {

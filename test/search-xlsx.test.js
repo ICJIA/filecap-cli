@@ -22,7 +22,7 @@ const ROWS = [
     sizeBytes: 2048,
     modified: "2024-03-05",
     fileUrl: "https://dvfr.icjia-api.cloud/uploads/2023/Annual%20Report%202023.pdf",
-    reportUrl: "https://icjia-fleet-audit.netlify.app/dvfr-20260816-125634Z.html",
+    reportUrl: "https://fleet.icjia.app/dvfr-20260816-125634Z.html",
     matchedOn: "dvfr: site name; report: filename",
   },
   {

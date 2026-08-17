@@ -7,7 +7,7 @@
 
 ## Problem
 
-Non-technical managers who land on the fleet rollup at `icjia-fleet-audit.netlify.app` need to grok each site's accessibility-audit scope in a glance. The current cards bury the site title in a small `<h3>`, use the short nickname only (e.g. "DVFR", "i2i") with no explanation, and present one paragraph of mixed numbers ("69 need accessibility audit · 33 other · 38 MB"). For a manager who _won't_ read (busy, skim-mode), this lands as undifferentiated gray text. Detail pages have the same issue: small `<h1>`, modest stat block, then the file table.
+Non-technical managers who land on the fleet rollup at `fleet.icjia.app` need to grok each site's accessibility-audit scope in a glance. The current cards bury the site title in a small `<h3>`, use the short nickname only (e.g. "DVFR", "i2i") with no explanation, and present one paragraph of mixed numbers ("69 need accessibility audit · 33 other · 38 MB"). For a manager who _won't_ read (busy, skim-mode), this lands as undifferentiated gray text. Detail pages have the same issue: small `<h1>`, modest stat block, then the file table.
 
 The redesign goal is one sentence: **make each card and each detail page read like an infographic for an executive who has 3 seconds**.
 

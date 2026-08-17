@@ -1232,11 +1232,11 @@ Expected: one line with the v1.7.0 SHA + `refs/tags/v1.7.0`.
 node /Volumes/satechi/webdev/icjia-fleet-audit/bin/filecap.js web-rollup --deploy --deploy-site 9a079a16-be6d-4ccd-8f2b-074444baef39
 ```
 
-Expected: bundle written under `~/filecap-audits/_web-rollup/2026-…/`, Netlify CLI uploads, deploy goes live. Final lines include `✔ Deploy is live!` and `Production URL: https://icjia-fleet-audit.netlify.app`.
+Expected: bundle written under `~/filecap-audits/_web-rollup/2026-…/`, Netlify CLI uploads, deploy goes live. Final lines include `✔ Deploy is live!` and `Production URL: https://fleet.icjia.app`.
 
 - [ ] **Step 2: Verify the production page**
 
-Open https://icjia-fleet-audit.netlify.app in a browser. Confirm:
+Open https://fleet.icjia.app in a browser. Confirm:
 
 - Cards display full site names (e.g., "Domestic Violence Fatality Review" instead of just "DVFR").
 - Numbers are big and color-coded (blue total, amber audit).
@@ -1249,8 +1249,8 @@ Open https://icjia-fleet-audit.netlify.app in a browser. Confirm:
 Run an accessibility audit against the live URL:
 
 ```
-mcp__axecap__audit_url url=https://icjia-fleet-audit.netlify.app
-mcp__contrastcap__check_page_contrast url=https://icjia-fleet-audit.netlify.app
+mcp__axecap__audit_url url=https://fleet.icjia.app
+mcp__contrastcap__check_page_contrast url=https://fleet.icjia.app
 ```
 
 Expected: zero serious / critical violations on the nickname text (the contrast we explicitly engineered for). Any pre-existing violations unrelated to this redesign get flagged as out-of-scope.
@@ -1258,7 +1258,7 @@ Expected: zero serious / critical violations on the nickname text (the contrast 
 - [ ] **Step 4: Capture a before/after screenshot of one site card (DVFR) for the design retrospective**
 
 ```
-mcp__viewcap__take_screenshot url=https://icjia-fleet-audit.netlify.app selector=".site-card" filename=2026-05-11-v1.7.0-dvfr-card.png
+mcp__viewcap__take_screenshot url=https://fleet.icjia.app selector=".site-card" filename=2026-05-11-v1.7.0-dvfr-card.png
 ```
 
 (Optional but useful for the next review session.)

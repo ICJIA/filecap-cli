@@ -62,4 +62,20 @@ describe("generateNetlifyRedirects", () => {
     expect(out).toContain("/DVFR-20260702-1200Z.html");
     expect(out).toContain("/dvfr-20260702-1200z");
   });
+
+  // v1.50.1 — the canonical URL is fleet.icjia.app. Netlify serves the old
+  // *.netlify.app hostname directly (observed 2026-08-17: password page,
+  // no redirect), so without this rule old bookmarks stay on the old host
+  // forever. Must be the FIRST rule — Netlify's _redirects is first-match —
+  // and force (301!) so it fires even though every file exists at the old
+  // host too.
+  it("force-301s the old netlify.app host to the canonical fleet.icjia.app domain, as the first rule", () => {
+    const out = generateNetlifyRedirects([{ htmlFile: "DVFR-20260702-1200Z.html" }]);
+    const rules = out.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
+    expect(rules[0]).toBe(
+      "https://icjia-fleet-audit.netlify.app/* https://fleet.icjia.app/:splat 301!",
+    );
+    // The per-report aliases still follow.
+    expect(out).toContain("/DVFR-20260702-1200Z.html");
+  });
 });

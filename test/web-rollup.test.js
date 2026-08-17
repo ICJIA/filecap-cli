@@ -1457,7 +1457,7 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     await fs.writeFile(sitesFile, JSON.stringify({
       version: 1,
       sites: [{ name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" }],
-      tools: [{ name: "icjia-fleet-audit", siteName: "Fleet Audit", siteUrl: "https://icjia-fleet-audit.netlify.app", image: localImg }],
+      tools: [{ name: "icjia-fleet-audit", siteName: "Fleet Audit", siteUrl: "https://fleet.icjia.app", image: localImg }],
     }));
     const outputDir = path.join(tmpDir, "out");
     // noOg: true → no network at all; the local file must still be copied in.
@@ -1468,9 +1468,9 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
     expect(sitesHtml).toContain('src="assets/og/icjia-fleet-audit.png"');
     // the bundle's own og:image meta points at it (absolute URL)
-    expect(sitesHtml).toContain('<meta property="og:image" content="https://icjia-fleet-audit.netlify.app/assets/og/icjia-fleet-audit.png">');
+    expect(sitesHtml).toContain('<meta property="og:image" content="https://fleet.icjia.app/assets/og/icjia-fleet-audit.png">');
     const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(indexHtml).toContain('<meta property="og:image" content="https://icjia-fleet-audit.netlify.app/assets/og/icjia-fleet-audit.png">');
+    expect(indexHtml).toContain('<meta property="og:image" content="https://fleet.icjia.app/assets/og/icjia-fleet-audit.png">');
     expect(indexHtml).toContain('name="twitter:image"');
   });
 

@@ -81,7 +81,7 @@ describe("generateSearchHtml", () => {
   });
 
   it("builds absolute audit-report URLs from the deployed bundle URL", () => {
-    expect(page()).toContain("https://icjia-fleet-audit.netlify.app");
+    expect(page()).toContain("https://fleet.icjia.app");
   });
 
   it("threads the generated-at stamp", () => {

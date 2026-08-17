@@ -43,7 +43,7 @@ import pLimit from "p-limit";
 
 // v1.25.0 — deployed bundle URL, used to build the absolute og:image in the
 // page <head>. (Single known deploy target for the fleet-audit bundle.)
-const FLEET_PUBLIC_URL = "https://icjia-fleet-audit.netlify.app";
+const FLEET_PUBLIC_URL = "https://fleet.icjia.app";
 // Package root (…/icjia-fleet-audit), to resolve local `image` override paths
 // independent of the current working directory.
 const PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");

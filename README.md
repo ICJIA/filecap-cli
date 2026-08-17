@@ -54,7 +54,7 @@
 
 **Why a tool like this has to exist.** You can't remediate — or budget to remediate — what you haven't measured, and no agency can hand-audit tens of thousands of files. There's no "accessibility status" sitting in a file store; it's just a folder of bytes. `filecap` exists to turn that opaque pile into a precise, repeatable inventory — what's there, what is likely to need work, and roughly how much — so the remediation can be scoped, competitively bid, tracked quarter over quarter, and demonstrated to regulators. It is the measurement layer that makes the legal obligation actionable instead of aspirational, which is also why the snapshot is published where the whole team (and any auditor) can see it.
 
-**Every current ICJIA site is now part of the accessibility audit.** Alongside the dense, data-rich fleet report, filecap also publishes a simpler, less-dense **[site directory](https://icjia-fleet-audit.netlify.app/sites)** (`/sites`) that lists just the sites — split into **content sites** and **agency tooling sites** — in a count-first layout for managers who only need to know "how many sites do we run?". Every card carries an at-a-glance **uptime status** (a green "Site live" / red "Site unreachable" indicator) so the whole fleet's health reads in a single scroll.
+**Every current ICJIA site is now part of the accessibility audit.** Alongside the dense, data-rich fleet report, filecap also publishes a simpler, less-dense **[site directory](https://fleet.icjia.app/sites)** (`/sites`) that lists just the sites — split into **content sites** and **agency tooling sites** — in a count-first layout for managers who only need to know "how many sites do we run?". Every card carries an at-a-glance **uptime status** (a green "Site live" / red "Site unreachable" indicator) so the whole fleet's health reads in a single scroll.
 
 ## Are you a...
 
@@ -252,7 +252,7 @@ inline-JS additions). The summary below is for managers and auditors.
 
 ### Live deployment posture
 
-The ICJIA fleet snapshot at https://icjia-fleet-audit.netlify.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master spreadsheet — verified HTTP 401 on `/`, the master `audit.xlsx`, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`, and a strict **`Content-Security-Policy`** (`default-src 'self'`; no external script/connect/frame; `frame-ancestors 'none'`; `object-src 'none'` — FC-2026-034, v1.21.4). The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline; v1.21.2 additionally **removes** origin-server identity (IPs, Forge scan paths, hostnames) from the bundle at source rather than relying on the gate alone (FC-2026-033).
+The ICJIA fleet snapshot at https://fleet.icjia.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master spreadsheet — verified HTTP 401 on `/`, the master `audit.xlsx`, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`, and a strict **`Content-Security-Policy`** (`default-src 'self'`; no external script/connect/frame; `frame-ancestors 'none'`; `object-src 'none'` — FC-2026-034, v1.21.4). The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline; v1.21.2 additionally **removes** origin-server identity (IPs, Forge scan paths, hostnames) from the bundle at source rather than relying on the gate alone (FC-2026-033).
 
 ### 2026-06-06 — on-demand uptime function (v1.22.0) security review
 
@@ -371,7 +371,7 @@ npx vitest run test/web-rollup.test.js
 
 The ICJIA fleet snapshot is deployed at:
 
-**https://icjia-fleet-audit.netlify.app**
+**https://fleet.icjia.app**
 
 The site is **password-protected** (Netlify Pro Site Password — server-side enforcement, gates every file including the CSVs). The current password is held by ICJIA's IDS (Innovation and Digital Services) team — request access by emailing IDS at ICJIA. The password is rotated periodically; if a previously-shared password stops working, ask IDS for the current one.
 
@@ -384,20 +384,20 @@ This is a common observation, and the short answer is: **what you're viewing the
 You can verify this for yourself in three seconds:
 
 ```bash
-curl -i https://icjia-fleet-audit.netlify.app/
+curl -i https://fleet.icjia.app/
 ```
 
 Returns `HTTP/2 401` and roughly 3.5 KB of body. That body is Netlify's password-challenge HTML — a `<form>`, some Netlify-managed CSS, and a brand stripe. Grep it for anything from our fleet:
 
 ```bash
-curl -sS https://icjia-fleet-audit.netlify.app/ | grep -iE "dvfr|icjia|illinois|\.pdf|\.csv"
+curl -sS https://fleet.icjia.app/ | grep -iE "dvfr|icjia|illinois|\.pdf|\.csv"
 # (no matches — the challenge page contains zero references to our data)
 ```
 
 And try to fetch a specific inventory file directly without authenticating:
 
 ```bash
-curl -i https://icjia-fleet-audit.netlify.app/audit-file-list-master.csv
+curl -i https://fleet.icjia.app/audit-file-list-master.csv
 # HTTP/2 401 — even when you ask for a specific path, you get the challenge page
 ```
 
@@ -1102,7 +1102,7 @@ Phases 2–5 are delegated to `examples/audit-fleet-auto.sh` rather than reimple
 
 ### The deployed site is gated — `401` is healthy
 
-The bundle deploys to **https://icjia-fleet-audit.netlify.app**, behind **Netlify visitor access**. Unauthenticated requests return **HTTP 401** on *every* path, including `/sites/` and `/.netlify/functions/uptime`. A `401` from `curl` is the *healthy* "deploy is live and gated" signal, not an error. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot) for the gate details.
+The bundle deploys to **https://fleet.icjia.app**, behind **Netlify visitor access**. Unauthenticated requests return **HTTP 401** on *every* path, including `/sites/` and `/.netlify/functions/uptime`. A `401` from `curl` is the *healthy* "deploy is live and gated" signal, not an error. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot) for the gate details.
 
 ### Targeted re-runs (updating one site)
 
