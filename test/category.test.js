@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   categorize,
   isRemediable,
-  REMEDIABLE_CATEGORIES,
   SCOREABLE_EXTENSIONS,
   isScoreable,
   isUnscoreableDocument,
