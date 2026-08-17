@@ -113,6 +113,29 @@ describe("buildSearchIndex", () => {
     expect(row[7]).toBeNull();
   });
 
+  it("carries an Office file's score, grade, and report link into the row", () => {
+    const fx = fixture();
+    fx.allEntries.push({
+      entry: {
+        filename: "memo.docx",
+        path: "files/memo.docx",
+        category: "office-document",
+        sizeBytes: 25260,
+        modifiedAt: "2023-12-08",
+        audit: { score: 79, grade: "C", reportUrl: "https://audit.icjia.app/report/abc123" },
+      },
+      serverName: "dvfr",
+      siteName: "DVFR",
+      publicUrlBase: "https://dvfr.icjia-api.cloud/uploads",
+      pathPrefix: null,
+    });
+    const idx = buildSearchIndex(fx);
+    const row = idx.rows.find((r) => r[0] === "memo.docx");
+    expect(row[6]).toBe(79);
+    expect(row[7]).toBe("C");
+    expect(row[9]).toBe("https://audit.icjia.app/report/abc123");
+  });
+
   it("sorts rows by filename, case-insensitively", () => {
     const idx = buildSearchIndex(fixture());
     const names = idx.rows.map((r) => r[0].toLowerCase());
