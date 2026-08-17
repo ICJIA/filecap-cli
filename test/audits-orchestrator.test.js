@@ -202,6 +202,72 @@ describe("runAudits", () => {
     expect(records[1].audit.score).toBeUndefined();
   });
 
+  it("Office document skips the HTTP call when the cache has a fresh entry for the sha256", async () => {
+    const docxEntry = {
+      path: "memo.docx",
+      filename: "memo.docx",
+      extension: "docx",
+      category: "office-document",
+      sizeBytes: 5000,
+      sha256: "ddd4444444444444444444444444444444444444444444444444444444444444",
+      publicUrl: "https://icjia-api.cloud/uploads/memo.docx",
+    };
+    writeInventory(invPath, [docxEntry]);
+    fs.writeFileSync(cachePath, JSON.stringify({
+      [docxEntry.sha256]: {
+        score: 85,
+        grade: "B",
+        reportUrl: "https://r/cached",
+        reportId: "cached",
+        reportExpiresAt: "2027-01-01T00:00:00Z",
+        audited: "2026-05-15T00:00:00Z",
+        checkedAt: new Date().toISOString(),
+      },
+    }));
+    let calls = 0;
+    const fetcher = async () => { calls++; return {}; };
+    await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher,
+      log: () => {},
+    });
+    expect(calls).toBe(0);
+    const records = readNdjson(outPath);
+    expect(records[1].audit.score).toBe(85);
+    expect(records[1].audit.grade).toBe("B");
+    expect(records[1].audit.cached).toBe(true);
+  });
+
+  it("Office document with no publicUrl records skipped entry", async () => {
+    const docxEntry = {
+      path: "memo.docx",
+      filename: "memo.docx",
+      extension: "docx",
+      category: "office-document",
+      sizeBytes: 5000,
+      sha256: "ddd4444444444444444444444444444444444444444444444444444444444444",
+      publicUrl: undefined,
+    };
+    writeInventory(invPath, [docxEntry]);
+    let calls = 0;
+    const fetcher = async () => { calls++; return {}; };
+    await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher,
+      log: () => {},
+    });
+    expect(calls).toBe(0);
+    const records = readNdjson(outPath);
+    expect(records[1].audit.skipped).toBe("no-public-url");
+    expect(records[1].audit.score).toBeUndefined();
+  });
+
   it("preserves the inventory header and footer unchanged", async () => {
     writeInventory(invPath, [pdfEntry()]);
     const fetcher = async () => ({ strict: { score: 50, grade: "F" }, reportUrl: "https://r/", reportId: "r", reportExpiresAt: "2027-01-01T00:00:00Z", pageCount: 1, audited: "2026-05-19T00:00:00Z", cached: false });
