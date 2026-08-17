@@ -117,8 +117,8 @@ function renderScoresBySiteSection(scoresBySite) {
   const lastAudit = scoresBySite.lastAuditAt ? fmtAuditDate(scoresBySite.lastAuditAt) : "";
   return `
   <section class="section master-csv scores-by-site">
-    <h2>Scores by site — PDF accessibility coverage at a glance</h2>
-    <p>A one-row-per-site summary workbook: how many remediable files each site has, how many PDFs were scored, the average PDF score, and the A–F grade distribution, with a fleet TOTAL row. Use it to see which sites carry the most accessibility risk without opening the full file list. Scores cover PDFs only — Word, Excel, and PowerPoint files have native accessibility checkers in their authoring apps and aren't re-scored here, so they appear in the inventory without a score.</p>
+    <h2>Scores by site — document accessibility coverage at a glance</h2>
+    <p>A one-row-per-site summary workbook: how many remediable files each site has, how many documents were scored, the average score, and the A–F grade distribution, with a fleet TOTAL row. Use it to see which sites carry the most accessibility risk without opening the full file list. Scores cover every machine-scoreable document — PDFs plus modern Word, Excel, and PowerPoint files (.docx/.xlsx/.pptx). Legacy Office files (.doc/.xls/.ppt) can't be machine-scored until they're re-saved in a modern format, so they appear with "N/A (legacy format)" instead of a score.</p>
     <p class="master-csv-download">
       <a class="cta-button" href="${he(scoresBySite.filename)}" download>
         Download <strong>${he(scoresBySite.filename)}</strong>
@@ -388,7 +388,7 @@ function renderTodoSection() {
       </li>
       <li class="todo-item">
         <h3 class="todo-item-h3">Fuzzy search across every file and page</h3>
-        <p>A fleet-wide search box: type part of a filename or a page name and it finds the match instantly across all the sites &mdash; no need for the exact name. Have a PDF and want to know where it lives? The result returns everything the audit knows about it: which site it&#39;s on, the pages that reference it, its accessibility score, and any duplicate copies on other sites.</p>
+        <p>A fleet-wide search box: type part of a filename or a page name and it finds the match instantly across all the sites &mdash; no need for the exact name. Have a file and want to know where it lives? The result returns everything the audit knows about it: which site it&#39;s on, the pages that reference it, its accessibility score, and any duplicate copies on other sites.</p>
         <p class="todo-item-payoff"><strong>Why it matters:</strong> answering &ldquo;is this file on our site, and where?&rdquo; goes from reading the spreadsheet by hand to a one-box lookup.</p>
       </li>
     </ul>

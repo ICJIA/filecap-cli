@@ -804,3 +804,16 @@ describe("meta description (v1.40.0)", () => {
     expect(html).toMatch(/<meta name="description" content="[^"]{40,}"/);
   });
 });
+
+describe("explains the widened scoring scope in the scores-by-site section", () => {
+  it("explains the widened scoring scope in the scores-by-site section", () => {
+    const html = generateIndexHtml({
+      siteResults: [],
+      password: null,
+      scoresBySite: { filename: "scores-by-site.xlsx", siteCount: 10, byteCount: 100000 },
+    });
+    expect(html).toContain("Scores cover every machine-scoreable document");
+    expect(html).toContain("re-saved in a modern format");
+    expect(html).not.toContain("Scores cover PDFs only");
+  });
+});

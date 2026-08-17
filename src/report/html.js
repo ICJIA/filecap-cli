@@ -186,7 +186,7 @@ function buildPageAuditChip(pa) {
   // chip is the whole signal we want next to "Page N" — managers ask
   // "is that page accessible?" and the letter answers it. A clickable
   // page-report viewer was scoped out of audit.icjia.app's 1.10.0
-  // release; only PDF audits get an "Open report" link. The tooltip
+  // release; every scored document gets an "Open report" link (the page-report viewer stays scoped out). The tooltip
   // still shows the full score + violation count for hover.
   const tip = `Page accessibility: ${grade}${score !== null ? ` (${score})` : ""}${violationLabel}`;
   return ` <span class="page-audit-chip ${cls}" title="${htmlEscape(tip)}">(${htmlEscape(grade)})</span>${source}`;
@@ -196,8 +196,8 @@ function buildPageAuditChip(pa) {
 // v1.19.0: the grade chip + numeric score were removed — the
 // audit.icjia.app scoring heuristic is still being refined, so the table
 // no longer asserts a grade. The cell renders only an "Open report" anchor
-// to audit.icjia.app/report/<id>; the score lives in that report. Non-PDF
-// entries, missing audits, and audited PDFs with no report URL render an
+// to audit.icjia.app/report/<id>; the score lives in that report. Unscored
+// entries, missing audits, and audited documents with no report URL render an
 // empty cell. audit.error renders an "Unavailable" chip — except a 413
 // (v1.50.0), which renders "Too large" with categorizeAuditError's
 // introspection-aware reason in the tooltip, so the one chip and the File
@@ -380,7 +380,7 @@ function buildRowValues({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.sizeBytes,
     entry.sha256 ?? "",
     duplicateOf,
-    // v1.34.0: Remediation Score ("B/88", "N/A (Office)", "Not scored").
+    // v1.34.0: Remediation Score ("B/88", "N/A (legacy format)", "Not scored").
     // Appended last to match its position in CSV_COLUMNS (the non-csvOnly
     // tail) so the by-name value index lookup in writeHtml resolves correctly.
     formatRemediationScore(entry),
