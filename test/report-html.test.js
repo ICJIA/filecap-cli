@@ -159,6 +159,25 @@ describe("writeHtml", () => {
     expect(html).toContain("Unavailable");
   });
 
+  // v1.50.0 — a 413 (file over the audit service's 25 MB cap) is a verdict,
+  // not an outage: the cell says "Too large" and the tooltip carries the
+  // introspection-aware plain-English reason instead of the raw HTTP line.
+  it("renders a 413-oversize audit error as a 'Too large' chip with the plain-English reason", async () => {
+    const out = path.join(tmpDir, "audit413.html");
+    const entries = [
+      {
+        ...sampleEntries[0],
+        sizeBytes: 36346875,
+        introspection: { kind: "pdf", isImageOnly: true, hasTextLayer: false, textLayerCoverage: 0, pageCount: 141 },
+        audit: { error: "HTTP 413 Payload Too Large for https://audit.icjia.app/api/audit-url" },
+      },
+    ];
+    await writeHtml({ sourceHeader: sampleHeader, entries, sources: [sampleHeader], outputPath: out });
+    const html = await fs.readFile(out, "utf8");
+    expect(html).toMatch(/<span class="audit-grade audit-grade-error" title="[^"]*image-only scan[^"]*">Too large<\/span>/);
+    expect(html).not.toMatch(/>Unavailable</);
+  });
+
   it("flags image-only PDFs visually (e.g. row class or badge)", async () => {
     const out = path.join(tmpDir, "files.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });

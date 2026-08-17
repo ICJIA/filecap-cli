@@ -10,6 +10,11 @@ import { csvCell, publicUrlFor } from "./format.js";
 
 const MB = 1024 * 1024;
 
+// audit.icjia.app's per-file analysis cap (its ANALYSIS.MAX_FILE_SIZE_MB,
+// 25 since that repo's v1.70.0). Files over it come back as HTTP 413. Quoted
+// in the too-large reasons below; update if the server cap changes.
+const AUDIT_SIZE_CAP_MB = 25;
+
 // The public-URL builder (v1.7.40 precedence: base+pathPrefix+per-segment
 // encoding, absolutePath tree→blob fallback) lives in format.js as
 // `publicUrlFor` since the v1.39.0 post-audit pass — shared with the live
@@ -34,6 +39,34 @@ export function categorizeAuditError(entry) {
         kind: "not-a-pdf",
         reason:
           "The audit service rejected it as not a valid PDF — the file is most likely not actually a PDF (for example, an HTML page or another format saved with a .pdf name).",
+      };
+    }
+    if (/\b413\b|payload too large/i.test(err)) {
+      // v1.50.0 — a 413 is a verdict, not an outage. The scan already
+      // introspected the file locally, so the reason can say what the audit
+      // would have found: an image-only scan with no text layer scores 0 on
+      // audit.icjia.app's model regardless of anything else, and the fix is
+      // OCR + tagging (or the source document), never a bigger audit. Only
+      // claim "scan" on explicit introspection evidence.
+      const sizeMb = entry.sizeBytes ? Math.round(entry.sizeBytes / MB) : 0;
+      const sizeLabel = sizeMb >= 1 ? `${sizeMb} MB` : "of unknown size";
+      const intro = entry.introspection ?? {};
+      const base = `This file is ${sizeLabel} — over the audit service's ${AUDIT_SIZE_CAP_MB} MB limit — so it was not audited.`;
+      if (intro.isImageOnly === true || intro.hasTextLayer === false) {
+        return {
+          kind: "too-large",
+          reason: `${base} Its own metadata shows an image-only scan with no text layer: assistive technology cannot read it as-is, and an audit would score it 0. Remediation means OCR + tagging, or recreating the document from its source — not a bigger audit.`,
+        };
+      }
+      if (intro.hasTextLayer === true) {
+        return {
+          kind: "too-large",
+          reason: `${base} It does carry a text layer; to get it graded, split it into parts under ${AUDIT_SIZE_CAP_MB} MB and audit each part, or run Acrobat's accessibility checker on it locally.`,
+        };
+      }
+      return {
+        kind: "too-large",
+        reason: `${base} To get it graded, split it into parts under ${AUDIT_SIZE_CAP_MB} MB and audit each part.`,
       };
     }
     if (/server-unavailable|\b5\d\d\b|unavailable|timeout|timed out/i.test(err)) {

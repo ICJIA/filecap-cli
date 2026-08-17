@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { CSV_COLUMNS, formatPageCount, formatRemediationScore } from "./csv.js";
 import { buildPageList, attachCrossSiteFiles } from "./pages.js";
+import { categorizeAuditError } from "./audit-errors.js";
 import { humanizeBytes } from "./format.js";
 import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
@@ -197,11 +198,18 @@ function buildPageAuditChip(pa) {
 // no longer asserts a grade. The cell renders only an "Open report" anchor
 // to audit.icjia.app/report/<id>; the score lives in that report. Non-PDF
 // entries, missing audits, and audited PDFs with no report URL render an
-// empty cell. audit.error renders an "Unavailable" chip.
-function buildAuditScoreCell(audit) {
+// empty cell. audit.error renders an "Unavailable" chip — except a 413
+// (v1.50.0), which renders "Too large" with categorizeAuditError's
+// introspection-aware reason in the tooltip, so the one chip and the File
+// errors page can never tell different stories about the same file.
+function buildAuditScoreCell(audit, entry) {
   if (!audit || typeof audit !== "object") return "<td></td>";
   if (audit.skipped) return "<td></td>";
   if (audit.error) {
+    const cat = entry ? categorizeAuditError(entry) : null;
+    if (cat?.kind === "too-large") {
+      return `<td><span class="audit-grade audit-grade-error" title="${htmlEscape(cat.reason)}">Too large</span></td>`;
+    }
     return `<td><span class="audit-grade audit-grade-error" title="${htmlEscape(audit.error)}">Unavailable</span></td>`;
   }
   if (typeof audit.score !== "number") return "<td></td>";
@@ -631,7 +639,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
         return buildReferencedCell(entry.references);
       }
       if (col.name === "auditScore") {
-        return buildAuditScoreCell(entry.audit);
+        return buildAuditScoreCell(entry.audit, entry);
       }
       if (col.name === "filename") {
         // File name text linked to the file's public URL. safeUrl() gates the

@@ -10,6 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.50.0] — 2026-08-17
+
+### Added — honest "Too large" verdicts for oversized PDFs
+
+- A PDF the audit service refuses with HTTP 413 (over its 25 MB analysis
+  cap) no longer renders as "Unavailable" with the raw HTTP line in the
+  tooltip — a state that reads as breakage rather than a verdict. The table
+  chip now says **Too large**, and the tooltip and the File errors page carry
+  a plain-English reason built from the scan's own introspection: an
+  image-only scan with no text layer is told outright that assistive
+  technology cannot read it, that an audit would score it 0, and that the
+  fix is OCR + tagging (or the source document) — never a bigger audit; a
+  file that does carry a text layer is told to split it into parts under
+  25 MB or check it locally; missing introspection makes no scan claim.
+  Implemented as a new `too-large` kind in `categorizeAuditError`
+  (previously 413s fell through to the generic raw-error branch), reused by
+  the table chip so the chip and the File errors page can never tell
+  different stories about the same file. Motivated by the 2026-08-16
+  rescore, which surfaced the fleet's 13 over-cap PDFs: eleven 1987–1998
+  archive scans (25–92 MB, all but one with no text layer) plus the two
+  drone reports audit.icjia.app's v1.70.0 cap deliberately keeps out.
+
 ## [1.49.0] — 2026-08-16
 
 ### Added — sortable search results

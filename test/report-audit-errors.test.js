@@ -5,7 +5,7 @@
 //   - writeAuditErrorsCsv routes cells through the shared csvCell helper so
 //     formula-leading cells get the apostrophe guard.
 import { describe, it, expect } from "vitest";
-import { collectAuditErrors, writeAuditErrorsCsv } from "../src/report/audit-errors.js";
+import { categorizeAuditError, collectAuditErrors, writeAuditErrorsCsv } from "../src/report/audit-errors.js";
 
 const erroredItem = (over = {}, entryOver = {}) => ({
   siteName: "Beta",
@@ -76,5 +76,66 @@ describe("writeAuditErrorsCsv formula-injection guard", () => {
     ]);
     const csv = writeAuditErrorsCsv(groups);
     expect(csv).toContain('"odd\rname.pdf"');
+  });
+});
+
+// v1.50.0 — HTTP 413 categorization: oversized files get an honest,
+// introspection-aware reason instead of falling through to the raw generic
+// error line. The 2026-08-16 fleet rescore surfaced 13 of these — 11 archive
+// scans from 1987–1998 at 25–92 MB, plus the two drone reports that
+// audit.icjia.app's v1.70.0 cap deliberately keeps out — and the table showed
+// "Unavailable" with a raw HTTP line in the tooltip, which reads as breakage
+// rather than the verdict it is.
+describe("categorizeAuditError: HTTP 413 (file exceeds the audit service's size cap)", () => {
+  const err413 = "HTTP 413 Payload Too Large for https://audit.icjia.app/api/audit-url";
+
+  it("categorizes a 413 image-only scan as too-large, with the scan verdict (would score 0)", () => {
+    // The real 1998 Madison.pdf case: 34.7 MB PFU ScanSnap scan, no text layer.
+    const cat = categorizeAuditError({
+      extension: "pdf",
+      category: "pdf",
+      sizeBytes: 36346875,
+      introspection: { kind: "pdf", isImageOnly: true, hasTextLayer: false, textLayerCoverage: 0, pageCount: 141 },
+      audit: { error: err413 },
+    });
+    expect(cat.kind).toBe("too-large");
+    expect(cat.reason).toContain("35 MB");
+    expect(cat.reason).toContain("25 MB");
+    expect(cat.reason).toMatch(/image-only scan/i);
+    expect(cat.reason).toMatch(/score it 0/);
+  });
+
+  it("categorizes a 413 file WITH a text layer as too-large without claiming it is a scan", () => {
+    // The real 59.7 MB drone-report case: 1,587 pages, 91% text-layer coverage.
+    const cat = categorizeAuditError({
+      extension: "pdf",
+      category: "pdf",
+      sizeBytes: 62599372,
+      introspection: { kind: "pdf", isImageOnly: false, hasTextLayer: true, textLayerCoverage: 0.9, pageCount: 1587 },
+      audit: { error: err413 },
+    });
+    expect(cat.kind).toBe("too-large");
+    expect(cat.reason).toContain("60 MB");
+    expect(cat.reason).toContain("25 MB");
+    expect(cat.reason).not.toMatch(/image-only|scan/i);
+    expect(cat.reason).toMatch(/split/i);
+  });
+
+  it("makes no scan claim when introspection is missing", () => {
+    const cat = categorizeAuditError({
+      extension: "pdf",
+      category: "pdf",
+      sizeBytes: 30 * 1024 * 1024,
+      audit: { error: err413 },
+    });
+    expect(cat.kind).toBe("too-large");
+    expect(cat.reason).not.toMatch(/image-only|scan/i);
+  });
+
+  it("leaves 422 and 5xx categorization untouched (the 413 branch does not swallow them)", () => {
+    expect(categorizeAuditError({ extension: "pdf", audit: { error: "HTTP 422 x" } }).kind).toBe("not-a-pdf");
+    expect(categorizeAuditError({ extension: "pdf", audit: { error: "HTTP 503 Service Unavailable" } }).kind).toBe(
+      "audit-unavailable",
+    );
   });
 });
