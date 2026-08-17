@@ -137,8 +137,22 @@ export function createRetryingJsonFetcher({
         ? rateLimitWaits >= maxRateLimitWaits
         : attempt >= maxRetries;
       if (!retryable || exhausted) {
+        // v1.54.0 — the API's JSON error bodies say WHY ("legacy format…",
+        // "could not be read…"). With Office formats in play a bare 422 is
+        // ambiguous, so surface the reason; the status stays first so the
+        // categorizer's \b4xx\b regexes keep matching. Best-effort: a
+        // non-JSON body (proxy HTML, empty) keeps the plain status line.
+        let detail = "";
+        try {
+          const body = await response.json();
+          if (typeof body?.error === "string" && body.error.length > 0) {
+            detail = ` — ${body.error}`;
+          }
+        } catch {
+          // body unreadable — keep the plain status line
+        }
         throw new Error(
-          `HTTP ${response.status} ${response.statusText} for ${url}`,
+          `HTTP ${response.status} ${response.statusText} for ${url}${detail}`,
         );
       }
 

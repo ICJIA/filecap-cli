@@ -11,7 +11,10 @@ import { createRetryingJsonFetcher } from "../src/audits/retrying-fetcher.js";
 // out and retried instead of failing the entry.
 
 // Build a minimal Response-like object the fetcher understands.
-function resp({ ok = false, status = 200, statusText = "", retryAfter, json = {} }) {
+// jsonError lets a caller simulate a body that fails to parse (e.g. HTML
+// from a proxy, or an empty body) — response.json() rejects instead of
+// resolving.
+function resp({ ok = false, status = 200, statusText = "", retryAfter, json = {}, jsonError }) {
   return {
     ok,
     status,
@@ -20,7 +23,10 @@ function resp({ ok = false, status = 200, statusText = "", retryAfter, json = {}
       get: (name) =>
         String(name).toLowerCase() === "retry-after" ? retryAfter ?? null : null,
     },
-    json: async () => json,
+    json: async () => {
+      if (jsonError) throw jsonError;
+      return json;
+    },
   };
 }
 
@@ -189,6 +195,44 @@ describe("createRetryingJsonFetcher", () => {
     );
     expect(calls).toBe(3); // 1 initial + 2 retries
     expect(sleeps).toHaveLength(2);
+  });
+
+  it("appends the JSON body's error text to a non-retryable HTTP error", async () => {
+    const fetcher = createRetryingJsonFetcher({
+      fetchImpl: async () =>
+        resp({
+          status: 422,
+          statusText: "Unprocessable Entity",
+          json: { error: "The fetched Excel file could not be read.", details: "corrupt" },
+        }),
+      maxRetries: 0,
+      baseDelayMs: 1,
+      maxDelayMs: 1,
+      log: () => {},
+    });
+
+    await expect(fetcher("https://audit.example/api", {})).rejects.toThrow(
+      "HTTP 422 Unprocessable Entity for https://audit.example/api — The fetched Excel file could not be read.",
+    );
+  });
+
+  it("throws the plain status line when the error body is not JSON", async () => {
+    const fetcher = createRetryingJsonFetcher({
+      fetchImpl: async () =>
+        resp({
+          status: 413,
+          statusText: "Payload Too Large",
+          jsonError: new Error("not json"),
+        }),
+      maxRetries: 0,
+      baseDelayMs: 1,
+      maxDelayMs: 1,
+      log: () => {},
+    });
+
+    await expect(fetcher("https://audit.example/api", {})).rejects.toThrow(
+      "HTTP 413 Payload Too Large for https://audit.example/api",
+    );
   });
 });
 
