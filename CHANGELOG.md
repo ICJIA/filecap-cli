@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.52.0] — 2026-08-17
+
+### Added — row numbers on /search
+
+- Both the results table and the custom-report view open with a muted `#`
+  column (right-aligned, `aria-label="Row number"`). Numbers follow the
+  current sort/filter order — 1–400 under the render cap — and renumber
+  on re-sort, chip filtering, or report-row removal.
+
+### Changed — the custom-report system is purple
+
+- The report bar reused the filter chips' exact palette (`#161b22`
+  surface, `#30363d` border, amber accents), so the two read as one
+  widget. The report system now owns a purple family the page uses
+  nowhere else: bar + return-banner tint (`rgba(163,113,247,.12)`,
+  borders `#8957e5`/`#a371f7`), the "Custom report: N files" count in
+  `#d2a8ff`, primary actions (Download report, Keep adding to it, Add
+  selected) in `#a371f7` with `#bc8cff` hover, purple secondary-button
+  hover borders, and an `#a371f7` row-checkbox accent — ticking a row
+  visibly feeds the purple system. Chips keep gray/amber, so the page
+  reads: amber = search & filters, purple = your report. Both new
+  pairings pass WCAG AA (`#d2a8ff` on the bar ≈8.5:1; `#0d1117` on
+  `#a371f7` ≈5.6:1); Remove stays red, focus rings stay blue.
+
 ## [1.51.0] — 2026-08-17
 
 ### Added — custom search reports on /search

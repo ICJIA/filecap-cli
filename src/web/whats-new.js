@@ -38,6 +38,14 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "numbered-results-purple-report-2026-08-17",
+    badge: "Improved",
+    text: "Two search-page improvements. Search results are now numbered, so it's easy to point a colleague to “row 12” instead of reading out a filename — the numbers follow whatever order you've sorted the results in, and the custom report view is numbered the same way. And everything that belongs to the custom report — the bar showing what you've collected, its buttons, and the checkboxes you tick — now appears in purple, so your report can't be mistaken for the gray-and-amber search filters sitting beside it.",
+    linkText: "See it on the search page",
+    linkHref: "search.html",
+    date: "August 17, 2026",
+  },
+  {
     id: "custom-search-reports-2026-08-17",
     badge: "New",
     text: "The search page can now build a custom report. Tick the box next to any result — or add every match at once — then search for something else and keep adding: your picks from every search collect into one running report. A bar above the results shows how many files you've gathered and lets you view the list, remove single rows, download everything as an Excel workbook (with clickable links and a column showing which search found each file), or clear it and start over. The report is private to your browser tab: it survives leaving and returning to the search page — you'll be asked whether to keep or clear it — and it clears itself when the tab closes.",

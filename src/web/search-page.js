@@ -104,6 +104,7 @@ const SEARCH_CSS = `
 .search-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #21262d; vertical-align: top; }
 .search-table tr:last-child td { border-bottom: none; }
 .search-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.search-table th.rownum, .search-table td.rownum { text-align: right; color: #7d8590; width: 1%; }
 .search-table .search-site { white-space: nowrap; font-weight: 600; color: #d4dae0; }
 .search-table .search-file a { word-break: break-all; }
 .search-cap-note { color: #7d8590; font-size: 0.88rem; margin: 0.6rem 0 0; }
@@ -154,9 +155,11 @@ const SEARCH_CSS = `
   padding: 0.55rem 0.9rem;
   margin: 0.9rem 0 0.35rem;
 }
-.report-bar { background: #161b22; border: 1px solid #30363d; }
-.report-banner { background: rgba(255, 176, 0, 0.08); border: 1px solid #ffb000; color: #e5e5e5; }
-.report-count { font-weight: 600; color: #ffd76a; }
+/* The report system is purple everywhere — bar, banner, buttons, row
+   checkboxes — so it can't be mistaken for the gray/amber filter chips. */
+.report-bar { background: rgba(163, 113, 247, 0.12); border: 1px solid #8957e5; }
+.report-banner { background: rgba(163, 113, 247, 0.1); border: 1px solid #a371f7; color: #e5e5e5; }
+.report-count { font-weight: 600; color: #d2a8ff; }
 .report-btn {
   font: inherit;
   font-size: 0.88rem;
@@ -167,16 +170,16 @@ const SEARCH_CSS = `
   padding: 0.3rem 0.7rem;
   cursor: pointer;
 }
-.report-btn:hover { border-color: #58a6ff; color: #e5e5e5; }
+.report-btn:hover { border-color: #a371f7; color: #e5e5e5; }
 .report-btn:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
 .report-btn[disabled] { color: #7d8590; border-color: #21262d; cursor: not-allowed; }
-.report-btn-primary { background: #ffb000; border-color: #ffb000; color: #0d1117; font-weight: 600; }
-.report-btn-primary:hover { background: #ffc23d; border-color: #ffc23d; color: #0d1117; }
+.report-btn-primary { background: #a371f7; border-color: #a371f7; color: #0d1117; font-weight: 600; }
+.report-btn-primary:hover { background: #bc8cff; border-color: #bc8cff; color: #0d1117; }
 .report-btn-primary[disabled] { background: #30363d; border-color: #30363d; color: #7d8590; }
 .report-status { color: #d4dae0; font-size: 0.9rem; margin: 0.35rem 0 0; min-height: 1.3em; }
 .report-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.75rem; }
 .search-table th.sel, .search-table td.sel { width: 1.8rem; text-align: center; vertical-align: middle; }
-.search-table input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: #ffb000; cursor: pointer; }
+.search-table input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: #a371f7; cursor: pointer; }
 .report-remove {
   font: inherit;
   font-size: 0.82rem;
@@ -597,6 +600,12 @@ ${searchReportClientSource()}
     table.className = "search-table";
     var thead = document.createElement("thead");
     var hr = document.createElement("tr");
+    var thNum = document.createElement("th");
+    thNum.scope = "col";
+    thNum.className = "rownum";
+    thNum.textContent = "#";
+    thNum.setAttribute("aria-label", "Row number");
+    hr.appendChild(thNum);
     var thSel = document.createElement("th");
     thSel.scope = "col";
     thSel.className = "sel";
@@ -658,6 +667,11 @@ ${searchReportClientSource()}
       var site = data.sites[row[2]] || {};
       var why = match.why || [];
       var tr = document.createElement("tr");
+
+      var tdNum = document.createElement("td");
+      tdNum.className = "num rownum";
+      tdNum.textContent = (i + 1).toLocaleString("en-US");
+      tr.appendChild(tdNum);
 
       var tdSel = document.createElement("td");
       tdSel.className = "sel";
@@ -915,11 +929,15 @@ ${searchReportClientSource()}
     table.className = "search-table";
     var thead = document.createElement("thead");
     var hr = document.createElement("tr");
-    var labels = ["Website", "Filename", "Type", "Score", "Grade", "Size", "Modified", "Found by search", "Audit report", ""];
+    var labels = ["#", "Website", "Filename", "Type", "Score", "Grade", "Size", "Modified", "Found by search", "Audit report", ""];
     for (var h = 0; h < labels.length; h++) {
       var th = document.createElement("th");
       th.scope = "col";
       th.textContent = labels[h];
+      if (labels[h] === "#") {
+        th.className = "rownum";
+        th.setAttribute("aria-label", "Row number");
+      }
       hr.appendChild(th);
     }
     thead.appendChild(hr);
@@ -928,6 +946,10 @@ ${searchReportClientSource()}
     for (var i = 0; i < report.length; i++) {
       (function (rr) {
         var tr = document.createElement("tr");
+        var tdNum = document.createElement("td");
+        tdNum.className = "num rownum";
+        tdNum.textContent = (i + 1).toLocaleString("en-US");
+        tr.appendChild(tdNum);
         var tdSite = document.createElement("td");
         tdSite.className = "search-site";
         tdSite.textContent = rr.site || "";

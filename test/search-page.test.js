@@ -205,6 +205,26 @@ describe("generateSearchHtml", () => {
     expect(html).not.toContain("confirm(");
   });
 
+  // v1.52.0 — the report bar originally reused the filter chips' exact
+  // gray/amber palette, so the two read as one widget. The report system
+  // now owns a purple family the page uses nowhere else; chips keep
+  // gray/amber. These pins keep the two systems from re-converging.
+  it("styles the report system purple, distinct from the gray/amber chips", () => {
+    const html = page();
+    expect(html).toContain("rgba(163, 113, 247, 0.12)"); // report-bar tint
+    expect(html).toContain("#8957e5"); // report-bar border
+    expect(html).toContain("#d2a8ff"); // "Custom report: N files" count
+    expect(html).toContain("accent-color: #a371f7"); // row checkboxes
+    expect(html).toContain('.search-chip[aria-pressed="true"] { background: #ffb000');
+  });
+
+  it("numbers rows in both the results table and the report view", () => {
+    const html = page();
+    expect(html).toContain("rownum");
+    expect(html).toContain('"Row number"');
+    expect(html).toContain('["#", "Website"');
+  });
+
   // The whole controller ships inside the generator's template literal,
   // where a stray backtick or cooked escape can silently corrupt the
   // emitted JS (the v1.48.1 class of bug). Parsing the inline script as

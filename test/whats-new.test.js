@@ -23,13 +23,20 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // v1.51.0 — newest entry announces custom search reports. No counts on
-  // this banner, so nothing to reconcile against the hero (the v1.44.1
-  // lesson); it links straight to the page it announces.
-  it("leads with the 2026-08-17 custom-report entry", () => {
+  // v1.52.0 — newest entry announces numbered results + the purple report
+  // system. No counts on this banner, so nothing to reconcile against the
+  // hero (the v1.44.1 lesson); it links straight to the page it announces.
+  it("leads with the 2026-08-17 numbering + purple-report entry", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("custom");
+    expect(e.id).toContain("numbered");
     expect(e.id).toContain("2026-08-17");
+    expect(e.linkHref).toBe("search.html");
+  });
+
+  // v1.51.0 — the custom-reports launch entry, now history.
+  it("keeps the 2026-08-17 custom-report entry as history", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("custom-search-reports"));
+    expect(e).toBeTruthy();
     expect(e.linkHref).toBe("search.html");
   });
 
