@@ -671,6 +671,44 @@ describe("legacy-office counts as remediable in computeSiteSummary (v1.39.0 E7)"
     // …and the phantom contributes no ×5 page estimate.
     expect(html).not.toContain("≈ 5 document pages");
   });
+
+  // v1.54.0 final-review gap: index-page.test.js and report-html.test.js both
+  // pin the unscoreableCount -> coverage-clause WIRING, but each hands the
+  // renderer an already-built summary/tally — neither exercises
+  // computeSiteSummary()'s own NDJSON-parsing loop (the isUnscoreableDocument
+  // branch at its heart). This test goes through the real path: a genuine
+  // inventory file, the real computeSiteSummary(), and the rendered card.
+  it("a lone legacy-office entry drives computeSiteSummary's unscoreableCount to exactly 1, through to the rendered card", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    await writeInv(path.join(auditsBase, "dvfr", "latest", "inventory.ndjson"), {
+      serverName: "dvfr",
+      entries: [
+        // Five scored PDFs clear MIN_SCORED_DOCS so the card takes the banded
+        // branch — the thin-data branch never renders the coverage clause
+        // (and so never mentions the unscoreable count) at all.
+        pdfEntry(0, 80), pdfEntry(1, 80), pdfEntry(2, 80), pdfEntry(3, 80), pdfEntry(4, 80),
+        {
+          path: "old.doc", absolutePath: "/uploads/old.doc", filename: "old.doc",
+          extension: "doc", category: "legacy-office", remediable: true, sizeBytes: 10,
+          modifiedAt: "2024-01-01T00:00:00.000Z", sha256: "d1", flags: [],
+        },
+      ],
+    });
+    const sitesFile = await writeSites([
+      { name: "dvfr", siteName: "DVFR", host: "10.0.0.1", user: "forge", remotePath: "/uploads" },
+    ]);
+    const outputDir = path.join(tmpDir, "out");
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+
+    const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    // 5 scored of 6 remediable (5 pdf + 1 legacy-office) files.
+    expect(html).toContain("5 of 6 remediable files scored");
+    // Singular "file" only renders when unscoreableCount === 1 exactly (the
+    // ternary in fileA11yCoverageText switches to "files" for any other
+    // count) — "can't" is HTML-entity-escaped (&#39;) in the rendered card.
+    expect(html).toContain("1 legacy Office file can");
+    expect(html).toContain("be machine-scored (re-save as .docx/.xlsx/.pptx to score them)");
+  });
 });
 
 // ── Audit fix (red-1 R1a/R1b): fleet-context markdown legacy-office row + enum ──

@@ -135,6 +135,21 @@ describe("fetchAuditScore", () => {
     ).rejects.toThrow(/HTTP 400/);
   });
 
+  it("rethrows a 4xx error even when its appended third-party body text mentions an HTTP 5xx code (regex must anchor to the message start)", async () => {
+    const fetcher = async () => {
+      throw new Error(
+        "HTTP 422 Unprocessable Entity for https://x — upstream said HTTP 502",
+      );
+    };
+    await expect(
+      fetchAuditScore({
+        pdfUrl: "https://x.com/a.pdf",
+        auditEndpoint: "https://audit.icjia.app/api/audit-url",
+        fetcher,
+      }),
+    ).rejects.toThrow(/HTTP 422/);
+  });
+
   it("passes force=true through to the server when requested (skips server-side dedup)", async () => {
     const calls = [];
     const fetcher = async (url, init) => {

@@ -1,4 +1,4 @@
-// Per-site file-accessibility history — a time series of the average scored-PDF
+// Per-site file-accessibility history — a time series of the average scored-document
 // score, so improvement can be tracked ("since last audit") and graphed later.
 // Persisted by web-rollup to the purge-safe <auditsBase>/<slug>/a11y-history.json
 // (sibling of latest/ since v1.39.0); the logic here is pure (web-rollup does
@@ -37,7 +37,7 @@ export function a11yTrend(history) {
   if (arr.length < 2) return null;
   const cur = arr[arr.length - 1];
   const prev = arr[arr.length - 2];
-  // v1.39.0 sampling-shift suppression: when the scored-PDF sample differs
+  // v1.39.0 sampling-shift suppression: when the scored-document sample differs
   // by more than 20% of the larger side between the two points, the avg
   // delta mostly measures WHICH PDFs got scored, not remediation — showing
   // it as an improvement/decline chip would mislead. Suppress the chip

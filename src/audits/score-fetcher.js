@@ -76,7 +76,7 @@ export async function fetchAuditScore({
   } catch (err) {
     // 5xx: transient server-side issue, return null so the orchestrator
     // can record "unscored" and continue without failing the run.
-    if (/HTTP 5\d\d/.test(err.message)) {
+    if (/^HTTP 5\d\d/.test(err.message)) {
       return null;
     }
     // 4xx and everything else: surface to caller. 4xx usually means the

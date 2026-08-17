@@ -7,7 +7,7 @@
 #
 #    1. Pre-flight — checks expect, Netlify login, sites.json, free disk
 #    2. Scan       — inventories every file on all content sites (ssh + rsync)
-#    3. Enrich     — CMS references -> cross-references -> PDF a11y scores -> website a11y scores
+#    3. Enrich     — CMS references -> cross-references -> document a11y scores -> website a11y scores
 #    4. Web audit  — builds the deployable web-rollup bundle
 #                    (all content sites + the tooling-site roster)
 #    5. Deploy     — pushes the bundle to Netlify (the live fleet-audit site)
@@ -86,7 +86,7 @@ printf 'transcript: %s\n' "$LOG"
 on_signal() {
   printf '\n[ABORTED] run-full-audit.sh received %s — pipeline stopped early.\n' "$1" >&2
   printf '          The last "Stage ..." line above is where it stopped.\n' >&2
-  printf '          State may be partial: latest/ can point at a fresh scan with no PDF\n' >&2
+  printf '          State may be partial: latest/ can point at a fresh scan with no document\n' >&2
   printf '          scores. Re-run ./run-full-audit.sh to finish — web-rollup now refuses\n' >&2
   printf '          to deploy an unscored bundle, so a partial state cannot reach production.\n' >&2
   exit 130

@@ -426,7 +426,7 @@ describe("runAudits", () => {
   });
 
   // v1.39.0: the summary line's ternary was inverted — when EVERY PDF was
-  // served from the local cache (pdfsToAudit.length === 0) it printed
+  // served from the local cache (docsToAudit.length === 0) it printed
   // "0 from cache" instead of the actual cache-served count.
   it("logs the real cache-served count when every PDF comes from the local cache", async () => {
     writeInventory(invPath, [pdfEntry()]);
@@ -457,7 +457,12 @@ describe("runAudits", () => {
   });
 
   it("page-audit pass preserves violations and incomplete arrays on ref.pageAudit (Fix 1)", async () => {
-    // Non-PDF entry with a reference — only the page-audit pass fires.
+    // Non-PDF entry with a reference and a publicUrl — "docx" is scoreable,
+    // so the file-audit pass fires too, not just the page-audit pass. The
+    // shared fetcher mock is shaped for the page-audit response only, so the
+    // file-audit pass reads it as scoreless and records entry.audit =
+    // { error: "no score in response" }; these assertions check only the
+    // page-audit outcome and deliberately ignore that file-audit error.
     const docEntry = {
       path: "doc.docx",
       filename: "doc.docx",

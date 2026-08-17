@@ -23,7 +23,7 @@
 #    ./run-site-update.sh i2i.illinois.gov                     # one site (+ archive prompt)
 #    ./run-site-update.sh i2i.illinois.gov archive.icjia.cloud # source + archive together
 #    ./run-site-update.sh i2i.illinois.gov --no-archive        # one site, leave the archive alone
-#    ./run-site-update.sh i2i.illinois.gov --scores-only       # skip the SSH re-scan; re-score PDFs only
+#    ./run-site-update.sh i2i.illinois.gov --scores-only       # skip the SSH re-scan; re-score documents only
 #    ./run-site-update.sh i2i.illinois.gov --no-deploy         # build locally, do NOT deploy
 #    ./run-site-update.sh i2i.illinois.gov --no-purge          # keep old run dirs
 #    ./run-site-update.sh i2i.illinois.gov --dry-run           # resolve + show the plan, do nothing
@@ -213,7 +213,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   else
     printf '  full refresh:  (none)\n'
   fi
-  printf '  re-score PDFs: %s\n' "${TARGETS[*]}"
+  printf '  re-score docs: %s\n' "${TARGETS[*]}"
   printf '  deploy:        %s\n' "$( [ "$DEPLOY" -eq 1 ] && echo yes || echo 'no (--no-deploy)' )"
   printf '  purge:         %s\n' "$( [ "$PURGE" -eq 1 ] && echo yes || echo 'no (--no-purge)' )"
   exit 0
@@ -313,8 +313,8 @@ if [ ${#FULL_TARGETS[@]} -gt 0 ]; then
   done
 fi
 
-# ── audits (ALL targets, both modes) — re-score PDFs; cache keeps it cheap ───────
-say "Scoring PDFs"
+# ── audits (ALL targets, both modes) — re-score documents; cache keeps it cheap ──
+say "Scoring documents (PDF + Office)"
 for site in "${TARGETS[@]}"; do
   d="$AUDITS_BASE/$site/latest"
   inv="$d/inventory.cross-ref.ndjson"

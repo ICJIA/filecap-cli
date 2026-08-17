@@ -962,8 +962,8 @@ main {
   text-align: center;
 }
 
-/* v1.36.0 — file-accessibility strip: the average of the site's scored-PDF
-   audit reports, banded far→partial→closer. The band class sets --a11y-accent
+/* v1.36.0 — file-accessibility strip: the average of the site's scored documents
+   (PDF + modern Office), banded far→partial→closer. The band class sets --a11y-accent
    (bar + dot + score + pill) and --a11y-tint (pill background). a11y-na covers
    the excluded archive and thin-data sites (caption only, no score). */
 .site-card .a11y-strip {

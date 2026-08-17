@@ -1205,6 +1205,7 @@ export async function runWebRollup({
     // points stranded at the old latest/ + runs/*Z locations on first touch,
     // and the write is atomic (tmp + rename).
     const { histPath, history } = await loadA11yHistory(auditsBase, slug);
+    // On-disk key stays "pdfs" for continuity; from v1.54.0 the value counts ALL scored documents (PDF + Office), not just PDFs — points before that date are PDF-only.
     const updated = appendA11yPoint(history, {
       at: a11yNowIso, avg: a.avg, scored: a.scored, pdfs: a.docs,
       remediable: a.remediable, band: a.band?.key ?? null,
