@@ -108,7 +108,7 @@ export function generateAuditErrorsPage({ groups = [], backHref = "index.html" }
 <main id="main">
   <p class="fe-back"><a href="${htmlEscape(backHref)}">&larr; Back to fleet index</a></p>
   <h1>File errors</h1>
-  <p class="fe-intro">Files the accessibility audit could not score, or whose content does not match their extension. A 422 means the file is not what its extension claims — a fake or corrupt PDF, Word, Excel, or PowerPoint file; "could not process" usually means a very large or complex document timed out — re-running the audit retries it.</p>
+  <p class="fe-intro">Files the accessibility audit could not score, or whose content does not match their extension. A 422 means the file is not what its extension claims — a fake or corrupt PDF, Word, Excel, or PowerPoint file; "could not process" usually means a very large or complex document timed out — re-running the audit retries it. Every site is listed; sites with no problems are marked clean.</p>
   ${summary}
   ${list.map(siteSection).join("\n")}
 </main>

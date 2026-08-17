@@ -104,6 +104,11 @@ describe("intro lede — format-aware 422/timeout wording", () => {
     expect(html).not.toMatch(/not actually a PDF/);
   });
 
+  it("keeps the 'every site is listed' sentence — orthogonal to format wording", () => {
+    const html = generateAuditErrorsPage({ groups: [] });
+    expect(html).toContain("Every site is listed");
+  });
+
   it("says 'large or complex document', not 'large PDF', for the timeout note", () => {
     const html = generateAuditErrorsPage({ groups: [] });
     expect(html).toContain(
