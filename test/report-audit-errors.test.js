@@ -133,9 +133,68 @@ describe("categorizeAuditError: HTTP 413 (file exceeds the audit service's size 
   });
 
   it("leaves 422 and 5xx categorization untouched (the 413 branch does not swallow them)", () => {
-    expect(categorizeAuditError({ extension: "pdf", audit: { error: "HTTP 422 x" } }).kind).toBe("not-a-pdf");
-    expect(categorizeAuditError({ extension: "pdf", audit: { error: "HTTP 503 Service Unavailable" } }).kind).toBe(
-      "audit-unavailable",
-    );
+    // category: "pdf" set explicitly — real inventory entries always carry
+    // it alongside extension; the format-aware 422/413 branches key off it.
+    expect(
+      categorizeAuditError({ extension: "pdf", category: "pdf", audit: { error: "HTTP 422 x" } }).kind,
+    ).toBe("not-a-pdf");
+    expect(
+      categorizeAuditError({ extension: "pdf", category: "pdf", audit: { error: "HTTP 503 Service Unavailable" } })
+        .kind,
+    ).toBe("audit-unavailable");
+  });
+});
+
+// Office-scoring follow-on: non-PDF scoreable formats (docx/xlsx/pptx) get
+// their own 422/413/5xx wording instead of PDF-specific text. PDF wording is
+// unchanged (kind "not-a-pdf" stays PDF-only); non-PDF 422s get the new
+// "invalid-document" kind, additive for downstream consumers.
+describe("categorizeAuditError: format-aware wording (non-PDF Office documents)", () => {
+  it("categorizes a docx 422 as invalid-document with Word wording", () => {
+    const cat = categorizeAuditError({
+      extension: "docx",
+      category: "office-document",
+      audit: { error: "HTTP 422 Unprocessable Entity for https://x/m.docx — The fetched Word document could not be read." },
+    });
+    expect(cat.kind).toBe("invalid-document");
+    expect(cat.reason).toMatch(/not a valid Word/);
+    expect(cat.reason).toMatch(/corrupt or mislabeled/);
+    expect(cat.reason).not.toMatch(/not a valid PDF/);
+  });
+
+  it("keeps the PDF wording for a pdf 422", () => {
+    const cat = categorizeAuditError({
+      extension: "pdf",
+      category: "pdf",
+      audit: { error: "HTTP 422 Unprocessable Entity for https://x/f.pdf" },
+    });
+    expect(cat.kind).toBe("not-a-pdf");
+    expect(cat.reason).toMatch(/not a valid PDF/);
+  });
+
+  it("gives an oversized xlsx the size verdict without PDF-specific advice", () => {
+    const cat = categorizeAuditError({
+      extension: "xlsx",
+      category: "spreadsheet",
+      // 30,000,000 bytes = 28.6 MiB, rounds to 29 MB (matches the assertion
+      // below) — deliberately not 30*1024*1024, which would round to 30.
+      sizeBytes: 30_000_000,
+      audit: { error: "HTTP 413 Payload Too Large for https://x/big.xlsx" },
+    });
+    expect(cat.kind).toBe("too-large");
+    expect(cat.reason).toMatch(/29 MB — over the audit service's 25 MB limit/);
+    expect(cat.reason).toMatch(/Reduce its size/);
+    expect(cat.reason).not.toMatch(/text layer|OCR|split it into parts/);
+  });
+
+  it("says documents, not PDFs, in the timeout note", () => {
+    const cat = categorizeAuditError({
+      extension: "pptx",
+      category: "presentation",
+      sizeBytes: 8 * 1024 * 1024,
+      audit: { error: "HTTP 504 Gateway Timeout for https://x/deck.pptx" },
+    });
+    expect(cat.kind).toBe("audit-unavailable");
+    expect(cat.reason).toMatch(/large or complex documents can time out/);
   });
 });

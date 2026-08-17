@@ -3,8 +3,11 @@ import { categorizeAuditError, collectAuditErrors } from "../src/report/audit-er
 
 describe("categorizeAuditError", () => {
   it("flags an HTTP 422 as not a valid PDF", () => {
+    // category: "pdf" set explicitly — real inventory entries always carry
+    // it alongside extension; the format-aware 422 branch keys off it.
     const r = categorizeAuditError({
       extension: "pdf",
+      category: "pdf",
       audit: { error: "HTTP 422 Unprocessable Entity for https://audit.icjia.app/api/audit-url" },
     });
     expect(r.kind).toBe("not-a-pdf");

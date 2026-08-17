@@ -155,7 +155,7 @@ function renderFileErrorsSection(fileErrors) {
   const blurb =
     n === 0
       ? `Every site's files were checked against audit.icjia.app — no file errors anywhere in the fleet.`
-      : `${he(n)} file${n === 1 ? "" : "s"} across ${he(withErrors)} site${withErrors === 1 ? "" : "s"} could not be audited — most are non-PDF files saved with a .pdf name, or large PDFs that timed out.`;
+      : `${he(n)} file${n === 1 ? "" : "s"} across ${he(withErrors)} site${withErrors === 1 ? "" : "s"} could not be audited — most are files saved with the wrong extension, or large documents that timed out.`;
   return `
   <section class="section file-errors">
     <h2>File errors</h2>

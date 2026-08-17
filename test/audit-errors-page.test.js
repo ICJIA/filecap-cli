@@ -90,3 +90,25 @@ describe("meta description (v1.40.0)", () => {
     expect(html).toMatch(/<meta name="description" content="[^"]{40,}"/);
   });
 });
+
+// Office-scoring follow-on: the intro lede used to say a 422 means "not
+// actually a PDF" and a timeout means "a very large PDF timed out" — both
+// PDF-specific. Now that docx/xlsx/pptx are scored too, the lede must not
+// imply PDF is the only format that can 422 or time out.
+describe("intro lede — format-aware 422/timeout wording", () => {
+  it("attributes a 422 to any scoreable format, not just PDF", () => {
+    const html = generateAuditErrorsPage({ groups: [] });
+    expect(html).toContain(
+      "A 422 means the file is not what its extension claims — a fake or corrupt PDF, Word, Excel, or PowerPoint file",
+    );
+    expect(html).not.toMatch(/not actually a PDF/);
+  });
+
+  it("says 'large or complex document', not 'large PDF', for the timeout note", () => {
+    const html = generateAuditErrorsPage({ groups: [] });
+    expect(html).toContain(
+      '"could not process" usually means a very large or complex document timed out — re-running the audit retries it.',
+    );
+    expect(html).not.toMatch(/a very large PDF timed out/);
+  });
+});

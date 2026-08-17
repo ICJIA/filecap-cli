@@ -1,7 +1,7 @@
 // Audit-error collection + categorisation for the fleet "File errors" report.
 //
-// After the audits step some PDFs carry `entry.audit.error` instead of a score
-// (audit.icjia.app could not fetch or process the file). Scans from v1.17.0+
+// After the audits step some documents carry `entry.audit.error` instead of a
+// score (audit.icjia.app could not fetch or process the file). Scans from v1.17.0+
 // also carry a `content-type-mismatch` flag (the extension says one format, the
 // bytes say another). This module gathers both into a per-site list with a
 // plain-English likely reason — the input to audit-file-errors.html and .csv.
@@ -20,6 +20,13 @@ const AUDIT_SIZE_CAP_MB = 25;
 // `publicUrlFor` since the v1.39.0 post-audit pass — shared with the live
 // orphan emitters so every fleet artifact encodes links the same way.
 
+// Human name for a scoreable non-PDF format, for error prose.
+const FORMAT_LABELS = {
+  "office-document": "Word (.docx)",
+  spreadsheet: "Excel (.xlsx)",
+  presentation: "PowerPoint (.pptx)",
+};
+
 /**
  * Categorise why an entry counts as an error.
  *
@@ -35,10 +42,17 @@ export function categorizeAuditError(entry) {
   if (auditErr) {
     const err = String(auditErr);
     if (/\b422\b|unprocessable/i.test(err)) {
+      if (entry.category === "pdf") {
+        return {
+          kind: "not-a-pdf",
+          reason:
+            "The audit service rejected it as not a valid PDF — the file is most likely not actually a PDF (for example, an HTML page or another format saved with a .pdf name).",
+        };
+      }
+      const label = FORMAT_LABELS[entry.category] ?? `.${ext}`;
       return {
-        kind: "not-a-pdf",
-        reason:
-          "The audit service rejected it as not a valid PDF — the file is most likely not actually a PDF (for example, an HTML page or another format saved with a .pdf name).",
+        kind: "invalid-document",
+        reason: `The audit service rejected it as not a valid ${label} file — it is most likely corrupt or mislabeled (for example, another format saved with a .${ext} name).`,
       };
     }
     if (/\b413\b|payload too large/i.test(err)) {
@@ -52,27 +66,36 @@ export function categorizeAuditError(entry) {
       const sizeLabel = sizeMb >= 1 ? `${sizeMb} MB` : "of unknown size";
       const intro = entry.introspection ?? {};
       const base = `This file is ${sizeLabel} — over the audit service's ${AUDIT_SIZE_CAP_MB} MB limit — so it was not audited.`;
-      if (intro.isImageOnly === true || intro.hasTextLayer === false) {
+      // The introspection-aware verdicts (image-only scan / has-text-layer)
+      // only apply to PDFs — that's the only format this scan introspects
+      // for a text layer. Non-PDF formats get a plain size-reduction reason.
+      if (entry.category === "pdf") {
+        if (intro.isImageOnly === true || intro.hasTextLayer === false) {
+          return {
+            kind: "too-large",
+            reason: `${base} Its own metadata shows an image-only scan with no text layer: assistive technology cannot read it as-is, and an audit would score it 0. Remediation means OCR + tagging, or recreating the document from its source — not a bigger audit.`,
+          };
+        }
+        if (intro.hasTextLayer === true) {
+          return {
+            kind: "too-large",
+            reason: `${base} It does carry a text layer; to get it graded, split it into parts under ${AUDIT_SIZE_CAP_MB} MB and audit each part, or run Acrobat's accessibility checker on it locally.`,
+          };
+        }
         return {
           kind: "too-large",
-          reason: `${base} Its own metadata shows an image-only scan with no text layer: assistive technology cannot read it as-is, and an audit would score it 0. Remediation means OCR + tagging, or recreating the document from its source — not a bigger audit.`,
-        };
-      }
-      if (intro.hasTextLayer === true) {
-        return {
-          kind: "too-large",
-          reason: `${base} It does carry a text layer; to get it graded, split it into parts under ${AUDIT_SIZE_CAP_MB} MB and audit each part, or run Acrobat's accessibility checker on it locally.`,
+          reason: `${base} To get it graded, split it into parts under ${AUDIT_SIZE_CAP_MB} MB and audit each part.`,
         };
       }
       return {
         kind: "too-large",
-        reason: `${base} To get it graded, split it into parts under ${AUDIT_SIZE_CAP_MB} MB and audit each part.`,
+        reason: `${base} Reduce its size (large embedded images and media are the usual cause) to get it scored.`,
       };
     }
     if (/server-unavailable|\b5\d\d\b|unavailable|timeout|timed out/i.test(err)) {
       const sizeMb = entry.sizeBytes ? Math.round(entry.sizeBytes / MB) : 0;
       const sizeNote =
-        sizeMb >= 1 ? ` (this file is ${sizeMb} MB; large PDFs can time out)` : "";
+        sizeMb >= 1 ? ` (this file is ${sizeMb} MB; large or complex documents can time out)` : "";
       return {
         kind: "audit-unavailable",
         reason: `The audit service could not process this file${sizeNote}. Transient outages also cause this — re-running the audit will retry it.`,

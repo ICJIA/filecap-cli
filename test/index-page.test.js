@@ -473,6 +473,28 @@ describe("index page file-errors section", () => {
     expect(html).toMatch(/<a href="audit-file-errors\.html"[^>]*>/);
     expect(html).toContain("audit-file-errors.csv");
   });
+
+  // Office-scoring follow-on: the non-zero blurb used to say "non-PDF files
+  // saved with a .pdf name, or large PDFs that timed out" — PDF-specific
+  // wording that no longer fits now docx/xlsx/pptx are scored too.
+  it("uses format-aware wording in the non-zero blurb, not PDF-specific", () => {
+    const html = generateIndexHtml({
+      siteResults: [],
+      password: null,
+      fileErrors: {
+        htmlFilename: "audit-file-errors.html",
+        csvFilename: "audit-file-errors.csv",
+        errorCount: 3,
+        siteCount: 5,
+        sitesWithErrors: 2,
+      },
+    });
+    expect(html).toContain(
+      "3 files across 2 sites could not be audited — most are files saved with the wrong extension, or large documents that timed out.",
+    );
+    expect(html).not.toMatch(/non-PDF files saved with a \.pdf name/);
+    expect(html).not.toMatch(/large PDFs that timed out/);
+  });
 });
 
 describe("index page — PDF scoring panel removed (v1.19.0)", () => {
