@@ -72,16 +72,24 @@ async function writeInventory(filePath) {
 
 async function buildBundle() {
   const auditsBase = path.join(tmpDir, "filecap-audits");
-  const latestDir = path.join(auditsBase, "dvfr", "latest");
-  await fs.mkdir(latestDir, { recursive: true });
-  await writeInventory(path.join(latestDir, "inventory.ndjson"));
+  // Two sites on purpose — one plain slug, one hyphenated+numbered (the
+  // research-hub-1-0 shape) — so the sanitizer drift-guard below proves
+  // the timestamp-strip rule is generic across slug shapes.
+  for (const slug of ["dvfr", "research-hub-1-0"]) {
+    const latestDir = path.join(auditsBase, slug, "latest");
+    await fs.mkdir(latestDir, { recursive: true });
+    await writeInventory(path.join(latestDir, "inventory.ndjson"));
+  }
 
   const sitesFile = path.join(tmpDir, "sites.json");
   await fs.writeFile(
     sitesFile,
     JSON.stringify({
       version: 1,
-      sites: [{ name: "dvfr", siteName: "DVFR", host: "203.0.113.10", user: "forge", remotePath: "/uploads" }],
+      sites: [
+        { name: "dvfr", siteName: "DVFR", host: "203.0.113.10", user: "forge", remotePath: "/uploads" },
+        { name: "research-hub-1-0", siteName: "Research Hub 1.0", host: "203.0.113.11", user: "forge", remotePath: "/uploads" },
+      ],
     }),
   );
 
@@ -188,6 +196,23 @@ describe("bundle pages carry the snippet", () => {
         html.indexOf("</head>"),
       );
     }
+  });
+});
+
+describe("sanitizer matches the emitted per-site filename format (drift guard)", () => {
+  // Ties plausibleSanitizePath to what web-rollup ACTUALLY names the
+  // per-site pages. If either side changes shape — a new timestamp format,
+  // a new slug rule — this goes red instead of analytics silently
+  // fragmenting into per-rollup pages again. Applies to every site slug,
+  // hyphenated/numbered ones included.
+  it("every emitted per-site page path collapses to its bare site slug", async () => {
+    const outputDir = await buildBundle();
+    const perSite = (await fs.readdir(outputDir)).filter((f) => /-\d{8}-\d{6}Z\.html$/i.test(f));
+    expect(perSite.length).toBe(2);
+    const collapsed = perSite
+      .map((f) => plausibleSanitizePath("/" + f.replace(/\.html$/i, "").toLowerCase()))
+      .sort();
+    expect(collapsed).toEqual(["/dvfr", "/research-hub-1-0"]);
   });
 });
 

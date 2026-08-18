@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.60.2] — 2026-08-18
+
+### Tests — sanitizer pinned to the emitted filename format, all slugs
+
+- The v1.60.1 timestamp-strip rule is generic across every site slug —
+  verified against all 12 deployed per-site pages (`/archive` … `/vpp`,
+  including digit slugs `/i2i`, `/r3` and the hyphenated
+  `/research-hub-1-0`). New drift-guard test builds a two-site fixture
+  bundle (plain + hyphenated-numbered slug) and asserts every emitted
+  `<slug>-<timestamp>.html` page path collapses to its bare slug, so a
+  future change to either the filename format or the sanitizer goes red
+  instead of silently fragmenting analytics again. No behavior change;
+  nothing redeployed (live bundle stays v1.60.1, whose sanitizer already
+  covers every site).
+
 ## [1.60.1] — 2026-08-18
 
 ### Fixed — analytics record `/sfs`, not `/sfs-20260818-004852z`
