@@ -105,14 +105,30 @@ describe("plausibleSanitizePath", () => {
     expect(plausibleSanitizePath("/page-report/")).toBe("/page-report");
   });
 
+  // v1.60.1 — per-site report pages carry the scan timestamp in their URL
+  // (/sfs-20260818-004852z), so every rollup would fragment that site's
+  // stats into a new "page". Only the site slug matters for visit counts.
+  it("strips the scan timestamp from per-site report paths", () => {
+    expect(plausibleSanitizePath("/sfs-20260818-004852z")).toBe("/sfs");
+    expect(plausibleSanitizePath("/dvfr-20260818-004356Z")).toBe("/dvfr");
+    expect(plausibleSanitizePath("/dvfr-20260818-004356z.html")).toBe("/dvfr");
+    expect(plausibleSanitizePath("/dvfr-20260818-004356z/")).toBe("/dvfr");
+    // slugs may themselves contain hyphens and digits
+    expect(plausibleSanitizePath("/research-hub-1-0-20260818-004831z")).toBe("/research-hub-1-0");
+  });
+
   it("leaves every other path untouched", () => {
     expect(plausibleSanitizePath("/")).toBe("/");
     expect(plausibleSanitizePath("/sites")).toBe("/sites");
-    expect(plausibleSanitizePath("/dvfr-20260818-004356z")).toBe("/dvfr-20260818-004356z");
+    expect(plausibleSanitizePath("/whats-new")).toBe("/whats-new");
+    expect(plausibleSanitizePath("/audit-pdfs")).toBe("/audit-pdfs");
+    expect(plausibleSanitizePath("/audit-orphaned-files")).toBe("/audit-orphaned-files");
     expect(plausibleSanitizePath("/page-audit")).toBe("/page-audit");
     expect(plausibleSanitizePath("/page-report")).toBe("/page-report");
     // prefix boundary: only the exact segment collapses
     expect(plausibleSanitizePath("/page-auditx/foo")).toBe("/page-auditx/foo");
+    // timestamp shape must match exactly — a stray date-ish suffix survives
+    expect(plausibleSanitizePath("/report-2026-plan")).toBe("/report-2026-plan");
   });
 });
 

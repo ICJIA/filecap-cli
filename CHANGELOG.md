@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.60.1] — 2026-08-18
+
+### Fixed — analytics record `/sfs`, not `/sfs-20260818-004852z`
+
+- `plausibleSanitizePath` now also strips the scan-timestamp suffix from
+  per-site report paths (`/<slug>-<YYYYMMDD>-<HHMMSS>z`, with or without
+  `.html` or a trailing slash) so Plausible records hits to the site's
+  report **page** by its stable slug (`/sfs`, `/research-hub-1-0`) — the
+  question the analytics answer is "which site's report gets looked at",
+  and every rollup renames the underlying file, which would otherwise
+  mint a brand-new analytics page per site per audit. Hyphenated slugs
+  survive intact; look-alike paths without the exact timestamp shape
+  (`/report-2026-plan`) are untouched.
+
 ## [1.60.0] — 2026-08-18
 
 ### Added — Plausible visit tracking on the deployed bundle

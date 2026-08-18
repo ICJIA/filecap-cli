@@ -1,6 +1,6 @@
 {
   "name": "@icjia/filecap",
-  "version": "1.60.0",
+  "version": "1.60.1",
   "description": "ICJIA Fleet Audit — pipeline that builds and publishes the fleet.icjia.app accessibility-audit web app",
   "keywords": [
     "accessibility",
