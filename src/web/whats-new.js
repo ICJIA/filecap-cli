@@ -41,8 +41,6 @@ export const WHATS_NEW = [
     id: "website-vs-files-scores-2026-08-18",
     badge: "Improved",
     text: "Every site report shows two different accessibility scores, and they kept being read as one: the score for the site's web pages, and the score for the files (PDFs and Office documents) the site publishes. The two are measured independently and often disagree — a site can have perfectly accessible pages and barely accessible documents. Each score card now leads with its own visual badge so you can tell them apart at a glance: an orange document icon with “Scores the files this site publishes… not its web pages” on the file score, and a blue globe icon with “Scores this site's web pages — not the files it publishes” on the website score. The icons and wording carry the difference too, so it works in print and regardless of color vision.",
-    linkText: "Open the site reports",
-    linkHref: "sites.html",
     date: "August 18, 2026",
   },
   {

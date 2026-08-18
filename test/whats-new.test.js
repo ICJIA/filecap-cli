@@ -25,11 +25,15 @@ describe("WHATS_NEW data", () => {
 
   // v1.56.0 — newest entry announces the website-vs-files scope lockups
   // (no counts in it, so nothing to reconcile against the surfaces).
-  it("leads with the 2026-08-18 website-vs-files distinction entry", () => {
+  // v1.56.1 — the entry carries NO trailing link: it announces a passive
+  // visual improvement, and "Open the site reports" just went to /sites.
+  it("leads with the 2026-08-18 website-vs-files distinction entry, link-free", () => {
     const e = WHATS_NEW[0];
     expect(e.id).toContain("website-vs-files");
     expect(e.id).toContain("2026-08-18");
     expect(e.badge).toBe("Improved");
+    expect(e.linkHref).toBeUndefined();
+    expect(e.linkText).toBeUndefined();
   });
 
   // v1.55.0 — downloads + pagination usability pass, now history.
