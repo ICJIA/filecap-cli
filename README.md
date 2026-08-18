@@ -17,7 +17,7 @@
   - [TL;DR for developers](#tldr-for-developers)
   - [TL;DR for vendors and auditors](#tldr-for-vendors-and-auditors)
   - [TL;DR for the curious](#tldr-for-the-curious)
-- ["All I want is a file count for the remediators..."](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-filecap-is-more-than-wc--l)
+- ["All I want is a file count for the remediators..."](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-the-fleet-audit-is-more-than-wc--l)
 - [Status](#status)
 - [Quick start](#quick-start)
 - [Quick start for managers](#quick-start-for-managers)
@@ -32,29 +32,39 @@
 - [One-command full audit](#one-command-full-audit-run-full-auditsh)
 - [For auditors: self-contained audit scripts](#for-auditors-self-contained-audit-scripts)
 - [Publishing a fleet snapshot](#publishing-a-fleet-snapshot)
-- [What filecap does not do](#what-filecap-does-not-do)
+- [What the Fleet Audit does not do](#what-the-fleet-audit-does-not-do)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 - [Related tools](#related-icjia-tools)
 
-# @icjia/filecap
+# ICJIA Fleet Audit
 
-**File inventory CLI for accessibility audit scoping.**
+**Fleet-wide file-accessibility auditing for ICJIA's websites — a published audit snapshot at [fleet.icjia.app](https://fleet.icjia.app) plus the pipeline and CLI that build it.**
 
-> **Internal tooling — not for external use.** `filecap` is an accessibility-audit
-> tool built for **ICJIA's own use**. The npm package `@icjia/filecap` is
+> **Internal tooling — not for external use.** The ICJIA Fleet Audit is an
+> accessibility-audit tool built for **ICJIA's own use**. The npm package
+> `@icjia/filecap` (the project's original, smaller-scope working name) is
 > **deprecated**: it is not maintained, supported, or documented for anyone
-> outside ICJIA. If you want to run it, clone this repository and run it directly
-> (`node bin/filecap.js …`) — do **not** `npm install` it. It remains public here
-> for transparency, not for distribution.
+> outside ICJIA. If you want to run it, clone this repository and run the CLI
+> directly (`node bin/filecap.js …`) — do **not** `npm install` it. It remains
+> public here for transparency, not for distribution.
 
-`filecap` walks a directory tree, introspects each file (PDFs, DOCX, XLSX), and produces a structured NDJSON inventory suitable for accessibility remediation scoping. The primary use case is generating per-server inventories of file stores (Strapi `/uploads` directories, general file servers) to hand to remediation vendors so they can produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
+> **Naming note.** This project began as a small file-inventory tool named
+> `filecap`, originally imagined as little more than an MCP server. It has since
+> grown into the full ICJIA Fleet Audit web app, and the old name is retired.
+> It survives only in machine-facing identifiers kept for compatibility: the
+> `bin/filecap.js` CLI entry point, the `~/.filecap/` config directory, the
+> `~/filecap-audits/` output tree, `FILECAP_*` environment variables, the
+> `filecap_*` MCP tool names, and the NDJSON schema `kind` strings. Everywhere
+> else in this document, the tool is the **Fleet Audit**.
+
+The Fleet Audit CLI walks a directory tree, introspects each file (PDFs, DOCX, XLSX), and produces a structured NDJSON inventory suitable for accessibility remediation scoping. The primary use case is generating per-server inventories of file stores (Strapi `/uploads` directories, general file servers) to hand to remediation vendors so they can produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
 
 **Why this matters.** The 2024 ADA Title II rule — and, in Illinois, the IITAA — require state and local government web content, *including the documents agencies publish*, to meet WCAG 2.1 AA. Most government sites have accumulated thousands of uploaded PDFs, Word files, and spreadsheets over the years, and a large share are inaccessible: scanned images with no text layer, untagged PDFs, tables with no header rows, documents with no reading order. To someone using a screen reader, an inaccessible PDF of a grant notice or a set of meeting minutes is simply a locked door — the information is published, but not actually available to them.
 
-**Why a tool like this has to exist.** You can't remediate — or budget to remediate — what you haven't measured, and no agency can hand-audit tens of thousands of files. There's no "accessibility status" sitting in a file store; it's just a folder of bytes. `filecap` exists to turn that opaque pile into a precise, repeatable inventory — what's there, what is likely to need work, and roughly how much — so the remediation can be scoped, competitively bid, tracked quarter over quarter, and demonstrated to regulators. It is the measurement layer that makes the legal obligation actionable instead of aspirational, which is also why the snapshot is published where the whole team (and any auditor) can see it.
+**Why a tool like this has to exist.** You can't remediate — or budget to remediate — what you haven't measured, and no agency can hand-audit tens of thousands of files. There's no "accessibility status" sitting in a file store; it's just a folder of bytes. The Fleet Audit exists to turn that opaque pile into a precise, repeatable inventory — what's there, what is likely to need work, and roughly how much — so the remediation can be scoped, competitively bid, tracked quarter over quarter, and demonstrated to regulators. It is the measurement layer that makes the legal obligation actionable instead of aspirational, which is also why the snapshot is published where the whole team (and any auditor) can see it.
 
-**Every current ICJIA site is now part of the accessibility audit.** Alongside the dense, data-rich fleet report, filecap also publishes a simpler, less-dense **[site directory](https://fleet.icjia.app/sites)** (`/sites`) that lists just the sites — split into **content sites** and **agency tooling sites** — in a count-first layout for managers who only need to know "how many sites do we run?". Every card carries an at-a-glance **uptime status** (a green "Site live" / red "Site unreachable" indicator) so the whole fleet's health reads in a single scroll.
+**Every current ICJIA site is now part of the accessibility audit.** Alongside the dense, data-rich fleet report, the Fleet Audit also publishes a simpler, less-dense **[site directory](https://fleet.icjia.app/sites)** (`/sites`) that lists just the sites — split into **content sites** and **agency tooling sites** — in a count-first layout for managers who only need to know "how many sites do we run?". Every card carries an at-a-glance **uptime status** (a green "Site live" / red "Site unreachable" indicator) so the whole fleet's health reads in a single scroll.
 
 ## Are you a...
 
@@ -71,7 +81,7 @@ You run a website. Like most websites, it hosts hundreds or thousands of uploade
 
 To budget the remediation work, you need to know what's actually there: file counts by type, which PDFs are scanned images (may need OCR — often substantially more expensive than tagging born-digital PDFs), which Word docs lack heading structure, which tables are missing header rows, and so on.
 
-`filecap` produces this inventory automatically. It walks your website's `/uploads` folder, parses every file, and writes a spreadsheet (CSV) plus an interactive HTML report with one row per file and detailed accessibility-relevant metadata. You hand the spreadsheet to a remediation vendor; they give you a fixed-price quote with confidence.
+The Fleet Audit produces this inventory automatically. It walks your website's `/uploads` folder, parses every file, and writes a spreadsheet (CSV) plus an interactive HTML report with one row per file and detailed accessibility-relevant metadata. You hand the spreadsheet to a remediation vendor; they give you a fixed-price quote with confidence.
 
 The included `audit-remote.sh` script automates the entire workflow against any server you have SSH access to. Auditors run one command, answer a few prompts, and get a vendor-ready deliverable. Works on macOS, Linux, and Windows (via WSL2). Free; open source.
 
@@ -91,7 +101,7 @@ Each PDF is scored by [audit.icjia.app](https://audit.icjia.app), ICJIA's automa
 What the score cell can say:
 
 - **`B/88`** (etc.) — a scored PDF.
-- **`N/A (Office)`** — a Word, Excel, or PowerPoint file. Those formats have built-in accessibility checkers in their authoring apps, so filecap inventories them but doesn't duplicate that check. The cell says so explicitly rather than going blank (a blank would read as "missing data").
+- **`N/A (Office)`** — a Word, Excel, or PowerPoint file. Those formats have built-in accessibility checkers in their authoring apps, so the Fleet Audit inventories them but doesn't duplicate that check. The cell says so explicitly rather than going blank (a blank would read as "missing data").
 - **`Not scored`** — a PDF the scorer couldn't process: usually it exceeds audit.icjia.app's upload-size limit (`413 Payload Too Large`) or hit a transient error. It's in the inventory; it just has no score.
 - **blank** — a non-remediable reference file (image, text, archive, web page), or a PDF still awaiting its first audit.
 
@@ -113,7 +123,7 @@ The deployed page reads like an infographic, not a spreadsheet. Five major areas
 
 **Per-site detail pages** mirror the index hero, surface a `How to access this site's files` panel, and include a sticky bar at the top with Back / FAQ / PDF Audit Tool / Download-CSV / Last-audit-date chips.
 
-**Language and staff workflow.** Manager-facing strings use *"may need"* rather than prescriptive *"needs"* — filecap describes what the data suggests, the audit team decides what to do. Every CSV the bundle emits carries two staff-fill columns: `Delete?` (empty default — staff writes any non-blank value to flag for removal) and free-text `Notes`. These are CSV-only and don't appear in the HTML view.
+**Language and staff workflow.** Manager-facing strings use *"may need"* rather than prescriptive *"needs"* — the Fleet Audit describes what the data suggests, the audit team decides what to do. Every CSV the bundle emits carries two staff-fill columns: `Delete?` (empty default — staff writes any non-blank value to flag for removal) and free-text `Notes`. These are CSV-only and don't appear in the HTML view.
 
 **1.8.0 Referenced column.** A `Referenced` column sits at position 5 of every CSV and HTML view, immediately after `Public URL`, listing the page URLs that link to each file. Managers use it as the inflection point for the delete-vs-keep decision: if a file has no known referrers, it's a deletion candidate; if it's linked from one or more live pages, every linking URL surfaces directly in the cell. See [Reference discovery (1.8.0)](#reference-discovery-180) below.
 
@@ -127,11 +137,11 @@ See the [CHANGELOG](CHANGELOG.md) for the version-by-version breakdown.
 
 Node.js CLI written in ESM, run from the GitHub repo (npm package deprecated as of v1.13.0). Walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX) and, after the `audits` pass, an `entry.audit` accessibility grade/score from audit.icjia.app. 20-column CSV writer (`CSV_COLUMNS` is the single source of truth: 18 value columns — `Public URL`, `Referenced` page-links (1.8.0), `Audit Report` link + `Remediation Score` grade/score (1.9.0/1.34.0), `Page Count` (1.20.0), etc. — plus the csvOnly `Delete?` / `Notes` staff-fill columns from v1.7.16) feeding the CSV, a manager-trimmed self-contained dark-mode HTML report (sortable/filterable client-side JS), and an XLSX workbook. Cross-server rollup with content-duplicate detection via SHA-256.
 
-Includes an MCP server (`filecap mcp`) exposing five tools for AI agents (Claude Desktop, Claude Code, Cursor, Windsurf, Continue): `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory`, `filecap_web_rollup`.
+Includes an MCP server (the `mcp` subcommand) exposing five tools for AI agents (Claude Desktop, Claude Code, Cursor, Windsurf, Continue): `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory`, `filecap_web_rollup`.
 
-As of 1.2.0: `filecap web-rollup` bundles the most recent scan of every saved site into a static-site directory, ready for Netlify deployment (drag-and-drop, CLI, or Git-connected auto-deploy). Includes auto-generated `netlify.toml`, optional client-side SHA-256 password gate (`--password`), `--no-client-gate` for Netlify dashboard Site Password, and a `--deploy` flag that calls the Netlify CLI directly after the build.
+As of 1.2.0: the `web-rollup` subcommand bundles the most recent scan of every saved site into a static-site directory, ready for Netlify deployment (drag-and-drop, CLI, or Git-connected auto-deploy). Includes auto-generated `netlify.toml`, optional client-side SHA-256 password gate (`--password`), `--no-client-gate` for Netlify dashboard Site Password, and a `--deploy` flag that calls the Netlify CLI directly after the build.
 
-Two distribution shapes: `filecap` CLI invoked directly via npx, plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where filecap actually ran.
+Two distribution shapes: the CLI run from a repo clone (`node bin/filecap.js`), plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where the scan actually ran.
 
 ESM-only. Node 20+ required. 62 test files; 952 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
 
@@ -180,25 +190,25 @@ Zero account creation; the inventory is a vendor-neutral structured file you can
 
 ## TL;DR for the curious
 
-filecap was originally built at ICJIA (the [Illinois Criminal Justice Information Authority](https://icjia.illinois.gov)) to inventory the document files on our agency's public-facing websites — PDFs of meeting agendas, annual reports, statutes, etc. Federal accessibility law requires those files to be reachable for screen-readers, keyboard navigation, and assistive technology, but figuring out exactly *which* files need *which* kind of work, across multiple servers, was a manual job that took weeks.
+The Fleet Audit was originally built at ICJIA (the [Illinois Criminal Justice Information Authority](https://icjia.illinois.gov)) to inventory the document files on our agency's public-facing websites — PDFs of meeting agendas, annual reports, statutes, etc. Federal accessibility law requires those files to be reachable for screen-readers, keyboard navigation, and assistive technology, but figuring out exactly *which* files need *which* kind of work, across multiple servers, was a manual job that took weeks.
 
 The tool is general-purpose. Any organization that hosts public-facing document repositories — government agencies, schools, libraries, nonprofits, businesses — can use it to scope their accessibility work. The output is a spreadsheet a remediation vendor can quote against, line by line.
 
-The complexity in filecap exists because "is this PDF accessible?" is a much harder question than "does this file exist?" Answering it requires actually opening every file and inspecting its internal structure — see the [next section](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-filecap-is-more-than-wc--l) for why this matters.
+The complexity in the Fleet Audit exists because "is this PDF accessible?" is a much harder question than "does this file exist?" Answering it requires actually opening every file and inspecting its internal structure — see the [next section](#all-i-want-is-a-file-count-for-the-remediators-all-right-thats-it-just-do-it--why-the-fleet-audit-is-more-than-wc--l) for why this matters.
 
 → See the project page on GitHub: https://github.com/ICJIA/icjia-fleet-audit
 
 ---
 
-## "All I want is a file count for the remediators, all right? That's it. Just do it." — why filecap is more than `wc -l`
+## "All I want is a file count for the remediators, all right? That's it. Just do it." — why the Fleet Audit is more than `wc -l`
 
 Imagine asking a remediation vendor for a quote. They say "I need to see the files first." You forward them a list of filenames and sizes. They reply: "Great — but how many are scanned PDFs vs born-digital? How many Word docs lack heading structure? How many tables are missing header rows? Without that detail, my quote will be the worst-case price for every single file."
 
-That's why filecap exists. A simple `find . -type f` gives you filenames and sizes — but a vendor can't price accurately against that. They'll either give you a worst-case quote (you overpay), or insist on inspecting every file themselves (the audit takes weeks instead of hours).
+That's why the Fleet Audit exists. A simple `find . -type f` gives you filenames and sizes — but a vendor can't price accurately against that. They'll either give you a worst-case quote (you overpay), or insist on inspecting every file themselves (the audit takes weeks instead of hours).
 
-filecap is built around one question: **what does a remediation vendor need to know, per file, to give a defensible fixed-price quote?** Every "complexity" in this tool answers a specific vendor question:
+The Fleet Audit is built around one question: **what does a remediation vendor need to know, per file, to give a defensible fixed-price quote?** Every "complexity" in this tool answers a specific vendor question:
 
-| Vendor question | What filecap captures |
+| Vendor question | What the audit captures |
 |---|---|
 | Is this PDF a scan (needs OCR — often substantially more expensive)? | `isImageOnly`, `hasTextLayer`, `textLayerCoverage` |
 | Is this PDF already partly accessible? | `hasTags`, `documentLanguage` |
@@ -211,9 +221,9 @@ filecap is built around one question: **what does a remediation vendor need to k
 | Do the same files appear on multiple servers? | `sha256` content hash + `duplicateOf` cross-server linking |
 | Are filenames human-readable? | filename heuristic flags |
 
-**The cost of NOT having this information is often substantially greater than the cost of running filecap.** Scanned PDFs typically cost vendors substantially more to remediate than born-digital ones, because OCR + tagging is an order of magnitude more work than tagging alone. If your inventory has 100 PDFs and 30 of them are scanned, knowing that distinction affects the vendor quote materially.
+**The cost of NOT having this information is often substantially greater than the cost of running the audit.** Scanned PDFs typically cost vendors substantially more to remediate than born-digital ones, because OCR + tagging is an order of magnitude more work than tagging alone. If your inventory has 100 PDFs and 30 of them are scanned, knowing that distinction affects the vendor quote materially.
 
-filecap takes a few seconds per file to extract this metadata — and produces a spreadsheet a vendor can price line by line. That's the whole game.
+The Fleet Audit takes a few seconds per file to extract this metadata — and produces a spreadsheet a vendor can price line by line. That's the whole game.
 
 So: yes, "just count the files" is a one-liner. But the count alone won't help you budget for compliance. The detail is the point.
 
@@ -221,7 +231,7 @@ So: yes, "just count the files" is a one-liner. But the count alone won't help y
 
 ## Security audit
 
-filecap is open source and tries to be transparent about its security posture.
+The ICJIA Fleet Audit is open source and tries to be transparent about its security posture.
 The full audit findings and mitigations are in `docs/security/audit-2026-05-10.md`
 (initial 1.3.0 baseline audit) and `docs/security/audit-2026-05-11.md` (re-audit
 of every release through 1.6.5, covering the bearer-token store, git-clone
@@ -357,15 +367,15 @@ npx vitest run test/web-rollup.test.js
 |---|---|---|
 | v0.1 – v0.6 | shipped | Phased core: scan → PDF/Office introspection → filename flags → rollup → CSV report |
 | v1.0.x | shipped | MCP server + AI-client docs + audit automation scripts + HTML report |
-| v1.1.0 – v1.2.0 | shipped | Column-set trim; `filecap web-rollup` static-site bundle with Netlify amenities |
+| v1.1.0 – v1.2.0 | shipped | Column-set trim; `web-rollup` static-site bundle with Netlify amenities |
 | v1.3.x | shipped | Red/blue team security audit (17 findings, all Critical and Moderate fixed); auto-detected `sites.json`; opt-in `webRollup.autoDeploy`; bearer-token support |
 | v1.4.x – v1.5.x | shipped | CSV trim to 14 columns; click-and-drag horizontal pan; cross-server duplicates section with explainer; master + duplicates CSVs in bundle |
 | v1.6.x | shipped | `type:"git"` site mode for Nuxt static-site repos (shallow-clone + scan); mixed strapi + git fleets in one bundle |
 | v1.7.x | shipped | Manager-friendly visual redesign: infographic site cards, big audit-count hero, copy-to-clipboard buttons throughout, per-file-type drill-down, `Delete?` + `Notes` staff-fill columns, access-method modal, PII reassurance banner, sticky-bar polish on per-site detail pages |
 | v1.8.0 | shipped | References pipeline: `Referenced` column at CSV/HTML position 5 next to `Public URL`, per-site Strapi extractor (v3 + v4 GraphQL/REST), git-repo extractor for Nuxt sites, bearer-token + auto-refresh login for intranet, fleet-wide cross-site reverse index, domain-alias-aware URL matching. |
-| v1.9 – v1.33 | shipped | PDF + page accessibility scoring via audit.icjia.app (`filecap audits`, `entry.audit` grade/score); `Page Count` restored (v1.20.0); `/sites` roster + tooling apps (v1.21.0); Netlify Pro Site Password gating + origin-identity removal-at-source + strict CSP (v1.21.x); CMS-hosted cross-site files in the Page view (v1.32.0); per-site detail-page redesign for lower density (v1.33.0). |
+| v1.9 – v1.33 | shipped | PDF + page accessibility scoring via audit.icjia.app (the `audits` subcommand, `entry.audit` grade/score); `Page Count` restored (v1.20.0); `/sites` roster + tooling apps (v1.21.0); Netlify Pro Site Password gating + origin-identity removal-at-source + strict CSP (v1.21.x); CMS-hosted cross-site files in the Page view (v1.32.0); per-site detail-page redesign for lower density (v1.33.0). |
 | **v1.34.0** | **shipped** | **Per-file `Remediation Score` column (`grade/score`, e.g. `B/88`) in every CSV / HTML / XLSX; rate-limit-resilient scorer (retry + `Retry-After` backoff on `429`/transient `5xx`) so large cold batches of new files no longer cascade into errors.** |
-| vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; `filecap process-deletions <csv>` to act on staff-edited `Delete?` rows; raise/handle the audit.icjia.app `413` upload cap for oversized PDFs |
+| vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; a `process-deletions <csv>` subcommand to act on staff-edited `Delete?` rows; raise/handle the audit.icjia.app `413` upload cap for oversized PDFs |
 
 ### Production deployment
 
@@ -375,7 +385,7 @@ The ICJIA fleet snapshot is deployed at:
 
 The site is **password-protected** (Netlify Pro Site Password — server-side enforcement, gates every file including the CSVs). The current password is held by ICJIA's IDS (Innovation and Digital Services) team — request access by emailing IDS at ICJIA. The password is rotated periodically; if a previously-shared password stops working, ask IDS for the current one.
 
-Deploy mechanics: `filecap web-rollup` automatically pushes to this Netlify site whenever `webRollup.autoDeploy: true` is set in `~/.filecap/config.json` (with `deploySite` set to the `icjia-fleet-audit` site id). The simplest way to run a fresh audit and publish it in one step is **[`./run-full-audit.sh`](#one-command-full-audit-run-full-auditsh)**; to republish from an already-completed scan, run `filecap web-rollup` on its own. No `--deploy` flag needed.
+Deploy mechanics: `web-rollup` automatically pushes to this Netlify site whenever `webRollup.autoDeploy: true` is set in `~/.filecap/config.json` (with `deploySite` set to the `icjia-fleet-audit` site id). The simplest way to run a fresh audit and publish it in one step is **[`./run-full-audit.sh`](#one-command-full-audit-run-full-auditsh)**; to republish from an already-completed scan, run `node bin/filecap.js web-rollup` on its own. No `--deploy` flag needed.
 
 #### "Wait — if it's password-protected, why can I still 'view source' on the gate page?"
 
@@ -407,8 +417,13 @@ The gate is enforced at Netlify's edge (server-side), not by JavaScript in your 
 
 ## Quick start
 
+The npm package is deprecated — run the CLI from a clone of this repository:
+
 ```bash
-npx --yes @icjia/filecap scan /var/strapi/uploads
+git clone https://github.com/ICJIA/icjia-fleet-audit.git
+cd icjia-fleet-audit
+npm install
+node bin/filecap.js scan /var/strapi/uploads
 # writes filecap-<hostname>.ndjson in cwd
 ```
 
@@ -460,7 +475,7 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 
 ## Reference discovery (1.8.0)
 
-**The "where is this PDF linked from?" question.** Every manager who opens a filecap audit asks the same thing first: "Where on the site is this PDF used?" Without that answer, the delete-vs-keep decision requires manual verification — defeating the audit's purpose. 1.8.0 surfaces the answer directly in the report.
+**The "where is this PDF linked from?" question.** Every manager who opens a fleet audit asks the same thing first: "Where on the site is this PDF used?" Without that answer, the delete-vs-keep decision requires manual verification — defeating the audit's purpose. 1.8.0 surfaces the answer directly in the report.
 
 **New per-file column.** A `Referenced` column slots in after `Duplicate of` on every CSV and HTML view, listing the page URLs that link to each file. Cell semantics:
 
@@ -532,7 +547,9 @@ This was the deciding factor: Strapi data is strictly more complete than what th
 
 ## CLI reference
 
-### `filecap scan <directory>`
+Every subcommand runs from a repo clone through the CLI entry point: `node bin/filecap.js <subcommand>` (the entry file keeps the project's original internal name — see the naming note at the top). The headings below name just the subcommand.
+
+### `scan <directory>`
 
 | Flag | Default | Description |
 |---|---|---|
@@ -552,7 +569,7 @@ This was the deciding factor: Strapi data is strictly more complete than what th
 
 **Exit codes.** `0` success, `1` argument or runtime error, `2` directory not readable, `3` partial completion.
 
-### `filecap rollup <files...>`
+### `rollup <files...>`
 
 Merge multiple per-server NDJSONs into a consolidated inventory.
 
@@ -561,7 +578,7 @@ Merge multiple per-server NDJSONs into a consolidated inventory.
 | `-o, --output <path>` | `consolidated.ndjson` | Output path |
 | `--strict` | (off) | Fail on schema mismatch or missing footer in any input (default: warn and skip) |
 
-### `filecap report <inventory>`
+### `report <inventory>`
 
 Generate vendor handoff package (CSV + summary + flagged lists) from an inventory NDJSON (single-instance or consolidated).
 
@@ -570,7 +587,7 @@ Generate vendor handoff package (CSV + summary + flagged lists) from an inventor
 | `-o, --output <dir>` | `./filecap-report-<ts>/` | Output directory |
 | `--html` | (off) | Also write a self-contained sortable dark-mode HTML report (`audit-file-list.html`) |
 
-### `filecap references <siteName>` *(new in 1.8.0)*
+### `references <siteName>` *(new in 1.8.0)*
 
 Per-site reference extractor. Reads the site's `references.*` block from `sites.json`, dispatches to the matching strategy (`strapi-v3` or `strapi-v4`), and writes an NDJSON sidecar with one record per content entry — naming the deployed page URL and the file URLs that page references.
 
@@ -578,7 +595,7 @@ Per-site reference extractor. Reads the site's `references.*` block from `sites.
 |---|---|---|
 | `-o, --output <path>` | (required) | Output NDJSON sidecar path. Convention: `<site>.refs.ndjson` |
 
-### `filecap cross-references <inventory>` *(new in 1.8.0)*
+### `cross-references <inventory>` *(new in 1.8.0)*
 
 Fleet-wide reverse-index resolver. Reads every site's sidecar (via `--sidecar` flags) and `~/.filecap/sites.json` (for domain-alias resolution), builds a URL → referrers index, and walks the named inventory NDJSON to attach `entry.references[]` to each file via canonical-URL match. Writes the augmented inventory.
 
@@ -587,7 +604,7 @@ Fleet-wide reverse-index resolver. Reads every site's sidecar (via `--sidecar` f
 | `-s, --sidecar <path>` | (required, repeatable) | Path to a `references` sidecar NDJSON. Repeat for every site in the fleet. |
 | `-o, --output <path>` | (required) | Output path for the augmented inventory NDJSON |
 
-### `filecap audits <inventory>` *(new in 1.9.0)*
+### `audits <inventory>` *(new in 1.9.0)*
 
 Scores every PDF in an inventory NDJSON against [audit.icjia.app](https://audit.icjia.app)'s accessibility checker and attaches `entry.audit = { score, grade, reportUrl, … }` to each PDF (the source of the `Audit Report` and `Remediation Score` report columns). By default it also runs a page-audit pass over referenced page URLs (`--skip-pages` to opt out). Results are cached by content hash (`~/.filecap/audit-cache.json`, 30-day TTL), so re-runs only re-fetch changed/uncached PDFs. As of v1.34.0 the HTTP layer retries `429`/transient `5xx` honoring `Retry-After`, so a large batch of newly-added PDFs no longer trips audit.icjia.app's per-IP rate limit. Only PDFs are scored — Office formats have native checkers in their authoring apps.
 
@@ -601,7 +618,7 @@ Scores every PDF in an inventory NDJSON against [audit.icjia.app](https://audit.
 
 Pipeline placement: `scan → references → cross-references → audits → web-rollup`.
 
-### `filecap site-audit <site>` *(new in 1.35.0)*
+### `site-audit <site>` *(new in 1.35.0)*
 
 Scores a site's web pages for accessibility (axe via [audit.icjia.app](https://audit.icjia.app)) using the site's sitemap plus any CMS pages as the scored set. Writes a purge-exempt `latest/site-audit.json` sidecar with the 0–100 score, A–F grade, severity + WCAG-level (A/AA) outstanding-issue breakdown, needs-review count, and a true fixed/new issue-set trend vs. the previous run. `web-rollup` reads the sidecar automatically and adds a compact "Website accessibility" tile to the site card and a full breakdown section to the per-site detail page.
 
@@ -620,7 +637,7 @@ Scores a site's web pages for accessibility (axe via [audit.icjia.app](https://a
 Pipeline placement: `scan → references → cross-references → audits → site-audit → web-rollup`.
 To skip in the fleet pipeline: `SKIP_SITE_AUDIT=1 ./examples/audit-fleet-auto.sh`.
 
-### `filecap web-rollup`
+### `web-rollup`
 
 Bundle the most recent scans of every saved site into a static-site directory ready for Netlify or any static host. The bundle includes the per-site reports, the `audit-file-list-master.xlsx` (every remediable file across the fleet), and `scores-by-site.xlsx` (per-site PDF score coverage + A–F grade distribution + a fleet total).
 
@@ -631,14 +648,14 @@ Bundle the most recent scans of every saved site into a static-site directory re
 | `--no-client-gate` | (off) | Skip the client-side gate JS. Use with Netlify dashboard Site Password for server-side enforcement. |
 | `--deploy` | (off) | After building, run `netlify deploy --prod` automatically. Requires Netlify CLI installed and logged in. |
 | `--deploy-site <site-id>` | (none) | Pass `--site <id>` to `netlify deploy` (for non-linked sites) |
-| `--title <title>` | `"filecap fleet audit snapshot"` | Title shown on the index page |
+| `--title <title>` | `"ICJIA Fleet Audit Assessment"` | Title shown on the index page |
 | `--include-site <name...>` | (all sites) | Only bundle these site nicknames |
 | `--exclude-site <name...>` | (none excluded) | Skip these site nicknames |
 | `--sites-file <path>` | `~/.filecap/sites.json` | Override saved-sites JSON path |
 
 When `--no-client-gate` is passed without `--password`, the bundle is open by design. When both are passed, `--password` is ignored (a warning is printed) — the bundle has no embedded gate and Netlify Site Password provides the protection.
 
-### `filecap mcp`
+### `mcp`
 
 Starts an stdio MCP server for use with AI agent clients (Claude Desktop, Claude Code, Cursor, etc.). No flags — configuration is handled by the client.
 
@@ -650,7 +667,7 @@ When scanning multiple servers from a single coordinator with SSH access:
 ssh deploy@strapi-prod-01 "npx --yes @icjia/filecap scan /var/strapi/uploads -o -" > ./inventories/strapi-prod-01.ndjson
 ```
 
-The `-o -` flag writes NDJSON to stdout, which SSH transports back. Compute (walk, hash, introspection) happens on the remote; only the inventory output crosses the network.
+The `-o -` flag writes NDJSON to stdout, which SSH transports back. Compute (walk, hash, introspection) happens on the remote; only the inventory output crosses the network. (The remote side runs the published npm package via `npx` because the target server has no repo clone — the one place the deprecated package name is still exercised. `audit-remote.sh` does the same, and falls back to rsync-and-scan-locally when the remote lacks Node 20+.)
 
 A sample bash orchestrator is in [`examples/multi-scan.sh`](examples/multi-scan.sh).
 
@@ -832,7 +849,7 @@ Flags are emitted as a sorted array. The `flags` column was removed from the CSV
 After scanning N servers, merge the per-server NDJSONs into a consolidated inventory:
 
 ```bash
-filecap rollup ./inventories/*.ndjson -o consolidated.ndjson
+node bin/filecap.js rollup ./inventories/*.ndjson -o consolidated.ndjson
 ```
 
 The consolidated NDJSON has the same line-delimited structure as a single-instance inventory but with three differences:
@@ -887,8 +904,8 @@ The consolidated NDJSON has the same line-delimited structure as a single-instan
 Generate the vendor handoff package from an inventory NDJSON (single-instance or consolidated):
 
 ```bash
-filecap report consolidated.ndjson -o ./report-2026-Q2/
-filecap report consolidated.ndjson -o ./report-2026-Q2/ --html
+node bin/filecap.js report consolidated.ndjson -o ./report-2026-Q2/
+node bin/filecap.js report consolidated.ndjson -o ./report-2026-Q2/ --html
 ```
 
 Output directory contents:
@@ -904,7 +921,7 @@ Output directory contents:
 | `duplicate_hashes.txt` | Content-duplicate groups (entries sharing a SHA-256) — useful for de-dup analysis |
 | `pdf_image_only.txt` | PDFs with `isImageOnly: true` — the headline cost driver in PDF remediation |
 
-The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `filecap diff` command to detect changes.
+The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `diff` subcommand to detect changes.
 
 **CSV column order** (20 columns; `Page References` added at position 5 in v1.8.0, `Audit Report` at 6 in v1.9.0, `Page Count` restored in v1.20.0, `Remediation Score` added in v1.34.0; the `Delete?` / `Notes` staff-fill columns stay last):
 
@@ -916,11 +933,11 @@ The deliverable focuses on the fields a remediator needs to **find** and **price
 
 Column headers are human-facing labels (not raw field names). Empty cells indicate the field doesn't apply to this file's type.
 
-**Inputs.** `filecap report` accepts BOTH a single-instance NDJSON (from `filecap scan`) and a consolidated NDJSON (from `filecap rollup`). Both input shapes produce the same 20-column CSV.
+**Inputs.** `report` accepts BOTH a single-instance NDJSON (from `scan`) and a consolidated NDJSON (from `rollup`). Both input shapes produce the same 20-column CSV.
 
 ## MCP server (Phase 7)
 
-`filecap mcp` starts an stdio MCP server that exposes five tools AI agents can call during conversational audits:
+The `mcp` subcommand (`node bin/filecap.js mcp`) starts an stdio MCP server that exposes five tools AI agents can call during conversational audits:
 
 | Tool | What it does |
 |---|---|
@@ -930,120 +947,34 @@ Column headers are human-facing labels (not raw field names). Empty cells indica
 | `filecap_query_inventory` | Filter/sort entries in an existing NDJSON by size, extension, flags, isImageOnly, etc. |
 | `filecap_web_rollup` | Bundle the most recent scans of every saved site into a static-site directory |
 
-### Always-latest config (recommended)
+### Client configuration — run from the repo clone
 
-Pin to `@latest` (or omit the version tag entirely) so the host re-checks the npm registry each time it spawns the MCP process. This guarantees you pick up new tool definitions and bug fixes without touching your config file:
-
-```json
-"args": ["--yes", "@icjia/filecap@latest", "mcp"]
-```
-
-All client snippets below use this form.
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows. Restart Claude Desktop after saving.
+The npm package is deprecated, so point your MCP client at the CLI entry point inside your clone of this repository (use the absolute path on your machine):
 
 ```json
 {
   "mcpServers": {
-    "filecap": {
-      "command": "npx",
-      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
+    "fleet-audit": {
+      "command": "node",
+      "args": ["/absolute/path/to/icjia-fleet-audit/bin/filecap.js", "mcp"]
     }
   }
 }
 ```
 
-### Claude Code
+Where that snippet goes, per client:
 
-`.claude/mcp.json` in your project root for project-scoped access, or `~/.claude/mcp.json` for user-global access:
+| Client | Config file |
+|---|---|
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows; restart Claude Desktop after saving |
+| Claude Code | `.claude/mcp.json` in your project root (project-scoped) or `~/.claude/mcp.json` (user-global) |
+| Cursor | `~/.cursor/mcp.json` (also configurable in-app at Settings → Features → MCP) |
+| Windsurf (Codeium) | `~/.codeium/windsurf/mcp_config.json` |
+| Continue | `~/.continue/config.json` (user-global) or `.continue/config.json` in your project root — different shape: the server goes under `experimental.modelContextProtocolServers` as `{"transport": {"type": "stdio", "command": "node", "args": ["/absolute/path/to/icjia-fleet-audit/bin/filecap.js", "mcp"]}}` |
 
-```json
-{
-  "mcpServers": {
-    "filecap": {
-      "command": "npx",
-      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
-    }
-  }
-}
-```
+### Updating
 
-### Cursor
-
-`~/.cursor/mcp.json` (also configurable in-app at Settings → Features → MCP):
-
-```json
-{
-  "mcpServers": {
-    "filecap": {
-      "command": "npx",
-      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
-    }
-  }
-}
-```
-
-### Windsurf (Codeium)
-
-`~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "filecap": {
-      "command": "npx",
-      "args": ["--yes", "@icjia/filecap@latest", "mcp"]
-    }
-  }
-}
-```
-
-### Continue
-
-`~/.continue/config.json` for user-global access, or `.continue/config.json` in your project root for project-scoped access. Continue uses a different shape — MCP servers go under `experimental.modelContextProtocolServers`:
-
-```json
-{
-  "experimental": {
-    "modelContextProtocolServers": [
-      {
-        "transport": {
-          "type": "stdio",
-          "command": "npx",
-          "args": ["--yes", "@icjia/filecap@latest", "mcp"]
-        }
-      }
-    ]
-  }
-}
-```
-
-### How auto-update works
-
-When you use `@latest`, npx checks the npm registry on each spawn. If a newer version has been published, npx downloads it before starting the server — typically 1–3 seconds of additional startup time. If the installed version is already current, npx reuses the cached package with no network round-trip.
-
-For zero startup overhead with explicit update control, install globally instead:
-
-```bash
-npm install -g @icjia/filecap
-```
-
-Then reference the binary directly in your client config:
-
-```json
-{
-  "mcpServers": {
-    "filecap": {
-      "command": "filecap",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-To update: `npm install -g @icjia/filecap@latest`.
+The MCP server runs whatever code is in your clone — `git pull` to update; clients pick up the new code the next time they spawn the server. Old `npx @icjia/filecap@latest`-style configs still function but run the deprecated npm package; migrate them to the clone form above.
 
 ### Verifying it works
 
@@ -1076,8 +1007,8 @@ Seven phases, in order:
 |---|-------|--------|
 | 1 | **Pre-flight** | Hard-aborts unless `expect`, a logged-in `netlify` CLI, and `~/.filecap/sites.json` are all present and no other scan is running; warns (does not abort) when `$HOME` has under ~10 GB free. Fails fast instead of 15 minutes in. |
 | 2 | **Scan** | Inventories every file on all content sites over SSH + rsync. Delegated to `examples/audit-fleet-auto.sh`, which drives `audit-fleet.sh` / `audit-remote.sh` under `expect`. |
-| 3 | **Enrich** | `filecap references` (CMS page references) -> `filecap cross-references` -> `filecap audits` (per-PDF **and** per-page accessibility scores from `audit.icjia.app`) -> `filecap site-audit` (per-site web-page score 0–100 + A–F grade, Stage 3.6; skip with `SKIP_SITE_AUDIT=1`). |
-| 4 | **Web rollup** | `filecap web-rollup` builds the deployable bundle: every content site, plus the tooling-site roster shown on `/sites`. |
+| 3 | **Enrich** | `references` (CMS page references) -> `cross-references` -> `audits` (per-PDF **and** per-page accessibility scores from `audit.icjia.app`) -> `site-audit` (per-site web-page score 0–100 + A–F grade, Stage 3.6; skip with `SKIP_SITE_AUDIT=1`). |
+| 4 | **Web rollup** | `web-rollup` builds the deployable bundle: every content site, plus the tooling-site roster shown on `/sites`. |
 | 5 | **Deploy** | Pushes the bundle to the `icjia-fleet-audit` Netlify site. Driven by `webRollup.autoDeploy: true` in `~/.filecap/config.json`; `--no-deploy` exports `FILECAP_NO_DEPLOY=1` to suppress it. |
 | 6 | **Purge** | Keeps only the newest run dir per site and the newest rollup bundle. Never touches `latest/` symlinks, `mirror/` rsync caches, or `_fleet/` consolidated dirs. Skip with `--no-purge`. |
 | 7 | **Summary** | Prints total files, remediable count, the deployed URL, and the transcript path. |
@@ -1115,7 +1046,7 @@ When remediation happens **one site at a time** — PDFs fixed in place, or move
 ./run-site-update.sh i2i.illinois.gov --dry-run           # resolve + show the plan, do nothing
 ```
 
-Name sites by **URL** (front-end or file-server), domain alias, slug, or nickname — `filecap resolve-site <query>` does the lookup, rejecting a bare host shared by several apps (e.g. `icjia.illinois.gov`) with the unique alternatives listed. Because moving excepted PDFs into `archive.icjia.cloud` changes its count too, a content-site update **prompts to also refresh the archive** (default Y; `--no-archive` opts out). A full refresh per site is SSH re-scan -> references -> cross-references -> audits; `--scores-only` skips the scan for in-place PDF fixes (and offers a full run, default Y, if a named site has no cached inventory yet).
+Name sites by **URL** (front-end or file-server), domain alias, slug, or nickname — the `resolve-site` subcommand does the lookup, rejecting a bare host shared by several apps (e.g. `icjia.illinois.gov`) with the unique alternatives listed. Because moving excepted PDFs into `archive.icjia.cloud` changes its count too, a content-site update **prompts to also refresh the archive** (default Y; `--no-archive` opts out). A full refresh per site is SSH re-scan -> references -> cross-references -> audits; `--scores-only` skips the scan for in-place PDF fixes (and offers a full run, default Y, if a named site has no cached inventory yet).
 
 To redo *part* of the pipeline by hand instead — most commonly re-scoring the PDF/page audits for a site whose scoring requests timed out — run the underlying commands against the inventories already on disk. Audit errors are **never cached**, so a re-run retries only the pages that failed; successful pages are served from `~/.filecap/page-audit-cache.json`:
 
@@ -1125,7 +1056,7 @@ node bin/filecap.js audits ~/filecap-audits/researchhub-prod/latest/inventory.cr
 node bin/filecap.js web-rollup
 ```
 
-Pass `--force` to `filecap audits` only if you also want to re-fetch already-cached *successes* (rarely needed — it re-hammers the scoring endpoint). Re-score sites **serially, not in parallel**: parallel runs re-trigger the endpoint throttling that usually caused the errors in the first place.
+Pass `--force` to `audits` only if you also want to re-fetch already-cached *successes* (rarely needed — it re-hammers the scoring endpoint). Re-score sites **serially, not in parallel**: parallel runs re-trigger the endpoint throttling that usually caused the errors in the first place.
 
 ### Runtime and exit status
 
@@ -1135,7 +1066,7 @@ A cache-warm run is roughly **15–20 minutes** (a cold first run, or one after 
 
 ### What this is
 
-`filecap` is a tool for taking a complete inventory of the document files stored on a remote web server — typically the `/uploads` folder of a Strapi-powered website — so that a remediation vendor can see exactly what work is needed and produce a defensible, fixed-price quote. It works by connecting to the server over SSH, walking the entire file tree, and recording structured metadata about each file: PDF page counts, whether a PDF is image-only (scanned), DOCX heading structure, alt-text coverage, and more. The result is a spreadsheet (CSV) the vendor can open in Excel, plus an optional interactive web page (HTML) you can open in any browser for review meetings. No files on the server are modified — this is a read-only audit.
+The Fleet Audit is a tool for taking a complete inventory of the document files stored on a remote web server — typically the `/uploads` folder of a Strapi-powered website — so that a remediation vendor can see exactly what work is needed and produce a defensible, fixed-price quote. It works by connecting to the server over SSH, walking the entire file tree, and recording structured metadata about each file: PDF page counts, whether a PDF is image-only (scanned), DOCX heading structure, alt-text coverage, and more. The result is a spreadsheet (CSV) the vendor can open in Excel, plus an optional interactive web page (HTML) you can open in any browser for review meetings. No files on the server are modified — this is a read-only audit.
 
 ### What you'll need
 
@@ -1150,7 +1081,7 @@ Check this list before running anything. All five items are required.
    - Ubuntu/Linux: `sudo apt install -y nodejs` or download from https://nodejs.org
    - Windows (WSL2/Ubuntu): see the [Windows](#windows-the-situation) section
 
-4. **`npx` available in your terminal.** `npx` comes bundled with Node.js 20+ — if you have Node, you have `npx`. It's the tool that downloads and runs `filecap` automatically; you don't have to install `filecap` separately.
+4. **`npx` available in your terminal.** `npx` comes bundled with Node.js 20+ — if you have Node, you have `npx`. It's the tool that downloads and runs the scanner CLI automatically when needed; you don't have to install it separately.
 
 5. **`bash`, `ssh`, `rsync`, and `python3` available.** These are pre-installed on every Mac (macOS 12+), every modern Ubuntu/Debian Linux, and every WSL2/Ubuntu environment. You don't need to do anything. The scripts check for these at startup and tell you if something is missing.
 
@@ -1281,7 +1212,7 @@ When the JWT rotates (every 15 days for ICJIA's intranet token), update the one 
 }
 ```
 
-**Security notes.** The token is fed to `curl` via stdin (`--header @-`), not argv, so it never appears in `ps aux`. The `secrets.json` file is read only when needed; nothing writes the token to logs, the report bundle, or any output artifact. Audit work directories never contain the token. If the token leaks, rotate it on the issuing server and update `secrets.json` (or the env var); the leaked one stops working without any change to filecap.
+**Security notes.** The token is fed to `curl` via stdin (`--header @-`), not argv, so it never appears in `ps aux`. The `secrets.json` file is read only when needed; nothing writes the token to logs, the report bundle, or any output artifact. Audit work directories never contain the token. If the token leaks, rotate it on the issuing server and update `secrets.json` (or the env var); the leaked one stops working without any change to the audit tooling.
 
 ### Static-site (Nuxt-style) repos — `type: "git"`
 
@@ -1300,7 +1231,7 @@ Some sites are self-contained static-site builds (Nuxt, Astro, Vite, plain HTML)
 }
 ```
 
-When `audit-fleet.sh` encounters this entry, it dispatches to `audit-static.sh` instead of `audit-remote.sh`. The script shallow-clones the repo to `~/filecap-audits/vpp-git/clone/`, runs `filecap scan` on the `/public` directory, and rewrites every entry's `absolutePath` to a GitHub source URL like `https://github.com/ICJIA/icjia-vpp-2025/tree/main/public/docs/file.pdf` — so a vendor clicking through in the bundle CSV lands on the file's source on github.com (with full git history). Subsequent runs `git fetch` and reset to the latest default-branch commit; clones don't redo from scratch.
+When `audit-fleet.sh` encounters this entry, it dispatches to `audit-static.sh` instead of `audit-remote.sh`. The script shallow-clones the repo to `~/filecap-audits/vpp-git/clone/`, runs a `scan` over the `/public` directory, and rewrites every entry's `absolutePath` to a GitHub source URL like `https://github.com/ICJIA/icjia-vpp-2025/tree/main/public/docs/file.pdf` — so a vendor clicking through in the bundle CSV lands on the file's source on github.com (with full git history). Subsequent runs `git fetch` and reset to the latest default-branch commit; clones don't redo from scratch.
 
 **Private repos: auth via `gh CLI` (recommended)** or `FILECAP_GITHUB_TOKEN`:
 
@@ -1315,7 +1246,7 @@ export FILECAP_GITHUB_TOKEN=ghp_yourPATwithRepoScope
 
 Auth resolution order on every run: `gh CLI` (if logged in) → `FILECAP_GITHUB_TOKEN` env var → anonymous (public-repo only). With private repos and neither set, the audit fails fast with a clear error pointing at this setup.
 
-Mixed fleets work in one run — `sites.json` can have any mix of strapi and git entries; `filecap web-rollup` bundles them into the same index page, master CSV, and duplicates section. The Bundle's per-site report for a git-type site shows the GitHub source URL in the "Full file path on server" column instead of an SSH path.
+Mixed fleets work in one run — `sites.json` can have any mix of strapi and git entries; `web-rollup` bundles them into the same index page, master CSV, and duplicates section. The Bundle's per-site report for a git-type site shows the GitHub source URL in the "Full file path on server" column instead of an SSH path.
 
 ### How to use it (single server)
 
@@ -1549,7 +1480,7 @@ To skip the check (e.g., on an air-gapped system or for faster startup):
 SKIP_VERSION_CHECK=1 ./audit-remote.sh
 ```
 
-The `filecap` package itself (which the script invokes via `npx`) auto-updates separately on each run — it always pulls the latest from npm.
+The scanner CLI itself normally runs from the same repo checkout as the scripts; the one `npx` path (scanning directly on a Node 20+ remote) always pulls the latest published package from npm.
 
 ---
 
@@ -1710,13 +1641,13 @@ The scripts run a tool-presence and Node-version preflight at startup and abort 
 
 ### Why local-mode scanning matters
 
-Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The `audit-remote.sh` script sidesteps this by detecting Node 16 (or any Node < 20) on the remote and pulling the files down via rsync, then running filecap on the auditor's local machine. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
+Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 18+ binaries require glibc 2.28+ (Ubuntu 20+); compiling Node from source on EOL Ubuntu is fragile due to old g++. The `audit-remote.sh` script sidesteps this by detecting Node 16 (or any Node < 20) on the remote and pulling the files down via rsync, then running the scanner on the auditor's local machine. The output CSV still records the *source* server's IP and remote path so vendors can ssh in and locate any flagged file — the auditor's local machine is invisible in the deliverable.
 
 ---
 
 ## Publishing a fleet snapshot
 
-After scanning your fleet, the `filecap web-rollup` subcommand bundles every site's latest scan into a self-contained static-site directory ready to upload to Netlify (or any static host).
+After scanning your fleet, the `web-rollup` subcommand bundles every site's latest scan into a self-contained static-site directory ready to upload to Netlify (or any static host).
 
 ### What's in the bundle
 
@@ -1752,7 +1683,7 @@ After scanning your fleet, the `filecap web-rollup` subcommand bundles every sit
 ### Building the bundle
 
 ```bash
-filecap web-rollup --output ~/Desktop/icjia-fleet
+node bin/filecap.js web-rollup --output ~/Desktop/icjia-fleet
 ```
 
 Reads `~/.filecap/sites.json` (the saved-sites file managed by `audit-remote.sh`) and the most-recent inventory at `~/filecap-audits/<server-name>/latest/inventory.ndjson` for each site. Sites without a recent scan are skipped with a warning.
@@ -1764,7 +1695,7 @@ The bundle is publicly accessible by default. For private content (intranet docs
 **Recommended: Netlify Site Password (paid Netlify plan).** Server-side enforcement at the CDN edge. Rotate without redeploying.
 
 ```bash
-filecap web-rollup --output ~/Desktop/icjia-fleet --no-client-gate
+node bin/filecap.js web-rollup --output ~/Desktop/icjia-fleet --no-client-gate
 # Deploy to Netlify, then in the dashboard:
 #   Site settings -> Visitor access -> Site password -> enter your password
 ```
@@ -1772,7 +1703,7 @@ filecap web-rollup --output ~/Desktop/icjia-fleet --no-client-gate
 **Alternative: client-side gate (free Netlify, "ward off the curious" only).** SHA-256 of password embedded in the HTML; JS prompt at page load. Anyone with view-source can read the content.
 
 ```bash
-filecap web-rollup --output ~/Desktop/icjia-fleet --password "your-shared-pw"
+node bin/filecap.js web-rollup --output ~/Desktop/icjia-fleet --password "your-shared-pw"
 ```
 
 ### Three deploy paths
@@ -1786,23 +1717,23 @@ cd ~/Desktop/icjia-fleet
 netlify deploy --prod --dir .
 ```
 
-Or include `--deploy` in `filecap web-rollup` to combine build + deploy:
+Or include `--deploy` in `web-rollup` to combine build + deploy:
 
 ```bash
-filecap web-rollup --output ~/Desktop/icjia-fleet --no-client-gate --deploy
+node bin/filecap.js web-rollup --output ~/Desktop/icjia-fleet --no-client-gate --deploy
 ```
 
 **Git-connected (auto-deploy on push):**
 
 1. Create a snapshots repo (e.g., `ICJIA/icjia-fleet-snapshot`, private).
 2. Connect to a Netlify site via the Netlify dashboard (Build settings: empty build command, publish dir `.`).
-3. Each `filecap web-rollup --output <repo-path>` overwrites the bundle; commit + push triggers redeploy.
+3. Each `web-rollup --output <repo-path>` run overwrites the bundle; commit + push triggers redeploy.
 
 The bundle's `netlify.toml` ensures Netlify sees the correct publish directory + cache headers automatically; you don't have to configure those in the dashboard.
 
 ### Auto-deploying every snapshot — `~/.filecap/config.json`
 
-If you always want `filecap web-rollup` to deploy on completion (no `--deploy` flag, every time), drop a `config.json` next to your `sites.json`:
+If you always want `web-rollup` to deploy on completion (no `--deploy` flag, every time), drop a `config.json` next to your `sites.json`:
 
 ```json
 {
@@ -1813,7 +1744,7 @@ If you always want `filecap web-rollup` to deploy on completion (no `--deploy` f
 }
 ```
 
-With that file in place, plain `filecap web-rollup` builds **and** deploys to Netlify. Pass `--deploy` on the CLI to override (it always wins). Both `--deploy` and `--deploy-site` on the CLI take precedence over the config; the config only fills in defaults when the flag is absent. To temporarily skip auto-deploy, comment out `autoDeploy` in the config or move the file aside.
+With that file in place, a plain `web-rollup` run builds **and** deploys to Netlify. Pass `--deploy` on the CLI to override (it always wins). Both `--deploy` and `--deploy-site` on the CLI take precedence over the config; the config only fills in defaults when the flag is absent. To temporarily skip auto-deploy, comment out `autoDeploy` in the config or move the file aside.
 
 The config file is validated on load: unknown top-level fields, typos in `webRollup` keys (e.g., `autodeploy` instead of `autoDeploy`), or wrong types (string instead of boolean) cause an immediate, named error rather than silently being ignored.
 
@@ -1857,9 +1788,9 @@ After choosing the mode, the script also asks "Auto-deploy to Netlify? [y/N]". A
 
 ---
 
-## What filecap does not do
+## What the Fleet Audit does not do
 
-- Perform full WCAG conformance auditing — filecap does inventory; scoring and conformance analysis are performed by separate specialist tools and human auditors.
+- Perform full WCAG conformance auditing — the Fleet Audit does inventory; scoring and conformance analysis are performed by separate specialist tools and human auditors.
 - Remediate, fix, or modify any files.
 - Track vendor remediation status (out of scope — NDJSON inventories are themselves the time-series record).
 - Integrate with the Strapi API (deferred to a future release; the core inventory pipeline is format-agnostic).
@@ -1869,17 +1800,17 @@ After choosing the mode, the script also asks "Auto-deploy to Netlify? [y/N]". A
 
 **Scan exits with code 3.** At least one directory was unreadable. The footer's `permissionDenials` count tells you how many.
 
-**`introspection` field missing from a PDF / DOCX / XLSX entry.** filecap couldn't parse this file. Likely causes: malformed file, encrypted, exotic variant. The file still appears in the inventory; vendor's deeper tooling (Acrobat Pro, Office, qpdf) will surface the actual issue.
+**`introspection` field missing from a PDF / DOCX / XLSX entry.** The CLI couldn't parse this file. Likely causes: malformed file, encrypted, exotic variant. The file still appears in the inventory; vendor's deeper tooling (Acrobat Pro, Office, qpdf) will surface the actual issue.
 
 **Scans are slow on large directories.** Hashing dominates wall time. For triage scans, pass `--no-hash`. For Office-heavy stores, increase `--concurrency`. Skip introspection with `--no-introspect` for filesystem-only inventories.
 
 **pdfjs-dist warning chatter on stderr.** pdfjs-dist emits informational warnings for non-fatal conditions (e.g., "TT: undefined function", unsupported PDF features). These are cosmetic noise — the scan continues and the introspection result is valid. Pipe stderr to `/dev/null`, or use `--quiet` if you want a clean terminal.
 
-**EOL Ubuntu / Node 16 / glibc-2.27 on the remote server.** The audit scripts handle this automatically: if the remote server has Node < 20 (or no Node at all), the script falls back to rsync-and-scan-locally. No manual intervention needed. If you're running filecap directly on such a server (not via the audit scripts), you'll need to install a compatible Node version — see [Why local-mode scanning matters](#why-local-mode-scanning-matters).
+**EOL Ubuntu / Node 16 / glibc-2.27 on the remote server.** The audit scripts handle this automatically: if the remote server has Node < 20 (or no Node at all), the script falls back to rsync-and-scan-locally. No manual intervention needed. If you're running the CLI directly on such a server (not via the audit scripts), you'll need to install a compatible Node version — see [Why local-mode scanning matters](#why-local-mode-scanning-matters).
 
 **rsync `--info=progress2` not supported on macOS.** The audit scripts use a macOS-compatible rsync progress flag. If you're running rsync manually and see this error, use `--progress` instead of `--info=progress2`.
 
-**`netlify deploy` not found when using `--deploy`.** Install the Netlify CLI with `npm install -g netlify-cli` and authenticate with `netlify login`. filecap prints a reminder with these instructions if the CLI is missing at runtime.
+**`netlify deploy` not found when using `--deploy`.** Install the Netlify CLI with `npm install -g netlify-cli` and authenticate with `netlify login`. The audit CLI prints a reminder with these instructions if the Netlify CLI is missing at runtime.
 
 ## License
 

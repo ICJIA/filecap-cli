@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.59.3] — 2026-08-18
+
+### Fixed — "filecap" branding retired
+
+- The project is the **ICJIA Fleet Audit**; the original working name
+  "filecap" no longer appears as a name anywhere user-facing. The README is
+  fully rebranded — title, prose, headings and their anchors, the CLI
+  reference (subcommand headings, `node bin/filecap.js` invocation forms),
+  and the MCP client configs, which now point at the repo clone instead of
+  the deprecated npm package. A naming note at the top explains the
+  machine-facing identifiers that keep the old string for compatibility
+  (`bin/filecap.js`, `~/.filecap/`, `~/filecap-audits/`, `FILECAP_*` env
+  vars, `filecap_*` MCP tool names, NDJSON `kind` strings).
+- Rollup copy: the roadmap footer on the fleet index now links to the
+  "ICJIA Fleet Audit CHANGELOG" (was "filecap CHANGELOG"), and the
+  auto-generated bundle artifacts (`_headers`, `_redirects`, `style.css`,
+  the uptime function) attribute themselves to the ICJIA Fleet Audit
+  web-rollup.
+- README accuracy fixes swept up along the way: the documented `--title`
+  default now matches the code ("ICJIA Fleet Audit Assessment"), and
+  "Staying current" reflects that the scripts run the CLI from the repo
+  checkout (npx is used only for remote-side scans on Node 20+ servers).
+
 ## [1.59.2] — 2026-08-18
 
 ### Fixed — the severity card explains itself too

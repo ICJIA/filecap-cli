@@ -67,7 +67,7 @@ export const DESIGN_TOKENS = {
  * @returns {string}
  */
 export function darkModeCss() {
-  return `/* filecap web-rollup shared styles */
+  return `/* ICJIA Fleet Audit web-rollup shared styles */
 /* Design tokens — see src/web/styles.js for the full palette */
 :root {
   --fc-bg-base:        ${DESIGN_TOKENS.bgBase};

@@ -381,7 +381,7 @@ function renderTodoSection() {
       </li>
     </ul>
 
-    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">filecap CHANGELOG</a> — the next major release will roll these out.</p>
+    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">ICJIA Fleet Audit CHANGELOG</a> — the next major release will roll these out.</p>
   </section>`;
 }
 
