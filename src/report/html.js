@@ -2117,6 +2117,12 @@ ${siteFooterCss()}
 .scope-head-lg .scope-head-sub { font-size: 0.82rem; }
 .files-section { border-left: 5px solid #3fb950; padding-left: 16px; margin: 2rem 0 0; border-radius: 2px; }
 .files-section .inv-header { margin: 0; }
+/* v1.59.0 — mirror of the website card's .sa-independence explainer: same
+   umbrella (digital accessibility), completely different remediation
+   disciplines — written for managers deciding who does which work. */
+.files-section .fa-independence { font-size: 0.95rem; color: #9aa5b1; max-width: 70ch; margin: 10px 0 14px; }
+.files-section .fa-independence strong { color: #d4dae0; }
+.files-section .fa-independence em { color: #c0cdda; font-style: italic; }
 
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
@@ -2246,6 +2252,8 @@ ${renderSiteAccessibilitySection(siteAudit)}
   </div>
   ${viewToggleHtml}
 </div>
+
+<p class="fa-independence"><strong>File accessibility is not website accessibility.</strong> Both fall under <em>digital accessibility</em>, but they are separate disciplines — the process and manner of remediation are completely different. Fixing a web page means changing the site's code and content; fixing a document means remediating that individual PDF, Word, Excel, or PowerPoint file, one file at a time. A website accessibility specialist may not have the skills or experience to remediate files — and a document remediation specialist may not be able to fix web pages. When planning work or hiring a vendor, treat the two as separate scopes.</p>
 
 <details class="dp-disclosure dp-breakdown">
   <summary><span class="dp-disclosure-title">Breakdown by file type</span> <span class="dp-disclosure-hint">every type &amp; category count</span></summary>

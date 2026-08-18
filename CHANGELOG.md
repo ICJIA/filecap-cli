@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.59.0] — 2026-08-18
+
+### Added — file-accessibility independence explainer
+
+- The File accessibility section now opens with an explainer paragraph
+  (`fa-independence`) mirroring the website card's: file accessibility is
+  not website accessibility — both fall under digital accessibility, but
+  the process and manner of remediation are completely different, and a
+  specialist in one may not have the skills or experience for the other.
+  Written for managers planning work or hiring vendors: treat the two as
+  separate scopes. Styled identically to the website card's explainer.
+
 ## [1.58.0] — 2026-08-18
 
 ### Changed — one green-barred "File accessibility" section

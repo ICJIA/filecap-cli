@@ -1404,6 +1404,27 @@ describe("writeHtml", () => {
       expect(html).toContain("scope-head-website scope-head-lg");
     });
 
+    // v1.59.0 — the files section opens with an independence explainer
+    // mirroring the website card's: same "digital accessibility" umbrella,
+    // completely different remediation disciplines. Written for managers
+    // deciding who does the work.
+    it("explains file-vs-website remediation under the File accessibility header", async () => {
+      const out = path.join(tmpDir, "fa-independence.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('<p class="fa-independence">');
+      expect(html).toContain("File accessibility is not website accessibility.");
+      expect(html).toContain("may not have the skills or experience to remediate files");
+      // sits inside the files-section, under the header, above the disclosures
+      const headerIdx = html.indexOf('<div class="inv-header inv-header-files">');
+      const noteIdx = html.indexOf('<p class="fa-independence">');
+      const breakdownIdx = html.indexOf("dp-disclosure dp-breakdown");
+      expect(noteIdx).toBeGreaterThan(headerIdx);
+      expect(noteIdx).toBeLessThan(breakdownIdx);
+      // styled like the website card's sa-independence paragraph
+      expect(html).toMatch(/\.files-section \.fa-independence \{[^}]*max-width: 70ch/);
+    });
+
     // v1.58.0 — the whole files region reads as ONE section: the header,
     // the breakdown + site-details disclosures, and both table views live
     // inside <section class="files-section">, whose green left bar runs the
