@@ -15,6 +15,20 @@ export function renderSiteAccessibilitySection(siteAudit) {
   const trend = siteAudit.trend;
   const pages = Array.isArray(siteAudit.pages) ? siteAudit.pages : [];
 
+  const aCount = wcag.A ?? 0;
+  const aaCount = wcag.AA ?? 0;
+  const aaaBpCount = (wcag.AAA ?? 0) + (wcag.bestPractice ?? 0);
+  // v1.59.1 — when the severity card shows issues but Level A and AA are
+  // both 0, the two cards read as a contradiction (severity = axe impact,
+  // WCAG level = conformance mapping; they're independent axes). Spell the
+  // reconciliation out: every outstanding issue is an AAA/best-practice
+  // item, outside the WCAG 2.1 AA target that ADA Title II requires.
+  const wcagNote = aCount === 0 && aaCount === 0 && aaaBpCount > 0
+    ? (aaaBpCount === 1
+      ? `<p class="sa-wcag-note">The one outstanding issue is an AAA / best-practice item — <strong>it does not count against the WCAG 2.1 AA compliance target</strong> (the standard ADA Title II requires). The severity card counts this same issue.</p>`
+      : `<p class="sa-wcag-note">All ${aaaBpCount.toLocaleString()} outstanding issues are AAA / best-practice items — <strong>none count against the WCAG 2.1 AA compliance target</strong> (the standard ADA Title II requires). The severity card counts these same ${aaaBpCount.toLocaleString()} issues.</p>`)
+    : "";
+
   const trendHtml = trend
     ? `<p class="sa-trend">Since the previous run: <strong>${(trend.fixed ?? 0).toLocaleString()} fixed</strong>, <strong>${(trend.new ?? 0).toLocaleString()} new</strong>, ${(trend.stillOpen ?? 0).toLocaleString()} still open.</p>`
     : `<p class="sa-trend">First run — no trend yet.</p>`;
@@ -53,11 +67,11 @@ export function renderSiteAccessibilitySection(siteAudit) {
       <li>Minor: <strong>${(sev.minor ?? 0).toLocaleString()}</strong></li>
     </ul></div>
     <div class="sa-card"><h3>Outstanding by WCAG level</h3><ul>
-      <li>Level A: <strong>${(wcag.A ?? 0).toLocaleString()}</strong></li>
-      <li>Level AA: <strong>${(wcag.AA ?? 0).toLocaleString()}</strong></li>
-      <li class="sa-muted">AAA / best-practice: ${((wcag.AAA ?? 0) + (wcag.bestPractice ?? 0)).toLocaleString()} (outside the AA compliance target)</li>
-      <li class="sa-muted">Needs review (manual): ${(out.needsReview ?? 0).toLocaleString()}</li>
-    </ul></div>
+      <li>Level A: <strong>${aCount.toLocaleString()}</strong></li>
+      <li>Level AA: <strong>${aaCount.toLocaleString()}</strong></li>
+      <li class="sa-muted">AAA / best-practice: ${aaaBpCount.toLocaleString()} (outside the AA compliance target)</li>
+      <li class="sa-muted">Needs review (manual): ${(out.needsReview ?? 0).toLocaleString()} — checks a human must confirm; not counted as violations</li>
+    </ul>${wcagNote}</div>
   </div>
   <details class="sa-pages"><summary>Per-page scores (${pages.length.toLocaleString()})</summary>
     <table><thead><tr><th>Page</th><th>Score</th><th>Grade</th><th>Issues</th><th>Review</th><th></th></tr></thead><tbody>${pageRows}</tbody></table>

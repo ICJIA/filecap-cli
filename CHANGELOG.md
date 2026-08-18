@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.59.1] — 2026-08-18
+
+### Fixed — the WCAG-level card explains itself
+
+- When a site has outstanding issues but Level A and Level AA both read 0
+  (ARI's case: 3 issues, all best-practice), the card now appends a
+  reconciliation note: "All 3 outstanding issues are AAA / best-practice
+  items — none count against the WCAG 2.1 AA compliance target (the
+  standard ADA Title II requires). The severity card counts these same 3
+  issues." Singular phrasing for one issue; no note when A/AA issues
+  exist or nothing is outstanding. (Severity = axe impact; WCAG level =
+  conformance mapping — independent axes that looked contradictory.)
+- The "Needs review (manual)" line now says what it is: "checks a human
+  must confirm; not counted as violations."
+
 ## [1.59.0] — 2026-08-18
 
 ### Added — file-accessibility independence explainer

@@ -26,6 +26,63 @@ describe("renderSiteAccessibilitySection", () => {
     expect(renderSiteAccessibilitySection({ score: null })).toBe("");
   });
 
+  // v1.59.1 — the WCAG-level card explains itself. ARI case: 3 issues in
+  // the severity card but Level A/AA both 0 read as a contradiction until
+  // you know all 3 are AAA/best-practice items outside the AA target.
+  describe("self-explanatory WCAG card (v1.59.1)", () => {
+    const ariShaped = {
+      score: 99, grade: "A",
+      coverage: { pagesInSet: 500, scored: 500 },
+      outstanding: {
+        total: 3,
+        bySeverity: { critical: 0, serious: 1, moderate: 1, minor: 1 },
+        byWcag: { A: 0, AA: 0, AAA: 0, bestPractice: 3 },
+        needsReview: 500,
+      },
+      pages: [],
+    };
+
+    it("reconciles the two cards when A and AA are 0 but issues exist", () => {
+      const html = renderSiteAccessibilitySection(ariShaped);
+      expect(html).toContain('<p class="sa-wcag-note">');
+      expect(html).toContain("All 3 outstanding issues are AAA / best-practice items");
+      expect(html).toContain("none count against the WCAG 2.1 AA compliance target");
+      expect(html).toContain("The severity card counts these same 3 issues");
+    });
+
+    it("uses singular phrasing for one issue", () => {
+      const one = {
+        ...ariShaped,
+        outstanding: {
+          total: 1,
+          bySeverity: { critical: 0, serious: 1, moderate: 0, minor: 0 },
+          byWcag: { A: 0, AA: 0, AAA: 0, bestPractice: 1 },
+          needsReview: 2,
+        },
+      };
+      const html = renderSiteAccessibilitySection(one);
+      expect(html).toContain("The one outstanding issue is an AAA / best-practice item");
+      expect(html).toContain("it does not count against the WCAG 2.1 AA compliance target");
+      expect(html).toContain("The severity card counts this same issue");
+    });
+
+    it("renders no note when A or AA issues exist, or when nothing is outstanding", () => {
+      // sidecar fixture: A 9 / AA 28 — the counts speak for themselves.
+      expect(renderSiteAccessibilitySection(sidecar)).not.toContain("sa-wcag-note");
+      const clean = {
+        ...ariShaped,
+        outstanding: { total: 0, bySeverity: { critical: 0, serious: 0, moderate: 0, minor: 0 }, byWcag: { A: 0, AA: 0, AAA: 0, bestPractice: 0 }, needsReview: 0 },
+      };
+      expect(renderSiteAccessibilitySection(clean)).not.toContain("sa-wcag-note");
+    });
+
+    it("clarifies that needs-review items are not violations", () => {
+      const html = renderSiteAccessibilitySection(ariShaped);
+      expect(html).toContain("Needs review (manual): 500");
+      expect(html).toContain("checks a human must confirm; not counted as violations");
+    });
+  });
+
   // v1.56.0 — the section leads with a blue "website" scope lockup so it
   // cannot be mistaken for the orange file-accessibility banner above it.
   it("leads with the website scope lockup (globe icon + web-pages subtitle)", () => {
