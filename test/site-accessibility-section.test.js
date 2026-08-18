@@ -30,7 +30,8 @@ describe("renderSiteAccessibilitySection", () => {
   // cannot be mistaken for the orange file-accessibility banner above it.
   it("leads with the website scope lockup (globe icon + web-pages subtitle)", () => {
     const html = renderSiteAccessibilitySection(sidecar);
-    expect(html).toContain('class="scope-head scope-head-website"');
+    // v1.57.0 — the lockup carries the infographic size (scope-head-lg).
+    expect(html).toContain('class="scope-head scope-head-website scope-head-lg"');
     expect(html).toContain('<h2 id="sa-heading">Website accessibility</h2>');
     expect(html).toContain("not the files it publishes");
     expect(html).not.toContain("scope-head-files");

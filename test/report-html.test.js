@@ -915,8 +915,8 @@ describe("writeHtml", () => {
       const out = path.join(tmpDir, "invheader.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toMatch(/<div class="inv-header">/);
-      expect(html).toMatch(/<h2 id="dp-inv-heading">File inventory<\/h2>/);
+      expect(html).toMatch(/<div class="inv-header inv-header-files">/);
+      expect(html).toMatch(/<h2 id="dp-inv-heading">File accessibility<\/h2>/);
       // The toggle JS swaps that single heading instead of two competing h2s.
       expect(html).toContain('document.getElementById("dp-inv-heading")');
     });
@@ -1341,6 +1341,65 @@ describe("writeHtml", () => {
       const html = await fs.readFile(out, "utf8");
       expect(html).toMatch(/\.scope-head-files \.scope-head-sub \{[^}]*#ffa84d/);
       expect(html).toMatch(/\.scope-head-website \.scope-head-sub \{[^}]*#4dabf7/);
+    });
+  });
+
+  // v1.57.0 — the two assessment titles step up to infographic size
+  // (scope-head-lg) and the inventory section is retitled "File
+  // accessibility" with an orange left section bar — distinct from the blue
+  // website-section bar and the blue/purple access-panel bars.
+  describe("matched infographic titles + orange File accessibility bar (v1.57.0)", () => {
+    const saFixture = {
+      score: 82, grade: "B",
+      coverage: { scored: 1, pagesInSet: 1 },
+      outstanding: { total: 0, bySeverity: {}, byWcag: {}, needsReview: 0 },
+      pages: [],
+    };
+
+    it("retitles the inventory section 'File accessibility' with the big orange lockup", async () => {
+      const out = path.join(tmpDir, "inv-retitle.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('<div class="inv-header inv-header-files">');
+      expect(html).toContain('<h2 id="dp-inv-heading">File accessibility</h2>');
+      expect(html).not.toMatch(/<h2 id="dp-inv-heading">File inventory<\/h2>/);
+      expect(html).toContain('id="dp-inv-sub"');
+      const invIdx = html.indexOf('<div class="inv-header inv-header-files">');
+      const lgIdx = html.indexOf("scope-head-files scope-head-lg", invIdx);
+      expect(lgIdx).toBeGreaterThan(invIdx);
+    });
+
+    it("swaps heading AND subtitle when toggling to Page view", async () => {
+      const out = path.join(tmpDir, "inv-toggle.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('"Pages on this site" : "File accessibility"');
+      expect(html).toContain('document.getElementById("dp-inv-sub")');
+    });
+
+    it("keeps the hero banner lockup at its compact size", async () => {
+      const out = path.join(tmpDir, "inv-banner.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      const bannerStart = html.indexOf('<div class="dp-a11y');
+      const bannerEnd = html.indexOf("dp-metaline", bannerStart);
+      expect(bannerStart).toBeGreaterThan(-1);
+      expect(html.slice(bannerStart, bannerEnd)).not.toContain("scope-head-lg");
+    });
+
+    it("styles the big lockup and the orange section bar", async () => {
+      const out = path.join(tmpDir, "inv-css.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/\.scope-head-lg h2 \{[^}]*font-size/);
+      expect(html).toMatch(/\.inv-header-files \{[^}]*#ffa84d/);
+    });
+
+    it("website section lockup carries the big size too", async () => {
+      const out = path.join(tmpDir, "inv-sa-lg.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out, siteAudit: saFixture });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain("scope-head-website scope-head-lg");
     });
   });
 

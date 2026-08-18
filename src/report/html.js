@@ -437,13 +437,18 @@ const ACCESS_PANEL_COPY = {
 // the homepage card's renderFileA11y() (same summarizeFileA11y() input) so the
 // two surfaces never disagree: excluded archive, thin data, or score + band.
 // The average is the site's scored documents only — nothing site-level.
+// v1.57.0 — one copy of the orange files scope icon; used by the hero
+// banner's compact lockup AND the big "File accessibility" section header
+// so the two can never drift apart.
+const FILES_SCOPE_ICON_SVG = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.5h5.5L13 5v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1z"/><path d="M9.5 1.5V5H13"/><path d="M5.5 8.5h5M5.5 11h3.5"/></svg>`;
+
 function renderFileA11yBanner(a, trend) {
   // v1.56.0 — scope lockup: orange document icon + a subtitle naming WHAT
   // this banner scores (the files), paired with the blue-globe lockup on the
   // "Website accessibility" section below it. Managers kept reading one
   // score as the other; icon + hue + words make the scope unmistakable.
   const head = `<div class="scope-head scope-head-files">
-    <span class="scope-head-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.5h5.5L13 5v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1z"/><path d="M9.5 1.5V5H13"/><path d="M5.5 8.5h5M5.5 11h3.5"/></svg></span>
+    <span class="scope-head-icon" aria-hidden="true">${FILES_SCOPE_ICON_SVG}</span>
     <span class="scope-head-text">
       <span class="dp-a11y-head">File accessibility <small>(documents)</small></span>
       <span class="scope-head-sub">Scores the files this site publishes &mdash; PDFs, Word, Excel, PowerPoint &mdash; not its web pages</span>
@@ -704,8 +709,8 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   }
   const pageViewSectionHtml = buildPageViewSection(pageList, { sourceHeader, sourceMap, isConsolidated });
   // v1.33.0 — the toggle sits in the inventory header beside the heading that
-  // the toggle JS swaps between "File inventory" and "Pages on this site"; the
-  // explanatory blurb renders on its own line just below the header.
+  // the toggle JS swaps between "File accessibility" and "Pages on this
+  // site" (v1.57.0 rename); the explanatory blurb renders just below.
   const viewToggleHtml = `
 <div class="view-toggle" role="group" aria-label="Switch report view">
   <div class="view-toggle-buttons">
@@ -2098,6 +2103,16 @@ ${siteFooterCss()}
 .scope-head-website .scope-head-icon { color: #4dabf7; background: rgba(77, 171, 247, 0.13); border: 1px solid rgba(77, 171, 247, 0.4); }
 .scope-head-website .scope-head-sub { color: #4dabf7; }
 .site-accessibility .scope-head { margin-bottom: 10px; }
+/* v1.57.0 — infographic size for the two SECTION titles (the hero banner's
+   compact lockup keeps the default size). The File accessibility section
+   opens with an orange left bar — the files hue — so its start reads like
+   the blue-barred website card; orange is distinct from the blue/purple/
+   amber access-panel bars. */
+.scope-head-lg .scope-head-icon { width: 40px; height: 40px; border-radius: 10px; }
+.scope-head-lg .scope-head-icon svg { width: 22px; height: 22px; }
+.scope-head-lg h2 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.015em; line-height: 1.15; }
+.scope-head-lg .scope-head-sub { font-size: 0.82rem; }
+.inv-header-files { border-left: 5px solid #ffa84d; padding-left: 16px; border-radius: 2px; }
 
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
@@ -2261,8 +2276,14 @@ ${categoryRows}
   </div>
 </details>
 
-<div class="inv-header">
-  <h2 id="dp-inv-heading">File inventory</h2>
+<div class="inv-header inv-header-files">
+  <div class="scope-head scope-head-files scope-head-lg">
+    <span class="scope-head-icon" aria-hidden="true">${FILES_SCOPE_ICON_SVG}</span>
+    <div class="scope-head-text">
+      <h2 id="dp-inv-heading">File accessibility</h2>
+      <span class="scope-head-sub" id="dp-inv-sub">Every file this site publishes, with its accessibility score &mdash; the remediation worklist</span>
+    </div>
+  </div>
   ${viewToggleHtml}
 </div>
 ${viewToggleBlurbHtml}
@@ -2596,14 +2617,19 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
   var pageView = document.getElementById("page-view");
   // v1.33.0 — one heading sits in the always-visible inventory header and is
   // swapped here, so each view keeps its own title without two competing h2s.
+  // v1.57.0 — the heading is "File accessibility" and its subtitle swaps too.
   var heading = document.getElementById("dp-inv-heading");
+  var headingSub = document.getElementById("dp-inv-sub");
   if (!buttons.length || !fileViews.length || !pageView) return;
   buttons.forEach(function (btn) {
     btn.addEventListener("click", function () {
       var showPage = btn.getAttribute("data-view") === "page";
       fileViews.forEach(function (fv) { fv.hidden = showPage; });
       pageView.hidden = !showPage;
-      if (heading) heading.textContent = showPage ? "Pages on this site" : "File inventory";
+      if (heading) heading.textContent = showPage ? "Pages on this site" : "File accessibility";
+      if (headingSub) headingSub.textContent = showPage
+        ? "One row per page, with the files each page links to"
+        : "Every file this site publishes, with its accessibility score — the remediation worklist";
       buttons.forEach(function (b) {
         var on = b === btn;
         b.classList.toggle("is-active", on);

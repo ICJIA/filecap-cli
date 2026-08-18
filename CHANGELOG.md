@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.57.0] — 2026-08-18
+
+### Changed — infographic-size section titles; "File inventory" → "File accessibility"
+
+- The two assessment titles on every site report step up to infographic
+  size (`scope-head-lg`: 1.45rem/800 heading, 40px icon tile) so the
+  website-vs-files pairing reads at a glance.
+- The inventory section is retitled **"File accessibility"** (was "File
+  inventory") and now opens with the full orange files lockup — document
+  icon + "Every file this site publishes, with its accessibility score —
+  the remediation worklist" — plus an **orange left section bar**
+  (#ffa84d, the files hue), distinct from the blue website-section bar
+  and the blue/purple/amber access-panel bars. The Page-view toggle swaps
+  both the heading ("Pages on this site") and the subtitle.
+- The hero banner's compact lockup is unchanged; its document icon is now
+  a shared constant so the banner and section header can't drift apart.
+
 ## [1.56.1] — 2026-08-18
 
 ### Fixed
