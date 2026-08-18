@@ -11,8 +11,11 @@ import {
 
 // The one CSP. `connect-src 'self'` is load-bearing: the uptime widget works
 // only because its function is same-origin at /.netlify/functions/uptime.
+// v1.60.0 — https://plausible.icjia.cloud is the single allowed external
+// origin (script-src for the tracker, connect-src for its /api/event
+// beacons); everything else stays first-party.
 const CSP =
-  "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; upgrade-insecure-requests";
+  "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://plausible.icjia.cloud; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://plausible.icjia.cloud; upgrade-insecure-requests";
 
 describe("generateNetlifyHeaders (_headers — the copy manual deploys actually honor)", () => {
   const out = generateNetlifyHeaders();

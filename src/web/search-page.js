@@ -11,6 +11,7 @@
 
 import { INDEX_CSS } from "./index-css.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
+import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { escapeHtml as he } from "../util/html.js";
 import { ICJIA_LOGO_SVG } from "./index-page.js";
 import { searchMatchClientSource } from "./search-match.js";
@@ -227,6 +228,7 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Search every file inventoried across the ICJIA web fleet by full or partial filename, see which sites carry it, and download the results as a workbook.">
 <meta name="robots" content="noindex, nofollow">
+${PLAUSIBLE_SNIPPET}
 <title>Search the fleet — ICJIA Fleet Audit Assessment</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
 <style>${INDEX_CSS}${siteFooterCss()}${SEARCH_CSS}</style>

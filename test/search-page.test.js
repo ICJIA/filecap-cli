@@ -237,13 +237,18 @@ describe("generateSearchHtml", () => {
 
   // The whole controller ships inside the generator's template literal,
   // where a stray backtick or cooked escape can silently corrupt the
-  // emitted JS (the v1.48.1 class of bug). Parsing the inline script as
+  // emitted JS (the v1.48.1 class of bug). Parsing the inline scripts as
   // standalone JavaScript catches every syntax-level case of that.
+  // v1.60.0 — the page now carries more than one bare <script> (the
+  // Plausible pageview bootstrap in <head> plus the controller), so each
+  // block is matched non-greedily and compiled on its own.
   it("emits inline JS that parses as standalone JavaScript", () => {
     const html = page();
-    const m = html.match(/<script>([\s\S]*)<\/script>/);
-    expect(m).toBeTruthy();
-    // Compile-only (never run): vm.Script throws on any syntax error.
-    expect(() => new vm.Script(m[1])).not.toThrow();
+    const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+    expect(blocks.length).toBeGreaterThanOrEqual(2);
+    for (const m of blocks) {
+      // Compile-only (never run): vm.Script throws on any syntax error.
+      expect(() => new vm.Script(m[1])).not.toThrow();
+    }
   });
 });

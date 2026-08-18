@@ -1,4 +1,5 @@
 import { injectPasswordGate } from "./password-gate.js";
+import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 import { INDEX_CSS } from "./index-css.js";
@@ -1008,6 +1009,7 @@ export function generateIndexHtml({
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Fleet-wide inventory of files that may need accessibility remediation across ICJIA's websites, with per-site detail, spreadsheets, and a live snapshot.">
 <meta name="robots" content="noindex, nofollow">
+${PLAUSIBLE_SNIPPET}
 ${ogImage ? `<meta property="og:type" content="website">
 <meta property="og:title" content="${pageTitle}">
 <meta property="og:image" content="${he(ogImage)}">

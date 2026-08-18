@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { PLAUSIBLE_SNIPPET } from "../web/analytics.js";
 import { CSV_COLUMNS, formatPageCount, formatRemediationScore } from "./csv.js";
 import { buildPageList, attachCrossSiteFiles } from "./pages.js";
 import { categorizeAuditError } from "./audit-errors.js";
@@ -843,6 +844,7 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
 <meta name="robots" content="noindex, nofollow">
 <title>ICJIA Fleet Audit Assessment — ${htmlEscape(titleSuffix)}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
+${backHref ? PLAUSIBLE_SNIPPET : ""}
 <style>
 /* ── base ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }

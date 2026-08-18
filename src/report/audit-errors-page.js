@@ -9,6 +9,7 @@
 import { humanizeBytes } from "./format.js";
 import { escapeHtml as htmlEscape } from "../util/html.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
+import { PLAUSIBLE_SNIPPET } from "../web/analytics.js";
 
 
 const FAVICON = `<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">`;
@@ -101,6 +102,7 @@ export function generateAuditErrorsPage({ groups = [], backHref = "index.html" }
 <meta name="description" content="Files the fleet audit could not fully process, grouped by error type, with per-file detail for follow-up." />
   <title>File errors — ICJIA Fleet Audit</title>
   ${FAVICON}
+  ${PLAUSIBLE_SNIPPET}
   <style>${STYLES}${siteFooterCss()}</style>
 </head>
 <body>

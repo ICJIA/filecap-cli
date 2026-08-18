@@ -272,7 +272,7 @@ inline-JS additions). The summary below is for managers and auditors.
 
 ### Live deployment posture
 
-The ICJIA fleet snapshot at https://fleet.icjia.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master spreadsheet — verified HTTP 401 on `/`, the master `audit.xlsx`, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`, and a strict **`Content-Security-Policy`** (`default-src 'self'`; no external script/connect/frame; `frame-ancestors 'none'`; `object-src 'none'` — FC-2026-034, v1.21.4). The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline; v1.21.2 additionally **removes** origin-server identity (IPs, Forge scan paths, hostnames) from the bundle at source rather than relying on the gate alone (FC-2026-033).
+The ICJIA fleet snapshot at https://fleet.icjia.app is deployed behind Netlify Pro Site Password (server-side enforcement, every file gated including the master spreadsheet — verified HTTP 401 on `/`, the master `audit.xlsx`, and per-site reports). TLS 1.3 + HSTS, `robots.txt: Disallow: /`, `X-Robots-Tag: noindex,nofollow` on all HTML, `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer`, and a strict **`Content-Security-Policy`** (`default-src 'self'`; `frame-ancestors 'none'`; `object-src 'none'` — FC-2026-034, v1.21.4; since v1.60.0 the one allowed external origin is ICJIA's own self-hosted Plausible instance at `plausible.icjia.cloud`, in `script-src` + `connect-src` only). The Pro password gate closes findings FC-2026-005 (unsalted-SHA-256 cracking risk) and FC-2026-014 (publicly-guessable bundle URL) from the 1.3.0 baseline; v1.21.2 additionally **removes** origin-server identity (IPs, Forge scan paths, hostnames) from the bundle at source rather than relying on the gate alone (FC-2026-033).
 
 ### 2026-06-06 — on-demand uptime function (v1.22.0) security review
 
@@ -1772,7 +1772,7 @@ The auto-generated `netlify.toml` sets:
 - No JavaScript framework — pure HTML + CSS + self-contained vanilla JS (table sorting/search, pagination, the search page's client modules, the What's New banner, the optional password gate), all inlined so every page works offline.
 - No version history of past snapshots — git history is your archive.
 - No per-site authentication — single shared password (whatever method you use).
-- No analytics — managers see what auditors see, no tracking.
+- No invasive analytics — visit counts only, via ICJIA's own self-hosted [Plausible](https://plausible.io) instance (`plausible.icjia.cloud`, since v1.60.0): cookieless, anonymous, no cross-site tracking, and recorded URLs are sanitized so id-bearing paths (`/page-audit/<id>`, `/page-report/<id>`) collapse to their bare prefixes. Standalone reports emailed to vendors carry no analytics at all.
 
 ### Using the `w` menu option in audit-remote.sh
 

@@ -17,6 +17,7 @@
 
 import { INDEX_CSS } from "./index-css.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
+import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { escapeHtml as he } from "../util/html.js";
 // Benign import cycle (whats-new ⇄ index-page): index-page renders the banner,
 // this page borrows the header logo. Both are function-time accesses — neither
@@ -173,6 +174,7 @@ export function generateWhatsNewHtml({ generatedAt = "" } = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Every update announced on the ICJIA Fleet Audit Assessment, newest first — what changed, and when.">
 <meta name="robots" content="noindex, nofollow">
+${PLAUSIBLE_SNIPPET}
 <title>What&#39;s new — ICJIA Fleet Audit Assessment</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
 <style>${INDEX_CSS}${siteFooterCss()}</style>

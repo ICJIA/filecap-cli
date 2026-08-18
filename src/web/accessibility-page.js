@@ -5,6 +5,7 @@
 // theme, consistent with the fleet index and the per-site reports.
 
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
+import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { escapeHtml as htmlEscape } from "../util/html.js";
 
 
@@ -104,6 +105,7 @@ export function generateAccessibilityPage({ currentStatus, log = [] }) {
 <meta name="description" content="The fleet-audit bundle's own accessibility standing: current axe-core and Lighthouse results plus a dated log of every self-check." />
   <title>Accessibility — ICJIA Fleet Audit</title>
   ${FAVICON}
+  ${PLAUSIBLE_SNIPPET}
   <style>${STYLES}${siteFooterCss()}</style>
 </head>
 <body>

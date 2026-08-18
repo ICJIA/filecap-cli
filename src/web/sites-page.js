@@ -10,6 +10,7 @@
 
 import { INDEX_CSS } from "./index-css.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
+import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { uptimeClientScript } from "./uptime-client.js";
 import {
   he,
@@ -214,6 +215,7 @@ ${toolCards}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Directory of every ICJIA content and tooling site — titles, live URLs, statuses, and roster spreadsheet downloads.">
 <meta name="robots" content="noindex, nofollow">
+${PLAUSIBLE_SNIPPET}
 ${ogImage ? `<meta property="og:type" content="website">
 <meta property="og:title" content="${pageTitle}">
 <meta property="og:image" content="${he(ogImage)}">

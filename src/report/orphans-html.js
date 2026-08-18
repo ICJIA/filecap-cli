@@ -6,6 +6,7 @@
 import { humanizeBytes, publicUrlFor } from "./format.js";
 import { escapeHtml as htmlEscape, safeUrlNormalized as safeUrl } from "../util/html.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
+import { PLAUSIBLE_SNIPPET } from "../web/analytics.js";
 import { paginatorNav } from "../web/paginator-nav.js";
 
 
@@ -474,6 +475,7 @@ export function writeOrphansHtml({
 <meta name="description" content="Files on ICJIA servers that no site page references — review candidates for archiving or removal." />
   <title>Orphaned files report (${totalCount})</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
+  ${PLAUSIBLE_SNIPPET}
   <style>${STYLES}${siteFooterCss({ theme: "light" })}</style>
 </head>
 <body>

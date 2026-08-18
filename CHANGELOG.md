@@ -10,6 +10,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.60.0] — 2026-08-18
+
+### Added — Plausible visit tracking on the deployed bundle
+
+- Every bundle page now carries a visit-tracking tag for ICJIA's
+  **self-hosted Plausible** instance (`plausible.icjia.cloud`, site id
+  `fleet.icjia.app`) — cookieless, anonymous visit counts, no cross-site
+  tracking. One shared constant (`src/web/analytics.js`
+  `PLAUSIBLE_SNIPPET`) feeds all eight page generators so the tag can't
+  drift between pages.
+- **Recorded URLs are sanitized — no ids in analytics.** The tag loads
+  Plausible's *manual* extension (`script.manual.js`) instead of the auto
+  script (which records `location.href` as-is) and sends the pageview
+  itself with a cleaned URL: any path under `/page-audit/` or
+  `/page-report/` collapses to the bare prefix, so a shareable id like
+  `/page-audit/<uuid>` can never appear in the analytics as a distinct
+  page. The sanitizer (`plausibleSanitizePath`) is unit-tested and
+  embedded into the inline call via the house `.toString()` pattern — the
+  tested function IS the shipped code — and the inline bootstrap has a
+  `vm.Script` compile guard.
+- **Bundle pages only.** Standalone vendor reports (`writeHtml` without
+  `backHref`) are emailed and opened offline; they carry no tag and never
+  phone home (test-pinned).
+- **CSP**: `script-src` and `connect-src` in both emitted configs
+  (`netlify.toml` + `_headers`) now allowlist
+  `https://plausible.icjia.cloud` — the script load and its `/api/event`
+  beacons; every other directive stays first-party. No SRI hash on
+  purpose: the operator controls the instance, and an integrity pin would
+  silently kill tracking at the first Plausible upgrade.
+- The search page's inline-JS compile guard now matches script blocks
+  non-greedily and compiles **each** bare `<script>` on its own (the page
+  carries two now — the pageview bootstrap and the controller).
+- README: the "no analytics" bundle claim and the CSP posture description
+  updated to match. Suite grows to 1,605 tests / 103 files.
+
 ## [1.59.4] — 2026-08-18
 
 ### Fixed — README coordinated with the web app
