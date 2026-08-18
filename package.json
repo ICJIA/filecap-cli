@@ -1,7 +1,7 @@
 {
   "name": "@icjia/filecap",
-  "version": "1.59.3",
-  "description": "File inventory CLI for accessibility audit scoping",
+  "version": "1.59.4",
+  "description": "ICJIA Fleet Audit — pipeline that builds and publishes the fleet.icjia.app accessibility-audit web app",
   "keywords": [
     "accessibility",
     "a11y",

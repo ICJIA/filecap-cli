@@ -22,7 +22,7 @@ const program = new Command();
 
 program
   .name("filecap")
-  .description("File inventory CLI for accessibility audit scoping")
+  .description("ICJIA Fleet Audit pipeline — builds and publishes the fleet.icjia.app accessibility-audit web app")
   .version(FILECAP_VERSION);
 
 function commaList(value) {

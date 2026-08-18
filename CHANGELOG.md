@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.59.4] — 2026-08-18
+
+### Fixed — README coordinated with the web app
+
+- The README now presents the project as what it is: **a web app at
+  [fleet.icjia.app](https://fleet.icjia.app)** built by this repo's
+  pipeline. Project-as-"CLI" framing is retired everywhere — the tagline,
+  banner alt text, intro, and all four TL;DRs lead with the web app, and
+  the "CLI reference" section is now **"Pipeline reference"**. Mentions of
+  third-party CLIs (Netlify, `gh`, 1Password) are unchanged.
+- Stale facts reconciled against the deployed app: the CSV is **22
+  columns** (numeric `Score (0-100)` + `Grade` since v1.43.0, fixed in all
+  five places that said 20); document scoring covers PDFs **and modern
+  Office** (v1.54.0) with `N/A (legacy format)` for pre-OOXML files and
+  "Too large" verdicts for over-cap PDFs; the "Current shape" section
+  describes today's app (What's New banner, dual score gauges with trend
+  chips, green File-accessibility vs blue Website-accessibility sections,
+  `/search` with custom Excel reports, `/sites` with uptime, error/orphan
+  reports); the bundle tree matches the real bundle (per-site **XLSX**
+  workbooks, search/sites/whats-new/accessibility pages, uptime function);
+  test counts read 102 files / 1,594 tests; the Status section and version
+  table now cover v1.35 → v1.59; "What the Fleet Audit does not do" no
+  longer denies features that shipped (Strapi reference extraction, PPTX
+  scoring); the gate-page examples name `audit-file-list-master.xlsx`
+  (401 verified live).
+- `package.json` and the `bin/filecap.js` `--help` description updated
+  from "File inventory CLI for accessibility audit scoping" to the ICJIA
+  Fleet Audit pipeline description.
+
 ## [1.59.3] — 2026-08-18
 
 ### Fixed — "filecap" branding retired

@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/icjia-fleet-audit-banner.png" alt="icjia-fleet-audit — file inventory CLI for accessibility audit scoping" width="820">
+  <img src="assets/icjia-fleet-audit-banner.png" alt="ICJIA Fleet Audit — fleet-wide file and website accessibility auditing, published at fleet.icjia.app" width="820">
 </p>
 
 ## Table of contents
@@ -21,7 +21,7 @@
 - [Status](#status)
 - [Quick start](#quick-start)
 - [Quick start for managers](#quick-start-for-managers)
-- [CLI reference](#cli-reference)
+- [Pipeline reference](#pipeline-reference)
 - [Multi-server workflow](#multi-server-workflow)
 - [NDJSON output format](#ndjson-output-format)
 - [What gets introspected](#what-gets-introspected)
@@ -39,26 +39,26 @@
 
 # ICJIA Fleet Audit
 
-**Fleet-wide file-accessibility auditing for ICJIA's websites — a published audit snapshot at [fleet.icjia.app](https://fleet.icjia.app) plus the pipeline and CLI that build it.**
+**The ICJIA Fleet Audit is a web app at [fleet.icjia.app](https://fleet.icjia.app): a fleet-wide file- and website-accessibility audit of ICJIA's sites, rebuilt and republished from every audit run by the pipeline in this repository.**
 
 > **Internal tooling — not for external use.** The ICJIA Fleet Audit is an
 > accessibility-audit tool built for **ICJIA's own use**. The npm package
 > `@icjia/filecap` (the project's original, smaller-scope working name) is
 > **deprecated**: it is not maintained, supported, or documented for anyone
-> outside ICJIA. If you want to run it, clone this repository and run the CLI
-> directly (`node bin/filecap.js …`) — do **not** `npm install` it. It remains
+> outside ICJIA. If you want to run it, clone this repository and run the
+> pipeline directly (`node bin/filecap.js …`) — do **not** `npm install` it. It remains
 > public here for transparency, not for distribution.
 
 > **Naming note.** This project began as a small file-inventory tool named
 > `filecap`, originally imagined as little more than an MCP server. It has since
 > grown into the full ICJIA Fleet Audit web app, and the old name is retired.
 > It survives only in machine-facing identifiers kept for compatibility: the
-> `bin/filecap.js` CLI entry point, the `~/.filecap/` config directory, the
+> `bin/filecap.js` entry point, the `~/.filecap/` config directory, the
 > `~/filecap-audits/` output tree, `FILECAP_*` environment variables, the
 > `filecap_*` MCP tool names, and the NDJSON schema `kind` strings. Everywhere
 > else in this document, the tool is the **Fleet Audit**.
 
-The Fleet Audit CLI walks a directory tree, introspects each file (PDFs, DOCX, XLSX), and produces a structured NDJSON inventory suitable for accessibility remediation scoping. The primary use case is generating per-server inventories of file stores (Strapi `/uploads` directories, general file servers) to hand to remediation vendors so they can produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
+The web app is the deliverable: an interactive fleet report that managers, auditors, and vendors browse — per-site accessibility scores, per-file detail pages, a fleet-wide search, and downloadable Excel workbooks. Behind it, the Fleet Audit pipeline walks each server's directory tree, introspects each file (PDFs, DOCX, XLSX), scores documents and web pages against [audit.icjia.app](https://audit.icjia.app), and produces the structured NDJSON inventories the site is built from. The founding use case still holds: per-server inventories of file stores (Strapi `/uploads` directories, general file servers) that let remediation vendors produce a defensible, fixed-price quote on ADA Title II / WCAG 2.1 AA remediation work.
 
 **Why this matters.** The 2024 ADA Title II rule — and, in Illinois, the IITAA — require state and local government web content, *including the documents agencies publish*, to meet WCAG 2.1 AA. Most government sites have accumulated thousands of uploaded PDFs, Word files, and spreadsheets over the years, and a large share are inaccessible: scanned images with no text layer, untagged PDFs, tables with no header rows, documents with no reading order. To someone using a screen reader, an inaccessible PDF of a grant notice or a set of meeting minutes is simply a locked door — the information is published, but not actually available to them.
 
@@ -81,51 +81,59 @@ You run a website. Like most websites, it hosts hundreds or thousands of uploade
 
 To budget the remediation work, you need to know what's actually there: file counts by type, which PDFs are scanned images (may need OCR — often substantially more expensive than tagging born-digital PDFs), which Word docs lack heading structure, which tables are missing header rows, and so on.
 
-The Fleet Audit produces this inventory automatically. It walks your website's `/uploads` folder, parses every file, and writes a spreadsheet (CSV) plus an interactive HTML report with one row per file and detailed accessibility-relevant metadata. You hand the spreadsheet to a remediation vendor; they give you a fixed-price quote with confidence.
+The Fleet Audit produces this inventory automatically — and publishes it as a web app. It walks each website's `/uploads` folder, parses every file, scores it for accessibility, and publishes the result at **[fleet.icjia.app](https://fleet.icjia.app)**: one card per site, interactive per-site report pages, a fleet-wide file search, and a downloadable Excel workbook with one row per file and detailed accessibility-relevant metadata. You hand the workbook to a remediation vendor; they give you a fixed-price quote with confidence.
 
 The included `audit-remote.sh` script automates the entire workflow against any server you have SSH access to. Auditors run one command, answer a few prompts, and get a vendor-ready deliverable. Works on macOS, Linux, and Windows (via WSL2). Free; open source.
 
 **Four things you, as a manager, get out of this:**
 
 1. A precise count of files that may need remediation, with composition (not just `wc -l`).
-2. A spreadsheet you can email to bid-out vendors without explanation — now with a **per-file accessibility score** for every PDF (a grade/score like `B/88`) so you can triage worst-first.
-3. A **scores-by-site summary** (`scores-by-site.xlsx`) — one row per site with its PDF coverage and A–F grade spread, plus a fleet total — for the "which sites are in the worst shape?" conversation.
-4. Repeatability — re-run quarterly, see what changed.
+2. A spreadsheet you can email to bid-out vendors without explanation — with a **per-file accessibility score** for every PDF *and* every modern Word / Excel / PowerPoint file (a grade/score like `B/88`, plus sortable numeric Score and Grade columns) so you can triage worst-first.
+3. A **scores-by-site summary** (`scores-by-site.xlsx`) — one row per site with its document score coverage and A–F grade spread, plus a fleet total — for the "which sites are in the worst shape?" conversation.
+4. Repeatability — every audit run republishes **[fleet.icjia.app](https://fleet.icjia.app)**, one bookmarkable, password-protected URL for the whole team, with per-site ▲/▼ trend chips showing what changed since the last audit.
 
-As of 1.2.0, you can also publish the latest snapshot to a URL that your whole team can bookmark — one command bundles everything and deploys to Netlify. See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot).
+See [Publishing a fleet snapshot](#publishing-a-fleet-snapshot) for how the app gets built and deployed.
 
 ### Understanding the accessibility scores
 
-Each PDF is scored by [audit.icjia.app](https://audit.icjia.app), ICJIA's automated PDF accessibility checker (strict WCAG 2.1 AA + IITAA §E205.4). The `Remediation Score` column shows the result as **grade/score**, e.g. `B/88` — an A–F letter grade and a 0–100 number; lower means more remediation work. The full per-PDF report (what failed and why) is linked from the adjacent `Audit Report` column.
+Each PDF **and each modern Office document** (`.docx` / `.xlsx` / `.pptx`, since v1.54.0) is scored by [audit.icjia.app](https://audit.icjia.app), ICJIA's automated document accessibility checker (strict WCAG 2.1 AA + IITAA §E205.4). The `Remediation Score` column shows the result as **grade/score**, e.g. `B/88` — an A–F letter grade and a 0–100 number; lower means more remediation work. The workbooks also carry the same result as separate, properly sortable **`Score (0-100)`** and **`Grade`** columns (since v1.43.0), and the full per-file report (what failed and why) is linked from the adjacent `Audit Report` column.
 
 What the score cell can say:
 
-- **`B/88`** (etc.) — a scored PDF.
-- **`N/A (Office)`** — a Word, Excel, or PowerPoint file. Those formats have built-in accessibility checkers in their authoring apps, so the Fleet Audit inventories them but doesn't duplicate that check. The cell says so explicitly rather than going blank (a blank would read as "missing data").
-- **`Not scored`** — a PDF the scorer couldn't process: usually it exceeds audit.icjia.app's upload-size limit (`413 Payload Too Large`) or hit a transient error. It's in the inventory; it just has no score.
-- **blank** — a non-remediable reference file (image, text, archive, web page), or a PDF still awaiting its first audit.
+- **`B/88`** (etc.) — a scored document (PDF, Word, Excel, or PowerPoint).
+- **`N/A (legacy format)`** — a pre-OOXML binary Office file (`.doc` / `.xls` / `.ppt`, plus ODF/RTF). The scoring service refuses these formats; re-save as `.docx` / `.xlsx` / `.pptx` to make them scoreable.
+- **`Not scored`** — a document the scorer couldn't process. The most common case is a PDF over audit.icjia.app's 25 MB analysis cap, which the report pages call out as **Too large** with a plain-English reason (an image-only scan is told the fix is OCR + tagging, not a bigger audit); the rest surface with reasons on the **File errors** page.
+- **blank** — a non-remediable reference file (image, text, archive, web page), or a document still awaiting its first audit.
 
-Scoring covers **PDFs only** — if your fleet is heavy on Word/Excel, expect a large share of `N/A (Office)`. That's by design, not missing data. To see the big picture without opening every file, download **`scores-by-site.xlsx`** from the fleet snapshot: it has PDF coverage and the A–F grade distribution per site, plus a fleet TOTAL row.
+**Two scores, two scopes.** Every site also carries a separate **Website accessibility** score — its web *pages* scored with axe (0–100 + A–F grade, with severity and WCAG-level breakdowns). The file score and the website score are independent and do not correlate: a site can have excellent pages and poor files, or vice versa. The report pages explain this beside each score.
 
-### Current shape of the fleet rollup
+To see the big picture without opening every file, download **`scores-by-site.xlsx`** from the fleet snapshot: one row per site with its document score coverage and A–F grade distribution, plus a fleet TOTAL row.
 
-The deployed page reads like an infographic, not a spreadsheet. Five major areas, top to bottom:
+### Current shape of the web app
 
-**1. Navbar.** ICJIA wordmark on the left; two filled-blue action buttons on the right — `ICJIA Accessibility FAQs` ([accessibility.icjia.app](https://accessibility.icjia.app)) and `ICJIA PDF Audit Tool` ([audit.icjia.app](https://audit.icjia.app)).
+[fleet.icjia.app](https://fleet.icjia.app) reads like an infographic, not a spreadsheet. The major surfaces, top to bottom:
 
-**2. Fleet hero.** Leads with the **audit count** in big amber type (e.g. "4,871 files may need accessibility audit") with a donut chart showing the audit-share percentage and a plain-English caption like "About half may need audit."
+**1. Navbar.** ICJIA wordmark on the left; action buttons on the right — `Accessibility FAQs` ([accessibility.icjia.app](https://accessibility.icjia.app)) and `File Audit Tool` ([audit.icjia.app](https://audit.icjia.app)) — plus internal `What's New` and `Search` links.
 
-**3. PII reassurance banner.** *"Zero Personally Identifying Information (PII) in this audit"* with side-by-side IN / NOT-IN lists. The companion `audit-fleet.ndjson` carries no PDF/DOCX `author` or `lastModifiedBy` fields, so the claim is strictly accurate.
+**2. Fleet hero.** Leads with the **audit count** in big amber type (at the current snapshot: "4,633 of 8,768 files may need accessibility audit") with a donut chart showing the audit-share percentage and an estimate of the document-page workload ("≈ 92,600 document pages — pages inside the files, not web pages").
 
-**4. Site cards.** One per ICJIA site, alphabetised by title. Each card has a coloured "For bulk file access" chip that opens an instructions modal with a 3-step numbered workflow and a direct contact line to **`christopher.schweda@illinois.gov`**; big two-up tiles (total files / may need audit) with a CSS-only donut; a live/unreachable **status line** under the title; a `Download spreadsheet` button with `Last audit: <date>` caption; and a `Technical details` disclosure (Website / Hostname when it differs from the IP / public URL, with copy-to-clipboard buttons — the origin IP and scan path were dropped in v1.21.2). The whole card is one click target to the per-site detail page.
+**3. What's New banner.** A dismissible announcement of the newest change to the audit (rubric updates, scope changes, new features), backed by a full newest-first archive at [/whats-new](https://fleet.icjia.app/whats-new). Dismissal is permanent per entry (`localStorage`).
 
-**5. By-file-type drill-down.** Click "PDFs" → full detail page listing every PDF across the fleet plus a filtered CSV. Same for Word, Excel, PowerPoint, images, text, archives, web files, and other.
+**4. PII reassurance banner.** *"Zero Personally Identifying Information (PII) in this audit"* with side-by-side IN / NOT-IN lists. The companion `audit-fleet.ndjson` carries no PDF/DOCX `author` or `lastModifiedBy` fields, so the claim is strictly accurate.
 
-**Per-site detail pages** mirror the index hero, surface a `How to access this site's files` panel, and include a sticky bar at the top with Back / FAQ / PDF Audit Tool / Download-CSV / Last-audit-date chips.
+**5. Site cards.** One per audited ICJIA site, alphabetised by title. Each card carries the site's **two independent scores** — **File accessibility** (the average score of its scored documents, on a red/amber/green gauge, with a ▲/▼ trend chip vs. the previous audit) and **Website accessibility** (its axe page score) — plus a live/unreachable **status line** under the title; big two-up tiles (total files / may need audit) with a CSS-only donut; a coloured "For bulk file access" chip that opens an instructions modal with a direct contact line to **`christopher.schweda@illinois.gov`**; a `Download spreadsheet` (XLSX) button with `Last audit: <date>` caption; and a `Technical details` disclosure with copy-to-clipboard buttons (origin IPs and scan paths were removed at source in v1.21.2). The whole card is one click target to the per-site detail page.
 
-**Language and staff workflow.** Manager-facing strings use *"may need"* rather than prescriptive *"needs"* — the Fleet Audit describes what the data suggests, the audit team decides what to do. Every CSV the bundle emits carries two staff-fill columns: `Delete?` (empty default — staff writes any non-blank value to flag for removal) and free-text `Notes`. These are CSV-only and don't appear in the HTML view.
+**6. Per-site detail pages.** Two clearly-separated assessments, each with an icon lockup, a colored section bar, and an explainer that the two scopes are independent: **File accessibility** (green — every file the site publishes with its per-file score, sortable/searchable, a Page view toggle, paginators at both table ends, and the hero's green **Download spreadsheet (XLSX)** call-to-action) and **Website accessibility** (blue — page score + grade, severity and WCAG-level breakdowns with plain-language glosses, a needs-review count, a fixed/new issue trend, and a per-page table).
 
-**1.8.0 Referenced column.** A `Referenced` column sits at position 5 of every CSV and HTML view, immediately after `Public URL`, listing the page URLs that link to each file. Managers use it as the inflection point for the delete-vs-keep decision: if a file has no known referrers, it's a deletion candidate; if it's linked from one or more live pages, every linking URL surfaces directly in the cell. See [Reference discovery (1.8.0)](#reference-discovery-180) below.
+**7. Fleet-wide search — [/search](https://fleet.icjia.app/search).** Search every inventoried file by full or partial filename — typo-tolerant, separator-blind, and site-name aware — with category/site filter chips, sortable results, per-file audit-report links, a per-row explanation of *why* it matched, and an Excel download of the results. Tick rows across any number of searches to build a session-scoped **custom report** with its own XLSX download.
+
+**8. Site directory — [/sites](https://fleet.icjia.app/sites).** The count-first roster for managers: the 13 ICJIA content sites (12 of them under file audit) split from the agency's tooling apps, every card with an at-a-glance uptime indicator and a per-site workbook download pill.
+
+**9. By-file-type drill-down.** Click "PDFs" → a detail page listing every PDF across the fleet. Same for Word, Excel, PowerPoint, legacy Office, images, text, archives, web files, and other — plus **File errors** (documents the scorer couldn't process, with reasons) and **Orphaned files** (no known referring page) reports, each with a matching workbook.
+
+**Language and staff workflow.** Manager-facing strings use *"may need"* rather than prescriptive *"needs"* — the Fleet Audit describes what the data suggests, the audit team decides what to do. Every CSV the pipeline emits carries two staff-fill columns: `Delete?` (empty default — staff writes any non-blank value to flag for removal) and free-text `Notes`. These are CSV-only and don't appear in the web views or workbooks.
+
+**Page References column (1.8.0).** A `Page References` column sits at position 5 of every CSV and HTML view, immediately after `Public URL`, listing the page URLs that link to each file. Managers use it as the inflection point for the delete-vs-keep decision: if a file has no known referrers, it's a deletion candidate; if it's linked from one or more live pages, every linking URL surfaces directly in the cell. See [Reference discovery (1.8.0)](#reference-discovery-180) below.
 
 See the [CHANGELOG](CHANGELOG.md) for the version-by-version breakdown.
 
@@ -135,33 +143,35 @@ See the [CHANGELOG](CHANGELOG.md) for the version-by-version breakdown.
 
 ## TL;DR for developers
 
-Node.js CLI written in ESM, run from the GitHub repo (npm package deprecated as of v1.13.0). Walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX) and, after the `audits` pass, an `entry.audit` accessibility grade/score from audit.icjia.app. 20-column CSV writer (`CSV_COLUMNS` is the single source of truth: 18 value columns — `Public URL`, `Referenced` page-links (1.8.0), `Audit Report` link + `Remediation Score` grade/score (1.9.0/1.34.0), `Page Count` (1.20.0), etc. — plus the csvOnly `Delete?` / `Notes` staff-fill columns from v1.7.16) feeding the CSV, a manager-trimmed self-contained dark-mode HTML report (sortable/filterable client-side JS), and an XLSX workbook. Cross-server rollup with content-duplicate detection via SHA-256.
+A fully static web app (pure HTML + CSS + vanilla JS, no framework) generated by a Node.js ESM pipeline, run from the GitHub repo (npm package deprecated as of v1.13.0). The pipeline walks a directory tree (concurrent-bounded), produces line-delimited JSON (NDJSON): a header line, one entry per file, a footer line. Each entry includes filesystem metadata + SHA-256 hash + format-specific introspection (pdfjs-dist for PDFs, jszip + fast-xml-parser for DOCX, exceljs for XLSX) and, after the `audits` pass, an `entry.audit` accessibility grade/score from audit.icjia.app (PDFs since 1.9.0; modern Office since 1.54.0). 22-column CSV writer (`CSV_COLUMNS` is the single source of truth: 20 value columns — `Public URL`, `Page References` page-links (1.8.0), `Audit Report` link + `Remediation Score` grade/score (1.9.0/1.34.0), sortable numeric `Score (0-100)` + `Grade` (1.43.0), `Page Count` (1.20.0), etc. — plus the csvOnly `Delete?` / `Notes` staff-fill columns from v1.7.16) feeding the CSV, self-contained dark-mode HTML report pages (sortable/filterable client-side JS), and XLSX workbooks. Cross-server rollup with content-duplicate detection via SHA-256.
 
 Includes an MCP server (the `mcp` subcommand) exposing five tools for AI agents (Claude Desktop, Claude Code, Cursor, Windsurf, Continue): `filecap_scan`, `filecap_rollup`, `filecap_report`, `filecap_query_inventory`, `filecap_web_rollup`.
 
 As of 1.2.0: the `web-rollup` subcommand bundles the most recent scan of every saved site into a static-site directory, ready for Netlify deployment (drag-and-drop, CLI, or Git-connected auto-deploy). Includes auto-generated `netlify.toml`, optional client-side SHA-256 password gate (`--password`), `--no-client-gate` for Netlify dashboard Site Password, and a `--deploy` flag that calls the Netlify CLI directly after the build.
 
-Two distribution shapes: the CLI run from a repo clone (`node bin/filecap.js`), plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where the scan actually ran.
+Two distribution shapes: the pipeline run from a repo clone (`node bin/filecap.js`), plus standalone bash scripts (`audit-remote.sh`, `audit-fleet.sh`) auditors curl from GitHub raw URLs. The bash scripts handle SSH preflight, rsync mirroring (for older Ubuntu servers that can't run Node 20+), and post-scan path rewriting so the resulting CSV reflects source-server paths regardless of where the scan actually ran.
 
-ESM-only. Node 20+ required. 62 test files; 952 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
+ESM-only. Node 20+ required. 102 test files; 1,594 tests via vitest. Source under `src/`; entrypoint `bin/filecap.js`. License: MIT.
 
 ### Architecture summary
 
-**Pipeline (1.8.0).** `scan` (per server, NDJSON) → `references` (per site, CMS-aware URL extraction; new in 1.8.0) → `cross-references` (fleet-wide URL → referrers reverse index; new in 1.8.0) → `web-rollup` (bundles latest scan of every saved site into a static-site directory ready for Netlify).
+**Pipeline.** `scan` (per server, NDJSON) → `references` (per site, CMS-aware URL extraction; 1.8.0) → `cross-references` (fleet-wide URL → referrers reverse index; 1.8.0) → `audits` (per-document + per-page accessibility scoring via audit.icjia.app; 1.9.0) → `site-audit` (per-site web-page score; 1.35.0) → `web-rollup` (builds the deployable web app and, with `webRollup.autoDeploy`, publishes it to fleet.icjia.app; since v1.41.0 it refuses to deploy a bundle whose sites have no document scores).
 
 **Index renderer.** `renderCard` + `generateIndexHtml` (`src/web/index-page.js`) build the fleet index — alphabetically-sorted `<article class="site-card">` elements with the dp-hero pattern: nickname → full name → two-up tiles → CSS-only conic-gradient donut → expanded tech-details with copy buttons → `Last audit:` caption.
 
 **Per-site detail pages.** `writeHtml` (`src/report/html.js`) renders each page using the same `dp-hero` block; it accepts `accessKind` for the access-method panel and emits the `<table class="row-marker-table">` legend plus the file table with `table-layout: fixed` + `<colgroup>` + per-`<th>` resize handles.
 
-**CSV / HTML / XLSX column layout.** `CSV_COLUMNS` (`src/report/csv.js`) is the single source of truth for all three writers. Entries flagged `csvOnly: true` (the `deleteFlag` and `notes` columns) are filtered out of the HTML and XLSX views, so the CSV ships all 20 columns while the HTML renders a manager-trimmed projection of the non-`csvOnly` columns and the XLSX reprojects them into a manager-friendly order (`XLSX_COLUMN_ORDER`). The `Audit Report` (report link) and `Remediation Score` (`grade/score`, e.g. `B/88`) columns come from `entry.audit`.
+**CSV / HTML / XLSX column layout.** `CSV_COLUMNS` (`src/report/csv.js`) is the single source of truth for all three writers. Entries flagged `csvOnly: true` (the `deleteFlag` and `notes` columns) are filtered out of the HTML and XLSX views, so the CSV ships all 22 columns while the HTML renders a manager-trimmed projection of the non-`csvOnly` columns and the XLSX reprojects them into a manager-friendly order (`XLSX_COLUMN_ORDER`). The `Audit Report` (report link) and `Remediation Score` (`grade/score`, e.g. `B/88`) columns come from `entry.audit`.
 
-**Site classification.** `deriveAccessKind(site)` and `TYPE_BUCKETS` (`src/commands/web-rollup.js`) classify sites into `strapi` / `github` / `server` and into per-file-type buckets. The latter drives one CSV+HTML pair per non-empty bucket (`audit-pdfs.csv` + `audit-pdfs.html`, etc.) by reusing `writeHtml` with a consolidated header.
+**Site classification.** `deriveAccessKind(site)` and `TYPE_BUCKETS` (`src/commands/web-rollup.js`) classify sites into `strapi` / `github` / `server` and into per-file-type buckets. The latter drives one detail page per non-empty bucket (`audit-pdfs.html`, `audit-docx.html`, etc.) by reusing `writeHtml` with a consolidated header.
 
 **References module (1.8.0).** `src/references/` — `url-canonical.js` (host lowercasing + fragment stripping), `extract-urls.js` (PDF/DOCX/XLSX/PPTX/ZIP URL regex over markdown), `field-classifier.js` (GraphQL `__type` field bucketing: url-string / body-string / upload-file / upload-file-list / relation / other), `domain-filter.js` (ICJIA-fleet whitelist from sites.json), `strapi-v3.js` + `strapi-v4.js` (per-version adapters with shared interface), `cross-resolver.js` (alias-aware reverse-index resolver). The orchestrators live in `src/commands/references.js` and `src/commands/cross-references.js`.
 
+**Fleet search + What's New.** `src/web/search-index.js` emits a compact positional-array index (`search-index.json`) next to `search.html`; the tiered typo-tolerant matcher (`search-match.js`), the browser-side OOXML workbook writer (`search-xlsx.js`), and the sessionStorage custom-report store (`search-report.js`) are unit-tested modules shipped verbatim into the page via the `.toString()` embed pattern — the tested code IS the shipped code. `src/web/whats-new.js` holds the `WHATS_NEW` entries that drive the home-page banner and the `whats-new.html` archive.
+
 **Click handling.** Index-card clicks use `pointer-events: none` on non-interactive descendants with `pointer-events: auto` re-enabled on action buttons, tech-details summary, copy-to-clipboard buttons, and the access-method chip.
 
-**Tech stack.** Pure CSS / vanilla JS throughout — no chart library, no preprocessor. The only inline JS is column-resize, table-pan, clipboard-copy, duplicate-filter, and access-modal handlers embedded in the report HTML.
+**Tech stack.** Pure CSS / vanilla JS throughout — no chart library, no preprocessor, no framework. The inline JS is limited to embedded handlers (column-resize, table-pan, clipboard-copy, filters, pagination, access modals, the What's New banner) plus the search page's client modules, all shipped from unit-tested source.
 
 → Skip to [Quick start](#quick-start) for installation and basic usage.
 
@@ -169,18 +179,18 @@ ESM-only. Node 20+ required. 62 test files; 952 tests via vitest. Source under `
 
 ## TL;DR for vendors and auditors
 
-You receive an `audit-file-list.csv` (20 columns, one row per file) with everything needed to scope and quote a remediation engagement:
+You receive an `audit-file-list.csv` (22 columns, one row per file) — or browse the same data on the published web app at [fleet.icjia.app](https://fleet.icjia.app) and download its per-site XLSX workbooks — with everything needed to scope and quote a remediation engagement:
 
 - **Identification**: server name, website nickname, server IP, **public URL** (position 4 since v1.7.2 — front and centre so you don't have to scroll), date published, source folder on server, file location, full path, filename, extension, category.
 - **Filesystem metadata**: size in bytes, SHA-256 content hash (Excel-text-formula-wrapped so it doesn't auto-convert to scientific notation), duplicate-of reference.
-- **Accessibility scoring (PDFs, since v1.9.0 / v1.34.0)**: an `Audit Report` column links each PDF's audit.icjia.app accessibility report, and a `Remediation Score` column shows that report's grade and score together (e.g. `B/88`) so you can triage worst-first without opening every report. Non-PDF and unscoreable files leave the cell blank.
+- **Accessibility scoring (PDFs since v1.9.0; modern Office since v1.54.0)**: an `Audit Report` column links each document's audit.icjia.app accessibility report, a `Remediation Score` column shows that report's grade and score together (e.g. `B/88`), and sortable numeric `Score (0-100)` + `Grade` columns (v1.43.0) let you rank worst-first without opening a single report. Legacy binary Office files read `N/A (legacy format)`, unscoreable documents read `Not scored`, and non-remediable reference files leave the cells blank.
 - **Staff-fill columns (CSV-only, since v1.7.16)**: `Delete?` (empty by default since v1.7.28 — staff writes any non-blank value to flag a file for removal before the next audit) and `Notes` (free-text). These columns don't appear in the HTML/XLSX views; the web is informational, the CSV is the actionable artefact.
 
 Most format-specific introspection columns (image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped from the CSV in v1.4.0/1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly — though **PDF page count was restored in v1.20.0** (vendors quote per page). The full introspection is still carried in the underlying NDJSON inventory if your tooling wants it (the MCP server exposes a `filecap_query_inventory` tool for that).
 
 The "Server IP" and "Full file path on server" columns identify exactly where each file lives — you ssh into the server and download the file directly. Optionally accompanied by an `audit-file-list.html` rendering of the same data with sortable/searchable browser-based interface (without the staff-fill columns, by design).
 
-As of 1.2.0, the auditor can also publish the fleet snapshot to a Netlify URL for a shared web-based view — useful for review meetings where you navigate by clicking rather than filtering a spreadsheet.
+The fleet snapshot is published as a web app at [fleet.icjia.app](https://fleet.icjia.app) (password-protected) for a shared view — useful for review meetings where you navigate by clicking, search the whole fleet by filename, and build a custom Excel report of just the files under discussion, rather than filtering a spreadsheet.
 
 Zero account creation; the inventory is a vendor-neutral structured file you can ingest into your own tooling.
 
@@ -340,28 +350,7 @@ npx vitest run test/web-rollup.test.js
 
 ## Status
 
-**v1.34.0 shipped.** Per-file accessibility scoring is now both **surfaced** and **resilient**: a `Remediation Score` column (audit.icjia.app `grade/score`, e.g. `B/88`) appears in every CSV / HTML / XLSX deliverable beside the `Audit Report` link, and the scorer retries/backs-off on audit.icjia.app's 100-request/min per-IP rate limit (honoring `Retry-After`) so a large batch of newly-added files no longer cascades into `429` errors. See the [CHANGELOG](CHANGELOG.md) for the full v1.9 → v1.34 line.
-
-**v1.8.0 shipped.** Reference-discovery pipeline (`scan → references → cross-references → web-rollup`) landed. The `Referenced` column on every CSV and HTML view, plus a fleet-wide URL → referrers reverse index, is the headline change. See [Reference discovery (1.8.0)](#reference-discovery-180) for the manager-facing overview.
-
-**v1.7.x shipped.** Manager-friendly visual redesign, complete pipeline `scan → rollup → report → web-rollup → deploy`:
-
-- **Fleet index** — infographic site cards alphabetised by title, big amber audit-count hero with CSS-only donut + plain-English captions ("Two-thirds may need audit"), whole-card click → detail page, two-axis touch-friendly tables, click-and-drag resizable detail-page columns.
-- **Per-file-type drill-down** — detail page + filtered CSV download for every non-empty bucket (`audit-pdfs.html`/`.csv`, `audit-docx.*`, etc.).
-- **Staff-fill columns** on every CSV: `Delete?` and `Notes`, CSV-only so the HTML view stays at 14 columns.
-- **"For bulk file access" modal** — clickable chip on each site card opens a `<dialog>` with per-access-type instructions + direct contact `christopher.schweda@illinois.gov`.
-- **Cross-server duplicates section** with a plain-English explainer that duplicates are normal — not a webmaster error.
-- **"Zero PII" reassurance banner** above the site grid with side-by-side IN / NOT-IN lists.
-- **Navbar buttons** on every page: `ICJIA Accessibility FAQs` + `ICJIA PDF Audit Tool`. `Last audit:` caption under every CSV download.
-- **Copy-to-clipboard buttons** throughout (per-card tech-details + per-site meta-grid).
-
-**Inherited from earlier releases:**
-
-- Cross-server duplicates detection + per-occurrence duplicates CSV (1.5.x).
-- Master CSV combining every file from every server (1.5.0).
-- One-command Netlify deploy via `webRollup.autoDeploy` (1.3.2).
-- Bearer-token support for sites requiring JWT auth (1.3.3, mode-0600 `~/.filecap/secrets.json`).
-- Git-type sites — audit self-contained static-site (Nuxt) repos by shallow-clone + scan of `/public/` (1.6.0).
+**v1.59.3 shipped (2026-08-18).** The Fleet Audit is a **web app at [fleet.icjia.app](https://fleet.icjia.app)**, republished from every audit run. At the current snapshot: **8,768 files** inventoried across the 12 audited content sites, **4,633** of them (53%) on the remediation list, an estimated ≈92,600 document pages of workload. Every PDF and modern Office document carries a per-file `grade/score` (e.g. `B/88`) with a linked audit report, and every site carries an independent axe-based **Website accessibility** score alongside its **File accessibility** score. The app includes fleet-wide [/search](https://fleet.icjia.app/search) with custom Excel reports, the [/sites](https://fleet.icjia.app/sites) directory with live uptime, a What's New announcement system, and per-site XLSX workbook downloads. See the [CHANGELOG](CHANGELOG.md) for the version-by-version breakdown.
 
 | Version line | Status | Highlight |
 |---|---|---|
@@ -374,8 +363,11 @@ npx vitest run test/web-rollup.test.js
 | v1.7.x | shipped | Manager-friendly visual redesign: infographic site cards, big audit-count hero, copy-to-clipboard buttons throughout, per-file-type drill-down, `Delete?` + `Notes` staff-fill columns, access-method modal, PII reassurance banner, sticky-bar polish on per-site detail pages |
 | v1.8.0 | shipped | References pipeline: `Referenced` column at CSV/HTML position 5 next to `Public URL`, per-site Strapi extractor (v3 + v4 GraphQL/REST), git-repo extractor for Nuxt sites, bearer-token + auto-refresh login for intranet, fleet-wide cross-site reverse index, domain-alias-aware URL matching. |
 | v1.9 – v1.33 | shipped | PDF + page accessibility scoring via audit.icjia.app (the `audits` subcommand, `entry.audit` grade/score); `Page Count` restored (v1.20.0); `/sites` roster + tooling apps (v1.21.0); Netlify Pro Site Password gating + origin-identity removal-at-source + strict CSP (v1.21.x); CMS-hosted cross-site files in the Page view (v1.32.0); per-site detail-page redesign for lower density (v1.33.0). |
-| **v1.34.0** | **shipped** | **Per-file `Remediation Score` column (`grade/score`, e.g. `B/88`) in every CSV / HTML / XLSX; rate-limit-resilient scorer (retry + `Retry-After` backoff on `429`/transient `5xx`) so large cold batches of new files no longer cascade into errors.** |
-| vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; a `process-deletions <csv>` subcommand to act on staff-edited `Delete?` rows; raise/handle the audit.icjia.app `413` upload cap for oversized PDFs |
+| v1.34.x | shipped | Per-file `Remediation Score` column (`grade/score`, e.g. `B/88`) in every CSV / HTML / XLSX; rate-limit-resilient scorer (retry + `Retry-After` backoff); `scores-by-site.xlsx` manager summary. |
+| v1.35 – v1.41 | shipped | **Website accessibility score** per site (the `site-audit` stage — axe via audit.icjia.app, severity + WCAG-level breakdowns, fixed/new trend); file-accessibility bands, infographic gauges + ▲/▼ score history; `run-site-update.sh` targeted refreshes; two full-app review releases (~50 verified fixes; Lighthouse 100/100, axe 0 violations, skip links, keyboard-sortable tables, mobile layout); `AUDIT_ICJIA_TOKEN` privileged rate tier, full `Retry-After` honoring, the unscored-inventory deploy guard, purge safety. |
+| v1.42 – v1.53 | shipped | **What's New system** (dismissible banner + `/whats-new` archive); canonical **fleet.icjia.app** domain (301 from `*.netlify.app`); sortable numeric `Score (0-100)` + `Grade` columns in every workbook and the CSV (now 22 columns); clickable `Audit Report` hyperlinks in XLSX; per-site workbook downloads on `/sites`; **fleet-wide `/search`** (typo-tolerant matcher, match-reason transparency, sortable results, Excel export, session-scoped custom reports); honest "Too large" verdicts for over-cap PDFs; system files excluded from all counts; document archive back in audit scope with full scoring. |
+| **v1.54 – v1.59** | **shipped** | **Office documents (`.docx`/`.xlsx`/`.pptx`) scored and blended into every average (legacy Office marked `N/A (legacy format)`); the hero's Download spreadsheet (XLSX) call-to-action; paginators at both table ends; matched scope lockups + independence explainers separating File accessibility (green) from Website accessibility (blue) on every site report; severity and WCAG-level cards that explain themselves; "filecap" branding retired.** |
+| vNext | deferred | Headless rendering for SPA sites where Strapi fallback isn't sufficient; a `process-deletions <csv>` subcommand to act on staff-edited `Delete?` rows |
 
 ### Production deployment
 
@@ -383,13 +375,13 @@ The ICJIA fleet snapshot is deployed at:
 
 **https://fleet.icjia.app**
 
-The site is **password-protected** (Netlify Pro Site Password — server-side enforcement, gates every file including the CSVs). The current password is held by ICJIA's IDS (Innovation and Digital Services) team — request access by emailing IDS at ICJIA. The password is rotated periodically; if a previously-shared password stops working, ask IDS for the current one.
+The site is **password-protected** (Netlify Pro Site Password — server-side enforcement, gates every file including the workbooks). The current password is held by ICJIA's IDS (Innovation and Digital Services) team — request access by emailing IDS at ICJIA. The password is rotated periodically; if a previously-shared password stops working, ask IDS for the current one.
 
 Deploy mechanics: `web-rollup` automatically pushes to this Netlify site whenever `webRollup.autoDeploy: true` is set in `~/.filecap/config.json` (with `deploySite` set to the `icjia-fleet-audit` site id). The simplest way to run a fresh audit and publish it in one step is **[`./run-full-audit.sh`](#one-command-full-audit-run-full-auditsh)**; to republish from an already-completed scan, run `node bin/filecap.js web-rollup` on its own. No `--deploy` flag needed.
 
 #### "Wait — if it's password-protected, why can I still 'view source' on the gate page?"
 
-This is a common observation, and the short answer is: **what you're viewing the source of is Netlify's challenge page, not the underlying fleet rollup.** Until you authenticate, the actual inventory content (site names, file paths, public URLs, totals, the per-site CSVs, the master CSV — *everything* you'd consider sensitive) is never sent to your browser at all.
+This is a common observation, and the short answer is: **what you're viewing the source of is Netlify's challenge page, not the underlying fleet report.** Until you authenticate, the actual inventory content (site names, file paths, public URLs, totals, the per-site workbooks, the master workbook — *everything* you'd consider sensitive) is never sent to your browser at all.
 
 You can verify this for yourself in three seconds:
 
@@ -407,7 +399,7 @@ curl -sS https://fleet.icjia.app/ | grep -iE "dvfr|icjia|illinois|\.pdf|\.csv"
 And try to fetch a specific inventory file directly without authenticating:
 
 ```bash
-curl -i https://fleet.icjia.app/audit-file-list-master.csv
+curl -i https://fleet.icjia.app/audit-file-list-master.xlsx
 # HTTP/2 401 — even when you ask for a specific path, you get the challenge page
 ```
 
@@ -417,7 +409,7 @@ The gate is enforced at Netlify's edge (server-side), not by JavaScript in your 
 
 ## Quick start
 
-The npm package is deprecated — run the CLI from a clone of this repository:
+The npm package is deprecated — run the pipeline from a clone of this repository:
 
 ```bash
 git clone https://github.com/ICJIA/icjia-fleet-audit.git
@@ -477,7 +469,7 @@ If you're handing this off to an auditor or accessibility coordinator, copy the 
 
 **The "where is this PDF linked from?" question.** Every manager who opens a fleet audit asks the same thing first: "Where on the site is this PDF used?" Without that answer, the delete-vs-keep decision requires manual verification — defeating the audit's purpose. 1.8.0 surfaces the answer directly in the report.
 
-**New per-file column.** A `Referenced` column slots in after `Duplicate of` on every CSV and HTML view, listing the page URLs that link to each file. Cell semantics:
+**New per-file column.** A `Page References` column (position 5, immediately after `Public URL`) on every CSV and HTML view lists the page URLs that link to each file. Cell semantics:
 
 - `entry.references` populated → anchor chips (HTML) or newline-joined URLs (CSV).
 - `entry.references` empty array `[]` → muted "No references found" chip — we looked and found none.
@@ -545,9 +537,9 @@ This was the deciding factor: Strapi data is strictly more complete than what th
 
 ---
 
-## CLI reference
+## Pipeline reference
 
-Every subcommand runs from a repo clone through the CLI entry point: `node bin/filecap.js <subcommand>` (the entry file keeps the project's original internal name — see the naming note at the top). The headings below name just the subcommand.
+These are the build commands behind the web app. Every subcommand runs from a repo clone through the entry point: `node bin/filecap.js <subcommand>` (the entry file keeps the project's original internal name — see the naming note at the top). The headings below name just the subcommand.
 
 ### `scan <directory>`
 
@@ -606,7 +598,7 @@ Fleet-wide reverse-index resolver. Reads every site's sidecar (via `--sidecar` f
 
 ### `audits <inventory>` *(new in 1.9.0)*
 
-Scores every PDF in an inventory NDJSON against [audit.icjia.app](https://audit.icjia.app)'s accessibility checker and attaches `entry.audit = { score, grade, reportUrl, … }` to each PDF (the source of the `Audit Report` and `Remediation Score` report columns). By default it also runs a page-audit pass over referenced page URLs (`--skip-pages` to opt out). Results are cached by content hash (`~/.filecap/audit-cache.json`, 30-day TTL), so re-runs only re-fetch changed/uncached PDFs. As of v1.34.0 the HTTP layer retries `429`/transient `5xx` honoring `Retry-After`, so a large batch of newly-added PDFs no longer trips audit.icjia.app's per-IP rate limit. Only PDFs are scored — Office formats have native checkers in their authoring apps.
+Scores every PDF **and every modern Office document** (`.docx`/`.xlsx`/`.pptx`, since v1.54.0) in an inventory NDJSON against [audit.icjia.app](https://audit.icjia.app)'s accessibility checker and attaches `entry.audit = { score, grade, reportUrl, … }` to each (the source of the `Audit Report`, `Remediation Score`, `Score (0-100)`, and `Grade` report columns). By default it also runs a page-audit pass over referenced page URLs (`--skip-pages` to opt out). Results are cached by content hash (`~/.filecap/audit-cache.json`, 30-day TTL), so re-runs only re-fetch changed/uncached documents. As of v1.34.0 the HTTP layer retries `429`/transient `5xx` honoring `Retry-After` (in full since v1.41.0, with `AUDIT_ICJIA_TOKEN` unlocking the endpoint's 10× privileged rate tier), so a large cold batch no longer trips audit.icjia.app's rate limit. Legacy binary Office formats (`.doc`/`.xls`/`.ppt`, plus ODF/RTF) are never sent — the service refuses them — and are marked `N/A (legacy format)`.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -639,7 +631,7 @@ To skip in the fleet pipeline: `SKIP_SITE_AUDIT=1 ./examples/audit-fleet-auto.sh
 
 ### `web-rollup`
 
-Bundle the most recent scans of every saved site into a static-site directory ready for Netlify or any static host. The bundle includes the per-site reports, the `audit-file-list-master.xlsx` (every remediable file across the fleet), and `scores-by-site.xlsx` (per-site PDF score coverage + A–F grade distribution + a fleet total).
+Build the web app: bundle the most recent scans of every saved site into a static-site directory ready for Netlify or any static host — this is the command that produces (and, with `webRollup.autoDeploy`, publishes) [fleet.icjia.app](https://fleet.icjia.app). The bundle includes the per-site report pages and workbooks, the `/sites`, `/search`, and What's New pages, `audit-file-list-master.xlsx` (every remediable file across the fleet), and `scores-by-site.xlsx` (per-site document score coverage + A–F grade distribution + a fleet total). Since v1.41.0 it refuses to deploy a bundle whose sites have no document scores (`--allow-unscored` overrides; build-only runs warn instead).
 
 | Flag | Default | Description |
 |---|---|---|
@@ -912,7 +904,7 @@ Output directory contents:
 
 | File | Purpose |
 |---|---|
-| `audit-file-list.csv` | One row per file, 20 columns (18 value columns — including `Page References`, `Audit Report`, `Remediation Score`, and `Page Count` — plus the 2 `Delete?` / `Notes` staff-fill columns). Human-readable column headers. Filterable in Excel, Smartsheet, etc. |
+| `audit-file-list.csv` | One row per file, 22 columns (20 value columns — including `Page References`, `Audit Report`, `Remediation Score`, sortable numeric `Score (0-100)` + `Grade`, and `Page Count` — plus the 2 `Delete?` / `Notes` staff-fill columns). Human-readable column headers. Filterable in Excel, Smartsheet, etc. |
 | `audit-file-list.html` | (Only when `--html` is passed.) Self-contained interactive dark-mode page — same data, sortable columns, full-text search, category filter chips, no external dependencies. `audit-remote.sh` always passes `--html` unless `AUDIT_HTML=0` is set. |
 | `audit-summary.txt` | Manager-friendly top-line numbers: file counts by category, total bytes, image-only PDF count, remediable count, heading coverage, alt-text coverage, and "What this means" observation bullets. |
 | `README.txt` | Plain-text guide to all files in this folder. Start here if you're not sure which file to open. |
@@ -923,9 +915,9 @@ Output directory contents:
 
 The CSV is pure inventory — there are NO vendor-fill columns. Vendors return remediated files; ICJIA re-scans and uses a future `diff` subcommand to detect changes.
 
-**CSV column order** (20 columns; `Page References` added at position 5 in v1.8.0, `Audit Report` at 6 in v1.9.0, `Page Count` restored in v1.20.0, `Remediation Score` added in v1.34.0; the `Delete?` / `Notes` staff-fill columns stay last):
+**CSV column order** (22 columns; `Page References` added at position 5 in v1.8.0, `Audit Report` at 6 in v1.9.0, `Page Count` restored in v1.20.0, `Remediation Score` added in v1.34.0, numeric `Score (0-100)` + `Grade` in v1.43.0; the `Delete?` / `Notes` staff-fill columns stay last):
 
-`Server, Website, Server IP, Public URL, Page References, Audit Report, Date published, Source folder on server, File location (relative to source folder), Full file path on server, File name, Page Count, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of, Remediation Score, Delete?, Notes`
+`Server, Website, Server IP, Public URL, Page References, Audit Report, Date published, Source folder on server, File location (relative to source folder), Full file path on server, File name, Page Count, File extension, File type, Size (bytes), Content hash (SHA-256), Duplicate of, Remediation Score, Score (0-100), Grade, Delete?, Notes`
 
 The deliverable focuses on the fields a remediator needs to **find** and **price** each file (filename, path, server, type, size, duplicate marker, public URL). Format-specific introspection columns (PDF page count, image-only/OCR, DOCX heading coverage, XLSX sheet count, etc.) were dropped in v1.4.0 / v1.4.1 — remediators open the file in Adobe Acrobat / Word / Excel and read those properties directly from the file. The full introspection remains in the underlying NDJSON inventory for MCP queries and custom reports.
 
@@ -933,7 +925,7 @@ The deliverable focuses on the fields a remediator needs to **find** and **price
 
 Column headers are human-facing labels (not raw field names). Empty cells indicate the field doesn't apply to this file's type.
 
-**Inputs.** `report` accepts BOTH a single-instance NDJSON (from `scan`) and a consolidated NDJSON (from `rollup`). Both input shapes produce the same 20-column CSV.
+**Inputs.** `report` accepts BOTH a single-instance NDJSON (from `scan`) and a consolidated NDJSON (from `rollup`). Both input shapes produce the same 22-column CSV.
 
 ## MCP server (Phase 7)
 
@@ -949,7 +941,7 @@ The `mcp` subcommand (`node bin/filecap.js mcp`) starts an stdio MCP server that
 
 ### Client configuration — run from the repo clone
 
-The npm package is deprecated, so point your MCP client at the CLI entry point inside your clone of this repository (use the absolute path on your machine):
+The npm package is deprecated, so point your MCP client at the entry point inside your clone of this repository (use the absolute path on your machine):
 
 ```json
 {
@@ -984,7 +976,7 @@ After wiring up your client, ask the AI agent:
 - "Use filecap_query_inventory on /tmp/consolidated.ndjson to find PDFs over 100 MB on server strapi-prod-02"
 - "Generate a report from /tmp/consolidated.ndjson into /tmp/report-2026-Q2/"
 
-If the tools are registered correctly, the agent will call them directly rather than suggesting you run the CLI manually.
+If the tools are registered correctly, the agent will call them directly rather than suggesting commands for you to run manually.
 
 ## One-command full audit (`run-full-audit.sh`)
 
@@ -1023,7 +1015,7 @@ Phases 2–5 are delegated to `examples/audit-fleet-auto.sh` rather than reimple
 | `netlify` CLI, logged in | Deploy target comes from `~/.filecap/config.json` -> `webRollup.deploySite`; run `netlify login` once | Skip with `--no-deploy` |
 | `~/.filecap/sites.json` | The fleet roster — `sites[]` get scanned, `tools[]` are roster-only and never scanned | Required |
 | SSH keys per content server | Passwordless / agent-loaded keys for each host | Required |
-| `rsync`, `python3`, `jq`, Node >= 20 | Mirroring, JSON parsing, and the CLI itself | Required |
+| `rsync`, `python3`, `jq`, Node >= 20 | Mirroring, JSON parsing, and the pipeline itself | Required |
 
 ### Output and logs
 
@@ -1042,11 +1034,11 @@ When remediation happens **one site at a time** — PDFs fixed in place, or move
 ```bash
 ./run-site-update.sh i2i.illinois.gov                     # full refresh of one site (+ archive prompt)
 ./run-site-update.sh i2i.illinois.gov archive.icjia.cloud # source + archive together
-./run-site-update.sh i2i.illinois.gov --scores-only       # re-score PDFs only; skip the SSH re-scan
+./run-site-update.sh i2i.illinois.gov --scores-only       # re-score documents only; skip the SSH re-scan
 ./run-site-update.sh i2i.illinois.gov --dry-run           # resolve + show the plan, do nothing
 ```
 
-Name sites by **URL** (front-end or file-server), domain alias, slug, or nickname — the `resolve-site` subcommand does the lookup, rejecting a bare host shared by several apps (e.g. `icjia.illinois.gov`) with the unique alternatives listed. Because moving excepted PDFs into `archive.icjia.cloud` changes its count too, a content-site update **prompts to also refresh the archive** (default Y; `--no-archive` opts out). A full refresh per site is SSH re-scan -> references -> cross-references -> audits; `--scores-only` skips the scan for in-place PDF fixes (and offers a full run, default Y, if a named site has no cached inventory yet).
+Name sites by **URL** (front-end or file-server), domain alias, slug, or nickname — the `resolve-site` subcommand does the lookup, rejecting a bare host shared by several apps (e.g. `icjia.illinois.gov`) with the unique alternatives listed. Because moving excepted PDFs into `archive.icjia.cloud` changes its count too, a content-site update **prompts to also refresh the archive** (default Y; `--no-archive` opts out). A full refresh per site is SSH re-scan -> references -> cross-references -> audits; `--scores-only` skips the scan for in-place document fixes (and offers a full run, default Y, if a named site has no cached inventory yet).
 
 To redo *part* of the pipeline by hand instead — most commonly re-scoring the PDF/page audits for a site whose scoring requests timed out — run the underlying commands against the inventories already on disk. Audit errors are **never cached**, so a re-run retries only the pages that failed; successful pages are served from `~/.filecap/page-audit-cache.json`:
 
@@ -1081,7 +1073,7 @@ Check this list before running anything. All five items are required.
    - Ubuntu/Linux: `sudo apt install -y nodejs` or download from https://nodejs.org
    - Windows (WSL2/Ubuntu): see the [Windows](#windows-the-situation) section
 
-4. **`npx` available in your terminal.** `npx` comes bundled with Node.js 20+ — if you have Node, you have `npx`. It's the tool that downloads and runs the scanner CLI automatically when needed; you don't have to install it separately.
+4. **`npx` available in your terminal.** `npx` comes bundled with Node.js 20+ — if you have Node, you have `npx`. It's the tool that downloads and runs the scanner automatically when needed; you don't have to install it separately.
 
 5. **`bash`, `ssh`, `rsync`, and `python3` available.** These are pre-installed on every Mac (macOS 12+), every modern Ubuntu/Debian Linux, and every WSL2/Ubuntu environment. You don't need to do anything. The scripts check for these at startup and tell you if something is missing.
 
@@ -1246,7 +1238,7 @@ export FILECAP_GITHUB_TOKEN=ghp_yourPATwithRepoScope
 
 Auth resolution order on every run: `gh CLI` (if logged in) → `FILECAP_GITHUB_TOKEN` env var → anonymous (public-repo only). With private repos and neither set, the audit fails fast with a clear error pointing at this setup.
 
-Mixed fleets work in one run — `sites.json` can have any mix of strapi and git entries; `web-rollup` bundles them into the same index page, master CSV, and duplicates section. The Bundle's per-site report for a git-type site shows the GitHub source URL in the "Full file path on server" column instead of an SSH path.
+Mixed fleets work in one run — `sites.json` can have any mix of strapi and git entries; `web-rollup` bundles them into the same index page, master workbook, and duplicates section. The Bundle's per-site report for a git-type site shows the GitHub source URL in the "Full file path on server" column instead of an SSH path.
 
 ### How to use it (single server)
 
@@ -1282,7 +1274,7 @@ In interactive mode, the script asks a few questions. Here's what each one means
 
 After the script finishes, navigate to `~/filecap-audits/<server-name>/latest/report/`. You'll find:
 
-- **`audit-file-list.csv`** — The main deliverable. One row per file, 20 columns covering server, website, file location, full path, public URL, page references, filename, page count, type, size, content hash, duplicate-of marker, the PDF `Audit Report` link and `Remediation Score`, plus two staff-fill columns (`Delete?` empty by default, and `Notes`). Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor (the staff-fill columns are for an internal pre-pass — vendors can ignore them).
+- **`audit-file-list.csv`** — The main deliverable. One row per file, 22 columns covering server, website, file location, full path, public URL, page references, filename, page count, type, size, content hash, duplicate-of marker, the per-document `Audit Report` link, `Remediation Score`, and sortable numeric `Score (0-100)` + `Grade`, plus two staff-fill columns (`Delete?` empty by default, and `Notes`). Open in Excel, Google Sheets, or Numbers. This is what you hand to the remediation vendor (the staff-fill columns are for an internal pre-pass — vendors can ignore them).
 - **`audit-summary.txt`** — Top-line numbers: total files by type, total storage, how many PDFs are image-only, how many documents are remediable. Good for an executive summary or a project charter.
 - **`audit-file-list.html`** — A self-contained dark-mode web page version of the same data. Open in any browser — no internet connection required. Supports sorting by any column, full-text search, category filter chips, and print-to-PDF. (Set `AUDIT_HTML=0` in the environment to suppress this file on rare occasions when you don't want it.)
 - **`README.txt`** — A plain-text guide to all the files in this folder. Start here if you're not sure which file to open.
@@ -1480,7 +1472,7 @@ To skip the check (e.g., on an air-gapped system or for faster startup):
 SKIP_VERSION_CHECK=1 ./audit-remote.sh
 ```
 
-The scanner CLI itself normally runs from the same repo checkout as the scripts; the one `npx` path (scanning directly on a Node 20+ remote) always pulls the latest published package from npm.
+The scanner itself normally runs from the same repo checkout as the scripts; the one `npx` path (scanning directly on a Node 20+ remote) always pulls the latest published package from npm.
 
 ---
 
@@ -1647,37 +1639,43 @@ Many production Strapi servers run on Ubuntu 18.04 with Node 16. Prebuilt Node 1
 
 ## Publishing a fleet snapshot
 
-After scanning your fleet, the `web-rollup` subcommand bundles every site's latest scan into a self-contained static-site directory ready to upload to Netlify (or any static host).
+After scanning your fleet, the `web-rollup` subcommand bundles every site's latest scan into a self-contained static-site directory ready to upload to Netlify (or any static host). This directory **is** the web app deployed at [fleet.icjia.app](https://fleet.icjia.app).
 
 ### What's in the bundle
 
 ```
 ~/filecap-audits/_web-rollup/<UTC-timestamp>/
-├── index.html                      ← landing page: hero + alphabetical site cards + "By file type" table
-├── netlify.toml                    ← cache headers + security headers, ready to deploy
+├── index.html                      ← the fleet report: hero + What's New banner + site cards + by-type table
+├── sites.html                      ← /sites directory: content sites + tooling apps, uptime, workbook pills
+├── search.html                     ← /search: fleet-wide file search + custom Excel reports
+├── search-index.json               ← compact positional-array search index the page loads
+├── whats-new.html                  ← announcement archive (the banner shows only the newest entry)
+├── accessibility.html              ← accessibility statement for the report itself
+│
+├── <slug>-<UTC-timestamp>.html     ← one per-site report page per audited site (dark mode, sortable, Page view)
+├── <slug>-<UTC-timestamp>.xlsx     ← …and its per-site workbook (the card / hero download)
+│
+├── audit.xlsx                      ← every inventoried file across the fleet
+├── audit-file-list-master.xlsx     ← every remediable file across the fleet
+├── scores-by-site.xlsx             ← one row per site: score coverage + A–F grade spread + fleet TOTAL
+├── audit-file-duplicates.xlsx      ← per-occurrence cross-server duplicates
+├── audit-file-errors.html / .xlsx  ← documents the scorer couldn't process, with plain-English reasons
+├── audit-orphaned-files.html / .xlsx ← files with no known referring page
+├── sites-list.xlsx (+ -content / -tools) ← the roster itself as workbooks
+│
+├── audit-pdfs.html                 ← by-file-type detail pages: every PDF across the fleet; same for
+├── audit-docx.html … audit-other.html   docx, xlsx, pptx, office-legacy, images, text-files, archives,
+│                                        web-files, other (non-empty buckets only)
+│
+├── audit-fleet.ndjson              ← the consolidated machine-readable inventory
+├── audit-fleet-context.md          ← LLM-ready context file describing the snapshot
+├── a11y-history.json               ← consolidated per-site score history
+│
+├── netlify.toml + _headers + _redirects ← deploy config: cache + security headers, strict CSP,
+│                                          forced 301 from *.netlify.app to fleet.icjia.app
+├── netlify/functions/uptime.mjs    ← on-demand uptime probe (edge-cached; runs ≤ ~once per 6 h)
 ├── robots.txt                      ← User-agent: * Disallow: /
-├── assets/
-│   └── style.css                   ← shared dark-mode design tokens
-│
-├── audit-file-list-master.csv      ← one row per file across every server (16 cols incl. Delete? + Notes)
-├── audit-file-duplicates.csv       ← per-occurrence cross-server duplicates (since 1.5.1)
-│
-├── audit-pdfs.html                 ← per-file-type detail page: every PDF across the fleet (since 1.7.14)
-├── audit-pdfs.csv                  ← matching filtered CSV
-├── audit-docx.html / .csv
-├── audit-xlsx.html / .csv
-├── audit-pptx.html / .csv
-├── audit-images.html / .csv
-├── audit-text-files.html / .csv
-├── audit-archives.html / .csv
-├── audit-web-files.html / .csv
-├── audit-other.html / .csv         ← non-empty buckets only; empty buckets skipped
-│
-├── dvfr-20260509-160504Z.html      ← per-site report (dark mode, sortable, searchable, copy-buttons)
-├── dvfr-20260509-160504Z.csv       ← per-site CSV (16 cols)
-├── i2i-20260510-093000Z.html
-├── i2i-20260510-093000Z.csv
-└── … one .html + .csv pair per site, named <slug>-<UTC-timestamp>.<ext>
+└── assets/                         ← shared dark-mode design tokens + images
 ```
 
 ### Building the bundle
@@ -1744,7 +1742,7 @@ If you always want `web-rollup` to deploy on completion (no `--deploy` flag, eve
 }
 ```
 
-With that file in place, a plain `web-rollup` run builds **and** deploys to Netlify. Pass `--deploy` on the CLI to override (it always wins). Both `--deploy` and `--deploy-site` on the CLI take precedence over the config; the config only fills in defaults when the flag is absent. To temporarily skip auto-deploy, comment out `autoDeploy` in the config or move the file aside.
+With that file in place, a plain `web-rollup` run builds **and** deploys to Netlify. Pass `--deploy` on the command line to override (it always wins). Both `--deploy` and `--deploy-site` flags take precedence over the config; the config only fills in defaults when the flag is absent. To temporarily skip auto-deploy, comment out `autoDeploy` in the config or move the file aside.
 
 The config file is validated on load: unknown top-level fields, typos in `webRollup` keys (e.g., `autodeploy` instead of `autoDeploy`), or wrong types (string instead of boolean) cause an immediate, named error rather than silently being ignored.
 
@@ -1771,7 +1769,7 @@ The auto-generated `netlify.toml` sets:
 
 ### What's deliberately NOT in the bundle
 
-- No JavaScript framework — pure HTML + CSS + a tiny inline JS for the password gate (when used).
+- No JavaScript framework — pure HTML + CSS + self-contained vanilla JS (table sorting/search, pagination, the search page's client modules, the What's New banner, the optional password gate), all inlined so every page works offline.
 - No version history of past snapshots — git history is your archive.
 - No per-site authentication — single shared password (whatever method you use).
 - No analytics — managers see what auditors see, no tracking.
@@ -1790,27 +1788,26 @@ After choosing the mode, the script also asks "Auto-deploy to Netlify? [y/N]". A
 
 ## What the Fleet Audit does not do
 
-- Perform full WCAG conformance auditing — the Fleet Audit does inventory; scoring and conformance analysis are performed by separate specialist tools and human auditors.
-- Remediate, fix, or modify any files.
-- Track vendor remediation status (out of scope — NDJSON inventories are themselves the time-series record).
-- Integrate with the Strapi API (deferred to a future release; the core inventory pipeline is format-agnostic).
-- Introspect PPTX (deferred to a future phase; current introspection covers DOCX, XLSX, and legacy stubs).
+- Remediate, fix, or modify any files — it measures, scores, and reports; the fixing is human work.
+- Replace a full manual WCAG conformance audit. Document and page scores come from automated checking (audit.icjia.app / axe), and automated tools cannot detect every barrier — which is why the website sections carry an explicit "needs review (manual)" count.
+- Track vendor remediation status (out of scope — the NDJSON inventories and the per-site score history are themselves the time-series record).
+- Introspect PPTX internals during the scan (PowerPoint files are scored via audit.icjia.app since v1.54.0, but scan-time introspection covers PDF, DOCX, XLSX, and legacy stubs).
 
 ## Troubleshooting
 
 **Scan exits with code 3.** At least one directory was unreadable. The footer's `permissionDenials` count tells you how many.
 
-**`introspection` field missing from a PDF / DOCX / XLSX entry.** The CLI couldn't parse this file. Likely causes: malformed file, encrypted, exotic variant. The file still appears in the inventory; vendor's deeper tooling (Acrobat Pro, Office, qpdf) will surface the actual issue.
+**`introspection` field missing from a PDF / DOCX / XLSX entry.** The scanner couldn't parse this file. Likely causes: malformed file, encrypted, exotic variant. The file still appears in the inventory; vendor's deeper tooling (Acrobat Pro, Office, qpdf) will surface the actual issue.
 
 **Scans are slow on large directories.** Hashing dominates wall time. For triage scans, pass `--no-hash`. For Office-heavy stores, increase `--concurrency`. Skip introspection with `--no-introspect` for filesystem-only inventories.
 
 **pdfjs-dist warning chatter on stderr.** pdfjs-dist emits informational warnings for non-fatal conditions (e.g., "TT: undefined function", unsupported PDF features). These are cosmetic noise — the scan continues and the introspection result is valid. Pipe stderr to `/dev/null`, or use `--quiet` if you want a clean terminal.
 
-**EOL Ubuntu / Node 16 / glibc-2.27 on the remote server.** The audit scripts handle this automatically: if the remote server has Node < 20 (or no Node at all), the script falls back to rsync-and-scan-locally. No manual intervention needed. If you're running the CLI directly on such a server (not via the audit scripts), you'll need to install a compatible Node version — see [Why local-mode scanning matters](#why-local-mode-scanning-matters).
+**EOL Ubuntu / Node 16 / glibc-2.27 on the remote server.** The audit scripts handle this automatically: if the remote server has Node < 20 (or no Node at all), the script falls back to rsync-and-scan-locally. No manual intervention needed. If you're running the scanner directly on such a server (not via the audit scripts), you'll need to install a compatible Node version — see [Why local-mode scanning matters](#why-local-mode-scanning-matters).
 
 **rsync `--info=progress2` not supported on macOS.** The audit scripts use a macOS-compatible rsync progress flag. If you're running rsync manually and see this error, use `--progress` instead of `--info=progress2`.
 
-**`netlify deploy` not found when using `--deploy`.** Install the Netlify CLI with `npm install -g netlify-cli` and authenticate with `netlify login`. The audit CLI prints a reminder with these instructions if the Netlify CLI is missing at runtime.
+**`netlify deploy` not found when using `--deploy`.** Install the Netlify CLI with `npm install -g netlify-cli` and authenticate with `netlify login`. The pipeline prints a reminder with these instructions if the Netlify CLI is missing at runtime.
 
 ## License
 
@@ -1818,7 +1815,7 @@ After choosing the mode, the script also asks "Auto-deploy to Netlify? [y/N]". A
 
 ## Related @icjia tools
 
-- [audit.icjia.app](https://audit.icjia.app) — single-PDF accessibility check (web tool). The fleet rollup links to this from the index navbar and from every per-site sticky bar (since v1.7.16) so a remediator looking at the inventory can pop a candidate PDF into the checker in one click.
+- [audit.icjia.app](https://audit.icjia.app) — the **File Audit Tool**: scores PDFs and modern Office documents (and, via its API, web pages) for accessibility. It powers the fleet's per-file `Remediation Score` and per-site website scores, and every fleet page links to it from the navbar so a remediator can pop a candidate file into the checker in one click.
 - `@icjia/viewcap` — screenshot capture (MCP)
 - `@icjia/lightcap` — Lighthouse audits (MCP)
 - `@icjia/axecap` — axe-core accessibility audits (MCP)
