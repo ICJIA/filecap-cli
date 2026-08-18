@@ -83,6 +83,29 @@ describe("renderSiteAccessibilitySection", () => {
     });
   });
 
+  // v1.59.2 — the severity card explains itself too: each level carries a
+  // plain-language gloss, and a footer note says severity = user impact
+  // (axe's rating), independent of WCAG conformance level.
+  describe("self-explanatory severity card (v1.59.2)", () => {
+    it("glosses all four severity levels in plain language", () => {
+      const html = renderSiteAccessibilitySection(sidecar);
+      expect(html).toContain("blocks some users entirely");
+      expect(html).toContain("a major barrier, hard to work around");
+      expect(html).toContain("frustrating, but usable with effort");
+      expect(html).toContain("an annoyance");
+      const glosses = html.match(/class="sa-sev-gloss"/g) || [];
+      expect(glosses.length).toBe(4);
+    });
+
+    it("explains that severity is user impact, independent of WCAG level", () => {
+      const html = renderSiteAccessibilitySection(sidecar);
+      expect(html).toContain('<p class="sa-sev-note">');
+      expect(html).toContain("how badly an issue affects a person who encounters it");
+      expect(html).toContain("independent of WCAG level");
+      expect(html).toContain("Outstanding by WCAG level");
+    });
+  });
+
   // v1.56.0 — the section leads with a blue "website" scope lockup so it
   // cannot be mistaken for the orange file-accessibility banner above it.
   it("leads with the website scope lockup (globe icon + web-pages subtitle)", () => {

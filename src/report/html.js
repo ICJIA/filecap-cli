@@ -2081,9 +2081,15 @@ ${siteFooterCss()}
 .site-accessibility .sa-muted { color: #8b949e; font-size: 0.85rem; list-style: none; margin-left: -18px; }
 /* v1.59.1 — reconciliation note inside the WCAG card: shown only when
    issues exist but none map to Level A/AA, so the card explains itself
-   instead of looking like it contradicts the severity card. */
-.site-accessibility .sa-wcag-note { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid #21262d; font-size: 0.85rem; color: #9aa5b1; line-height: 1.5; }
-.site-accessibility .sa-wcag-note strong { color: #d4dae0; }
+   instead of looking like it contradicts the severity card. v1.59.2 —
+   the severity card gets the same treatment: per-level plain-language
+   glosses + a footer note (severity = axe user-impact rating, independent
+   of WCAG conformance level). */
+.site-accessibility .sa-wcag-note,
+.site-accessibility .sa-sev-note { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid #21262d; font-size: 0.85rem; color: #9aa5b1; line-height: 1.5; }
+.site-accessibility .sa-wcag-note strong,
+.site-accessibility .sa-sev-note strong { color: #d4dae0; }
+.site-accessibility .sa-sev-gloss { color: #8b949e; font-size: 0.85em; }
 .site-accessibility .sa-pages { margin-top: 14px; }
 .site-accessibility .sa-pages summary { cursor: pointer; color: #c0cdda; }
 .site-accessibility .sa-pages table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 8px; }

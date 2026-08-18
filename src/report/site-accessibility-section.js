@@ -61,11 +61,12 @@ export function renderSiteAccessibilitySection(siteAudit) {
   ${trendHtml}
   <div class="sa-breakdown">
     <div class="sa-card"><h3>Outstanding by severity</h3><ul>
-      <li>Critical: <strong>${(sev.critical ?? 0).toLocaleString()}</strong></li>
-      <li>Serious: <strong>${(sev.serious ?? 0).toLocaleString()}</strong></li>
-      <li>Moderate: <strong>${(sev.moderate ?? 0).toLocaleString()}</strong></li>
-      <li>Minor: <strong>${(sev.minor ?? 0).toLocaleString()}</strong></li>
-    </ul></div>
+      <li>Critical: <strong>${(sev.critical ?? 0).toLocaleString()}</strong> <span class="sa-sev-gloss">— blocks some users entirely</span></li>
+      <li>Serious: <strong>${(sev.serious ?? 0).toLocaleString()}</strong> <span class="sa-sev-gloss">— a major barrier, hard to work around</span></li>
+      <li>Moderate: <strong>${(sev.moderate ?? 0).toLocaleString()}</strong> <span class="sa-sev-gloss">— frustrating, but usable with effort</span></li>
+      <li>Minor: <strong>${(sev.minor ?? 0).toLocaleString()}</strong> <span class="sa-sev-gloss">— an annoyance</span></li>
+    </ul>
+    <p class="sa-sev-note">Severity is <strong>how badly an issue affects a person who encounters it</strong> (the axe scanner&#39;s impact rating). It is independent of WCAG level — whether an issue counts toward the AA compliance target is shown in the &ldquo;Outstanding by WCAG level&rdquo; card.</p></div>
     <div class="sa-card"><h3>Outstanding by WCAG level</h3><ul>
       <li>Level A: <strong>${aCount.toLocaleString()}</strong></li>
       <li>Level AA: <strong>${aaCount.toLocaleString()}</strong></li>

@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.59.2] — 2026-08-18
+
+### Fixed — the severity card explains itself too
+
+- Each severity level now carries a plain-language gloss: Critical
+  "blocks some users entirely", Serious "a major barrier, hard to work
+  around", Moderate "frustrating, but usable with effort", Minor "an
+  annoyance".
+- A footer note states what severity is: the axe scanner's user-impact
+  rating — how badly an issue affects a person who encounters it —
+  independent of WCAG level; compliance mapping lives in the
+  "Outstanding by WCAG level" card beside it.
+
 ## [1.59.1] — 2026-08-18
 
 ### Fixed — the WCAG-level card explains itself
