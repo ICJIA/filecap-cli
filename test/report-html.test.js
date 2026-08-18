@@ -1335,11 +1335,13 @@ describe("writeHtml", () => {
       expect(websiteIdx).toBeGreaterThan(filesIdx);
     });
 
-    it("styles the identity hues: hero-orange files, section-blue website", async () => {
+    it("styles the identity hues: green files, section-blue website", async () => {
+      // v1.58.0 — files hue moved orange → green: orange is already a
+      // score-band indicator in the spreadsheet/table cells.
       const out = path.join(tmpDir, "scope-css.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toMatch(/\.scope-head-files \.scope-head-sub \{[^}]*#ffa84d/);
+      expect(html).toMatch(/\.scope-head-files \.scope-head-sub \{[^}]*#3fb950/);
       expect(html).toMatch(/\.scope-head-website \.scope-head-sub \{[^}]*#4dabf7/);
     });
   });
@@ -1348,7 +1350,7 @@ describe("writeHtml", () => {
   // (scope-head-lg) and the inventory section is retitled "File
   // accessibility" with an orange left section bar — distinct from the blue
   // website-section bar and the blue/purple access-panel bars.
-  describe("matched infographic titles + orange File accessibility bar (v1.57.0)", () => {
+  describe("matched infographic titles + File accessibility section bar (v1.57.0/v1.58.0)", () => {
     const saFixture = {
       score: 82, grade: "B",
       coverage: { scored: 1, pagesInSet: 1 },
@@ -1387,12 +1389,12 @@ describe("writeHtml", () => {
       expect(html.slice(bannerStart, bannerEnd)).not.toContain("scope-head-lg");
     });
 
-    it("styles the big lockup and the orange section bar", async () => {
+    it("styles the big lockup and the green full-length section bar", async () => {
       const out = path.join(tmpDir, "inv-css.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
       expect(html).toMatch(/\.scope-head-lg h2 \{[^}]*font-size/);
-      expect(html).toMatch(/\.inv-header-files \{[^}]*#ffa84d/);
+      expect(html).toMatch(/\.files-section \{[^}]*#3fb950/);
     });
 
     it("website section lockup carries the big size too", async () => {
@@ -1400,6 +1402,32 @@ describe("writeHtml", () => {
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out, siteAudit: saFixture });
       const html = await fs.readFile(out, "utf8");
       expect(html).toContain("scope-head-website scope-head-lg");
+    });
+
+    // v1.58.0 — the whole files region reads as ONE section: the header,
+    // the breakdown + site-details disclosures, and both table views live
+    // inside <section class="files-section">, whose green left bar runs the
+    // full length of the section.
+    it("wraps header, disclosures, and both views in the files-section (in that order)", async () => {
+      const out = path.join(tmpDir, "files-section.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out, siteAudit: saFixture });
+      const html = await fs.readFile(out, "utf8");
+      const secIdx = html.indexOf('<section class="files-section"');
+      const headerIdx = html.indexOf('<div class="inv-header inv-header-files">');
+      const breakdownIdx = html.indexOf('dp-disclosure dp-breakdown');
+      const detailsIdx = html.indexOf('dp-disclosure dp-sitedetails');
+      const fileViewIdx = html.indexOf('<div class="file-view">');
+      const pageViewIdx = html.indexOf('id="page-view"');
+      // The section's own close sits immediately before </main> (an inner
+      // <section class="audit-stats"> closes earlier, inside the breakdown).
+      const secEnd = html.indexOf("</section>\n</main>");
+      expect(secIdx).toBeGreaterThan(html.indexOf('<section class="site-accessibility"')); // website section stays outside, above
+      expect(headerIdx).toBeGreaterThan(secIdx);
+      expect(breakdownIdx).toBeGreaterThan(headerIdx);
+      expect(detailsIdx).toBeGreaterThan(breakdownIdx);
+      expect(fileViewIdx).toBeGreaterThan(detailsIdx);
+      expect(pageViewIdx).toBeGreaterThan(fileViewIdx);
+      expect(secEnd).toBeGreaterThan(pageViewIdx);
     });
   });
 

@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.58.0] — 2026-08-18
+
+### Changed — one green-barred "File accessibility" section
+
+- The "Breakdown by file type" and "Site details" disclosures moved under
+  the **File accessibility** header, and the whole files region — header,
+  disclosures, and both table views — is now a single `files-section`
+  element whose **left bar runs the section's full length**, mirroring
+  the full-height blue bar on the Website accessibility card.
+- The files identity hue moved **orange → green** (`#3fb950`, with print
+  inks to match): orange/amber is already a score-band indicator inside
+  the table and spreadsheet cells, so an orange section bar read as a
+  score signal. Green is the site's download/deliverable hue. The v1.56.0
+  What's New entry wording updated accordingly ("a green document icon").
+
 ## [1.57.0] — 2026-08-18
 
 ### Changed — infographic-size section titles; "File inventory" → "File accessibility"

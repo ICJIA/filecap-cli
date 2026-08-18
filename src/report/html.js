@@ -2088,38 +2088,42 @@ ${siteFooterCss()}
 /* ── scope lockups (v1.56.0) ────────────────────────────────── */
 /* The two assessments on this page score different things and kept being
    read as one. Each card now leads with an icon tile + subtitle naming its
-   scope: ORANGE document = the FILES the site publishes (same hue as the
-   hero's file-count number), BLUE globe = the WEBSITE's own pages (same
-   blue as that section's border). Distinct icons + explicit words carry
-   the pairing for color-blind readers; print gets darker inks below. */
+   scope: GREEN document = the FILES the site publishes (green = the
+   download/deliverable hue; v1.58.0 moved off orange because orange is a
+   score-band indicator in the table cells), BLUE globe = the WEBSITE's own
+   pages (same blue as that section's border). Distinct icons + explicit
+   words carry the pairing for color-blind readers; print inks below. */
 .scope-head { display: flex; align-items: flex-start; gap: 11px; }
 .scope-head-icon { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; }
 .scope-head-icon svg { width: 18px; height: 18px; }
 .scope-head-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .scope-head-text h2 { margin: 0; }
 .scope-head-sub { font-size: 0.78rem; font-weight: 600; line-height: 1.35; letter-spacing: 0.01em; }
-.scope-head-files .scope-head-icon { color: #ffa84d; background: rgba(255, 168, 77, 0.13); border: 1px solid rgba(255, 168, 77, 0.4); }
-.scope-head-files .scope-head-sub { color: #ffa84d; }
+.scope-head-files .scope-head-icon { color: #3fb950; background: rgba(63, 185, 80, 0.13); border: 1px solid rgba(63, 185, 80, 0.4); }
+.scope-head-files .scope-head-sub { color: #3fb950; }
 .scope-head-website .scope-head-icon { color: #4dabf7; background: rgba(77, 171, 247, 0.13); border: 1px solid rgba(77, 171, 247, 0.4); }
 .scope-head-website .scope-head-sub { color: #4dabf7; }
 .site-accessibility .scope-head { margin-bottom: 10px; }
 /* v1.57.0 — infographic size for the two SECTION titles (the hero banner's
-   compact lockup keeps the default size). The File accessibility section
-   opens with an orange left bar — the files hue — so its start reads like
-   the blue-barred website card; orange is distinct from the blue/purple/
-   amber access-panel bars. */
+   compact lockup keeps the default size). v1.58.0 — the whole files region
+   (header + breakdown/site-details disclosures + both table views) is one
+   .files-section element whose GREEN left bar runs its full length,
+   mirroring the blue-barred website card; green is distinct from the
+   blue/purple/amber access-panel bars and from the orange/amber
+   score-band colors used inside the table cells. */
 .scope-head-lg .scope-head-icon { width: 40px; height: 40px; border-radius: 10px; }
 .scope-head-lg .scope-head-icon svg { width: 22px; height: 22px; }
 .scope-head-lg h2 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.015em; line-height: 1.15; }
 .scope-head-lg .scope-head-sub { font-size: 0.82rem; }
-.inv-header-files { border-left: 5px solid #ffa84d; padding-left: 16px; border-radius: 2px; }
+.files-section { border-left: 5px solid #3fb950; padding-left: 16px; margin: 2rem 0 0; border-radius: 2px; }
+.files-section .inv-header { margin: 0; }
 
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
   .report-back-bar { display: none; }
   .dp-hero-download { display: none; }
-  .scope-head-files .scope-head-icon, .scope-head-files .scope-head-sub { color: #8a5a00; }
-  .scope-head-files .scope-head-icon { background: #fff5e0; border-color: #d0b060; }
+  .scope-head-files .scope-head-icon, .scope-head-files .scope-head-sub { color: #1a7f37; }
+  .scope-head-files .scope-head-icon { background: #e8f5ec; border-color: #9fd4ab; }
   .scope-head-website .scope-head-icon, .scope-head-website .scope-head-sub { color: #0a5bd3; }
   .scope-head-website .scope-head-icon { background: #e7f0fb; border-color: #9cc3ee; }
   body { background: #fff; color: #000; padding: 0; font-size: 10px; }
@@ -2231,6 +2235,18 @@ ${(() => {
 ${accessPanelHtml}
 ${renderSiteAccessibilitySection(siteAudit)}
 
+<section class="files-section" aria-labelledby="dp-inv-heading">
+<div class="inv-header inv-header-files">
+  <div class="scope-head scope-head-files scope-head-lg">
+    <span class="scope-head-icon" aria-hidden="true">${FILES_SCOPE_ICON_SVG}</span>
+    <div class="scope-head-text">
+      <h2 id="dp-inv-heading">File accessibility</h2>
+      <span class="scope-head-sub" id="dp-inv-sub">Every file this site publishes, with its accessibility score &mdash; the remediation worklist</span>
+    </div>
+  </div>
+  ${viewToggleHtml}
+</div>
+
 <details class="dp-disclosure dp-breakdown">
   <summary><span class="dp-disclosure-title">Breakdown by file type</span> <span class="dp-disclosure-hint">every type &amp; category count</span></summary>
   <div class="dp-disclosure-body">
@@ -2276,16 +2292,6 @@ ${categoryRows}
   </div>
 </details>
 
-<div class="inv-header inv-header-files">
-  <div class="scope-head scope-head-files scope-head-lg">
-    <span class="scope-head-icon" aria-hidden="true">${FILES_SCOPE_ICON_SVG}</span>
-    <div class="scope-head-text">
-      <h2 id="dp-inv-heading">File accessibility</h2>
-      <span class="scope-head-sub" id="dp-inv-sub">Every file this site publishes, with its accessibility score &mdash; the remediation worklist</span>
-    </div>
-  </div>
-  ${viewToggleHtml}
-</div>
 ${viewToggleBlurbHtml}
 <div class="file-view">
 ${filterBarHtml}
@@ -2341,6 +2347,7 @@ ${rowsHtml}
 ${paginatorNav({ live: true, bottom: true })}
 </div>
 ${pageViewSectionHtml}
+</section>
 </main>
 
 ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt })}
