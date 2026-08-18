@@ -1302,6 +1302,48 @@ describe("writeHtml", () => {
     });
   });
 
+  // v1.56.0 — the two assessments on a detail page (file banner in the hero,
+  // website section below it) kept being read as one score. Each now leads
+  // with a matched scope lockup: orange document icon = the FILES the site
+  // publishes, blue globe icon = the WEBSITE's own pages.
+  describe("file vs website assessment distinction (v1.56.0)", () => {
+    const saFixture = {
+      score: 82, grade: "B",
+      coverage: { scored: 1, pagesInSet: 1 },
+      outstanding: { total: 0, bySeverity: {}, byWcag: {}, needsReview: 0 },
+      pages: [],
+    };
+
+    it("file banner leads with the files scope lockup (all banner variants share the head)", async () => {
+      // sampleEntries (2 PDFs) renders the thin-data banner variant — the
+      // lockup is part of the shared head, so it must appear there too.
+      const out = path.join(tmpDir, "scope-files.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toContain('class="scope-head scope-head-files"');
+      expect(html).toContain("File accessibility");
+      expect(html).toContain("not its web pages");
+    });
+
+    it("renders both lockups on one page, files (hero) before website (section)", async () => {
+      const out = path.join(tmpDir, "scope-both.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out, siteAudit: saFixture });
+      const html = await fs.readFile(out, "utf8");
+      const filesIdx = html.indexOf("scope-head-files");
+      const websiteIdx = html.indexOf("scope-head-website");
+      expect(filesIdx).toBeGreaterThan(-1);
+      expect(websiteIdx).toBeGreaterThan(filesIdx);
+    });
+
+    it("styles the identity hues: hero-orange files, section-blue website", async () => {
+      const out = path.join(tmpDir, "scope-css.html");
+      await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
+      const html = await fs.readFile(out, "utf8");
+      expect(html).toMatch(/\.scope-head-files \.scope-head-sub \{[^}]*#ffa84d/);
+      expect(html).toMatch(/\.scope-head-website \.scope-head-sub \{[^}]*#4dabf7/);
+    });
+  });
+
   describe("detail-page sticky bar (v1.7.16: audit-tool link + last-audit date)", () => {
     it("includes a visible 'Audit a PDF' button linking to audit.icjia.app", async () => {
       const outputPath = path.join(tmpDir, "out.html");

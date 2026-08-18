@@ -32,7 +32,13 @@ export function renderSiteAccessibilitySection(siteAudit) {
     .join("");
 
   return `<section class="site-accessibility" aria-labelledby="sa-heading">
-  <h2 id="sa-heading">Website accessibility</h2>
+  <div class="scope-head scope-head-website">
+    <span class="scope-head-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13"/><path d="M8 1.5c1.9 1.8 2.9 4 2.9 6.5S9.9 12.7 8 14.5C6.1 12.7 5.1 10.5 5.1 8S6.1 3.3 8 1.5z"/></svg></span>
+    <div class="scope-head-text">
+      <h2 id="sa-heading">Website accessibility</h2>
+      <span class="scope-head-sub">Scores this site&#39;s web pages &mdash; not the files it publishes</span>
+    </div>
+  </div>
   <p class="sa-independence"><strong>This is the website&#39;s score — not its documents&#39;.</strong> It measures the accessibility of this site&#39;s <strong>web pages</strong> and says nothing about the <strong>files</strong> it publishes. The PDFs and Office documents are audited separately and may score far worse — or better. The two are measured independently and <strong>do not correlate</strong>.</p>
   <div class="sa-headline">
     <div class="sa-score"><span class="sa-num">${siteAudit.score}</span><span class="sa-grade">${esc(siteAudit.grade ?? "")}</span></div>

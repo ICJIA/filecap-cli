@@ -23,11 +23,19 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // v1.55.0 — newest entry announces the downloads + pagination usability
-  // pass (no counts in it, so nothing to reconcile against the surfaces).
-  it("leads with the 2026-08-17 easier-downloads-and-paging entry", () => {
+  // v1.56.0 — newest entry announces the website-vs-files scope lockups
+  // (no counts in it, so nothing to reconcile against the surfaces).
+  it("leads with the 2026-08-18 website-vs-files distinction entry", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("download-and-paging");
+    expect(e.id).toContain("website-vs-files");
+    expect(e.id).toContain("2026-08-18");
+    expect(e.badge).toBe("Improved");
+  });
+
+  // v1.55.0 — downloads + pagination usability pass, now history.
+  it("keeps the 2026-08-17 easier-downloads-and-paging entry as history", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("download-and-paging"));
+    expect(e).toBeTruthy();
     expect(e.id).toContain("2026-08-17");
     expect(e.badge).toBe("Improved");
   });

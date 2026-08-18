@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.56.0] — 2026-08-18
+
+### Changed — website score vs file score, visually distinct
+
+- The two assessments on every site report kept being read as one score.
+  Each now leads with a matched **scope lockup** — an icon tile plus a
+  colored subtitle naming exactly what it scores:
+  - **File accessibility** (hero banner): orange document icon +
+    "Scores the files this site publishes — PDFs, Word, Excel,
+    PowerPoint — not its web pages". Orange matches the hero's
+    file-count number, so warm = files everywhere on the page.
+  - **Website accessibility** (section below): blue globe icon +
+    "Scores this site's web pages — not the files it publishes". Blue
+    matches that section's existing border.
+- Distinct icons and explicit wording carry the pairing independently of
+  hue (color-blind-safe); print gets darker inks for both lockups. Shared
+  `.scope-head` CSS; the banner lockup is part of the shared head, so the
+  N/A and thin-data banner variants carry it too.
+- What's New entry announcing the change; suite grows to 1,581 tests.
+
 ## [1.55.0] — 2026-08-17
 
 ### Changed — download button front and center, pagination at both table ends

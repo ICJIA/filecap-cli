@@ -25,6 +25,16 @@ describe("renderSiteAccessibilitySection", () => {
     expect(renderSiteAccessibilitySection(null)).toBe("");
     expect(renderSiteAccessibilitySection({ score: null })).toBe("");
   });
+
+  // v1.56.0 — the section leads with a blue "website" scope lockup so it
+  // cannot be mistaken for the orange file-accessibility banner above it.
+  it("leads with the website scope lockup (globe icon + web-pages subtitle)", () => {
+    const html = renderSiteAccessibilitySection(sidecar);
+    expect(html).toContain('class="scope-head scope-head-website"');
+    expect(html).toContain('<h2 id="sa-heading">Website accessibility</h2>');
+    expect(html).toContain("not the files it publishes");
+    expect(html).not.toContain("scope-head-files");
+  });
   it("suppresses the report link when reportUrl uses a non-http(s) scheme (Fix 2)", () => {
     const maliciousSidecar = {
       score: 80, grade: "B",

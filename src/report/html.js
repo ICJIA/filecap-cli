@@ -438,7 +438,17 @@ const ACCESS_PANEL_COPY = {
 // two surfaces never disagree: excluded archive, thin data, or score + band.
 // The average is the site's scored documents only — nothing site-level.
 function renderFileA11yBanner(a, trend) {
-  const head = `<span class="dp-a11y-head">File accessibility <small>(documents)</small></span>`;
+  // v1.56.0 — scope lockup: orange document icon + a subtitle naming WHAT
+  // this banner scores (the files), paired with the blue-globe lockup on the
+  // "Website accessibility" section below it. Managers kept reading one
+  // score as the other; icon + hue + words make the scope unmistakable.
+  const head = `<div class="scope-head scope-head-files">
+    <span class="scope-head-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.5h5.5L13 5v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1z"/><path d="M9.5 1.5V5H13"/><path d="M5.5 8.5h5M5.5 11h3.5"/></svg></span>
+    <span class="scope-head-text">
+      <span class="dp-a11y-head">File accessibility <small>(documents)</small></span>
+      <span class="scope-head-sub">Scores the files this site publishes &mdash; PDFs, Word, Excel, PowerPoint &mdash; not its web pages</span>
+    </span>
+  </div>`;
   if (a.excluded) {
     return `<div class="dp-a11y dp-a11y-na">${head}<span class="dp-a11y-note">Score N/A &mdash; long-term archive (many files are ADA Title&nbsp;II exceptions)</span></div>`;
   }
@@ -2070,10 +2080,33 @@ ${siteFooterCss()}
 .site-accessibility .sa-pages th, .site-accessibility .sa-pages td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #21262d; color: #9aa5b1; }
 .site-accessibility .sa-pages td:first-child { word-break: break-all; }
 
+/* ── scope lockups (v1.56.0) ────────────────────────────────── */
+/* The two assessments on this page score different things and kept being
+   read as one. Each card now leads with an icon tile + subtitle naming its
+   scope: ORANGE document = the FILES the site publishes (same hue as the
+   hero's file-count number), BLUE globe = the WEBSITE's own pages (same
+   blue as that section's border). Distinct icons + explicit words carry
+   the pairing for color-blind readers; print gets darker inks below. */
+.scope-head { display: flex; align-items: flex-start; gap: 11px; }
+.scope-head-icon { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; }
+.scope-head-icon svg { width: 18px; height: 18px; }
+.scope-head-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.scope-head-text h2 { margin: 0; }
+.scope-head-sub { font-size: 0.78rem; font-weight: 600; line-height: 1.35; letter-spacing: 0.01em; }
+.scope-head-files .scope-head-icon { color: #ffa84d; background: rgba(255, 168, 77, 0.13); border: 1px solid rgba(255, 168, 77, 0.4); }
+.scope-head-files .scope-head-sub { color: #ffa84d; }
+.scope-head-website .scope-head-icon { color: #4dabf7; background: rgba(77, 171, 247, 0.13); border: 1px solid rgba(77, 171, 247, 0.4); }
+.scope-head-website .scope-head-sub { color: #4dabf7; }
+.site-accessibility .scope-head { margin-bottom: 10px; }
+
 /* ── print ─────────────────────────────────────────────────── */
 @media print {
   .report-back-bar { display: none; }
   .dp-hero-download { display: none; }
+  .scope-head-files .scope-head-icon, .scope-head-files .scope-head-sub { color: #8a5a00; }
+  .scope-head-files .scope-head-icon { background: #fff5e0; border-color: #d0b060; }
+  .scope-head-website .scope-head-icon, .scope-head-website .scope-head-sub { color: #0a5bd3; }
+  .scope-head-website .scope-head-icon { background: #e7f0fb; border-color: #9cc3ee; }
   body { background: #fff; color: #000; padding: 0; font-size: 10px; }
   h1, h2 { color: #000; }
   .controls { display: none; }

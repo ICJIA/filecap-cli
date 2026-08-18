@@ -38,6 +38,14 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "website-vs-files-scores-2026-08-18",
+    badge: "Improved",
+    text: "Every site report shows two different accessibility scores, and they kept being read as one: the score for the site's web pages, and the score for the files (PDFs and Office documents) the site publishes. The two are measured independently and often disagree — a site can have perfectly accessible pages and barely accessible documents. Each score card now leads with its own visual badge so you can tell them apart at a glance: an orange document icon with “Scores the files this site publishes… not its web pages” on the file score, and a blue globe icon with “Scores this site's web pages — not the files it publishes” on the website score. The icons and wording carry the difference too, so it works in print and regardless of color vision.",
+    linkText: "Open the site reports",
+    linkHref: "sites.html",
+    date: "August 18, 2026",
+  },
+  {
     id: "easier-download-and-paging-2026-08-17",
     badge: "Improved",
     text: "Two ease-of-use fixes. First, the green spreadsheet-download button on every site report now sits front and center in the summary header at the top of the page, with the “Last audit” date right beside it — no more hunting for a small button tucked into the navigation bar. Second, the table page controls (Prev / Next and the page numbers) now appear both above and below every long table — site reports, the page-by-page view, the duplicates list, and the orphaned-files report. Before, they existed only above the table, so scrolling to the end of a page of rows showed nothing telling you more pages existed. Clicking a control at the bottom of a table also jumps you back to the top of that table, so you land at the start of the rows you asked for.",
