@@ -39,10 +39,17 @@
 //      the result into Notes is the last, smallest part of the step.
 //
 // The screenshots are static PNGs committed at assets/help/ and copied
-// into the bundle by web-rollup. They show ARI (a site card) and DVFR (a
-// site report) as of the August 2026 rollup; the prose names those sites
-// as examples so the pictures and the words agree. Re-shoot them if the
-// card or report header is redesigned — see docs/help-screenshots.md.
+// into the bundle by web-rollup.
+//
+// ONE EXAMPLE SITE, ALL THE WAY THROUGH. Every screenshot, caption, alt
+// text, filename, and worked example uses Adult Redeploy Illinois (ARI)
+// as of the August 2026 rollup. An earlier version showed ARI's card in
+// step 1 and DVFR's report in step 2, and a reader following along could
+// not tell whether the two panels were the same journey or two different
+// ones — which is exactly the confusion this page exists to remove. If
+// you re-shoot against a different site, change ALL of them together and
+// re-run the tests; several pin ARI's numbers. See
+// docs/help-screenshots.md.
 
 import { INDEX_CSS } from "./index-css.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
@@ -92,8 +99,8 @@ const SHOTS = {
   downloadReport: {
     file: "step-download-report.png",
     width: 900,
-    height: 583,
-    alt: "The top of a site report for Domestic Violence Fatality Review, showing 74 files may need audit work, a green Download spreadsheet (XLSX) button, the date of the last audit, and a file accessibility score of 84 out of 100.",
+    height: 600,
+    alt: "The top of the site report for Adult Redeploy Illinois, showing 430 files may need audit work, a green Download spreadsheet (XLSX) button, the date of the last audit, and a file accessibility score of 69 out of 100.",
   },
 };
 
@@ -323,26 +330,30 @@ function renderColumnMap() {
  * already filled in so the finished state is unambiguous.
  */
 function renderExampleGrid() {
+  // Same site as every screenshot on this page — see the ONE EXAMPLE SITE
+  // note at the top of the module. Paths follow ARI's real URL shape
+  // (icjia.illinois.gov/adultredeploy/…) so the example reads as one
+  // continuous walk-through rather than three unrelated fragments.
   const rows = [
     {
       file: "annual_report_2019.pdf",
-      page: "/publications/",
+      page: "/adultredeploy/publications/",
       score: "41",
       note: "archive",
       kind: "archive",
       why: "The 2025 edition replaced it.",
     },
     {
-      file: "minutes_2026-05-12.pdf",
-      page: "/meetings/may-2026/",
+      file: "grant_application_2026.pdf",
+      page: "/adultredeploy/grants/",
       score: "58",
       note: "remediate",
       kind: "remediate",
       why: "Still linked, and the score is low.",
     },
     {
-      file: "statute_725ilcs_signed.pdf",
-      page: "/about/",
+      file: "authorizing_statute_signed.pdf",
+      page: "/adultredeploy/about/",
       score: "62",
       note: "as-is",
       kind: "asis",
@@ -360,7 +371,7 @@ function renderExampleGrid() {
     )
     .join("\n      ");
   return `<figure class="hp-grid-wrap">
-    <figcaption class="hp-grid-cap">What a decided row looks like. The score and the page told the story; the Notes cell just records the outcome.</figcaption>
+    <figcaption class="hp-grid-cap">Three rows from the same site's spreadsheet, decided. The score and the page told the story; the Notes cell just records the outcome.</figcaption>
     <div class="hp-grid-scroll">
       <table class="hp-grid">
         <thead>
@@ -592,7 +603,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
   const step2 = renderStep({
     n: "2",
     title: "Download the spreadsheet",
-    lede: `Two buttons do this, in two different places. They download <em>the same file</em> &mdash; use whichever you reach first.`,
+    lede: `Two buttons do this, in two different places. They download <em>the same file</em> &mdash; use whichever you reach first. Both pictures below show the same site as step 1.`,
     body: `<div class="hp-routes">
       <div class="hp-route">
         <p class="hp-route-tag">The quick way</p>
@@ -602,7 +613,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
       <div class="hp-route">
         <p class="hp-route-tag">From the site's report</p>
         <p class="hp-route-text">Or click <strong>View detailed report</strong> first, to see the site's scores. The green <strong>Download spreadsheet (XLSX)</strong> button sits at the top of that page.</p>
-        ${renderShot(SHOTS.downloadReport, { caption: `At the top of the site's report page.` })}
+        ${renderShot(SHOTS.downloadReport, { caption: `The same site's report page &mdash; the green button at the top gives you the identical file.` })}
       </div>
     </div>
 
@@ -613,7 +624,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
         <dt>Look in</dt>
         <dd>Your <strong>Downloads</strong> folder, or the download icon your browser puts near the address bar.</dd>
         <dt>It is called</dt>
-        <dd><code class="hp-filename">dvfr-20260818-004356Z.xlsx</code> &mdash; your site's short code, then the date of the audit. Yours will carry a different code and date.</dd>
+        <dd><code class="hp-filename">ari-20260818-004812Z.xlsx</code> &mdash; your site's short code, then the date of the audit. Yours will carry a different code and date.</dd>
         <dt>Open it with</dt>
         <dd>Excel, Apple Numbers, or Google Sheets. All three read it.</dd>
         <dt>If nothing arrived</dt>

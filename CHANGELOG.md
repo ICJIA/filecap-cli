@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.61.6] — 2026-08-19
+
+### Fixed — `/help` walks one example site the whole way through
+
+- Step 1 showed **Adult Redeploy Illinois**'s card and step 2 showed
+  **Domestic Violence Fatality Review**'s report. A reader following the
+  steps could not tell whether the two panels were one journey or two — the
+  exact confusion this page exists to remove.
+- The report screenshot is re-shot from **ARI**, so all three pictures, every
+  caption, the alt text, the example filename
+  (`ari-20260818-004812Z.xlsx`), and the worked-example table now walk the
+  same site. Step 2's lede says so outright: "Both pictures below show the
+  same site as step 1."
+- The worked example's page paths follow ARI's real URL shape
+  (`/adultredeploy/publications/`, `/adultredeploy/grants/`,
+  `/adultredeploy/about/`) instead of reading like a different site's.
+- **Tests pin the rule, not just the fix**: every screenshot's alt text must
+  name the example site, every example row must sit under its URL prefix, no
+  other ICJIA site may appear in a picture, caption, or example row, and the
+  captions must carry the site's real numbers (569 files, 430 may need audit,
+  69/100). Swapping one screenshot for another site now fails the build.
+- `docs/help-screenshots.md` records why they must be re-shot together, and
+  the new dimensions (900 × 600).
+
 ## [1.61.5] — 2026-08-19
 
 ### Changed — the SiteImprove section makes it clearer nobody has to choose

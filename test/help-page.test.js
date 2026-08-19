@@ -294,6 +294,61 @@ describe("help page — screenshots", () => {
   });
 });
 
+// v1.61.6 — step 1 showed ARI's card and step 2 showed DVFR's report, so a
+// reader following along could not tell whether the two panels were one
+// journey or two. That is the exact confusion this page exists to remove.
+// Every screenshot, caption, and worked example now walks one site.
+describe("help page — one example site, all the way through", () => {
+  const EXAMPLE = "Adult Redeploy Illinois";
+  const OTHER_SITES = [
+    "Domestic Violence Fatality Review",
+    "Safe From the Start",
+    "ICJIA Research Hub",
+    "Illinois Family Violence Coordinating Council",
+    "Violence Prevention Project",
+    "Institute to Innovate",
+    "ICJIA Document Archive",
+  ];
+
+  /** Alt text, captions, and the worked-example table — everything that
+   *  ties a picture or a row to a particular site. */
+  const narrative = () => [
+    ...[...html.matchAll(/<img [^>]*alt="([^"]+)"/g)].map((m) => m[1]),
+    ...[...html.matchAll(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/g)].map((m) => m[1]),
+    ...[...html.matchAll(/<td class="hp-grid-page">([^<]+)<\/td>/g)].map((m) => m[1]),
+  ].join("\n");
+
+  it("names that site in the screenshots that show it", () => {
+    const alts = [...html.matchAll(/<img [^>]*alt="([^"]+)"/g)].map((m) => m[1]);
+    expect(alts.length).toBe(3);
+    const naming = alts.filter((a) => a.includes(EXAMPLE));
+    expect(naming.length, "the card and the report shots both name the site").toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps the worked example on that site's URL shape", () => {
+    const paths = [...html.matchAll(/<td class="hp-grid-page">([^<]+)<\/td>/g)].map((m) => m[1]);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) {
+      expect(path, `${path} should sit under the example site`).toContain("/adultredeploy/");
+    }
+  });
+
+  it("lets no other site into a picture, caption, or example row", () => {
+    const text = narrative();
+    for (const site of OTHER_SITES) {
+      expect(text, `the walkthrough should not switch to ${site}`).not.toContain(site);
+    }
+  });
+
+  it("carries the example site's real numbers in the captions", () => {
+    // 569 total / 430 may need audit / 69 file-accessibility, as shot.
+    expect(html).toContain("569 files");
+    expect(html).toContain("430 of them may need accessibility work");
+    expect(html).toContain("430 files may need audit work");
+    expect(html).toContain("69 out of 100");
+  });
+});
+
 describe("help nav link", () => {
   // Labelled "Help", never "Start here": the earlier label read as a gate
   // the reader had to pass before using the rest of the site.

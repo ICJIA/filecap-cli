@@ -9,13 +9,17 @@ committed to the repo and copied verbatim into the bundle by `web-rollup`
 |---|---|---|
 | `step-find-site.png` | 420 × 660 | A site card on the fleet index, cropped to its identity: image, short code, name, URL, description, and the two number tiles. |
 | `step-download-card.png` | 420 × 206 | The bottom of a site card — the `View detailed report` and `Download spreadsheet` buttons with the `Last audit` caption. |
-| `step-download-report.png` | 900 × 583 | The top of a per-site report — headline count, the green `Download spreadsheet (XLSX)` button, and the File accessibility card. |
+| `step-download-report.png` | 900 × 600 | The top of a per-site report — headline count, the green `Download spreadsheet (XLSX)` button, and the File accessibility card. |
 
-They were shot against **ARI** (the card) and **DVFR** (the report) from the
-2026-08-18 rollup. The prose in `help-page.js` names those two sites, and the
-captions quote their numbers (569 / 430 files, 74 files, score 84) — so if you
-re-shoot against different sites, update the captions and the alt text with
-them, and re-run `npx vitest run test/help-page.test.js`.
+**All three are the same site: Adult Redeploy Illinois (ARI).** That is not
+incidental. An earlier version shot the card from ARI and the report from
+DVFR, and a reader following the steps could not tell whether the two panels
+were one journey or two — the exact confusion the page exists to remove. If
+you re-shoot, re-shoot **all of them against one site**, and update the
+captions and alt text with that site's numbers (currently 569 total files,
+430 may need audit, file accessibility 69/100), then re-run
+`npx vitest run test/help-page.test.js`. The worked-example table in step 4
+uses the same site's URL shape too.
 
 ## When to re-shoot
 
