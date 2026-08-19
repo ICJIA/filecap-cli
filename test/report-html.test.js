@@ -1886,7 +1886,7 @@ describe("writeHtml", () => {
       const out = path.join(tmpDir, "axfooter.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
+      expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility log<\/a>/);
     });
   });
 });

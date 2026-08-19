@@ -1,4 +1,4 @@
-// v1.61.0 — /help, the "start here" walkthrough.
+// v1.61.0 — /help, the guide for staff reviewing their site's files.
 //
 // Why this page exists: readers landing on the bundle told us they did not
 // know where to begin. The task they are actually being asked to do has
@@ -55,13 +55,17 @@ import { escapeHtml as he } from "../util/html.js";
 import { ICJIA_LOGO_SVG } from "./index-page.js";
 
 /**
- * Where a completed workbook goes. One constant so the address appears
- * once — it is repeated in the step, the summary rail, and the FAQ.
+ * Where a completed workbook goes. One constant, so the address cannot
+ * drift between the step, the closing block, and the FAQ.
+ *
+ * Shown as the literal address rather than behind a friendly label: the
+ * reader is being asked to attach a file and send it, and half of them
+ * will do that from Outlook rather than by clicking a link, so the thing
+ * they need is the address itself in a form they can read and copy.
  */
 export const HANDBACK = {
   email: "christopher.schweda@illinois.gov",
   label: "the audit administrator",
-  subject: "Fleet audit — completed file list",
 };
 
 /**
@@ -490,8 +494,6 @@ function renderShot(shot, { caption, size = "" }) {
  * @returns {string} full HTML document
  */
 export function generateHelpHtml({ generatedAt = "" } = {}) {
-  const mailto = `mailto:${HANDBACK.email}?subject=${encodeURIComponent(HANDBACK.subject)}`;
-
   const step1 = renderStep({
     n: "1",
     title: "Find your website",
@@ -585,13 +587,12 @@ export function generateHelpHtml({ generatedAt = "" } = {}) {
   const step5 = renderStep({
     n: "5",
     title: "Send it back",
-    lede: `Email the saved spreadsheet to <a href="${he(mailto)}">${he(HANDBACK.label)}</a>. That file becomes the audit record for your site &mdash; the evidence of what was decided, and when.`,
-    body: `<div class="hp-handback">
-      <a class="hp-handback-btn" href="${he(mailto)}">Email the completed spreadsheet</a>
-      <p class="hp-handback-meta">Attach the <code>.xlsx</code> file itself, not a screenshot or a copy pasted into the message. Keep your own copy too.</p>
+    lede: `Send the completed site audit report, with your remediation determinations in it, to <a class="hp-handback-address" href="mailto:${he(HANDBACK.email)}">${he(HANDBACK.email)}</a>. That file becomes the audit record for your site &mdash; the evidence of what was decided, and when.`,
+    body: `<div class="hp-note">
+      <p><strong>Attach the spreadsheet itself.</strong> Send the <code>.xlsx</code> file, not a screenshot of it and not the rows pasted into the message body. Keep your own copy as well.</p>
     </div>
     <div class="hp-note">
-      <p><strong>Partly done is still worth sending.</strong> A spreadsheet with the obvious rows marked and the rest blank is more useful than one that never arrives. Say in your email how far you got.</p>
+      <p><strong>Partly done is still worth sending.</strong> A report with the obvious rows decided and the rest blank is more useful than one that never arrives. Say in your email how far you got.</p>
     </div>`,
   });
 
@@ -600,10 +601,10 @@ export function generateHelpHtml({ generatedAt = "" } = {}) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Start here — how to download your website's file list from the ICJIA Fleet Audit and fill in the Notes column. A walkthrough for staff, in five steps.">
+<meta name="description" content="Help — how to download your website's file list from the ICJIA Fleet Audit and decide what happens to each file. A guide for staff, in five steps.">
 <meta name="robots" content="noindex, nofollow">
 ${PLAUSIBLE_SNIPPET}
-<title>Start here &mdash; ICJIA Fleet Audit Assessment</title>
+<title>Help &mdash; ICJIA Fleet Audit Assessment</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
 <style>${INDEX_CSS}${siteFooterCss()}${helpNavCss()}${helpCss()}</style>
 </head>
@@ -638,8 +639,8 @@ ${PLAUSIBLE_SNIPPET}
 
 <main id="main">
   <div class="fleet-section-banner hp-banner" role="presentation">
-    <p class="fleet-section-eyebrow">Start here</p>
-    <h1 class="fleet-section-headline">Download your site&#39;s file list</h1>
+    <p class="fleet-section-eyebrow">Help</p>
+    <h1 class="fleet-section-headline">How to review your site&#39;s files</h1>
     <p class="fleet-section-lede">Every ICJIA website has a spreadsheet listing every file it publishes &mdash; what each file is called, which page it appears on, and how accessible it is today. This page shows you how to get yours, and how to decide what happens to each file.</p>
     <ul class="hp-kit">
       <li><span class="hp-kit-k">You need</span> a web browser</li>
@@ -672,7 +673,7 @@ ${PLAUSIBLE_SNIPPET}
 
   <section class="hp-closing">
     <h2 class="hp-closing-title">Still stuck?</h2>
-    <p class="hp-closing-text">Email <a href="mailto:${he(HANDBACK.email)}">${he(HANDBACK.label)}</a> and say which website you are working on. A copy of your spreadsheet can be sent to you directly.</p>
+    <p class="hp-closing-text">Email <a class="hp-handback-address" href="mailto:${he(HANDBACK.email)}">${he(HANDBACK.email)}</a> and say which website you are working on. A copy of your report can be sent to you directly.</p>
     <p class="hp-closing-links"><a href="index.html">&larr; Back to the fleet snapshot</a> <span aria-hidden="true">&middot;</span> <a href="search.html">Search every file</a> <span aria-hidden="true">&middot;</span> <a href="https://accessibility.icjia.app" target="_blank" rel="noopener noreferrer">Accessibility FAQs</a></p>
   </section>
 </main>
@@ -1293,32 +1294,13 @@ export function helpCss() {
 .hp-grid-why { display: block; margin-top: 0.2rem; font-size: 0.82rem; color: #8b949e; }
 
 /* ── help: hand-back ─────────────────────────────────────────── */
-.hp-handback {
-  margin: 0 0 1.4rem;
-  padding: 1.3rem 1.4rem 1.4rem;
-  background: rgba(63, 185, 80, 0.07);
-  border: 1px solid rgba(63, 185, 80, 0.28);
-  border-radius: 12px;
-}
-.hp-handback-btn {
-  display: inline-block;
-  padding: 0.6rem 1.15rem;
-  background: linear-gradient(180deg, #1f7a30 0%, #176127 100%);
-  border: 1px solid #1f7a30;
-  border-radius: 8px;
-  color: #ffffff !important;
-  font-size: 0.95rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: filter 120ms ease, transform 120ms ease;
-}
-.hp-handback-btn:hover { filter: brightness(1.08); transform: translateY(-1px); text-decoration: none; }
-.hp-handback-btn:focus-visible { outline: 3px solid #3fb950; outline-offset: 2px; }
-.hp-handback-meta { margin: 0.85rem 0 0; font-size: 0.92rem; line-height: 1.55; color: #a9b8c6; }
-.hp-handback-meta code {
+/* The address is set in monospace at the size of the sentence around it:
+   it has to survive being read off a screen and typed into Outlook by
+   hand, so the characters need to be unambiguous. */
+.hp-handback-address {
   font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-  font-size: 0.85rem;
-  color: #c0cdda;
+  font-size: 0.95em;
+  overflow-wrap: anywhere;
 }
 
 /* ── help: shared note panel ─────────────────────────────────── */
@@ -1331,6 +1313,11 @@ export function helpCss() {
 }
 .hp-note p { margin: 0; font-size: 0.94rem; line-height: 1.6; color: #a9b8c6; }
 .hp-note strong { color: #e5e5e5; }
+.hp-note code {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.88rem;
+  color: #c0cdda;
+}
 
 /* ── help: troubleshooting ───────────────────────────────────── */
 /* Flat by design — see renderFaq(). Two columns so twelve answers stay
@@ -1409,15 +1396,20 @@ export function helpCss() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hp-callout, .hp-handback-btn { transition: none; }
-  .hp-callout:hover, .hp-handback-btn:hover { transform: none; }
+  .hp-callout { transition: none; }
+  .hp-callout:hover { transform: none; }
 }
 `;
 }
 
 /**
- * The home-page "New here?" callout. Rendered by index-page.js directly
- * under the What's New banner, where a first-time reader lands.
+ * The home-page Help callout, rendered by index-page.js at the top of
+ * <main> where a first-time reader lands.
+ *
+ * Phrased as an offer, not an instruction. An earlier version led with
+ * "Start here", which read as a gate the reader had to pass through
+ * before using the rest of the site. The guide is optional, and the last
+ * sentence says so outright.
  *
  * @returns {string}
  */
@@ -1425,9 +1417,9 @@ export function renderHelpCallout() {
   return `<a class="hp-callout" href="help.html">
   <span class="hp-callout-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M10.6 5.4 6.2 6.9 4.7 11.3l4.4-1.5z"/></svg></span>
   <span class="hp-callout-body">
-    <span class="hp-callout-eyebrow">New here?</span>
-    <span class="hp-callout-title">Start here &mdash; download your site&#39;s file list</span>
-    <span class="hp-callout-text">Find your website, download its spreadsheet, and decide what happens to each file. Five steps, about ten minutes.</span>
+    <span class="hp-callout-eyebrow">Help</span>
+    <span class="hp-callout-title">Confused about where to start? Follow this guide.</span>
+    <span class="hp-callout-text">It walks through finding your website, downloading its spreadsheet, and deciding what happens to each file. Five steps, about ten minutes. Nothing on the rest of this site depends on reading it.</span>
   </span>
   <span class="hp-callout-go" aria-hidden="true">&rarr;</span>
 </a>`;

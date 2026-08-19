@@ -14,6 +14,13 @@
 //
 // One source for markup + CSS so the bar cannot drift between pages. Pages
 // with a light palette (orphaned-files) pass { theme: "light" }.
+//
+// v1.61.2 — the footer carries every destination the header nav does, plus
+// the two the header omits. The header is now plain links sized to stay out
+// of the way; the footer is where a reader who has scrolled to the bottom
+// looking for something should always find it. "Accessibility log" is the
+// in-bundle page; "Accessibility FAQs" is the external site — they were both
+// called "Accessibility" somewhere, which helped nobody.
 
 import { FILECAP_VERSION } from "../version.js";
 import { escapeHtml as esc } from "../util/html.js";
@@ -34,15 +41,19 @@ export function renderSiteFooter({ generatedAt = "" } = {}) {
     <span class="site-footer-links">
       <a href="index.html">Home</a>
       <span aria-hidden="true">&middot;</span>
-      <a href="help.html">Start here</a>
+      <a href="help.html">Help</a>
       <span aria-hidden="true">&middot;</span>
       <a href="sites.html">Sites</a>
-      <span aria-hidden="true">&middot;</span>
-      <a href="accessibility.html">Accessibility</a>
       <span aria-hidden="true">&middot;</span>
       <a href="search.html">Search</a>
       <span aria-hidden="true">&middot;</span>
       <a href="whats-new.html">What's New</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="accessibility.html">Accessibility log</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="https://accessibility.icjia.app" target="_blank" rel="noopener noreferrer">Accessibility FAQs</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="https://audit.icjia.app" target="_blank" rel="noopener noreferrer">File Audit Tool</a>
       <span aria-hidden="true">&middot;</span>
       <a href="https://github.com/ICJIA/icjia-fleet-audit" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
       <span aria-hidden="true">&middot;</span>

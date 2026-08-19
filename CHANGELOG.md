@@ -10,6 +10,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.61.2] — 2026-08-19
+
+### Changed — "Help", not "Start here"; a quieter navbar
+
+- **The guide is called `Help` now.** "Start here" read as an instruction —
+  as though a reader had to work through it before they were allowed to use
+  the rest of the site. It is optional guidance and the label should say so.
+  The nav button, the page title, the eyebrow, and the What's New entry all
+  follow; the home-page callout leads with *"Confused about where to start?
+  Follow this guide."* and closes by saying outright that nothing else on the
+  site depends on reading it. The page's `h1` is now *"How to review your
+  site's files"* rather than the imperative *"Download your site's file
+  list"*.
+- **The navbar is plain links again, and smaller.** Every `.audit-tool-link`
+  was a filled pill — six competing calls to action that crowded the wordmark
+  onto three lines. They are now 0.78rem text links (`#a9b8c6`, 8.5:1 on the
+  header) with dimmed icons; only `Help` stays a real button, because it is
+  the only one that has to be noticed. The green `nav-sites` / `nav-whats-new`
+  fills are gone with nothing left to fill. Mirrored in `report/html.js`,
+  which keeps its own copy of the rule.
+- **The header wraps instead of hiding things.** `.site-header-right` is a
+  wrapping flex row, so below ~1000px the links move to a second line with
+  their labels intact. This retires two v1.61.0 workarounds: the media query
+  that hid the wordmark between 601px and 1180px, and the `≤600px` rule that
+  collapsed every link to an unlabelled icon.
+- **The footer carries every header destination.** `Accessibility FAQs` and
+  `File Audit Tool` were reachable only from the header; both are in the
+  footer now. The in-bundle page is relabelled `Accessibility log` — it and
+  the external FAQs were both called "Accessibility", which helped nobody. A
+  test fails if a header destination goes missing from the footer.
+
+### Changed — hand-back is an address, not a button
+
+- Step 5 dropped its green "Email the completed spreadsheet" button. It now
+  says plainly: send the completed site audit report, with your remediation
+  determinations in it, to `christopher.schweda@illinois.gov` — set in
+  monospace, because half the readers will type it into Outlook by hand
+  rather than clicking. The prefilled `subject` went with the button.
+
+### Security — robots.txt hardened
+
+- `robots.txt` disallowed every path for `User-agent: *` already. It now also
+  names ~25 crawlers individually — AI-training and retrieval agents
+  (`GPTBot`, `ClaudeBot`, `CCBot`, `Google-Extended`, `PerplexityBot`,
+  `Bytespider`, `meta-externalagent`, …), archivers (`ia_archiver`,
+  `archive.org_bot`, whose cached snapshots would outlive the password wall),
+  and aggressive SEO crawlers. The wildcard rule is already maximal under the
+  standard; the named blocks exist because several of these have shipped with
+  wildcard handling that ignores `*` but honours their own product token.
+  A test asserts every stanza ends in `Disallow: /` and that nothing is
+  re-allowed. This is the cooperative layer under the two that actually
+  enforce: the Netlify Site Password (every path 401s) and
+  `X-Robots-Tag: noindex, nofollow` on `/*`.
+
 ## [1.61.1] — 2026-08-19
 
 ### Changed — `/help` step 4 reframed: deciding, not typing

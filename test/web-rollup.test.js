@@ -1511,7 +1511,7 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
 
     const helpHtml = await fs.readFile(path.join(outputDir, "help.html"), "utf8");
     expect(helpHtml).toContain('<ol class="hp-stepper">');
-    expect(helpHtml).toContain("Download your site&#39;s file list");
+    expect(helpHtml).toContain("How to review your site&#39;s files");
     expect(helpHtml).toContain('class="site-footer"');
 
     for (const shot of HELP_SCREENSHOTS) {
@@ -1531,6 +1531,35 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
       const html = await fs.readFile(path.join(outputDir, page), "utf8");
       expect(html, `${page} should link help.html`).toContain('href="help.html"');
     }
+  });
+
+  // v1.61.2 — the bundle is internal ICJIA material; nothing in it should be
+  // indexed, cached, archived, or trained on. robots.txt is the cooperative
+  // layer under the Netlify password and the X-Robots-Tag header.
+  it("emits a robots.txt that disallows every path for every crawler", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    const robots = await fs.readFile(path.join(outputDir, "robots.txt"), "utf8");
+
+    // Wildcard rule first, and disallowing the root.
+    expect(robots).toMatch(/User-agent: \*\nDisallow: \/\n/);
+
+    // Every declared agent gets its own Disallow: / — a stanza with a
+    // narrower path, or none at all, would silently permit that crawler.
+    const stanzas = robots.split(/\n(?=User-agent: )/).filter((b) => b.startsWith("User-agent:"));
+    expect(stanzas.length).toBeGreaterThan(10);
+    for (const block of stanzas) {
+      const agent = block.match(/User-agent: (.+)/)[1];
+      expect(block, `${agent} must be disallowed from /`).toMatch(/\nDisallow: \/\s*$/);
+    }
+
+    // Named because these have ignored the wildcard in practice.
+    for (const agent of ["GPTBot", "ClaudeBot", "CCBot", "Google-Extended", "ia_archiver"]) {
+      expect(robots, `robots.txt should name ${agent}`).toContain(`User-agent: ${agent}`);
+    }
+
+    // Nothing may be re-allowed.
+    expect(robots).not.toMatch(/^Allow:/m);
   });
 
   it("password-gates help.html when a password is set", async () => {

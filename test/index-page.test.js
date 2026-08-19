@@ -488,7 +488,7 @@ describe("index page accessibility (v1.x)", () => {
 
   it("footer links to the /accessibility page", () => {
     const html = generateIndexHtml({ siteResults: [], password: null });
-    expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
+    expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility log<\/a>/);
   });
 });
 

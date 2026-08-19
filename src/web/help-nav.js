@@ -1,4 +1,4 @@
-// v1.61.0 — the "Start here" nav link, in one place.
+// v1.61.0 — the Help nav link, in one place.
 //
 // The header nav markup is hand-written in six generators (index-page,
 // sites-page, whats-new, search-page, help-page, report/html). Adding a
@@ -10,12 +10,18 @@
 // Placed FIRST in the nav on every page. The complaint this page answers
 // is "I don't know where to start" — a link a reader has to scan four
 // other buttons to find is not an answer to that.
+//
+// Labelled "Help", not "Start here". The earlier label read as an
+// instruction — as though the reader had to go through it before they were
+// allowed to use the rest of the site. The page is optional guidance, and
+// the label should say so. It stays the one real button in the nav because
+// it still has to be findable, not because it is compulsory.
 
 /** Compass-rose glyph — "you are here / find your way". */
 const HELP_NAV_ICON = `<svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M10.6 5.4 6.2 6.9 4.7 11.3l4.4-1.5z"/></svg>`;
 
 const HELP_NAV_TITLE =
-  "New here? A ten-minute walkthrough: find your site, download its spreadsheet, fill in the Notes column";
+  "Not sure where to start? A ten-minute guide to downloading your site's file list and deciding what happens to each file";
 
 /**
  * The nav button linking to help.html. Interpolate into a
@@ -28,9 +34,9 @@ const HELP_NAV_TITLE =
  * @returns {string}
  */
 export function helpNavLink({ current = false } = {}) {
-  return `<a class="audit-tool-link nav-help${current ? " is-current" : ""}" href="help.html"${current ? ` aria-current="page"` : ""} title="${current ? "You are here" : HELP_NAV_TITLE}">
+  return `<a class="audit-tool-link nav-help${current ? " is-current" : ""}" href="help.html"${current ? ` aria-current="page"` : ""} title="${current ? "You are reading this guide" : HELP_NAV_TITLE}">
       ${HELP_NAV_ICON}
-      <span>Start here</span>
+      <span>Help</span>
     </a>`;
 }
 
@@ -62,13 +68,9 @@ export function helpNavCss() {
   cursor: default;
 }
 .audit-tool-link.nav-help.is-current:hover { transform: none; box-shadow: none; filter: none; }
-/* A sixth nav button no longer fits beside the wordmark on a narrow
-   desktop — .site-header-right is flex:none, so the wordmark is what
-   wraps to three lines. The logo beside it identifies and links the site
-   on its own, so the wordmark is the thing that goes. Below 600px the
-   button labels collapse to icons and it fits again. */
-@media (min-width: 601px) and (max-width: 1180px) {
-  .site-header .brand { display: none; }
-}
+/* v1.61.2 — the wordmark used to be hidden between 601px and 1180px,
+   because six filled pills crowded it off the line. The nav is plain
+   links now and takes about a third of the width, and .site-header-right
+   wraps, so the wordmark stays at every size. */
 `;
 }

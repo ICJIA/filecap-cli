@@ -41,7 +41,7 @@ describe("writeOrphansHtml", () => {
 
   it("links to the /accessibility page from the top nav", () => {
     const html = writeOrphansHtml({ orphans: [orphan()], sources, siteTotals });
-    expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility<\/a>/);
+    expect(html).toMatch(/<a href="accessibility\.html"[^>]*>Accessibility log<\/a>/);
   });
 
   it("renders a table row per orphan with its filename", () => {

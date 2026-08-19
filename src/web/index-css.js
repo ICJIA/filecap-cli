@@ -97,40 +97,41 @@ html { scroll-behavior: smooth; }
 .site-header-right {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  flex: none;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.45rem 1.05rem;
+  flex: 0 1 auto;
+  min-width: 0;
 }
+/* v1.61.2 — the nav links are plain links, not buttons. Six filled pills
+   read as six competing calls to action and crowded the wordmark off the
+   line; only Help is a real button now (see helpNavCss), and it
+   is the only one that has to be noticed. */
 .audit-tool-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.4rem 0.8rem;
-  background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
-  color: #0c1219;
-  font-weight: 700;
-  font-size: 0.8rem;
+  gap: 0.35rem;
+  padding: 0.2rem 0.15rem;
+  background: none;
+  border: 0;
+  color: #a9b8c6;
+  font-weight: 600;
+  font-size: 0.78rem;
   letter-spacing: 0.01em;
   text-decoration: none;
-  border-radius: 7px;
-  border: 1px solid #2f8de0;
-  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+  border-radius: 4px;
+  transition: color 120ms ease;
   white-space: nowrap;
 }
-.audit-tool-link:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(77, 171, 247, 0.35);
-  filter: brightness(1.05);
-}
-.audit-tool-link:focus-visible {
-  outline: 3px solid #58a6ff;
-  outline-offset: 2px;
-}
-.audit-tool-link:active { transform: translateY(0); filter: brightness(0.96); }
-.audit-tool-icon { width: 14px; height: 14px; flex: none; }
-@media (max-width: 600px) {
-  .audit-tool-link { padding: 0.4rem 0.7rem; font-size: 0.82rem; }
-  .audit-tool-link span { display: none; }
-  .audit-tool-icon { width: 16px; height: 16px; }
+.audit-tool-link:hover { color: #ffffff; text-decoration: underline; }
+.audit-tool-link:focus-visible { outline: 2px solid #58a6ff; outline-offset: 3px; }
+.audit-tool-link .audit-tool-icon { opacity: 0.75; }
+.audit-tool-link:hover .audit-tool-icon { opacity: 1; }
+.audit-tool-icon { width: 13px; height: 13px; flex: none; }
+@media (max-width: 700px) {
+  /* Labels stay — a row of unlabelled icons is not a nav. They are small
+     enough now to wrap onto a second line instead. */
+  .audit-tool-link { font-size: 0.8rem; }
 }
 
 /* ── main content ────────────────────────────────────────────── */
@@ -2503,16 +2504,11 @@ dialog.access-modal .access-modal-cta a {
 .site-card .status-dot.status-down .status-line { color: #ff7b72; }
 .site-card .status-dot.status-down .status-glyph { background: transparent; border: 2px solid #f85149; box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.13); }
 
-/* Header "Sites" nav link — internal, so a green accent distinct from the
-   blue external-tool buttons. v1.44.0: the "What's New" link is internal too
-   and shares the accent. */
-.audit-tool-link.nav-sites,
-.audit-tool-link.nav-whats-new {
-  background: linear-gradient(180deg, #3fb950 0%, #2ea043 100%);
-  border-color: #2ea043;
-}
-.audit-tool-link.nav-sites:hover,
-.audit-tool-link.nav-whats-new:hover { box-shadow: 0 4px 14px rgba(63, 185, 80, 0.35); }
+/* v1.61.2 — "Sites" and "What's New" were filled green to separate internal
+   links from the blue external ones. With every link now plain text that
+   distinction has no fill to live in, and it was never one a reader needed:
+   the external ones say so with an arrow icon and open in a new tab. Kept as
+   empty rules would be dead weight, so the fills are gone. */
 
 /* ── What's New (v1.44.0) ────────────────────────────────────────────────
    Mirrors the file-accessibility-audit repo's announcements pattern: a

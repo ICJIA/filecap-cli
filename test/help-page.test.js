@@ -33,7 +33,7 @@ describe("help page — structure", () => {
     expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
     expect(html).toMatch(/<a class="skip-link" href="#main">Skip to content<\/a>/);
     expect(html).toMatch(/<main id="main">/);
-    expect(html).toContain("<title>Start here");
+    expect(html).toContain("<title>Help");
     expect(html).toContain('<meta name="robots" content="noindex, nofollow">');
     expect(html).toContain("2026-08-19 06:00 AM CDT (Chicago time)");
   });
@@ -152,9 +152,19 @@ describe("help page — the point the audit team asked for", () => {
     expect(html).toContain("nothing you type is sent back to this website");
   });
 
-  it("routes the finished workbook to the hand-back address", () => {
+  // The reader is asked to attach a file and send it, and many will do
+  // that from Outlook rather than by clicking. The address is shown
+  // literally, not hidden behind a friendly label or a styled button.
+  it("shows the hand-back address in full, with no email button", () => {
     expect(html).toContain(`mailto:${HANDBACK.email}`);
-    expect(html).toContain(encodeURIComponent(HANDBACK.subject));
+    expect(html).toContain(`>${HANDBACK.email}</a>`);
+    expect(html).not.toContain("hp-handback-btn");
+    expect(html).not.toContain("Email the completed spreadsheet");
+  });
+
+  it("tells the reader to attach the workbook rather than paste it", () => {
+    expect(html).toContain("Send the completed site audit report");
+    expect(html).toContain("not a screenshot of it and not the rows pasted into the message body");
   });
 });
 
@@ -224,10 +234,13 @@ describe("help page — screenshots", () => {
 });
 
 describe("help nav link", () => {
-  it("points at help.html and is labelled for a first-time reader", () => {
+  // Labelled "Help", never "Start here": the earlier label read as a gate
+  // the reader had to pass before using the rest of the site.
+  it("points at help.html and is labelled as optional help", () => {
     const link = helpNavLink();
     expect(link).toContain('href="help.html"');
-    expect(link).toContain("<span>Start here</span>");
+    expect(link).toContain("<span>Help</span>");
+    expect(link).not.toContain("Start here");
     expect(link).not.toContain('aria-current');
   });
 
@@ -250,9 +263,9 @@ describe("help link reaches every surface", () => {
   };
 
   for (const [label, page] of Object.entries(pages)) {
-    it(`${label} carries the Start here nav link`, () => {
+    it(`${label} carries the Help nav link`, () => {
       expect(page).toContain('href="help.html"');
-      expect(page).toContain("<span>Start here</span>");
+      expect(page).toContain("<span>Help</span>");
     });
 
     it(`${label} ships the nav link's styles`, () => {
@@ -261,10 +274,27 @@ describe("help link reaches every surface", () => {
   }
 
   it("the shared footer links to help.html", () => {
-    expect(renderSiteFooter()).toContain('<a href="help.html">Start here</a>');
+    expect(renderSiteFooter()).toContain('<a href="help.html">Help</a>');
   });
 
-  it("the home page carries the start-here callout", () => {
+  // Anything reachable from the header must be reachable from the footer —
+  // that is the whole point of thinning the header down to plain links.
+  it("the footer carries every header-nav destination", () => {
+    const footer = renderSiteFooter();
+    for (const href of [
+      "index.html",
+      "help.html",
+      "sites.html",
+      "search.html",
+      "whats-new.html",
+      "https://accessibility.icjia.app",
+      "https://audit.icjia.app",
+    ]) {
+      expect(footer, `footer should link ${href}`).toContain(`href="${href}"`);
+    }
+  });
+
+  it("the home page carries the help callout", () => {
     expect(pages["fleet index"]).toContain('<a class="hp-callout" href="help.html">');
     expect(pages["fleet index"]).toContain(".hp-callout");
   });

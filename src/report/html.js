@@ -934,8 +934,10 @@ body {
    caption hangs below the csv-link without pushing it around. */
 .report-back-bar-right {
   display: flex;
-  align-items: flex-start;
-  gap: 0.85rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem 1.05rem;
   flex-wrap: wrap;
 }
 .report-csv-block {
@@ -970,44 +972,31 @@ body {
    reads the same across surfaces. v1.7.28: font dropped to 0.8rem
    (matched against the index navbar variant) to leave more horizontal
    room for the two-button cluster (FAQ + audit tool) on narrow viewports. */
+/* v1.61.2 — mirror of INDEX_CSS: plain links, not filled pills. Only
+   Help (helpNavCss) stays a button. */
 .audit-tool-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.75rem;
-  background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
-  color: #0c1219 !important;
-  font-weight: 700;
-  font-size: 0.8rem;
+  gap: 0.35rem;
+  padding: 0.2rem 0.15rem;
+  background: none;
+  border: 0;
+  color: #a9b8c6 !important;
+  font-weight: 600;
+  font-size: 0.78rem;
   letter-spacing: 0.01em;
   text-decoration: none;
-  border-radius: 7px;
-  border: 1px solid #2f8de0;
-  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+  border-radius: 4px;
+  transition: color 120ms ease;
   white-space: nowrap;
 }
-.audit-tool-link:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(77, 171, 247, 0.35);
-  filter: brightness(1.05);
-  text-decoration: none;
-}
-.audit-tool-link:focus-visible {
-  outline: 3px solid #58a6ff;
-  outline-offset: 2px;
-}
-/* v1.44.0 — "What's New" is an internal bundle link; green accent matches the
-   home page's internal-nav buttons (nav-sites / nav-whats-new in INDEX_CSS). */
-.audit-tool-link.nav-whats-new {
-  background: linear-gradient(180deg, #3fb950 0%, #2ea043 100%);
-  border-color: #2ea043;
-}
-.audit-tool-link.nav-whats-new:hover { box-shadow: 0 4px 14px rgba(63, 185, 80, 0.35); }
-.audit-tool-icon { width: 14px; height: 14px; flex: none; }
-@media (max-width: 600px) {
-  .audit-tool-link { padding: 0.35rem 0.65rem; font-size: 0.82rem; }
-  .audit-tool-link span { display: none; }
-  .audit-tool-icon { width: 16px; height: 16px; }
+.audit-tool-link:hover { color: #ffffff !important; text-decoration: underline; }
+.audit-tool-link:focus-visible { outline: 2px solid #58a6ff; outline-offset: 3px; }
+.audit-tool-link .audit-tool-icon { opacity: 0.75; }
+.audit-tool-link:hover .audit-tool-icon { opacity: 1; }
+.audit-tool-icon { width: 13px; height: 13px; flex: none; }
+@media (max-width: 700px) {
+  .audit-tool-link { font-size: 0.8rem; }
 }
 h1 { font-size: 1.4rem; margin: 0 0 0.25rem; color: #e5e5e5; letter-spacing: -0.02em; }
 h2 { font-size: 1.1rem; margin: 1.25rem 0 0.5rem; color: #e5e5e5; font-weight: 600; }
