@@ -662,6 +662,16 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
       if (col.name === "category") {
         return `<td>${htmlEscape(formatCategory(v))}</td>`;
       }
+      if (col.name === "modifiedAt") {
+        // v1.62.0 — the table used to print the raw ISO timestamp
+        // ("2026-08-13T14:14:49.000Z"), machine noise for the manager
+        // audience. Human date in the cell; the ISO rides along in
+        // data-sort-value so chronological sort (plain string compare on
+        // ISO) and column search keep working exactly as before.
+        const iso = v === null || v === undefined ? "" : String(v);
+        const human = fmtChicagoDate(iso);
+        return `<td class="col-date"${iso ? ` data-sort-value="${htmlEscape(iso)}" title="${htmlEscape(iso)}"` : ""}>${htmlEscape(human || iso)}</td>`;
+      }
       if (col.name === "pageCount") {
         // Empty cell for non-PDFs and unintrospected PDFs; otherwise the
         // raw integer, right-aligned. data-num so the sort comparator
@@ -821,10 +831,13 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   }), fileA11yTrend);
 
   // Access-method panel: shown when web-rollup passes an accessKind. Tells a
-  // manager/remediator at a glance how the site's files are served + what
-  // credentials are needed to reach them. The index card carries the chip
-  // version; this is the verbose treatment with the SSH-key + Contact IDS
-  // call-to-action that the chip can't fit.
+  // remediator how the site's files are served + what credentials are needed
+  // to reach them. The index card carries the chip version; this is the
+  // verbose treatment with the SSH-key call-to-action the chip can't fit.
+  // v1.62.0 — rendered LAST on the page, after both assessments. It used to
+  // sit directly under the hero, which made rsync/SSH instructions the
+  // second thing a non-technical manager read; it's sysadmin content, and
+  // the worklist they came for was two sections further down.
   const accessCopy = accessKind && ACCESS_PANEL_COPY[accessKind] ? ACCESS_PANEL_COPY[accessKind] : null;
   const accessPanelHtml = accessCopy
     ? `<section class="access-panel access-${accessKind}" aria-labelledby="access-panel-heading">
@@ -1835,6 +1848,7 @@ thead th[data-nosort] { cursor: default; }
 thead th[data-nosort]:hover { background: #161b22; }
 /* v1.40.0 — sortable-header buttons: inherit the th look, add a visible
    keyboard focus ring. The sort arrows stay on the th classes below. */
+.col-date { white-space: nowrap; }
 .th-sort-btn { background: none; border: 0; padding: 0; margin: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
 .th-sort-btn:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; border-radius: 3px; }
 thead th.sort-asc::after  { content: " ▲"; font-size: 10px; color: #60a5fa; }
@@ -2243,9 +2257,6 @@ ${(() => {
   ${remediablePages > 0 ? `<p class="dp-snapshot-note"><strong>Snapshot as of ${htmlEscape(heroDateFmt || "the latest scan")}.</strong> These counts are a point-in-time view — they may change as files are added, edited, or removed from the site.</p>` : ""}
 </header>
 
-${accessPanelHtml}
-${renderSiteAccessibilitySection(siteAudit)}
-
 <section class="files-section" aria-labelledby="dp-inv-heading">
 <div class="inv-header inv-header-files">
   <div class="scope-head scope-head-files scope-head-lg">
@@ -2361,6 +2372,9 @@ ${paginatorNav({ live: true, bottom: true })}
 </div>
 ${pageViewSectionHtml}
 </section>
+
+${renderSiteAccessibilitySection(siteAudit)}
+${accessPanelHtml}
 </main>
 
 ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt })}
@@ -2379,7 +2393,7 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
   // data on the page instead of two. Survives DOM re-ordering by sort.
   const rowData = new Map();
   allRows.forEach(function (row) {
-    const vals = Array.from(row.cells).map(function (td) { return td.dataset.num || td.textContent.trim(); });
+    const vals = Array.from(row.cells).map(function (td) { return td.dataset.num || td.dataset.sortValue || td.textContent.trim(); });
     if (row.dataset.search) vals.push(row.dataset.search);
     rowData.set(row, vals);
   });

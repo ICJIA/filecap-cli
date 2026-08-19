@@ -194,14 +194,15 @@ const JOURNEY = [
   { n: "5", label: "Send it back", sub: "Email the file" },
 ];
 
+// v1.62.0 — trimmed from twelve entries to six. A density review found
+// half the answers restated guidance the steps above already give (the
+// Delete? column, saving as you go, judging a file from its two links);
+// an answer that repeats the page is length without information. The six
+// that remain answer questions the steps genuinely don't.
 const FAQ = [
   {
-    q: "I clicked Download and nothing opened.",
-    a: "That is what is supposed to happen. The file saves straight to your Downloads folder instead of opening in the browser. Look for it there, or click the download icon your browser shows near the address bar.",
-  },
-  {
-    q: "Nothing happened at all — no file appeared.",
-    a: "Your browser may have held the download back. Check for a small bar or icon near the address bar offering Keep or Allow, and choose it. If you are on a managed ICJIA laptop and still see nothing, email the audit administrator and one will be sent to you directly.",
+    q: "I clicked Download and nothing happened.",
+    a: "Usually it did — the file saves straight to your Downloads folder instead of opening on screen, so look there, or click the download icon your browser shows near the address bar. If there is truly no file, your browser may have held it back: look for a small bar or icon near the address bar offering Keep or Allow, and choose it. Still nothing? Email the audit administrator and one will be sent to you directly.",
   },
   {
     q: "I cannot find the Notes column.",
@@ -216,28 +217,8 @@ const FAQ = [
     a: "Whether the file can be read aloud correctly by a screen reader — whether its headings, tables, and images are labelled so software can make sense of them. It runs from 0 to 100. A high score does not mean the writing is good, only that the file is readable by assistive technology.",
   },
   {
-    q: "I do not recognise one of these files.",
-    a: "That is what the two link columns are for. Public URL (column D) opens the file itself. Page References (column E) opens the page on your website that links to it. Between them you can almost always place a file in under a minute.",
-  },
-  {
     q: "A file has no page listed in column E.",
     a: "It is on the server but nothing links to it any more. Those are usually good candidates for archive, but check with whoever published it first.",
-  },
-  {
-    q: "The same file appears on another site's list too.",
-    a: "Some files are published in more than one place. Mark it on your own site's spreadsheet and say so in the Notes cell; the audit team reconciles the copies.",
-  },
-  {
-    q: "Can I explain my reasoning in the Notes cell?",
-    a: "Please do. Put the outcome first so it can be read at a glance, then whatever context is useful — archive — superseded by the 2026 edition reads perfectly well. Your reasoning is often the most valuable thing on the row.",
-  },
-  {
-    q: "What about the Delete? column, next to Notes?",
-    a: "Leave it blank. It is an older column kept for compatibility. Everything the audit team needs is in Notes.",
-  },
-  {
-    q: "Do I have to finish it in one sitting?",
-    a: "No. Save the file and come back to it. Nothing on this website is keeping track — the spreadsheet on your desktop is the only copy of your answers, so save your work as you go.",
   },
   {
     q: "Some of these files should not be public at all.",
@@ -673,7 +654,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
     ${renderExampleGrid()}
 
     <div class="hp-note">
-      <p><strong>Three practical things.</strong> Record your decision on every file tab, not just the first. Ignore the <strong>Delete?</strong> column next to Notes &mdash; it is an older column and the audit team works from Notes. And save as you go: the spreadsheet on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
+      <p><strong>Four practical things.</strong> Record your decision on every file tab, not just the first. Writing more than the outcome is welcome &mdash; put the word first, then your reasoning (<em>archive &mdash; superseded by the 2026 edition</em> reads perfectly well). Ignore the <strong>Delete?</strong> column next to Notes &mdash; it is an older column and the audit team works from Notes. And save as you go: the spreadsheet on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
     </div>`,
   });
 
@@ -760,7 +741,7 @@ ${PLAUSIBLE_SNIPPET}
 
   <section class="hp-faqs" aria-labelledby="hp-faq-heading">
     <h2 class="hp-faq-heading" id="hp-faq-heading">If something does not go to plan</h2>
-    <p class="hp-faq-lede">The ${spellCount(FAQ.length)} things people ask most, answered in full.</p>
+    <p class="hp-faq-lede">The ${spellCount(FAQ.length)} questions people actually ask, answered in full.</p>
     <div class="hp-faq-grid">
       ${renderFaq()}
     </div>

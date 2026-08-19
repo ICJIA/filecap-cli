@@ -90,6 +90,11 @@ const SEARCH_CSS = `
 .search-status { color: #d4dae0; margin: 0.6rem 0 0.9rem; min-height: 1.4em; }
 .search-status strong { color: #e5e5e5; }
 .search-hint { color: #7d8590; font-size: 0.9rem; margin-top: 0.4rem; }
+.search-hint-more { margin-top: 0.5rem; font-size: 0.9rem; color: #7d8590; }
+.search-hint-more summary { cursor: pointer; color: #8fb8e8; font-weight: 600; }
+.search-hint-more summary:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; border-radius: 3px; }
+.search-hint-more[open] summary { margin-bottom: 0.4rem; }
+.search-hint-more p { margin: 0 0 0.6rem; line-height: 1.6; max-width: 90ch; }
 .search-table-wrap { overflow-x: auto; border: 1px solid #21262d; border-radius: 8px; }
 .search-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 .search-table th {
@@ -275,7 +280,8 @@ ${PLAUSIBLE_SNIPPET}
   <div class="fleet-section-banner" role="presentation">
     <p class="fleet-section-eyebrow">Fleet-wide file search</p>
     <h1 class="fleet-section-headline">Find a file, anywhere on the fleet</h1>
-    <p class="fleet-section-lede">Search all ${totalFmt} files inventoried across ${siteCount} ICJIA websites by full or partial filename. That's every file the scan sees — images, web pages, and other reference material included — not just the ${remFmt} ${remNoun} on the remediation list. Fragments are fine — <em>dvfr report</em>, <em>annual 2023</em>, a site's name, even a near-miss spelling — and the results show every site that carries a match.${generatedAt ? ` Generated <time>${he(generatedAt)}</time>.` : ""}</p>
+    <p class="fleet-section-lede">Search all ${totalFmt} files across ${siteCount} ICJIA websites by full or partial filename. Fragments and near-miss spellings are fine — <em>dvfr report</em>, <em>annual 2023</em>, a site's name.${generatedAt ? ` Generated <time>${he(generatedAt)}</time>.` : ""}</p>
+    <p class="fleet-section-meta">That's every file the scan sees — images and web pages included — not just the ${remFmt} ${remNoun} on the remediation list.</p>
   </div>
 
   <div class="search-wrap">
@@ -312,7 +318,16 @@ ${PLAUSIBLE_SNIPPET}
     </div>
     <div id="search-results"></div>
     <div id="report-view" hidden></div>
-    <p class="search-hint">Results are ordered by accessibility score, highest first — click any column heading to re-sort (files without a score always sort last). Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links. To build a <strong>custom report</strong>, tick the box on any result — or add every match at once — then search for something else and keep adding. The report bar above shows what you've collected, with its own view, Excel download, and clear buttons — the report view sorts like the results (click <em>Website</em> to group a site's files together), and the downloaded report follows the current sort. A custom report lasts for this browser tab only: it survives leaving and returning to this page, and is gone when the tab closes.</p>
+    <!-- v1.62.0 — this used to be one ~180-word paragraph of instructions,
+         shown before the reader had typed anything (density review: nobody
+         reads a manual for a search box). One line stays visible; the
+         mechanics wait behind a disclosure for the reader who wants them. -->
+    <p class="search-hint">Results are ordered by accessibility score, highest first &mdash; click any column heading to re-sort. Tick boxes to collect files into a <strong>custom report</strong> you can download as Excel.</p>
+    <details class="search-hint-more">
+      <summary>How matching, reports, and downloads work</summary>
+      <p>Matches look at the filename, the folder path, and the site's name — so <em>dvfr report</em> finds reports on the DVFR site even when "DVFR" isn't in the filename. The matched part of each filename is highlighted, and a note explains any match that isn't in the name itself. Files without a score always sort last. "View report" opens that file's shareable audit report — exactly what's wrong and how to fix it — in a new tab. Spreadsheet downloads include every matching file with the same links.</p>
+      <p>To build a <strong>custom report</strong>, tick the box on any result — or add every match at once — then search for something else and keep adding. The report bar above shows what you've collected, with its own view, Excel download, and clear buttons — the report view sorts like the results (click <em>Website</em> to group a site's files together), and the downloaded report follows the current sort. A custom report lasts for this browser tab only: it survives leaving and returning to this page, and is gone when the tab closes.</p>
+    </details>
   </div>
 </main>
 

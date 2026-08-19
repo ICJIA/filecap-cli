@@ -634,8 +634,8 @@ describe("legacy-office counts as remediable in computeSiteSummary (v1.39.0 E7)"
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
 
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    // Both legacy files count as remediable on the card tile…
-    expect(html).toMatch(/<div class="tile audit"><span class="num">2<\/span>/);
+    // Both legacy files count as remediable in the card's donut caption…
+    expect(html).toContain("2 of 2 files");
     // …and both feed the ×5 legacy-office page estimate (2 × 5 = 10).
     expect(html).toContain("≈ 10 document pages");
     // The by-type table shows one merged Legacy Office row counting both.
@@ -667,7 +667,7 @@ describe("legacy-office counts as remediable in computeSiteSummary (v1.39.0 E7)"
 
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
     // Only the pdf counts as remediable…
-    expect(html).toMatch(/<div class="tile audit"><span class="num">1<\/span>/);
+    expect(html).toContain("1 of 2 files");
     // …and the phantom contributes no ×5 page estimate.
     expect(html).not.toContain("≈ 5 document pages");
   });

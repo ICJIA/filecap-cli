@@ -195,6 +195,18 @@ main {
   line-height: 1.55;
   color: #c0cdda;
 }
+/* v1.62.0 — the one-sentence definition of "remediation", stated where the
+   word is first met. The audience is managers who may not know the term;
+   burying the gloss two screens down (where it used to live) meant they
+   read the whole hero without it. */
+.fleet-section-gloss {
+  margin: 0 0 0.8rem;
+  max-width: 72ch;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: #9aa8b6;
+}
+.fleet-section-gloss strong { color: #c9d6e2; }
 .fleet-section-meta {
   margin: 0;
   font-size: 0.85rem;
@@ -206,6 +218,40 @@ main {
   .fleet-section-banner::before { width: 56px; height: 4px; margin-bottom: 1rem; }
   .fleet-section-lede { font-size: 1rem; }
 }
+
+/* v1.62.0 — the hero's jump link to the site cards. The cards are the one
+   section a unit manager needs, and they now sit directly below the hero —
+   this link makes that explicit and skips the caveat block for anyone on a
+   short viewport. Blue register: internal navigation, same family as the
+   cards' own primary button. */
+.fleet-hero-jump-row {
+  margin: 1.4rem 0 0.4rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+}
+.fleet-hero-jump {
+  display: inline-block;
+  padding: 0.55rem 1.2rem;
+  background: linear-gradient(180deg, #4dabf7 0%, #2f8de0 100%);
+  border: 1px solid #2f8de0;
+  border-radius: 8px;
+  color: #0c1219 !important;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.fleet-hero-jump:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(77, 171, 247, 0.35); text-decoration: none; }
+.fleet-hero-jump:focus-visible { outline: 3px solid #58a6ff; outline-offset: 2px; }
+.fleet-hero-jump-hint { font-size: 0.88rem; color: #8b949e; }
+@media (prefers-reduced-motion: reduce) {
+  .fleet-hero-jump { transition: none; }
+  .fleet-hero-jump:hover { transform: none; }
+}
+/* The cards' target needs breathing room under the sticky header. */
+#websites { scroll-margin-top: 4.5rem; margin-top: 3rem; }
 
 /* v1.7.23 — "Zero PII" reassurance banner. Sits right under the top section
    banner so anyone on the page sees it immediately. Green color register
@@ -538,8 +584,15 @@ main {
 }
 
 /* ── explanation section ───────────────────────────────────────── */
+/* v1.62.0 — the explainer now FOLLOWS the site cards (density review:
+   managers first, methodology second), and opens the "about the numbers"
+   band. The big top margin + hairline is the seam between the two halves
+   of the page; the extra air is deliberate — this page had no quiet
+   zones, every section butting the next in a filled box. */
 .explanation {
-  margin: 3em 0;
+  margin: 4.5rem 0 3em;
+  padding-top: 2.5rem;
+  border-top: 1px solid #21262d;
 }
 .explanation > h2 {
   font-size: 1.15rem;
@@ -937,12 +990,16 @@ main {
 }
 .site-card .donut-caption { text-align: left; }
 .site-card .donut-caption strong { display: block; color: #ffffff; font-size: 1em; }
-.site-card .donut-caption span { color: #9aa5b1; font-size: 0.85em; }
+.site-card .donut-caption span { display: block; color: #9aa5b1; font-size: 0.85em; }
+/* v1.62.0 — the ≈-pages workload line moved here from the retired stat
+   tiles; amber to keep its "workload" register from the old tile. */
+.site-card .donut-caption-pages { color: #d8a35a !important; margin-top: 2px; }
 
 .site-card .chips {
-  display: flex; justify-content: center; flex-wrap: wrap;
-  gap: 8px; margin: 0 0 12px;
+  display: flex; justify-content: flex-start; flex-wrap: wrap;
+  gap: 8px; margin: 10px 0 8px;
 }
+.site-card .tech-details .scan-meta { text-align: left; margin: 0 0 10px; }
 .site-card .chip {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 11px;

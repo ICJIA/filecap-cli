@@ -34,11 +34,25 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  *   id        - kebab slug ending in the announce date; dismissal key
  *   badge     - short chip label ("Scoring update", "New", "Improved")
  *   text      - plain-language paragraph, written for non-technical readers
+ *   summary?  - AT MOST TWO SENTENCES for the home-page banner. v1.62.0:
+ *               a density review found the banner running ~200 words —
+ *               ten lines of wall-of-text at the very top of the page.
+ *               The banner shows `summary` when present (falling back to
+ *               `text` for older entries) with a "read the full update"
+ *               link; the archive page always shows the full `text`.
+ *               Write one for every new entry.
  *   linkText? - optional trailing link label
  *   linkHref? - optional trailing link target
  *   date      - human-readable date shown under the text
  */
 export const WHATS_NEW = [
+  {
+    id: "easier-to-skim-2026-08-19",
+    badge: "Improved",
+    summary: "This site is now easier to skim: your website's card sits right under the headline numbers, and each site's report leads with its file list. Same numbers, less scrolling to reach them.",
+    text: "A reader told us the site had grown dense, and they were right — so the whole thing got easier to skim. On this home page, the website cards now sit directly under the headline numbers (a Find your website button jumps straight to them), with the background material — why not every file is counted, the by-file-type tables, the privacy notice — moved below the cards for anyone who wants it. Each site's report now leads with what you came for: the file list is first, the website-accessibility detail follows it, and the technical instructions for bulk file access moved to the very end. The word remediation is defined in one plain sentence right at the top, dates in the file tables read like dates (August 13, 2026, not a string of digits), the website cards are shorter with the file-type counts tucked into their details section, this banner now keeps to a couple of sentences, and the Help guide's question list was trimmed to the six questions people actually ask. Nothing about the audit itself changed — every number is the same one it was yesterday.",
+    date: "August 19, 2026",
+  },
   {
     id: "start-here-help-page-2026-08-19",
     badge: "New",
@@ -125,9 +139,13 @@ function renderEntryLink(entry) {
 export function renderWhatsNewBanner() {
   const current = WHATS_NEW[0];
   if (!current) return "";
+  const banner = current.summary ?? current.text;
+  const readMore = current.summary
+    ? ` <a href="whats-new.html">Read the full update</a>`
+    : renderEntryLink(current);
   return `<div class="whats-new-banner" id="whats-new-banner" role="region" aria-label="What's New" data-announcement-id="${he(current.id)}">
     <span class="whats-new-badge">${he(current.badge)}</span>
-    <p class="whats-new-text"><span class="whats-new-heading">What's New</span>${he(current.text)}${renderEntryLink(current)}
+    <p class="whats-new-text"><span class="whats-new-heading">What's New</span>${he(banner)}${readMore}
       <span class="whats-new-meta">Updated ${he(current.date)} &middot; <a href="whats-new.html" aria-label="See all updates — previous announcements">See all updates</a></span>
     </p>
     <button type="button" class="whats-new-dismiss" aria-label="Dismiss announcement" title="Dismiss">

@@ -384,7 +384,9 @@ describe("writeHtml", () => {
     // v1.40.0 — the 481KB-per-big-page values blob is gone; the client
     // projects sort/search values from the rendered cells + data-search.
     expect(html).not.toMatch(/id="filecap-data"/);
-    expect(html).toContain("td.dataset.num || td.textContent.trim()");
+    // v1.62.0 — data-sort-value joined the projection chain: the date
+    // column shows "Aug 13, 2026" but sorts on the ISO it carries.
+    expect(html).toContain("td.dataset.num || td.dataset.sortValue || td.textContent.trim()");
     expect(html).toContain("row.dataset.search");
   });
 
@@ -1111,7 +1113,11 @@ describe("writeHtml", () => {
       expect(html).not.toMatch(/class="access-panel/);
     });
 
-    it("places the access panel between the dp-hero and the meta-grid", async () => {
+    // v1.62.0 — the panel is the LAST section on the page. It used to sit
+    // directly under the hero, which made rsync/SSH instructions the second
+    // thing a non-technical manager read; the worklist they came for was
+    // two sections further down.
+    it("places the access panel last, after the file worklist", async () => {
       const outputPath = path.join(tmpDir, "out.html");
       await writeHtml({
         sourceHeader: sampleHeader,
@@ -1121,12 +1127,12 @@ describe("writeHtml", () => {
         accessKind: "strapi",
       });
       const html = await fs.readFile(outputPath, "utf8");
-      const heroEnd = html.indexOf("</header>");
+      const filesStart = html.indexOf('<section class="files-section"');
       const panelStart = html.indexOf('<section class="access-panel');
-      const metaGrid = html.indexOf('<div class="meta-grid">');
-      expect(heroEnd).toBeGreaterThan(-1);
-      expect(panelStart).toBeGreaterThan(heroEnd);
-      expect(metaGrid).toBeGreaterThan(panelStart);
+      const mainEnd = html.indexOf("</main>");
+      expect(filesStart).toBeGreaterThan(-1);
+      expect(panelStart).toBeGreaterThan(filesStart);
+      expect(mainEnd).toBeGreaterThan(panelStart);
     });
   });
 
@@ -1439,10 +1445,11 @@ describe("writeHtml", () => {
       const detailsIdx = html.indexOf('dp-disclosure dp-sitedetails');
       const fileViewIdx = html.indexOf('<div class="file-view">');
       const pageViewIdx = html.indexOf('id="page-view"');
-      // The section's own close sits immediately before </main> (an inner
-      // <section class="audit-stats"> closes earlier, inside the breakdown).
-      const secEnd = html.indexOf("</section>\n</main>");
-      expect(secIdx).toBeGreaterThan(html.indexOf('<section class="site-accessibility"')); // website section stays outside, above
+      // v1.62.0 — the worklist leads: files-section comes BEFORE the
+      // website-accessibility section, which now follows it.
+      const siteA11yIdx = html.indexOf('<section class="site-accessibility"');
+      const secEnd = html.lastIndexOf("</section>", siteA11yIdx);
+      expect(siteA11yIdx).toBeGreaterThan(secIdx);
       expect(headerIdx).toBeGreaterThan(secIdx);
       expect(breakdownIdx).toBeGreaterThan(headerIdx);
       expect(detailsIdx).toBeGreaterThan(breakdownIdx);

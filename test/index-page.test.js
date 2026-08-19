@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot, renderScorecards } from "../src/web/index-page.js";
+import { renderCard, generateIndexHtml, renderToolCard, renderStatusDot, renderScorecards, renderTechDetails } from "../src/web/index-page.js";
 import { INDEX_CSS } from "../src/web/index-css.js";
 
 const baseSr = {
@@ -73,25 +73,24 @@ describe("renderCard", () => {
     expect(html).toMatch(/<h3 class="full-name">DVFR<\/h3>/);
   });
 
-  it("renders the total tile with the total-files number (not swapped)", () => {
+  // v1.62.0 — the two big stat tiles are gone (density review: the donut
+  // caption already carried both numbers, so the card said "430 of 569"
+  // twice). The donut row is now the card's one quantitative element.
+  it("renders both counts in the donut caption, not in stat tiles", () => {
     const html = renderCard(baseSr);
-    expect(html).toMatch(/<div class="tile total"><span class="num">102<\/span>/);
+    expect(html).not.toContain('class="tile');
+    expect(html).toContain("69 of 102 files");
   });
 
-  it("renders the audit tile with the audit-needed number (not swapped)", () => {
-    const html = renderCard(baseSr);
-    expect(html).toMatch(/<div class="tile audit"><span class="num">69<\/span>/);
-  });
-
-  it("renders a plain-English 'may need audit' label in the audit tile", () => {
+  it("renders a plain-English 'may need audit' label in the donut", () => {
     const html = renderCard(baseSr);
     expect(html).toMatch(/need audit/i);
   });
 
-  it("zero-files edge case renders 0/0 tiles", () => {
+  it("zero-files edge case renders a 0-of-0 caption", () => {
     const sr = { ...baseSr, summary: { totalFiles: 0, remediable: 0, totalBytes: 0, byCategory: {} } };
     const html = renderCard(sr);
-    expect(html).toMatch(/<span class="num">0<\/span>/);
+    expect(html).toContain("0 of 0 files");
   });
 
   it("makes the whole card clickable via a stretched-link <a> with aria-label", () => {
@@ -299,14 +298,21 @@ describe("renderCard tech-details (v1.7.8 expanded with copy buttons)", () => {
     expect(buttons.length).toBe(2);
   });
 
-  it("omits the entire tech-details section when no fields populated", () => {
+  // v1.62.0 — the disclosure also carries the per-type chips and the
+  // size/scan line now, so a card with no tech fields still renders it
+  // (for those), but with no tech-grid inside.
+  it("omits the tech-grid when no tech fields are populated", () => {
     const srEmpty = {
       ...sr,
       site: { name: "x", siteName: "", host: "" },
       header: { metadata: {} },
     };
     const html = renderCard(srEmpty);
-    expect(html).not.toContain('<details class="tech-details">');
+    expect(html).not.toContain('<div class="tech-grid">');
+  });
+
+  it("omits the entire disclosure when there is nothing at all to show", () => {
+    expect(renderTechDetails({ site: { name: "x", siteName: "", host: "" }, header: { metadata: {} } })).toBe("");
   });
 });
 

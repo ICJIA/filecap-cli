@@ -665,14 +665,17 @@ describe("runWebRollup", () => {
     expect(html).not.toContain("Text files (.txt");
   });
 
-  it("index.html site cards contain Technical details disclosure element", async () => {
+  it("index.html site cards contain the file-types/technical-details disclosure", async () => {
     const { sitesFile, outputDir, auditsBase } = await buildFixture();
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
 
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).toContain("Technical details");
+    // v1.62.0 — the disclosure absorbed the per-type chips and scan meta,
+    // and its summary label widened to say so.
+    expect(html).toContain("File types &amp; technical details");
     expect(html).toContain("<details");
     expect(html).toContain("<summary>");
+    expect(html).toMatch(/<details class="tech-details">[\s\S]*?class="chips"/);
   });
 
   it("index.html hero uses plain-English wording (v1.7.13: audit-first phrasing)", async () => {

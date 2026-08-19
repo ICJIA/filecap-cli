@@ -10,6 +10,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.62.0] — 2026-08-19
+
+### Changed — density pass: managers first, methodology second
+
+An adversarial design review (2026-08-19) judged the app against its actual
+audience — non-technical managers who may not know what "accessibility
+remediation" means — and found the craft good but the curation missing:
+8,364 words and 981 links on the home page, with the one section a manager
+needs starting three screens down. This release is that review's eight
+findings, implemented. **No number changed anywhere** — this is editing,
+reordering, and deleting.
+
+- **Home page reordered.** The site cards now sit directly under the fleet
+  hero; the "why aren't all files counted" explainer, the by-file-type
+  tables, and the PII banner moved below the cards, opening an
+  "about the numbers" band behind a visible seam. The hero gained a
+  **"Find your website ↓"** jump button (`#websites`, scroll-margin under
+  the sticky header).
+- **Report pages reordered.** The file worklist — the reason a manager is
+  on the page — now follows the hero directly. Website accessibility comes
+  after it, and the bulk-file-access panel (rsync/SSH instructions, pure
+  sysadmin content that used to be the *second thing on the page*) is now
+  last. Order pins in `report-html.test.js` updated to the new layout.
+- **"Remediation" is defined where it's first met.** One plain sentence
+  under the home headline: fixing a document so someone using a screen
+  reader can read it. The hero's "(remediation workload)" label is now
+  "(estimated fixing workload)", and "audit-actionable counts" left the
+  lede.
+- **Site cards slimmed.** The two big stat tiles are gone — the donut
+  caption already carried both numbers, so every card said "430 of 569"
+  twice. The ≈-pages workload line moved into the donut caption; the
+  file-type chips and the size/scan line moved inside the disclosure,
+  relabelled "File types & technical details" (which now renders even when
+  no tech fields are populated, since it carries the chips).
+- **The What's New banner keeps to two sentences.** Entries gained an
+  optional `summary` field the banner prefers, with a "Read the full
+  update" link to the archive; older entries without one fall back to full
+  text. The v1.62.0 entry is the first to use it — the banner was itself a
+  finding, running ~200 words at the very top of the page.
+- **Human dates in the report tables.** "Date published" shows
+  "Aug 13, 2026" instead of `2026-08-13T14:14:49.000Z`; the ISO rides in
+  `data-sort-value` (title-tooltip'd), and the sort/search projection
+  chain honors it, so chronological sort behaves exactly as before.
+- **Help FAQ trimmed from twelve to six.** Half the answers restated
+  guidance the steps already give (Delete? column, saving as you go,
+  judging from the two links). The reasoning-welcome guidance folded into
+  step 4's practical notes. The lede count derives from `FAQ.length`.
+- **Search page stops front-loading a manual.** The ~180-word instruction
+  paragraph shown before anyone typed is now one line plus a
+  "How matching, reports, and downloads work" disclosure; the lede
+  shortened to match. (The Help page's no-collapsibles rule is about task
+  steps; reference mechanics for a search box are exactly what disclosure
+  is for.)
+
 ## [1.61.6] — 2026-08-19
 
 ### Fixed — `/help` walks one example site the whole way through

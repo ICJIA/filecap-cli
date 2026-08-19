@@ -605,7 +605,7 @@ export function displayUrl(u) {
 // block. `header` is the site's NDJSON scan header (null for a
 // registered-but-unscanned site, in which case only the sites.json-derived
 // rows show). Renders nothing when no field is populated.
-export function renderTechDetails({ site, header }) {
+export function renderTechDetails({ site, header, chipsHtml = "", scanMeta = "" }) {
   const techWebsiteRaw = site.siteName ?? site.name ?? "";
   const techIpRaw = header?.metadata?.serverIp ?? "";
   const techHostnameRaw = header?.metadata?.hostname ?? site.host ?? "";
@@ -616,14 +616,22 @@ export function renderTechDetails({ site, header }) {
   // sites the scan records the IP as the hostname, so the row was redundant).
   const showHostname = techHostnameRaw && techHostnameRaw !== techIpRaw;
   const populated = [techWebsiteRaw, showHostname ? techHostnameRaw : "", techUrlRaw].filter(Boolean).length;
-  if (populated === 0) return "";
+  if (populated === 0 && !chipsHtml && !scanMeta) return "";
+  // v1.62.0 — the per-type chips (318 PDFs · 112 Office · 139 images) and
+  // the size/scan-time line moved in here from the card face. They answer
+  // "what kind of files, how big, when scanned" — real questions, but not
+  // the find-your-site-and-download decision the card exists for. Density
+  // review 2026-08-19: every visible element on a card is paid for twelve
+  // times over on the index.
   return `<details class="tech-details">
-    <summary>Technical details</summary>
-    <div class="tech-grid">
+    <summary>File types &amp; technical details</summary>
+    ${chipsHtml ? `<div class="chips">${chipsHtml}</div>` : ""}
+    ${scanMeta ? `<p class="scan-meta">${scanMeta}</p>` : ""}
+    ${populated > 0 ? `<div class="tech-grid">
       ${techWebsiteRaw ? `<span class="tech-label">Website:</span>${copyableValue(techWebsiteRaw, null, "site nickname")}` : ""}
       ${showHostname ? `<span class="tech-label">Hostname:</span>${copyableValue(techHostnameRaw, null, "hostname")}` : ""}
       ${techUrlRaw ? `<span class="tech-label">URL:</span>${copyableValue(techUrlRaw, `<a href="${he(techUrlRaw)}" target="_blank" rel="noopener noreferrer">${he(techUrlRaw)}</a>`, "public URL")}` : ""}
-    </div>
+    </div>` : ""}
   </details>`;
 }
 
@@ -834,7 +842,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   // v1.21.0 — tech-details extracted to renderTechDetails() so the /sites
   // roster card reuses the identical block (website, IP, hostname, scanned
   // path, public URL — each copy-to-clipboard, collapsed by default).
-  const techDetailsHtml = renderTechDetails({ site, header: sr.header });
+  const techDetailsHtml = renderTechDetails({ site, header: sr.header, chipsHtml, scanMeta });
 
   // v1.36.0 — file-accessibility read: the average of this site's scored
   // documents (auditScoreSum / auditedDocCount), banded far→closer. Derived
@@ -868,17 +876,11 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   </header>
   ${sr.description ? `<p class="card-desc">${he(sr.description)}</p>` : ""}
   ${renderStatusDot(sr.status, sr.site?.name)}
-  <div class="nums">
-    <div class="tile total"><span class="num">${he(totalFiles.toLocaleString())}</span><span class="lbl">total files</span></div>
-    <div class="tile audit"><span class="num">${he(remediable.toLocaleString())}</span><span class="lbl">may need audit</span>${remediablePages > 0 ? `<span class="lbl-sub" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} document pages</span>` : ""}</div>
-  </div>
   <div class="donut-row">
     <div class="donut" style="--pct:${pct}%"><div class="pct">${pctInt}%<small>may need audit</small></div></div>
-    <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span></div>
+    <div class="donut-caption"><strong>${he(phrase)}</strong><span>${he(remediable.toLocaleString())} of ${he(totalFiles.toLocaleString())} files</span>${remediablePages > 0 ? `<span class="donut-caption-pages" title="${he(sitePagesTooltip)}">≈ ${he(remediablePages.toLocaleString())} document pages to fix</span>` : ""}</div>
   </div>
   ${fileA11yHtml}
-  ${chipsHtml ? `<div class="chips">${chipsHtml}</div>` : ""}
-  <p class="scan-meta">${scanMeta}</p>
   ${techDetailsHtml}
   <div class="actions">
     <a href="${he(htmlFile)}" class="btn btn-primary">View detailed report &rarr;</a>
@@ -1159,7 +1161,8 @@ ${renderWhatsNewBanner()}
   <div class="fleet-section-banner" role="presentation">
     <p class="fleet-section-eyebrow">Section · Fleet snapshot</p>
     <h1 class="fleet-section-headline">ICJIA Accessibility Fleet Audit</h1>
-    <p class="fleet-section-lede">A complete scan of every file on ICJIA&#39;s ${he(String(siteCount))} sites, with audit-actionable counts, per-site detail, and a 30-second answer to &ldquo;what may need accessibility remediation across our fleet right now?&rdquo;</p>
+    <p class="fleet-section-lede">A complete scan of every file on ICJIA&#39;s ${he(String(siteCount))} sites: what each site publishes, which documents may need accessibility work, and a 30-second answer to &ldquo;how big is the job right now?&rdquo;</p>
+    <p class="fleet-section-gloss"><strong>&ldquo;Remediation&rdquo;</strong> &mdash; the word this audit uses throughout &mdash; just means <strong>fixing a document</strong> (a PDF, Word, Excel, or PowerPoint file) so someone using a screen reader can read it.</p>
     <p class="fleet-section-meta">Generated <time>${he(generatedAt)}</time> &middot; ${he(String(siteCount))} website${siteCount !== 1 ? "s" : ""}</p>
   </div>
 
@@ -1190,7 +1193,7 @@ ${renderWhatsNewBanner()}
       <div class="fleet-hero-num-block">
         <p class="fleet-hero-eyebrow">Files that may need accessibility audit</p>
         <p class="fleet-hero-num">${he(fleetRemediable.toLocaleString())}</p>${fleetRemediablePages > 0 ? `
-        <p class="fleet-hero-pages" title="${he(fleetPagesTooltip)}">≈ <strong>${he(fleetRemediablePages.toLocaleString())}</strong> document pages <span class="fleet-hero-pages-hint">(remediation workload)</span></p>` : ""}
+        <p class="fleet-hero-pages" title="${he(fleetPagesTooltip)}">≈ <strong>${he(fleetRemediablePages.toLocaleString())}</strong> document pages <span class="fleet-hero-pages-hint">(estimated fixing workload)</span></p>` : ""}
         <p class="fleet-hero-context">out of <strong>${he(fleetTotalFiles.toLocaleString())}</strong> files scanned across ${he(String(siteCount))} ICJIA website${siteCount !== 1 ? "s" : ""}</p>
       </div>
       <div class="fleet-hero-donut-block">
@@ -1199,12 +1202,39 @@ ${renderWhatsNewBanner()}
         </div>
         <p class="fleet-hero-phrase"><strong>${he(fleetPhrase)}</strong></p>
       </div>
-    </div>${fleetRemediablePages > 0 ? `
+    </div>
+    <p class="fleet-hero-jump-row"><a class="fleet-hero-jump" href="#websites">Find your website <span aria-hidden="true">&darr;</span></a><span class="fleet-hero-jump-hint">Each site has its own card, report, and spreadsheet below.</span></p>${fleetRemediablePages > 0 ? `
     <aside class="potential-callout" role="note">
       <p class="potential-callout-eyebrow">Snapshot as of <strong>${he(lastFleetScanLabel)}</strong> <span class="potential-callout-eyebrow-suffix">— last fleet audit</span></p>
       <p><strong>Potential workload — not a fixed commitment.</strong> Both the <strong>file counts</strong> and the <strong>document page counts</strong> shown here are a point-in-time view of the fleet. They <strong>will change</strong> as staff remove files, edit content, update sites, or publish new material. The fleet total (≈ ${he(fleetRemediablePages.toLocaleString())} document pages across ${he(fleetRemediable.toLocaleString())} files) is an inclusive estimate of <em>what a vendor could be quoted against today</em>, not what staff have committed to remediate. Treat the fleet total and the per-site numbers below as order-of-magnitude figures for planning — re-run the fleet audit before locking in any scope or budget number.</p>
     </aside>` : ""}`;
     })()}
+  </section>
+
+
+
+  <section class="section" id="websites">
+    <h2>Websites in this audit</h2>
+    <div class="site-grid-sort" role="group" aria-label="Sort the websites list">
+      <span class="site-grid-sort-label">Sort by:</span>
+      <div class="site-grid-sort-buttons">
+        <button type="button" class="sort-btn" data-sort="az" aria-pressed="false">
+          <span class="sort-btn-glyph" aria-hidden="true">A&thinsp;&rarr;&thinsp;Z</span>
+          <span class="sort-btn-label">Alphabetical</span>
+        </button>
+        <button type="button" class="sort-btn is-active" data-sort="added" aria-pressed="true">
+          <span class="sort-btn-glyph" aria-hidden="true">&#9733;</span>
+          <span class="sort-btn-label">Most recently added</span>
+        </button>
+        <button type="button" class="sort-btn" data-sort="files" aria-pressed="false">
+          <span class="sort-btn-glyph" aria-hidden="true">&#9660;</span>
+          <span class="sort-btn-label">Most files first</span>
+        </button>
+      </div>
+    </div>
+    <div class="site-grid">
+${cardsHtml}
+    </div>
   </section>
 
   <section class="explanation">
@@ -1291,11 +1321,12 @@ ${renderWhatsNewBanner()}
     </div>
   </section>
 
-  <!-- v1.7.25: PII banner moved here from the top of the page. The audit
-       numbers + donut hero are the most important above-the-fold content, so
-       they get the top position; the PII reassurance sits right before the
-       Websites-in-this-audit grid where a viewer would naturally start
-       asking "wait, what's actually IN these audits?" Headline spells out
+  <!-- v1.62.0: the "about the numbers" block — the why-arent-all-counted
+       explainer, the by-file-type tables, and the PII banner — now sits
+       BELOW the site cards. A 2026-08-19 density review found the cards
+       (the one section a unit manager actually needs) starting ~3 screens
+       down, behind fleet-level context that answers leadership questions.
+       Leadership scrolls; managers shouldn't have to. Headline spells out
        PII so a non-technical reader who hasn't seen the acronym doesn't
        have to guess what it means (and doesn't misread it as "PILL"). -->
   <aside class="no-pii-banner" role="note" aria-labelledby="no-pii-heading">
@@ -1335,30 +1366,6 @@ ${renderWhatsNewBanner()}
       <p class="no-pii-banner-footer">The Intranet site contains <strong>ICJIA-internal materials</strong> (staff worksheets, bus schedules, internal references) &mdash; useful to ICJIA staff, but <strong>still contains zero personally identifying information</strong>. Same applies to every other site in this audit.</p>
     </div>
   </aside>
-
-  <section class="section">
-    <h2>Websites in this audit</h2>
-    <div class="site-grid-sort" role="group" aria-label="Sort the websites list">
-      <span class="site-grid-sort-label">Sort by:</span>
-      <div class="site-grid-sort-buttons">
-        <button type="button" class="sort-btn" data-sort="az" aria-pressed="false">
-          <span class="sort-btn-glyph" aria-hidden="true">A&thinsp;&rarr;&thinsp;Z</span>
-          <span class="sort-btn-label">Alphabetical</span>
-        </button>
-        <button type="button" class="sort-btn is-active" data-sort="added" aria-pressed="true">
-          <span class="sort-btn-glyph" aria-hidden="true">&#9733;</span>
-          <span class="sort-btn-label">Most recently added</span>
-        </button>
-        <button type="button" class="sort-btn" data-sort="files" aria-pressed="false">
-          <span class="sort-btn-glyph" aria-hidden="true">&#9660;</span>
-          <span class="sort-btn-label">Most files first</span>
-        </button>
-      </div>
-    </div>
-    <div class="site-grid">
-${cardsHtml}
-    </div>
-  </section>
 
 ${renderMasterCsvSection(masterCsv)}
 ${renderScoresBySiteSection(scoresBySite)}
