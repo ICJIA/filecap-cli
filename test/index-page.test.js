@@ -828,3 +828,48 @@ describe("explains the widened scoring scope in the scores-by-site section", () 
     expect(html).not.toContain("Scores cover PDFs only");
   });
 });
+
+// v1.61.3 — the forward-looking section previewed the Page view and
+// fleet-wide search for months after both shipped (v1.13.0 / v1.46.0).
+// Nothing caught it, because a "coming soon" list has no failure mode a
+// test would notice. These pin the two properties that made it rot: it
+// promised delivery, and it named features by description rather than
+// linking to them, so nobody rereading the page recognised what had
+// already been built.
+describe("the 'what could come next' section stays honest (v1.61.3)", () => {
+  const section = () => {
+    const html = generateIndexHtml({ siteResults: [baseSr], password: null });
+    const start = html.indexOf('<section class="section todo">');
+    expect(start, "todo section is rendered").toBeGreaterThan(-1);
+    return html.slice(start, html.indexOf("</section>", start));
+  };
+
+  it("frames its items as proposals, not scheduled work", () => {
+    const todo = section();
+    expect(todo).toContain("Under consideration");
+    expect(todo).toContain("ideas, not commitments");
+    expect(todo).toContain("Neither of these is scheduled");
+  });
+
+  // Promise language is what turns a stale entry into a false claim.
+  it("makes no delivery promises", () => {
+    const todo = section();
+    for (const phrase of [
+      "in active development",
+      "will appear in upcoming releases",
+      "the next major release",
+      "Coming soon",
+    ]) {
+      expect(todo, `todo section should not say "${phrase}"`).not.toContain(phrase);
+    }
+  });
+
+  // Shipped features are linked, so a reader (or a maintainer rereading
+  // this page) sees at once that they exist rather than reading a
+  // description and assuming it is still to come.
+  it("points at the shipped features it used to preview", () => {
+    const todo = section();
+    expect(todo).toContain('href="search.html"');
+    expect(todo).toContain('href="help.html"');
+  });
+});

@@ -1813,6 +1813,9 @@ dialog.access-modal .access-modal-cta a {
   line-height: 1.55;
   color: #c0cdda;
 }
+/* v1.61.3 — items carry more than one paragraph now (what is missing
+   today, then what could replace it), so they need separating. */
+.todo .todo-item p + p { margin-top: 0.7rem; }
 .todo .todo-item code {
   background: rgba(0, 0, 0, 0.35);
   padding: 0.05rem 0.35rem;

@@ -355,36 +355,48 @@ function renderDuplicatesSection(groups, _duplicatesCsv) {
 }
 
 /**
- * v1.7.30 — "Coming soon" / in-development section at the bottom of the
- * fleet index. Mirrors the layout register of the fleet + duplicates
- * section banners (eyebrow + clamped headline + lede + accent bar), but
- * with a violet accent so the eye reads it as a third visual category:
- * not "current state" (blue), not "warning / awareness" (amber), but
- * "upcoming." v1.12.2: the reference-discovery items shipped; this now
- * previews the two upcoming features — the Page view and fuzzy search.
+ * v1.7.30 — the forward-looking section at the bottom of the fleet index.
+ * Mirrors the layout register of the fleet + duplicates section banners
+ * (eyebrow + clamped headline + lede + accent bar), but with a violet
+ * accent so the eye reads it as a third visual category: not "current
+ * state" (blue), not "warning / awareness" (amber), but "not yet."
+ *
+ * v1.61.3 — the two features previewed here, the Page view and fleet-wide
+ * search, shipped in v1.13.0 and v1.46.0 and sat here being promised for
+ * months afterwards. Nobody noticed, because a "coming soon" list has no
+ * failure mode that shows up in a test.
+ *
+ * So the framing changed with the content: these are ideas under
+ * consideration, explicitly not commitments, and the lede invites readers
+ * to say which would help. A list of proposals ages into a list of
+ * proposals; a list of promises ages into a lie. If you ship one of
+ * these, delete it from here in the same commit.
  */
 function renderTodoSection() {
   return `
   <section class="section todo">
     <div class="todo-section-banner" role="presentation">
-      <p class="todo-section-eyebrow">Section · Coming soon</p>
-      <h2 class="todo-section-headline">What's next for this audit</h2>
-      <p class="todo-section-lede">Two new ways to explore the same audit data are in active development and will appear in upcoming releases. The numbers don&#39;t change &mdash; these are just different lenses on the same fleet.</p>
+      <p class="todo-section-eyebrow">Section · Under consideration</p>
+      <h2 class="todo-section-headline">What could come next</h2>
+      <p class="todo-section-lede">The two features previewed here before &mdash; the <a href="search.html">fleet-wide search</a> and the <strong>Page view</strong> on every site report &mdash; have both shipped. These two are <strong>ideas, not commitments</strong>. They are the things that would most obviously help next; if one of them would make your job easier, say so and it moves up the list.</p>
     </div>
 
     <ul class="todo-list">
       <li class="todo-item">
-        <h3 class="todo-item-h3">A &ldquo;Page view&rdquo; alongside the current &ldquo;File view&rdquo;</h3>
-        <p>Today every report is organised <strong>by file</strong> &mdash; one row per document, with the pages that link to it. A new <strong>Page view</strong> turns that around: one row per <strong>page</strong> on a site, showing that page&#39;s own accessibility score and the files attached to it. A clear toggle at the top of each report switches between the two &mdash; <strong>File view stays the default</strong>, with a short plain-English note by the toggle explaining the difference. Useful when a manager wants to walk a smaller site page by page rather than file by file.</p>
+        <h3 class="todo-item-h3">Closing the loop on the spreadsheets you send back</h3>
+        <p>The <a href="help.html">Help guide</a> ends by asking you to email your completed workbook to the audit team. After that, nothing on this site knows it happened &mdash; the decisions live in an inbox, and the only way to find out how far the fleet has got is to open twelve attachments and count.</p>
+        <p>The audit could read those returned workbooks and show, per site, how many files have a decision recorded against them, how many are still blank, and the split between <strong>archive</strong>, <strong>remediate</strong>, and <strong>as-is</strong>. Your own numbers, back on the site you got the spreadsheet from.</p>
+        <p class="todo-item-payoff"><strong>Why it matters:</strong> &ldquo;which sites have come back, and what is still outstanding?&rdquo; becomes a number on this page instead of a search through email.</p>
       </li>
       <li class="todo-item">
-        <h3 class="todo-item-h3">Fuzzy search across every file and page</h3>
-        <p>A fleet-wide search box: type part of a filename or a page name and it finds the match instantly across all the sites &mdash; no need for the exact name. Have a file and want to know where it lives? The result returns everything the audit knows about it: which site it&#39;s on, the pages that reference it, its accessibility score, and any duplicate copies on other sites.</p>
-        <p class="todo-item-payoff"><strong>Why it matters:</strong> answering &ldquo;is this file on our site, and where?&rdquo; goes from reading the spreadsheet by hand to a one-box lookup.</p>
+        <h3 class="todo-item-h3">Progress over time, with the scope changes marked</h3>
+        <p>Every audit already records each site&#39;s score, and that history goes back to June &mdash; it is what drives the small &#9650;/&#9660; change chips on the cards above. Nothing yet draws it as a line.</p>
+        <p>A chart of the fleet&#39;s score across every audit, and one per site, would answer the question a snapshot cannot. The important part is what gets marked <em>on</em> the line: the day the scoring rubric changed, the day the document archive came into scope, the day Office files started being scored. Each of those moved the number without a single file being fixed, and each of them has been mistaken for real change.</p>
+        <p class="todo-item-payoff"><strong>Why it matters:</strong> it separates &ldquo;we are getting better&rdquo; from &ldquo;we started measuring more&rdquo; &mdash; the distinction this audit is asked about most often.</p>
       </li>
     </ul>
 
-    <p class="todo-footer-note">Track progress on the <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">ICJIA Fleet Audit CHANGELOG</a> — the next major release will roll these out.</p>
+    <p class="todo-footer-note">Neither of these is scheduled. Shipped work is recorded in <a href="whats-new.html">What&#39;s New</a> and, in more detail, the <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">CHANGELOG</a>.</p>
   </section>`;
 }
 

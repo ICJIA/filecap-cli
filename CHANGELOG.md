@@ -10,6 +10,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.61.3] — 2026-08-19
+
+### Changed — the fleet index stops advertising features that already shipped
+
+- The forward-looking section at the bottom of the fleet index was still
+  previewing **the Page view** and **fleet-wide search** as upcoming work,
+  with copy promising they were "in active development" and that "the next
+  major release will roll these out". The Page view shipped in **v1.13.0**
+  and search in **v1.46.0** — the section had been advertising finished work
+  for months. Both items are gone, and the lede now links the shipped
+  features so a reader recognises them.
+- **Reframed from promises to proposals.** The section is headed *"What could
+  come next"* under *"Section · Under consideration"*, states outright that
+  its items are "ideas, not commitments", and closes with "Neither of these
+  is scheduled." A stale proposal is still a proposal; a stale promise is a
+  false claim, which is exactly what happened here.
+- **Two replacements, both grounded in what the codebase actually lacks:**
+  - *Closing the loop on returned spreadsheets.* `/help` ends by asking staff
+    to email a completed workbook back, and nothing consumes it — `Delete?`
+    and `Notes` are only ever written, never read. The proposal is to ingest
+    returned workbooks and show, per site, how many files carry a decision,
+    how many are blank, and the archive / remediate / as-is split.
+  - *Progress over time, with the scope changes marked.* `a11y-history.json`
+    already holds per-site score history back to June and only feeds the
+    ▲/▼ chips. The proposal is to draw it, with the rubric change, the
+    archive entering scope, and Office scoring marked **on** the line —
+    each moved the number without a file being fixed, and each has been
+    mistaken for real remediation.
+- **A regression test now guards the section** (`test/index-page.test.js`):
+  it fails if the promise language returns, if the "ideas, not commitments"
+  framing is dropped, or if the section stops linking the shipped features
+  it used to preview. The rot went unnoticed because static prose has no
+  failure mode a suite would catch; now it has one.
+- `.todo-item p + p` gets top margin — items carry more than one paragraph
+  now (what is missing today, then what could replace it).
+
 ## [1.61.2] — 2026-08-19
 
 ### Changed — "Help", not "Start here"; a quieter navbar
