@@ -10,6 +10,7 @@
 // bundle's connect-src 'self' CSP.
 
 import { INDEX_CSS } from "./index-css.js";
+import { helpNavLink, helpNavCss } from "./help-nav.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
 import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { escapeHtml as he } from "../util/html.js";
@@ -231,7 +232,7 @@ export function generateSearchHtml({ generatedAt = "", totalFiles = 0, siteCount
 ${PLAUSIBLE_SNIPPET}
 <title>Search the fleet — ICJIA Fleet Audit Assessment</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
-<style>${INDEX_CSS}${siteFooterCss()}${SEARCH_CSS}</style>
+<style>${INDEX_CSS}${siteFooterCss()}${SEARCH_CSS}${helpNavCss()}</style>
 </head>
 <body id="top">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -242,6 +243,7 @@ ${PLAUSIBLE_SNIPPET}
     <span class="brand"><span>ICJIA</span> Fleet Audit Assessment</span>
   </div>
   <div class="site-header-right">
+    ${helpNavLink()}
     <a class="audit-tool-link nav-sites" href="index.html" title="Back to the fleet snapshot (home)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 2.5l5.5 5"/><path d="M4 7v6h8V7"/></svg>
       <span>Home</span>

@@ -3,6 +3,8 @@ import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 import { INDEX_CSS } from "./index-css.js";
+import { helpNavLink, helpNavCss } from "./help-nav.js";
+import { renderHelpCallout, helpCss } from "./help-page.js";
 import { gradeForScore } from "../site-audit/aggregate.js";
 import { summarizeFileA11y, fileA11yCoverageText,
   fileA11yThinDataText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "../report/accessibility-band.js";
@@ -1017,7 +1019,7 @@ ${ogImage ? `<meta property="og:type" content="website">
 <meta name="twitter:image" content="${he(ogImage)}">
 ` : ""}<title>${pageTitle}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
-<style>${INDEX_CSS}${siteFooterCss()}</style>
+<style>${INDEX_CSS}${siteFooterCss()}${helpNavCss()}${helpCss()}</style>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1035,6 +1037,7 @@ ${ogImage ? `<meta property="og:type" content="website">
     <span class="brand"><span>ICJIA</span> Fleet Audit Assessment</span>
   </div>
   <div class="site-header-right">
+    ${helpNavLink()}
     <a class="audit-tool-link nav-sites" href="sites.html" title="ICJIA site directory — every content + tooling site in this bundle">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/>
@@ -1071,6 +1074,11 @@ ${ogImage ? `<meta property="og:type" content="website">
 </header>
 
 <main id="main">
+  <!-- v1.61.0 — the start-here callout, ABOVE the announcement banner.
+       Orientation outranks news for a first-time reader, and the banner
+       below it is dismissible while this is permanent. -->
+  ${renderHelpCallout()}
+
 ${renderWhatsNewBanner()}
 
   <!-- v1.7.23: top section banner — mirrors the v1.7.22 "Cross-Server Duplicates"

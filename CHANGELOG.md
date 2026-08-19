@@ -10,6 +10,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.61.0] — 2026-08-19
+
+### Added — `/help`, the start-here walkthrough
+
+- **New page: `help.html`.** Readers told us the bundle gave them nowhere
+  to begin, and that downloading a site's spreadsheet was the step they
+  got stuck on. `/help` walks the whole task in five numbered steps —
+  find your website, download its spreadsheet, see what is in it, write
+  one word per file in the Notes column, send it back — written for
+  program and communications staff rather than auditors.
+- **Built as a stepper, with nothing collapsible.** The five steps are a
+  real `<ol>` with a spine running through their numbers, so the sequence
+  survives with styles off. There is no accordion anywhere on the page:
+  the first troubleshooting answer is the one that addresses the original
+  complaint, and an answer behind a disclosure triangle is one most
+  readers never open.
+- **The column map.** The workbook's twenty columns are drawn to scale in
+  one figure, fifteen of them dimmed to slivers and five lit — `B` File
+  name, `D` Public URL, `E` Page References, `I` Score, `T` Notes. It
+  answers "what is all this?" and "why can't I find the Notes column?" in
+  a single picture: Notes is at the far right edge. The letters are
+  derived from `XLSX_COLUMN_ORDER`, and a test fails if the workbook
+  moves a column out from under the page's instructions.
+- **Page References given its due.** The page leads on the spreadsheet
+  carrying both what each file is *called* and which web page it *appears
+  on*, and explains the per-type tabs (one row per file) against the
+  `Pages` tab (one row per web page) as two views of the same thing.
+- **The three words.** `archive`, `remediate`, and `as-is` are set at
+  headline scale, each with its own icon, plain-language definition, and
+  a "choose it when" test — colour is reinforcement only, so the
+  distinction survives greyscale printing and colour-blindness. Readers
+  are told to write `remediate` when unsure, and to leave the `Delete?`
+  column alone.
+- **Nothing is fillable in the browser.** The downloaded `.xlsx` is the
+  record the audit team keeps, so the page has no form, no input, and
+  says plainly that nothing typed on the site is stored.
+- **Three cropped screenshots** committed at `assets/help/` and copied
+  into the bundle by the rollup — the site card on the home page, the
+  card's download button, and the green download button on a site report.
+  Each carries alt text and intrinsic dimensions; a missing file warns
+  rather than failing the build.
+
+### Changed — a way in from every page
+
+- **"Start here" is first in the header nav** on the fleet index, the
+  site directory, What's New, `/search`, and every per-site report
+  (bundle builds only — standalone vendor reports have no `help.html`
+  beside them). Amber, so it is the one warm button in a row of blue
+  ones. `src/web/help-nav.js` owns the markup so six generators cannot
+  drift apart.
+- **A start-here callout tops the home page**, above the What's New
+  banner: orientation outranks news for a first-time reader, and the
+  banner is dismissible while the callout is permanent.
+- **"Start here" added to the shared footer** links on every page.
+- The header wordmark is hidden between 601px and 1180px, where a sixth
+  nav button no longer fits beside it and it wrapped to three lines. The
+  ICJIA logo still identifies and links the site.
+
 ## [1.60.2] — 2026-08-18
 
 ### Tests — sanitizer pinned to the emitted filename format, all slugs

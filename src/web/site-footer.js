@@ -34,6 +34,8 @@ export function renderSiteFooter({ generatedAt = "" } = {}) {
     <span class="site-footer-links">
       <a href="index.html">Home</a>
       <span aria-hidden="true">&middot;</span>
+      <a href="help.html">Start here</a>
+      <span aria-hidden="true">&middot;</span>
       <a href="sites.html">Sites</a>
       <span aria-hidden="true">&middot;</span>
       <a href="accessibility.html">Accessibility</a>

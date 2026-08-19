@@ -31,6 +31,7 @@ import { estimateRemediablePages } from "../web/page-estimate.js";
 import { darkModeCss } from "../web/styles.js";
 import { generateSitesHtml } from "../web/sites-page.js";
 import { generateWhatsNewHtml } from "../web/whats-new.js";
+import { generateHelpHtml, HELP_SCREENSHOTS } from "../web/help-page.js";
 import { generateSearchHtml } from "../web/search-page.js";
 import { buildSearchIndex, SEARCH_INDEX_FILENAME } from "../web/search-index.js";
 import { REMEDIABLE_CATEGORIES, isScoreable, isUnscoreableDocument } from "../scanner/category.js";
@@ -1148,6 +1149,7 @@ export async function runWebRollup({
   await fs.mkdir(output, { recursive: true });
   await fs.mkdir(path.join(output, "assets"), { recursive: true });
   await fs.mkdir(path.join(output, "assets", "og"), { recursive: true });
+  await fs.mkdir(path.join(output, "assets", "help"), { recursive: true });
 
   // 3. For each site, locate the latest inventory and generate outputs.
   //    We also accumulate every entry across every site (with its serverName
@@ -2235,6 +2237,28 @@ export async function runWebRollup({
     whatsNewHtml = injectPasswordGate(whatsNewHtml, passwordHash);
   }
   await fs.writeFile(path.join(output, "whats-new.html"), whatsNewHtml);
+
+  // v1.61.0 — /help, the start-here walkthrough. Static: no per-run data
+  // reaches it, so the page is identical in every bundle and the
+  // screenshots it references can be committed rather than re-shot. The
+  // PNGs live in the repo at assets/help/ and are copied verbatim; a
+  // missing one is a warning, not a build failure — a help page with a
+  // broken image still beats no help page.
+  for (const shot of HELP_SCREENSHOTS) {
+    const src = path.join(PKG_ROOT, "assets", "help", shot);
+    try {
+      await fs.copyFile(src, path.join(output, "assets", "help", shot));
+    } catch {
+      console.warn(`  warning: help screenshot missing, skipped: assets/help/${shot}`);
+    }
+  }
+  let helpHtml = generateHelpHtml({
+    generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
+  });
+  if (passwordHash) {
+    helpHtml = injectPasswordGate(helpHtml, passwordHash);
+  }
+  await fs.writeFile(path.join(output, "help.html"), helpHtml);
 
   // v1.46.0 — /search: fleet-wide filename search. One compact JSON of every
   // inventoried file (search-index.js documents the row shape) plus the

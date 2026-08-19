@@ -9,6 +9,7 @@
 // renderers so it never drifts from the home page visually.
 
 import { INDEX_CSS } from "./index-css.js";
+import { helpNavLink, helpNavCss } from "./help-nav.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
 import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { uptimeClientScript } from "./uptime-client.js";
@@ -223,7 +224,7 @@ ${ogImage ? `<meta property="og:type" content="website">
 <meta name="twitter:image" content="${he(ogImage)}">
 ` : ""}<title>${pageTitle}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
-<style>${INDEX_CSS}${siteFooterCss()}</style>
+<style>${INDEX_CSS}${siteFooterCss()}${helpNavCss()}</style>
 </head>
 <body id="top">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -234,6 +235,7 @@ ${ogImage ? `<meta property="og:type" content="website">
     <span class="brand"><span>ICJIA</span> site directory</span>
   </div>
   <div class="site-header-right">
+    ${helpNavLink()}
     <a class="audit-tool-link nav-sites" href="index.html" title="Back to the fleet snapshot (home)">
       ${HOME_ICON}
       <span>Home</span>

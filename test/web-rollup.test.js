@@ -12,6 +12,7 @@ import {
   buildFleetFileIndex,
 } from "../src/commands/web-rollup.js";
 import { buildAliasMap } from "../src/references/cross-resolver.js";
+import { HELP_SCREENSHOTS } from "../src/web/help-page.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -1499,6 +1500,44 @@ describe("/sites roster + tooling sites (v1.21.0)", () => {
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, password: "secret", noOg: true });
     const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
     expect(sitesHtml).toContain("sessionStorage");
+  });
+
+  // v1.61.0 — /help, the start-here walkthrough. It is static (no per-run
+  // data), so the only things the rollup can get wrong are writing it at
+  // all, copying its screenshots, and gating it like every other page.
+  it("writes help.html and copies its screenshots into the bundle", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+
+    const helpHtml = await fs.readFile(path.join(outputDir, "help.html"), "utf8");
+    expect(helpHtml).toContain('<ol class="hp-stepper">');
+    expect(helpHtml).toContain("Download your site&#39;s file list");
+    expect(helpHtml).toContain('class="site-footer"');
+
+    for (const shot of HELP_SCREENSHOTS) {
+      const onDisk = path.join(outputDir, "assets", "help", shot);
+      expect((await fs.stat(onDisk)).isFile(), `assets/help/${shot} copied`).toBe(true);
+      expect(helpHtml).toContain(`src="assets/help/${shot}"`);
+    }
+  });
+
+  it("links help.html from every bundle page", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    const names = await fs.readdir(outputDir);
+    const detail = names.find((n) => /^dvfr-\d{8}-\d{6}Z\.html$/.test(n));
+    expect(detail, "per-site detail page exists").toBeTruthy();
+    for (const page of ["index.html", "sites.html", "whats-new.html", "search.html", detail]) {
+      const html = await fs.readFile(path.join(outputDir, page), "utf8");
+      expect(html, `${page} should link help.html`).toContain('href="help.html"');
+    }
+  });
+
+  it("password-gates help.html when a password is set", async () => {
+    const { sitesFile, outputDir, auditsBase } = await buildFixture();
+    await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, password: "secret", noOg: true });
+    const helpHtml = await fs.readFile(path.join(outputDir, "help.html"), "utf8");
+    expect(helpHtml).toContain("sessionStorage");
   });
 
   it("emits sites-list.xlsx as a real workbook", async () => {

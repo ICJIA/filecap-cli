@@ -8,6 +8,7 @@ import { fmtChicagoDate, fmtChicagoGeneratedAt } from "../util/time.js";
 import { estimateRemediablePages, PAGE_ESTIMATES } from "../web/page-estimate.js";
 import { renderSiteFooter, siteFooterCss } from "../web/site-footer.js";
 import { paginatorNav } from "../web/paginator-nav.js";
+import { helpNavLink, helpNavCss } from "../web/help-nav.js";
 import { renderSiteAccessibilitySection } from "./site-accessibility-section.js";
 import { escapeHtml as htmlEscape, safeUrl } from "../util/html.js";
 import { REMEDIABLE_CATEGORIES, isScoreable, isUnscoreableDocument } from "../scanner/category.js";
@@ -2035,6 +2036,7 @@ tr.flagged td { /* let row bg show through; border is the indicator */ }
 
 /* ── footer ────────────────────────────────────────────────── */
 ${siteFooterCss()}
+${helpNavCss()}
 /* Detail pages have no max-width column — body side padding (1.5rem) is the
    content edge. Pull the bar full-bleed the same way .report-back-bar does,
    and align its content with the page content rather than a centered 1200px
@@ -2198,6 +2200,7 @@ ${(() => {
     <span aria-hidden="true">&larr;</span> Back to fleet index
   </a>` : '<span></span>'}
   <div class="report-back-bar-right">
+    ${backHref ? helpNavLink() : ""}
     <a class="audit-tool-link" href="https://accessibility.icjia.app" target="_blank" rel="noopener noreferrer" title="ICJIA accessibility FAQs (accessibility.icjia.app, opens in a new tab)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="8" cy="8" r="6.5"/>

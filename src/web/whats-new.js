@@ -16,6 +16,7 @@
 //     was superseded before they next visited — becomes unreachable.
 
 import { INDEX_CSS } from "./index-css.js";
+import { helpNavLink, helpNavCss } from "./help-nav.js";
 import { renderSiteFooter, siteFooterCss } from "./site-footer.js";
 import { PLAUSIBLE_SNIPPET } from "./analytics.js";
 import { escapeHtml as he } from "../util/html.js";
@@ -38,6 +39,14 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  *   date      - human-readable date shown under the text
  */
 export const WHATS_NEW = [
+  {
+    id: "start-here-help-page-2026-08-19",
+    badge: "New",
+    text: "There is now a Start here page that walks the whole task from beginning to end. Several people told us they landed on this site and could not tell what they were meant to do with it — and that downloading their website's spreadsheet was the step where they gave up. The new page answers both in five numbered steps: find your website, download its spreadsheet, see what is in it, write one word per file in the Notes column, and send it back. It shows where the download button is (there are two, in two places, and they give you the same file), where the file lands once you click — nothing opens on screen, which is what catches most people out — and what to do if nothing arrives at all. It also explains what the spreadsheet actually holds: not just the name of every file, but the web page each file appears on, which is usually what makes an unfamiliar filename recognisable. And it sets out the three words to choose between in the Notes column — archive, remediate, or as-is — with a plain-language test for each and the advice to write remediate whenever you are unsure. Look for the amber Start here button at the top of every page.",
+    linkText: "Open the Start here page",
+    linkHref: "help.html",
+    date: "August 19, 2026",
+  },
   {
     id: "website-vs-files-scores-2026-08-18",
     badge: "Improved",
@@ -177,7 +186,7 @@ export function generateWhatsNewHtml({ generatedAt = "" } = {}) {
 ${PLAUSIBLE_SNIPPET}
 <title>What&#39;s new — ICJIA Fleet Audit Assessment</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230d1117'/><path d='M12 9L12 23L23 16Z' fill='%23ffb000'/></svg>">
-<style>${INDEX_CSS}${siteFooterCss()}</style>
+<style>${INDEX_CSS}${siteFooterCss()}${helpNavCss()}</style>
 </head>
 <body id="top">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -188,6 +197,7 @@ ${PLAUSIBLE_SNIPPET}
     <span class="brand"><span>ICJIA</span> Fleet Audit Assessment</span>
   </div>
   <div class="site-header-right">
+    ${helpNavLink()}
     <a class="audit-tool-link nav-sites" href="index.html" title="Back to the fleet snapshot (home)">
       <svg class="audit-tool-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 2.5l5.5 5"/><path d="M4 7v6h8V7"/></svg>
       <span>Home</span>

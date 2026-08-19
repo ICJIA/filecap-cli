@@ -23,13 +23,23 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // v1.56.0 — newest entry announces the website-vs-files scope lockups
-  // (no counts in it, so nothing to reconcile against the surfaces).
-  // v1.56.1 — the entry carries NO trailing link: it announces a passive
-  // visual improvement, and "Open the site reports" just went to /sites.
-  it("leads with the 2026-08-18 website-vs-files distinction entry, link-free", () => {
+  // v1.61.0 — newest entry announces /help, the start-here walkthrough.
+  it("leads with the 2026-08-19 start-here entry, linking the new page", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("website-vs-files");
+    expect(e.id).toContain("start-here");
+    expect(e.id).toContain("2026-08-19");
+    expect(e.badge).toBe("New");
+    expect(e.linkHref).toBe("help.html");
+    expect(e.linkText.length).toBeGreaterThan(0);
+  });
+
+  // v1.56.0 — the website-vs-files scope lockups (no counts in it, so
+  // nothing to reconcile against the surfaces). v1.56.1 — the entry
+  // carries NO trailing link: it announced a passive visual improvement,
+  // and "Open the site reports" just went to /sites. Now history.
+  it("keeps the 2026-08-18 website-vs-files distinction entry, link-free", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("website-vs-files"));
+    expect(e).toBeTruthy();
     expect(e.id).toContain("2026-08-18");
     expect(e.badge).toBe("Improved");
     expect(e.linkHref).toBeUndefined();
