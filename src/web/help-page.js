@@ -2,11 +2,12 @@
 //
 // Why this page exists: readers landing on the bundle told us they did not
 // know where to begin. The task they are actually being asked to do has
-// exactly one shape — find your website, download its spreadsheet, write
-// one word per file, send it back — and nothing in the bundle said so.
+// exactly one shape — find your website, download its spreadsheet, open the
+// two link columns to see what each file actually is and where it lives,
+// decide, and send it back — and nothing in the bundle said so.
 //
-// Scope discipline. This page teaches DOWNLOADING the workbook and filling
-// in its Notes column. Nothing here is fillable in the browser: the
+// Scope discipline. This page teaches DOWNLOADING the workbook and making
+// the call on each file. Nothing here is fillable in the browser: the
 // downloaded .xlsx is the record the audit team keeps, so every instruction
 // has to end with a file on the reader's own desktop. Resist adding an
 // in-page form; it would produce a second, unrecorded answer.
@@ -28,11 +29,14 @@
 //      drawn to scale, fifteen dimmed to slivers, five lit. It answers
 //      "what is all this?" and "why can't I find Notes?" in one picture:
 //      Notes is column T, at the far right edge.
-//   2. The THREE WORDS (renderDecisionCards) — archive / remediate /
+//   2. The THREE OUTCOMES (renderDecisionCards) — archive / remediate /
 //      as-is at headline scale. Colour is reinforcement only; each card
 //      also carries its own icon and its own one-line test, so the
 //      distinction survives print and colour-blindness (same rule the
-//      site's two score badges follow).
+//      site's two score badges follow). They are framed as a JUDGEMENT,
+//      not a data-entry mechanic: the reader reaches one by opening the
+//      file (column D) and the page that carries it (column E). Typing
+//      the result into Notes is the last, smallest part of the step.
 //
 // The screenshots are static PNGs committed at assets/help/ and copied
 // into the bundle by web-rollup. They show ARI (a site card) and DVFR (a
@@ -124,10 +128,10 @@ const WORKBOOK_COLUMNS = [
   { letter: "Q", label: "Full file path on server" },
   { letter: "R", label: "Content hash (SHA-256)" },
   { letter: "S", label: "Delete?" },
-  { letter: "T", label: "Notes", role: "write", gloss: "The one cell you type in. One word per file." },
+  { letter: "T", label: "Notes", role: "write", gloss: "Where you record what you decided." },
 ];
 
-/** The three words, in the order a reader should consider them. */
+/** The three outcomes, in the order a reader should consider them. */
 const DECISIONS = [
   {
     word: "archive",
@@ -136,9 +140,9 @@ const DECISIONS = [
     detail:
       "The file has done its job. Nobody needs an accessible version of a document that is coming down.",
     when: [
-      "A newer version has replaced it",
+      "The file opened and a newer version has replaced it",
       "It announced an event that has passed",
-      "It is a draft, a duplicate, or was posted by mistake",
+      "Column E lists no page, or the page it was on is gone",
     ],
     icon: `<path d="M2.5 5.5h11v7.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M1.75 2.5h12.5v3H1.75z"/><path d="M6.5 8.5h3"/>`,
   },
@@ -149,8 +153,8 @@ const DECISIONS = [
     detail:
       "People still use this file, but it cannot be read properly by someone using a screen reader. It goes on the fix list.",
     when: [
-      "It is still linked from a page people visit",
-      "Its score is low — under about 70",
+      "Column E shows a page people still visit",
+      "The file opened and its score is low — under about 70",
       "You are not sure. This is the safe answer",
     ],
     icon: `<path d="M9.8 3.2a3 3 0 0 0 3.9 3.9l-6 6a1.6 1.6 0 0 1-2.3-2.3z"/><path d="M4.2 12.4h.01"/>`,
@@ -162,9 +166,9 @@ const DECISIONS = [
     detail:
       "Either it is already accessible, or it is a record that cannot be altered — a signed order, a scanned historical document.",
     when: [
-      "Its score is already high",
+      "It opened cleanly and its score is already high",
       "It is a legal record that must stay exactly as filed",
-      "An accessible alternative is already published beside it",
+      "The page carrying it already offers an accessible alternative",
     ],
     icon: `<path d="M3 8.4 6.4 12 13 4.6"/>`,
   },
@@ -175,7 +179,7 @@ const JOURNEY = [
   { n: "1", label: "Find your website", sub: "On the home page" },
   { n: "2", label: "Download the spreadsheet", sub: "One click" },
   { n: "3", label: "See what is in it", sub: "Five columns matter" },
-  { n: "4", label: "Write one word per file", sub: "In the Notes column" },
+  { n: "4", label: "Decide on each file", sub: "Open the links and judge" },
   { n: "5", label: "Send it back", sub: "Email the file" },
 ];
 
@@ -202,7 +206,7 @@ const FAQ = [
   },
   {
     q: "I do not recognise one of these files.",
-    a: "Two columns will tell you. Public URL (column D) opens the file itself. Page References (column E) shows which page on your website links to it — often that is enough to place it.",
+    a: "That is what the two link columns are for. Public URL (column D) opens the file itself. Page References (column E) opens the page on your website that links to it. Between them you can almost always place a file in under a minute.",
   },
   {
     q: "A file has no page listed in column E.",
@@ -213,8 +217,8 @@ const FAQ = [
     a: "Some files are published in more than one place. Mark it on your own site's spreadsheet and say so in the Notes cell; the audit team reconciles the copies.",
   },
   {
-    q: "Can I write more than one word?",
-    a: "Yes. Put the word first, then whatever else is useful — archive — superseded by the 2026 edition reads perfectly well. The word just has to come first.",
+    q: "Can I explain my reasoning in the Notes cell?",
+    a: "Please do. Put the outcome first so it can be read at a glance, then whatever context is useful — archive — superseded by the 2026 edition reads perfectly well. Your reasoning is often the most valuable thing on the row.",
   },
   {
     q: "What about the Delete? column, next to Notes?",
@@ -226,7 +230,7 @@ const FAQ = [
   },
   {
     q: "Some of these files should not be public at all.",
-    a: "Write archive in the Notes cell and say why, then mention it in your email so it gets attention ahead of the rest.",
+    a: "Put it down as archive, say why in the same cell, and mention it in your email so it gets attention ahead of the rest.",
   },
 ];
 
@@ -352,7 +356,7 @@ function renderExampleGrid() {
     )
     .join("\n      ");
   return `<figure class="hp-grid-wrap">
-    <figcaption class="hp-grid-cap">What a finished row looks like. Three files from one site, with the Notes cell already filled in.</figcaption>
+    <figcaption class="hp-grid-cap">What a decided row looks like. The score and the page told the story; the Notes cell just records the outcome.</figcaption>
     <div class="hp-grid-scroll">
       <table class="hp-grid">
         <thead>
@@ -360,7 +364,7 @@ function renderExampleGrid() {
             <th scope="col"><span class="hp-grid-col">B</span> File name</th>
             <th scope="col"><span class="hp-grid-col">E</span> Page References</th>
             <th scope="col"><span class="hp-grid-col">I</span> Score</th>
-            <th scope="col" class="hp-grid-th-note"><span class="hp-grid-col">T</span> Notes <em>&mdash; you type here</em></th>
+            <th scope="col" class="hp-grid-th-note"><span class="hp-grid-col">T</span> Notes <em>&mdash; your decision</em></th>
           </tr>
         </thead>
         <tbody>
@@ -371,7 +375,53 @@ function renderExampleGrid() {
   </figure>`;
 }
 
-/** The three words, at headline scale. The page's signature block. */
+/**
+ * The two link columns, framed as the investigation the decision rests on.
+ * This is the step's real work: the reader cannot judge a file from its
+ * name, so they open the file itself (column D) and the page carrying it
+ * (column E). Writing the outcome into Notes is the trivial part, and the
+ * page is careful not to present it as the task.
+ */
+function renderJudgeLinks() {
+  const links = [
+    {
+      letter: "D",
+      label: "Public URL",
+      lede: "Click it and the file itself opens in your browser.",
+      asks: [
+        "Is it still current, or has a newer version replaced it?",
+        "Is it a scan of a paper document? Those usually cannot be read by a screen reader at all.",
+        "Would you still hand this to a member of the public today?",
+      ],
+    },
+    {
+      letter: "E",
+      label: "Page References",
+      lede: "Click it and the web page that links to the file opens.",
+      asks: [
+        "Is that page still live, and still one people use?",
+        "Does the file still belong there, or has the programme moved on?",
+        "Nothing listed at all? Then no page on your site links to it any more.",
+      ],
+    },
+  ];
+  return `<div class="hp-judge">
+    <h3 class="hp-judge-title">Two columns do the deciding for you</h3>
+    <p class="hp-judge-lede">You cannot tell what a file is from its name. Both of these columns are clickable links &mdash; open them, and the answer is usually obvious in a few seconds.</p>
+    <div class="hp-judge-grid">
+      ${links.map((l) => `<div class="hp-judge-card">
+        <p class="hp-judge-head"><span class="hp-judge-letter">${he(l.letter)}</span> ${he(l.label)}</p>
+        <p class="hp-judge-lede-sm">${he(l.lede)}</p>
+        <p class="hp-judge-asks-head">It answers</p>
+        <ul class="hp-judge-asks">
+          ${l.asks.map((a) => `<li>${he(a)}</li>`).join("\n          ")}
+        </ul>
+      </div>`).join("\n      ")}
+    </div>
+  </div>`;
+}
+
+/** The three outcomes, at headline scale. The page's signature block. */
 function renderDecisionCards() {
   return `<div class="hp-decisions">
     ${DECISIONS.map(
@@ -514,19 +564,21 @@ export function generateHelpHtml({ generatedAt = "" } = {}) {
 
   const step4 = renderStep({
     n: "4",
-    title: "Write one word in the Notes column",
-    lede: `For each file, answer one question: <strong>does it still belong on the website, and if it does, does it need work?</strong> Write one of three words in the Notes cell &mdash; column T, at the far right.`,
-    body: `${renderDecisionCards()}
+    title: "Open the links and decide",
+    lede: `This is the part only you can do. Open the file, open the page it sits on, and judge: does it still belong on the website, and if it does, does it need work? Then note which of <strong>three outcomes</strong> you reached.`,
+    body: `${renderJudgeLinks()}
+
+    ${renderDecisionCards()}
 
     <div class="hp-unsure">
       <p class="hp-unsure-title">Not sure about a file?</p>
-      <p class="hp-unsure-text">Write <code>remediate</code>. It is the safe answer &mdash; it means someone will look at the file properly rather than it being quietly removed or quietly left alone.</p>
+      <p class="hp-unsure-text">Put it down as <code>remediate</code>. It is the safe answer &mdash; it means someone will look at the file properly rather than it being quietly removed or quietly left alone.</p>
     </div>
 
     ${renderExampleGrid()}
 
     <div class="hp-note">
-      <p><strong>Three practical things.</strong> Fill in the Notes column on every file tab, not just the first. Ignore the <strong>Delete?</strong> column next to it &mdash; it is an older column and the audit team works from Notes. And save as you go: the spreadsheet on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
+      <p><strong>Three practical things.</strong> Record your decision on every file tab, not just the first. Ignore the <strong>Delete?</strong> column next to Notes &mdash; it is an older column and the audit team works from Notes. And save as you go: the spreadsheet on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
     </div>`,
   });
 
@@ -588,7 +640,7 @@ ${PLAUSIBLE_SNIPPET}
   <div class="fleet-section-banner hp-banner" role="presentation">
     <p class="fleet-section-eyebrow">Start here</p>
     <h1 class="fleet-section-headline">Download your site&#39;s file list</h1>
-    <p class="fleet-section-lede">Every ICJIA website has a spreadsheet listing every file it publishes &mdash; what each file is called, which page it appears on, and how accessible it is today. This page shows you how to get yours, and what to write in it.</p>
+    <p class="fleet-section-lede">Every ICJIA website has a spreadsheet listing every file it publishes &mdash; what each file is called, which page it appears on, and how accessible it is today. This page shows you how to get yours, and how to decide what happens to each file.</p>
     <ul class="hp-kit">
       <li><span class="hp-kit-k">You need</span> a web browser</li>
       <li><span class="hp-kit-k">and</span> Excel, Numbers, or Google Sheets</li>
@@ -1031,7 +1083,80 @@ export function helpCss() {
 .hp-view-text { margin: 0; font-size: 0.93rem; line-height: 1.55; color: #a9b8c6; }
 .hp-view-text strong { color: #e5e5e5; }
 
-/* ── help: the three words ───────────────────────────────────── */
+/* ── help: the two link columns ──────────────────────────────── */
+/* Blue register, matching the read-columns in the column map above — these
+   are the same two columns, now being used rather than described. */
+.hp-judge {
+  margin: 0 0 1.6rem;
+  padding: 1.3rem 1.4rem 1.45rem;
+  background: #12181f;
+  border: 1px solid #21262d;
+  border-left: 4px solid #4dabf7;
+  border-radius: 14px;
+}
+.hp-judge-title { margin: 0 0 0.3rem; font-size: 1.12rem; font-weight: 800; color: #ffffff; }
+.hp-judge-lede { margin: 0 0 1.1rem; max-width: 70ch; font-size: 0.96rem; line-height: 1.55; color: #a9b8c6; }
+.hp-judge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 760px) { .hp-judge-grid { grid-template-columns: 1fr; } }
+.hp-judge-card {
+  padding: 1rem 1.1rem 1.1rem;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+}
+.hp-judge-head {
+  margin: 0 0 0.4rem;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #e5e5e5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.hp-judge-letter {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(77, 171, 247, 0.16);
+  border: 1px solid rgba(77, 171, 247, 0.4);
+  color: #7cc4fb;
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.hp-judge-lede-sm { margin: 0 0 0.85rem; font-size: 0.93rem; line-height: 1.55; color: #c0cdda; }
+.hp-judge-asks-head {
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8b98a8;
+}
+.hp-judge-asks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
+.hp-judge-asks li {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.91rem;
+  line-height: 1.5;
+  color: #b6c3d0;
+}
+.hp-judge-asks li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #4dabf7;
+  opacity: 0.7;
+}
+
+/* ── help: the three outcomes ────────────────────────────────── */
 .hp-decisions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 0 0 1.5rem; }
 @media (max-width: 900px) { .hp-decisions { grid-template-columns: 1fr; } }
 .hp-decision {
@@ -1279,6 +1404,7 @@ export function helpCss() {
   .hp-rail, .hp-callout { display: none; }
   .hp-step { break-inside: avoid; border-top: 1px solid #ccc; }
   .hp-decision { break-inside: avoid; border: 1px solid #ccc; }
+  .hp-judge-card { break-inside: avoid; }
   .hp-faq-item { break-inside: avoid; }
 }
 
@@ -1301,7 +1427,7 @@ export function renderHelpCallout() {
   <span class="hp-callout-body">
     <span class="hp-callout-eyebrow">New here?</span>
     <span class="hp-callout-title">Start here &mdash; download your site&#39;s file list</span>
-    <span class="hp-callout-text">Find your website, download its spreadsheet, and write one word per file. Five steps, about ten minutes.</span>
+    <span class="hp-callout-text">Find your website, download its spreadsheet, and decide what happens to each file. Five steps, about ten minutes.</span>
   </span>
   <span class="hp-callout-go" aria-hidden="true">&rarr;</span>
 </a>`;

@@ -19,11 +19,11 @@ import { generateSearchHtml } from "../src/web/search-page.js";
 import { renderSiteFooter } from "../src/web/site-footer.js";
 
 // v1.61.0 — /help, the start-here walkthrough. The page teaches one
-// journey: find your site, download its spreadsheet, write one word in the
-// Notes column, send it back. These tests pin the parts that would break
-// the instructions silently — the column letters it names, the file names
-// it embeds, and its two structural promises (a stepper, and nothing
-// collapsible).
+// journey: find your site, download its spreadsheet, open the two link
+// columns to judge each file, send it back. These tests pin the parts that
+// would break the instructions silently — the column letters it names, the
+// file names it embeds, and its three promises: a stepper, nothing
+// collapsible, and deciding framed as a judgement rather than data entry.
 
 const PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = generateHelpHtml({ generatedAt: "2026-08-19 06:00 AM CDT (Chicago time)" });
@@ -155,6 +155,44 @@ describe("help page — the point the audit team asked for", () => {
   it("routes the finished workbook to the hand-back address", () => {
     expect(html).toContain(`mailto:${HANDBACK.email}`);
     expect(html).toContain(encodeURIComponent(HANDBACK.subject));
+  });
+});
+
+describe("help page — deciding is the step, not typing", () => {
+  // The reader cannot judge a file from its name. Step 4 leads with the two
+  // clickable columns that settle it; recording the outcome is the tail end.
+  it("leads step 4 with the two link columns", () => {
+    expect(html).toContain('<li class="hp-step" id="step-4">');
+    expect(html).toContain("Open the links and decide");
+    expect(html).toContain("Two columns do the deciding for you");
+    const cards = html.match(/<div class="hp-judge-card">/g) ?? [];
+    expect(cards).toHaveLength(2);
+  });
+
+  it("tells the reader what each link opens", () => {
+    expect(html).toContain("Click it and the file itself opens in your browser.");
+    expect(html).toContain("Click it and the web page that links to the file opens.");
+    expect(html).toContain("no page on your site links to it any more");
+  });
+
+  it("puts the judging block before the outcomes it feeds", () => {
+    expect(html.indexOf("hp-judge-card")).toBeLessThan(html.indexOf("hp-decision-word"));
+  });
+
+  // Regression guard: the page was first written as "write one word per
+  // file", which framed a judgement call as a typing exercise.
+  it("never frames the task as writing a word", () => {
+    for (const phrase of ["one word", "One word", "three words", "word per file"]) {
+      expect(html, `page should not say "${phrase}"`).not.toContain(phrase);
+    }
+  });
+
+  it("still names all three outcomes and the safe default", () => {
+    expect(html).toContain("archive");
+    expect(html).toContain("remediate");
+    expect(html).toContain("as-is");
+    expect(html).toContain("Not sure about a file?");
+    expect(html).toContain("It is the safe answer");
   });
 });
 

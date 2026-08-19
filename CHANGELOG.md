@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.61.1] — 2026-08-19
+
+### Changed — `/help` step 4 reframed: deciding, not typing
+
+- v1.61.0 shipped step 4 as **"Write one word in the Notes column"**, which
+  framed a judgement call as a data-entry chore and skipped the part that
+  actually takes the time. The step is now **"Open the links and decide"**,
+  and leads with the two clickable columns that settle it:
+  - **`Public URL` (column `D`)** opens the document itself — is it still
+    current, is it a scan a screen reader cannot read at all, would you
+    still hand it to a member of the public today?
+  - **`Page References` (column `E`)** opens the web page carrying it — is
+    that page still live and used, does the file still belong there, and if
+    nothing is listed, does anything link to it at all?
+- The three outcomes (`archive`, `remediate`, `as-is`) are unchanged, but
+  their "choose it when" tests are now written against what those two links
+  just showed rather than against the filename. Recording the outcome in
+  `Notes` is presented as the last and smallest part of the step.
+- Copy follows throughout: the hero, the home-page callout, the summary
+  rail, the worked example, the What's New entry, and the FAQ (the "can I
+  write more than one word?" question became "can I explain my reasoning?",
+  answered yes — the reasoning is often the most valuable thing on the row).
+- A regression test fails the build if the page ever says "one word",
+  "three words", or "word per file" again.
+
 ## [1.61.0] — 2026-08-19
 
 ### Added — `/help`, the start-here walkthrough
