@@ -10,6 +10,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.61.4] — 2026-08-19
+
+### Changed — the home-page Help callout reads as an infographic
+
+- The `HELP` label and the compass were caption-sized, which made a band
+  spanning the full page look like a dismissible notice strip. The compass
+  now sits on its own 76px tinted plate (42px glyph), `HELP` is set at
+  1.05rem/900 with wider tracking, and the headline runs to
+  `clamp(1.25rem, 2.2vw, 1.65rem)`. Padding, gap, and the arrow scale with
+  them. At ≤760px the plate drops to 56px and the arrow hides rather than
+  crowding the text.
+
+### Added — `/help` explains how this differs from SiteImprove
+
+- ICJIA already licenses SiteImprove, and nothing said why there is a second
+  thing to read. A new section answers it in four rows: **what it measures**
+  (the files a site publishes, scored separately from its web pages, never
+  blended into one number), **what it measures against** (WCAG 2.1 Level AA
+  — the level ADA Title II's web rule and Illinois IITAA 2.1 actually
+  require, whereas a weighted rollup that folds Level AAA and vendor
+  best-practice rules in with A and AA can sit below 100 while every A and
+  AA check passes), **what you get out of it** (a per-site spreadsheet your
+  unit works from and hands back, not a dashboard reading), and **what it
+  covers** (the audited sites, by name, re-runnable on demand).
+- **Framed as complementary, not competing** — "SiteImprove scans web pages.
+  This audits the documents those pages publish." Every claim is about what
+  this audit does, or is a documented fact about how conformance levels
+  aggregate. Nothing asserts a defect in a vendor's product: such a claim
+  ages badly, and the staff reading this page have to work with both tools.
+  A test fails if disparaging language appears in the section.
+- **The site count is live.** `generateHelpHtml` takes `siteCount` from the
+  same per-site results the fleet hero counts, so the two can never
+  disagree. Omitted or zero degrades the copy to "ICJIA's audited sites"
+  rather than printing a stale number — also test-pinned.
+
+### Added — "What could come next" is a straw poll
+
+- **Three more ideas, five in total**, each grounded in data the audit
+  already collects rather than in a plausible-sounding feature:
+  - *A shortlist: the twenty files worth fixing first.* Every row already
+    carries the accessibility score and how many pages link to the file;
+    ranking on the two together turns "review 430 files" into "start with
+    these twenty".
+  - *Fix once, count everywhere: the duplicated files.* Cross-server
+    duplicate detection, the `Duplicate of` column, and
+    `audit-file-duplicates.xlsx` all ship today, and present duplication as
+    a fact. It could be presented as leverage — which groups clear the most
+    rows for one remediation.
+  - *Re-check a file as soon as you have fixed it.* `score-fetcher.js`
+    already accepts `force`, so a single file can be re-scored on demand
+    instead of waiting for the next fleet run to find out whether a fix
+    landed.
+- **Every idea carries a "this one would help me" link** — a `mailto` whose
+  subject names that idea, so interest is countable by filtering one inbox.
+  No backend, nothing to maintain, and it works from behind the password
+  wall. The lede says outright that what gets asked for most gets built
+  first, and asks for ideas that are not on the list.
+- `renderTodoSection()` is data-driven now (`TODO_IDEAS`), so adding or
+  deleting an idea is one array entry. A test asserts every idea has a vote
+  link, that the subjects are distinct, and that each subject names its own
+  idea — a poll whose subject lines collide cannot be tallied.
+
 ## [1.61.3] — 2026-08-19
 
 ### Changed — the fleet index stops advertising features that already shipped
@@ -23,8 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   features so a reader recognises them.
 - **Reframed from promises to proposals.** The section is headed *"What could
   come next"* under *"Section · Under consideration"*, states outright that
-  its items are "ideas, not commitments", and closes with "Neither of these
-  is scheduled." A stale proposal is still a proposal; a stale promise is a
+  its items are "ideas, not commitments", and closes with "Nothing here is
+  scheduled." A stale proposal is still a proposal; a stale promise is a
   false claim, which is exactly what happened here.
 - **Two replacements, both grounded in what the codebase actually lacks:**
   - *Closing the loop on returned spreadsheets.* `/help` ends by asking staff

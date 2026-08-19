@@ -444,6 +444,66 @@ function renderDecisionCards() {
 }
 
 /**
+ * "How this differs from SiteImprove" — the question staff arrive with,
+ * because DoIT already licenses a scanner and nobody explained why there
+ * is a second thing to read.
+ *
+ * TONE RULE, deliberate: every claim here is either about what THIS audit
+ * does, or is a documented fact about conformance levels. Nothing asserts
+ * a shortcoming in a vendor's product. That is not diplomacy for its own
+ * sake — claims about someone else's tool go stale when they ship a
+ * change, and this page is read by staff who have to work with both. The
+ * strongest true framing is that the two measure different things: a page
+ * scanner scores pages, this scores the documents those pages publish.
+ *
+ * The one comparative statement — that a weighted rollup mixing AAA and
+ * vendor best-practices into a single number can sit below 100 while every
+ * Level A and AA check passes — is a description of how a blended score
+ * behaves, and is verifiable from SiteImprove's own per-issue breakdown.
+ *
+ * The legal target is not editorial: ADA Title II's web rule
+ * (28 CFR 35.200(b)(3)) and Illinois IITAA 2.1 both require WCAG 2.1
+ * Level AA. AAA is above what either asks for.
+ */
+function renderVsSiteImprove(sitesPhrase) {
+  const rows = [
+    {
+      q: "What it measures",
+      us: `The <strong>files</strong> a site publishes &mdash; every PDF, Word, Excel and PowerPoint document, each with its own score &mdash; alongside a separate score for the site's web pages. The two never get blended into one number.`,
+      note: `A page scanner's job is the pages. Documents are a different discipline, and the people who remediate them are usually not the people who fix a template.`,
+    },
+    {
+      q: "What it measures against",
+      us: `<strong>WCAG 2.1 Level AA</strong> &mdash; the level ADA Title II's web rule and Illinois IITAA 2.1 actually require.`,
+      note: `A single weighted score that folds Level AAA and a vendor's own best-practice rules in with A and AA can sit below 100 while every A and AA check passes. That gap is worth knowing about before it reaches a manager as a number.`,
+    },
+    {
+      q: "What you get out of it",
+      us: `A <strong>spreadsheet per site</strong>: one row per file, its score, a link to the file, the page it appears on, and an empty Notes column for your decision. It is the thing your unit works from and hands back.`,
+      note: `A dashboard tells you a score. This is a worklist you can sort, filter, split between colleagues, and mark up offline.`,
+    },
+    {
+      q: "What it covers",
+      us: `${sitesPhrase} and nothing else &mdash; scoped, named, and scanned together so the numbers on this site reconcile with each other.`,
+      note: `Built here, so it can be re-run on demand and re-published with every audit rather than waiting on a licence tier.`,
+    },
+  ];
+
+  return `<section class="hp-vs" aria-labelledby="hp-vs-heading">
+    <h2 class="hp-vs-heading" id="hp-vs-heading">How this differs from SiteImprove</h2>
+    <p class="hp-vs-lede">ICJIA also uses <strong>SiteImprove</strong>, and this does not replace it. They answer different questions, and it is worth knowing which one to open. <strong>SiteImprove scans web pages. This audits the documents those pages publish</strong> &mdash; and gives you a spreadsheet to work from.</p>
+    <div class="hp-vs-grid">
+      ${rows.map((r) => `<div class="hp-vs-row">
+        <p class="hp-vs-q">${he(r.q)}</p>
+        <p class="hp-vs-us">${r.us}</p>
+        <p class="hp-vs-note">${r.note}</p>
+      </div>`).join("\n      ")}
+    </div>
+    <p class="hp-vs-foot">Both are worth having. If a SiteImprove score and a score on this site disagree, they are almost certainly measuring different things &mdash; ask the audit administrator and you will get the reconciliation in writing.</p>
+  </section>`;
+}
+
+/**
  * The troubleshooting list, flat. Deliberately NOT a <details> accordion:
  * the first entry answers the exact complaint that prompted this page,
  * and an answer behind a click is an answer most readers never see.
@@ -487,13 +547,19 @@ function renderShot(shot, { caption, size = "" }) {
 /* ── page ─────────────────────────────────────────────────────── */
 
 /**
- * Generate help.html — the start-here walkthrough.
+ * Generate help.html — the guide for staff reviewing their site's files.
  *
  * @param {object} [args]
  * @param {string} [args.generatedAt] - preformatted "generated at" string
+ * @param {number} [args.siteCount] - how many sites the audit actually
+ *   covers, from the same per-site results the hero counts. Omitted or
+ *   zero degrades the copy to "ICJIA's audited sites" rather than
+ *   printing a stale number.
  * @returns {string} full HTML document
  */
-export function generateHelpHtml({ generatedAt = "" } = {}) {
+export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
+  const n = Number.isFinite(siteCount) && siteCount > 0 ? siteCount : null;
+  const sitesPhrase = n ? `ICJIA's ${n} audited sites` : "ICJIA's audited sites";
   const step1 = renderStep({
     n: "1",
     title: "Find your website",
@@ -662,6 +728,8 @@ ${PLAUSIBLE_SNIPPET}
   ${step4}
   ${step5}
   </ol>
+
+  ${renderVsSiteImprove(sitesPhrase)}
 
   <section class="hp-faqs" aria-labelledby="hp-faq-heading">
     <h2 class="hp-faq-heading" id="hp-faq-heading">If something does not go to plan</h2>
@@ -1319,6 +1387,50 @@ export function helpCss() {
   color: #c0cdda;
 }
 
+/* ── help: how this differs from SiteImprove ─────────────────── */
+/* Blue register — this is orientation, not a warning and not an action. */
+.hp-vs { margin: 0 0 2.6rem; padding-top: 2.4rem; border-top: 1px solid #21262d; }
+.hp-vs-heading {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.6rem, 3vw, 2.05rem);
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+}
+.hp-vs-lede { margin: 0 0 1.5rem; max-width: 74ch; font-size: 1.04rem; line-height: 1.6; color: #c0cdda; }
+.hp-vs-lede strong { color: #e5e5e5; }
+.hp-vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+@media (max-width: 840px) { .hp-vs-grid { grid-template-columns: 1fr; } }
+.hp-vs-row {
+  padding: 1.1rem 1.25rem 1.2rem;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-left: 3px solid #4dabf7;
+  border-radius: 10px;
+}
+.hp-vs-q {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7cc4fb;
+}
+.hp-vs-us { margin: 0 0 0.6rem; font-size: 1rem; line-height: 1.55; color: #e5e5e5; }
+.hp-vs-us strong { color: #ffffff; }
+.hp-vs-note { margin: 0; font-size: 0.92rem; line-height: 1.55; color: #8b98a8; }
+.hp-vs-foot {
+  margin: 1.2rem 0 0;
+  padding: 0.95rem 1.15rem;
+  max-width: 82ch;
+  background: #12181f;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #a9b8c6;
+}
+
 /* ── help: troubleshooting ───────────────────────────────────── */
 /* Flat by design — see renderFaq(). Two columns so twelve answers stay
    scannable without any of them being hidden behind a click. */
@@ -1350,39 +1462,63 @@ export function helpCss() {
 .hp-closing-links { margin: 0; font-size: 0.92rem; color: #8b98a8; }
 
 /* ── help: home-page callout ─────────────────────────────────── */
+/* v1.61.4 — scaled up to read as an infographic band rather than a notice
+   strip. The compass sits on its own tinted plate at the size of the
+   hero's donut, and HELP is set as a real label, not a caption: those two
+   are what a reader scanning the page actually lands on. */
 .hp-callout {
   display: flex;
   align-items: center;
-  gap: 1.1rem;
-  margin: 0 0 1.6rem;
-  padding: 1.1rem 1.35rem;
-  background: linear-gradient(90deg, rgba(240, 169, 42, 0.14) 0%, rgba(240, 169, 42, 0.04) 60%, rgba(240, 169, 42, 0) 100%);
+  gap: 1.6rem;
+  margin: 0 0 1.8rem;
+  padding: 1.6rem 1.8rem;
+  background: linear-gradient(90deg, rgba(240, 169, 42, 0.16) 0%, rgba(240, 169, 42, 0.05) 60%, rgba(240, 169, 42, 0) 100%);
   border: 1px solid rgba(240, 169, 42, 0.35);
-  border-left: 4px solid #f0a92a;
-  border-radius: 12px;
+  border-left: 6px solid #f0a92a;
+  border-radius: 14px;
   text-decoration: none !important;
   transition: transform 120ms ease, border-color 120ms ease;
 }
 .hp-callout:hover { transform: translateY(-1px); border-color: rgba(240, 169, 42, 0.6); }
 .hp-callout:focus-visible { outline: 3px solid #f0a92a; outline-offset: 2px; }
-.hp-callout-icon { flex: none; width: 34px; height: 34px; color: #f0a92a; }
-.hp-callout-icon svg { width: 100%; height: 100%; }
+.hp-callout-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: rgba(240, 169, 42, 0.14);
+  border: 1px solid rgba(240, 169, 42, 0.45);
+  color: #f0a92a;
+}
+.hp-callout-icon svg { width: 42px; height: 42px; }
 .hp-callout-body { min-width: 0; }
 .hp-callout-eyebrow {
   display: block;
-  margin: 0 0 0.15rem;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  margin: 0 0 0.3rem;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
+  line-height: 1;
   color: #f0a92a;
 }
-.hp-callout-title { display: block; font-size: 1.08rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em; }
-.hp-callout-text { display: block; margin-top: 0.15rem; font-size: 0.93rem; line-height: 1.5; color: #c0cdda; }
-.hp-callout-go { flex: none; margin-left: auto; color: #f0a92a; font-size: 1.3rem; font-weight: 800; }
-@media (max-width: 620px) {
-  .hp-callout { gap: 0.85rem; padding: 0.95rem 1.1rem; }
-  .hp-callout-icon { width: 26px; height: 26px; }
+.hp-callout-title {
+  display: block;
+  font-size: clamp(1.25rem, 2.2vw, 1.65rem);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+.hp-callout-text { display: block; margin-top: 0.4rem; max-width: 78ch; font-size: 1rem; line-height: 1.5; color: #c0cdda; }
+.hp-callout-go { flex: none; margin-left: auto; color: #f0a92a; font-size: 2rem; font-weight: 800; line-height: 1; }
+@media (max-width: 760px) {
+  .hp-callout { gap: 1.1rem; padding: 1.2rem 1.25rem; }
+  .hp-callout-icon { width: 56px; height: 56px; }
+  .hp-callout-icon svg { width: 30px; height: 30px; }
+  .hp-callout-eyebrow { font-size: 0.9rem; letter-spacing: 0.16em; }
   .hp-callout-go { display: none; }
 }
 
@@ -1393,6 +1529,7 @@ export function helpCss() {
   .hp-decision { break-inside: avoid; border: 1px solid #ccc; }
   .hp-judge-card { break-inside: avoid; }
   .hp-faq-item { break-inside: avoid; }
+  .hp-vs-row { break-inside: avoid; }
 }
 
 @media (prefers-reduced-motion: reduce) {

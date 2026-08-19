@@ -848,7 +848,7 @@ describe("the 'what could come next' section stays honest (v1.61.3)", () => {
     const todo = section();
     expect(todo).toContain("Under consideration");
     expect(todo).toContain("ideas, not commitments");
-    expect(todo).toContain("Neither of these is scheduled");
+    expect(todo).toContain("Nothing here is scheduled");
   });
 
   // Promise language is what turns a stale entry into a false claim.
@@ -871,5 +871,31 @@ describe("the 'what could come next' section stays honest (v1.61.3)", () => {
     const todo = section();
     expect(todo).toContain('href="search.html"');
     expect(todo).toContain('href="help.html"');
+  });
+
+  // v1.61.4 — the section is a straw poll. Interest is counted by
+  // filtering one inbox on the subject line, so every idea needs a link
+  // and every subject has to name its own idea, or the tally is useless.
+  it("gives every idea a vote link whose subject names that idea", () => {
+    const todo = section();
+    const titles = [...todo.matchAll(/<h3 class="todo-item-h3">(.+?)<\/h3>/g)].map((m) => m[1]);
+    expect(titles.length).toBeGreaterThanOrEqual(3);
+
+    const votes = [...todo.matchAll(/<p class="todo-item-vote"><a href="mailto:([^?]+)\?subject=([^"]+)"/g)];
+    expect(votes, "one vote link per idea").toHaveLength(titles.length);
+
+    const subjects = votes.map((m) => decodeURIComponent(m[2]));
+    expect(new Set(subjects).size, "subjects must be distinct to be countable").toBe(titles.length);
+    titles.forEach((title, i) => {
+      expect(votes[i][1]).toBe("christopher.schweda@illinois.gov");
+      expect(subjects[i]).toBe(`Fleet audit idea: ${title}`);
+    });
+  });
+
+  it("tells the reader the list is a poll and invites what is missing", () => {
+    const todo = section();
+    expect(todo).toContain("Tell us which of these you want");
+    expect(todo).toContain("What gets asked for most gets built first");
+    expect(todo).toContain("if the thing you actually need is not on this list");
   });
 });

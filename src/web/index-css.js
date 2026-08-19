@@ -1816,6 +1816,30 @@ dialog.access-modal .access-modal-cta a {
 /* v1.61.3 — items carry more than one paragraph now (what is missing
    today, then what could replace it), so they need separating. */
 .todo .todo-item p + p { margin-top: 0.7rem; }
+/* v1.61.4 — the straw-poll link. Violet to match the section's register,
+   and set apart from the prose above it so it reads as the one thing on
+   the card you can act on. */
+.todo .todo-item-vote { margin-top: 0.9rem !important; }
+.todo .todo-item-vote a {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  background: rgba(137, 87, 229, 0.14);
+  border: 1px solid rgba(137, 87, 229, 0.55);
+  border-radius: 7px;
+  color: #d2a8ff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.todo .todo-item-vote a:hover {
+  background: rgba(137, 87, 229, 0.24);
+  border-color: #a371f7;
+  color: #e5d3ff;
+  text-decoration: none;
+}
+.todo .todo-item-vote a:focus-visible { outline: 3px solid #a371f7; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .todo .todo-item-vote a { transition: none; } }
 .todo .todo-item code {
   background: rgba(0, 0, 0, 0.35);
   padding: 0.05rem 0.35rem;

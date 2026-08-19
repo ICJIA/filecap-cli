@@ -2254,6 +2254,9 @@ export async function runWebRollup({
   }
   let helpHtml = generateHelpHtml({
     generatedAt: fmtChicagoGeneratedAt(new Date().toISOString()),
+    // Same source as the hero's site count, so the two can never disagree.
+    // The page degrades to "ICJIA's audited sites" if this is ever absent.
+    siteCount: siteResults.length,
   });
   if (passwordHash) {
     helpHtml = injectPasswordGate(helpHtml, passwordHash);

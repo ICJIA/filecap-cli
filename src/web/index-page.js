@@ -4,7 +4,7 @@ import { fmtChicagoDateTime, fmtChicagoDate, fmtChicagoGeneratedAt } from "../ut
 import { estimateRemediablePages, PAGE_ESTIMATES } from "./page-estimate.js";
 import { INDEX_CSS } from "./index-css.js";
 import { helpNavLink, helpNavCss } from "./help-nav.js";
-import { renderHelpCallout, helpCss } from "./help-page.js";
+import { renderHelpCallout, helpCss, HANDBACK } from "./help-page.js";
 import { gradeForScore } from "../site-audit/aggregate.js";
 import { summarizeFileA11y, fileA11yCoverageText,
   fileA11yThinDataText, fileA11yGaugeHtml, fileA11yTrendChipHtml } from "../report/accessibility-band.js";
@@ -369,34 +369,94 @@ function renderDuplicatesSection(groups, _duplicatesCsv) {
  * So the framing changed with the content: these are ideas under
  * consideration, explicitly not commitments, and the lede invites readers
  * to say which would help. A list of proposals ages into a list of
- * proposals; a list of promises ages into a lie. If you ship one of
- * these, delete it from here in the same commit.
+ * proposals; a list of promises ages into a lie. **If you ship one of
+ * these, delete it from here in the same commit.**
+ *
+ * v1.61.4 — the section is a straw poll now. Each idea carries a mailto
+ * whose subject names it, so interest is countable by filtering one
+ * inbox: no backend, no database, nothing to maintain, and it works from
+ * behind the password wall. Every idea below is grounded in something the
+ * codebase measurably lacks — the data each one needs already exists and
+ * is named in the entry, so none of them is a guess about feasibility.
  */
+const TODO_IDEAS = [
+  {
+    title: "Closing the loop on the spreadsheets you send back",
+    // Grounded: `deleteFlag` and `notes` appear only in the XLSX writer —
+    // nothing in src/ ever reads a returned workbook.
+    paragraphs: [
+      `The <a href="help.html">Help guide</a> ends by asking you to email your completed workbook to the audit team. After that, nothing on this site knows it happened &mdash; the decisions live in an inbox, and the only way to find out how far the fleet has got is to open twelve attachments and count.`,
+      `The audit could read those returned workbooks and show, per site, how many files have a decision recorded against them, how many are still blank, and the split between <strong>archive</strong>, <strong>remediate</strong>, and <strong>as-is</strong>. Your own numbers, back on the site you got the spreadsheet from.`,
+    ],
+    payoff: `&ldquo;which sites have come back, and what is still outstanding?&rdquo; becomes a number on this page instead of a search through email.`,
+  },
+  {
+    title: "Progress over time, with the scope changes marked",
+    // Grounded: a11y-history.json already stores {at, avg, scored,
+    // remediable, band} per site per run, back to June 2026.
+    paragraphs: [
+      `Every audit already records each site&#39;s score, and that history goes back to June &mdash; it is what drives the small &#9650;/&#9660; change chips on the cards above. Nothing yet draws it as a line.`,
+      `A chart of the fleet&#39;s score across every audit, and one per site, would answer the question a snapshot cannot. The important part is what gets marked <em>on</em> the line: the day the scoring rubric changed, the day the document archive came into scope, the day Office files started being scored. Each of those moved the number without a single file being fixed, and each of them has been mistaken for real change.`,
+    ],
+    payoff: `it separates &ldquo;we are getting better&rdquo; from &ldquo;we started measuring more&rdquo; &mdash; the distinction this audit is asked about most often.`,
+  },
+  {
+    title: "A shortlist: the twenty files worth fixing first",
+    // Grounded: every row already carries Score (col I) and Page
+    // References (col E); ranking is arithmetic on data in the workbook.
+    paragraphs: [
+      `A site with 430 files to review is the reason people put this off. The spreadsheet can be sorted by score, but the worst-scoring file might be a 2014 agenda nobody opens, while a mediocre one sits on your busiest page.`,
+      `Each row already carries both numbers that matter: the accessibility score, and how many pages link to the file. Ranking on the two together would give every site a short, ordered <strong>start here</strong> list &mdash; the handful of files where fixing one thing helps the most people.`,
+    ],
+    payoff: `it turns &ldquo;review 430 files&rdquo; into &ldquo;start with these twenty&rdquo;, which is a task somebody can actually begin on a Tuesday afternoon.`,
+  },
+  {
+    title: "Fix once, count everywhere: the duplicated files",
+    // Grounded: cross-server duplicate detection + duplicateOf column +
+    // audit-file-duplicates.xlsx all ship today.
+    paragraphs: [
+      `The audit already finds files published in more than one place &mdash; the <strong>Cross-Server Duplicates</strong> section below lists them, and every workbook has a <code>Duplicate of</code> column. Today that is presented as a fact to be aware of.`,
+      `It could be presented as leverage instead: which duplicate groups, if the file were remediated once and republished everywhere, would clear the most rows across the most sites. The same work, counted honestly wherever it lands.`,
+    ],
+    payoff: `remediation budget goes further when the same PDF is not paid for three times on three different sites.`,
+  },
+  {
+    title: "Re-check a file as soon as you have fixed it",
+    // Grounded: score-fetcher.js already accepts `force`, and
+    // ~/.filecap/audit-cache.json is keyed per file with score + grade.
+    paragraphs: [
+      `Scores only move when the whole fleet is re-audited. Fix a PDF today and this site will keep showing the old score until the next full run, which is a poor way to find out whether what you did actually worked.`,
+      `The scoring service can already be asked to re-check a single file on demand. A <strong>re-check</strong> control on a row would give you the new score in seconds, along with what is still outstanding on that document.`,
+    ],
+    payoff: `remediation stops being guesswork &mdash; you can see whether a fix landed before you move on to the next file.`,
+  },
+];
+
 function renderTodoSection() {
+  const items = TODO_IDEAS.map((idea) => {
+    const subject = encodeURIComponent(`Fleet audit idea: ${idea.title}`);
+    return `      <li class="todo-item">
+        <h3 class="todo-item-h3">${idea.title}</h3>
+        ${idea.paragraphs.map((para) => `<p>${para}</p>`).join("\n        ")}
+        <p class="todo-item-payoff"><strong>Why it matters:</strong> ${idea.payoff}</p>
+        <p class="todo-item-vote"><a href="mailto:${he(HANDBACK.email)}?subject=${subject}">This one would help me &rarr;</a></p>
+      </li>`;
+  }).join("\n");
+
   return `
   <section class="section todo">
     <div class="todo-section-banner" role="presentation">
       <p class="todo-section-eyebrow">Section · Under consideration</p>
       <h2 class="todo-section-headline">What could come next</h2>
-      <p class="todo-section-lede">The two features previewed here before &mdash; the <a href="search.html">fleet-wide search</a> and the <strong>Page view</strong> on every site report &mdash; have both shipped. These two are <strong>ideas, not commitments</strong>. They are the things that would most obviously help next; if one of them would make your job easier, say so and it moves up the list.</p>
+      <p class="todo-section-lede">The two features previewed here before &mdash; the <a href="search.html">fleet-wide search</a> and the <strong>Page view</strong> on every site report &mdash; have both shipped. What follows are <strong>ideas, not commitments</strong>: things the audit could do next, each one built on data it already collects.</p>
+      <p class="todo-section-lede"><strong>Tell us which of these you want.</strong> Every idea has a &ldquo;this one would help me&rdquo; link that opens an email naming it &mdash; one click, nothing to write unless you want to. What gets asked for most gets built first, and if the thing you actually need is not on this list, say that instead.</p>
     </div>
 
     <ul class="todo-list">
-      <li class="todo-item">
-        <h3 class="todo-item-h3">Closing the loop on the spreadsheets you send back</h3>
-        <p>The <a href="help.html">Help guide</a> ends by asking you to email your completed workbook to the audit team. After that, nothing on this site knows it happened &mdash; the decisions live in an inbox, and the only way to find out how far the fleet has got is to open twelve attachments and count.</p>
-        <p>The audit could read those returned workbooks and show, per site, how many files have a decision recorded against them, how many are still blank, and the split between <strong>archive</strong>, <strong>remediate</strong>, and <strong>as-is</strong>. Your own numbers, back on the site you got the spreadsheet from.</p>
-        <p class="todo-item-payoff"><strong>Why it matters:</strong> &ldquo;which sites have come back, and what is still outstanding?&rdquo; becomes a number on this page instead of a search through email.</p>
-      </li>
-      <li class="todo-item">
-        <h3 class="todo-item-h3">Progress over time, with the scope changes marked</h3>
-        <p>Every audit already records each site&#39;s score, and that history goes back to June &mdash; it is what drives the small &#9650;/&#9660; change chips on the cards above. Nothing yet draws it as a line.</p>
-        <p>A chart of the fleet&#39;s score across every audit, and one per site, would answer the question a snapshot cannot. The important part is what gets marked <em>on</em> the line: the day the scoring rubric changed, the day the document archive came into scope, the day Office files started being scored. Each of those moved the number without a single file being fixed, and each of them has been mistaken for real change.</p>
-        <p class="todo-item-payoff"><strong>Why it matters:</strong> it separates &ldquo;we are getting better&rdquo; from &ldquo;we started measuring more&rdquo; &mdash; the distinction this audit is asked about most often.</p>
-      </li>
+${items}
     </ul>
 
-    <p class="todo-footer-note">Neither of these is scheduled. Shipped work is recorded in <a href="whats-new.html">What&#39;s New</a> and, in more detail, the <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">CHANGELOG</a>.</p>
+    <p class="todo-footer-note">Nothing here is scheduled. Shipped work is recorded in <a href="whats-new.html">What&#39;s New</a> and, in more detail, the <a href="https://github.com/ICJIA/icjia-fleet-audit/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">CHANGELOG</a>.</p>
   </section>`;
 }
 

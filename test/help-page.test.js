@@ -206,6 +206,46 @@ describe("help page — deciding is the step, not typing", () => {
   });
 });
 
+describe("help page — how this differs from SiteImprove", () => {
+  it("names the section and frames the two as complementary", () => {
+    expect(html).toContain('id="hp-vs-heading"');
+    expect(html).toContain("How this differs from SiteImprove");
+    expect(html).toContain("this does not replace it");
+    expect(html).toContain("Both are worth having");
+  });
+
+  it("states the conformance target the law actually sets", () => {
+    expect(html).toContain("WCAG 2.1 Level AA");
+    expect(html).toContain("ADA Title II");
+    expect(html).toContain("IITAA 2.1");
+  });
+
+  // Tone rule (see renderVsSiteImprove): claims describe what THIS audit
+  // does. Nothing asserts a defect in a vendor's product — such a claim
+  // goes stale the moment they ship a change, and staff here have to work
+  // with both tools.
+  it("makes no disparaging claim about the vendor", () => {
+    const start = html.indexOf('<section class="hp-vs"');
+    const section = html.slice(start, html.indexOf("</section>", start));
+    for (const word of ["hit-or-miss", "confusing", "hides", "refuses", "worse", "unreliable", "fails to"]) {
+      expect(section, `comparison should not say "${word}"`).not.toContain(word);
+    }
+  });
+
+  // The count comes from the same per-site results the hero counts.
+  it("uses the real audited-site count, and degrades rather than lying", () => {
+    expect(generateHelpHtml({ siteCount: 12 })).toContain("ICJIA's 12 audited sites");
+    expect(generateHelpHtml({ siteCount: 7 })).toContain("ICJIA's 7 audited sites");
+    const bare = generateHelpHtml({});
+    expect(bare).toContain("ICJIA's audited sites");
+    expect(bare).not.toMatch(/ICJIA's \d+ audited sites/);
+  });
+
+  it("leads on the difference that actually matters", () => {
+    expect(html).toContain("SiteImprove scans web pages. This audits the documents those pages publish");
+  });
+});
+
 describe("help page — screenshots", () => {
   it("ships every screenshot it references", () => {
     expect(HELP_SCREENSHOTS.length).toBeGreaterThan(0);
