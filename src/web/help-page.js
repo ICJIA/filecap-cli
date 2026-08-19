@@ -461,6 +461,16 @@ function renderDecisionCards() {
  * Level A and AA check passes — is a description of how a blended score
  * behaves, and is verifiable from SiteImprove's own per-issue breakdown.
  *
+ * Where the two genuinely differ in kind, say so as a TRADE, not a
+ * failing. A statewide platform maintained by an outside vendor has to
+ * serve every agency in Illinois; that is why its roadmap cannot be
+ * bespoke, and it is a sound reason rather than a shortcoming. This audit
+ * is narrower and built in-house, so a request lands faster — which is
+ * worth stating precisely because it points readers at the straw poll on
+ * the home page.
+ *
+ * Nobody reading this should come away thinking they must pick one.
+ *
  * The legal target is not editorial: ADA Title II's web rule
  * (28 CFR 35.200(b)(3)) and Illinois IITAA 2.1 both require WCAG 2.1
  * Level AA. AAA is above what either asks for.
@@ -483,15 +493,21 @@ function renderVsSiteImprove(sitesPhrase) {
       note: `A dashboard tells you a score. This is a worklist you can sort, filter, split between colleagues, and mark up offline.`,
     },
     {
+      q: "When you need it to do something else",
+      us: `Ask. This audit is built and maintained inside ICJIA &mdash; the <a href="index.html#top">home page</a> carries a list of ideas under consideration with a one-click way to say which you want, and requests from staff are where most of what is already here came from.`,
+      note: `SiteImprove is a statewide platform maintained by an outside vendor, so its roadmap has to serve every agency in Illinois rather than one. That is a reasonable trade &mdash; it just means a request specific to ICJIA lands faster here.`,
+    },
+    {
       q: "What it covers",
       us: `${sitesPhrase} and nothing else &mdash; scoped, named, and scanned together so the numbers on this site reconcile with each other.`,
-      note: `Built here, so it can be re-run on demand and re-published with every audit rather than waiting on a licence tier.`,
+      note: `A narrower scope than a statewide platform, which is the point: it can be re-run on demand and re-published with every audit.`,
     },
   ];
 
   return `<section class="hp-vs" aria-labelledby="hp-vs-heading">
     <h2 class="hp-vs-heading" id="hp-vs-heading">How this differs from SiteImprove</h2>
-    <p class="hp-vs-lede">ICJIA also uses <strong>SiteImprove</strong>, and this does not replace it. They answer different questions, and it is worth knowing which one to open. <strong>SiteImprove scans web pages. This audits the documents those pages publish</strong> &mdash; and gives you a spreadsheet to work from.</p>
+    <p class="hp-vs-lede"><strong>You do not have to choose between the two.</strong> ICJIA uses <strong>SiteImprove</strong> as well, this does not replace it, and nothing here is a case against it. They answer different questions, and each has things it does better than the other.</p>
+    <p class="hp-vs-lede">The short version: <strong>SiteImprove scans web pages. This audits the documents those pages publish</strong> &mdash; and hands you a spreadsheet to work from. Open whichever one answers the question in front of you.</p>
     <div class="hp-vs-grid">
       ${rows.map((r) => `<div class="hp-vs-row">
         <p class="hp-vs-q">${he(r.q)}</p>
@@ -499,7 +515,7 @@ function renderVsSiteImprove(sitesPhrase) {
         <p class="hp-vs-note">${r.note}</p>
       </div>`).join("\n      ")}
     </div>
-    <p class="hp-vs-foot">Both are worth having. If a SiteImprove score and a score on this site disagree, they are almost certainly measuring different things &mdash; ask the audit administrator and you will get the reconciliation in writing.</p>
+    <p class="hp-vs-foot">Both are worth having, and plenty of people use both in the same week. If a SiteImprove score and a score on this site ever disagree, they are almost certainly measuring different things rather than one of them being wrong &mdash; ask the audit administrator and you will get the reconciliation in writing.</p>
   </section>`;
 }
 
@@ -1400,6 +1416,9 @@ export function helpCss() {
 .hp-vs-lede { margin: 0 0 1.5rem; max-width: 74ch; font-size: 1.04rem; line-height: 1.6; color: #c0cdda; }
 .hp-vs-lede strong { color: #e5e5e5; }
 .hp-vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+/* An odd number of rows leaves the last one stranded in half a grid; let
+   it run full width so the block ends squarely. */
+.hp-vs-row:last-child:nth-child(odd) { grid-column: 1 / -1; }
 @media (max-width: 840px) { .hp-vs-grid { grid-template-columns: 1fr; } }
 .hp-vs-row {
   padding: 1.1rem 1.25rem 1.2rem;

@@ -227,7 +227,10 @@ describe("help page — how this differs from SiteImprove", () => {
   it("makes no disparaging claim about the vendor", () => {
     const start = html.indexOf('<section class="hp-vs"');
     const section = html.slice(start, html.indexOf("</section>", start));
-    for (const word of ["hit-or-miss", "confusing", "hides", "refuses", "worse", "unreliable", "fails to"]) {
+    for (const word of [
+      "hit-or-miss", "confusing", "hides", "refuses", "worse", "unreliable",
+      "fails to", "licence tier", "license tier", "instead of SiteImprove",
+    ]) {
       expect(section, `comparison should not say "${word}"`).not.toContain(word);
     }
   });
@@ -243,6 +246,24 @@ describe("help page — how this differs from SiteImprove", () => {
 
   it("leads on the difference that actually matters", () => {
     expect(html).toContain("SiteImprove scans web pages. This audits the documents those pages publish");
+  });
+
+  // Nobody should come away thinking they must pick one tool.
+  it("says outright that it is not a choice between the two", () => {
+    expect(html).toContain("You do not have to choose between the two");
+    expect(html).toContain("nothing here is a case against it");
+    expect(html).toContain("each has things it does better than the other");
+    expect(html).toContain("Open whichever one answers the question in front of you");
+  });
+
+  // Where the two differ in kind, it is framed as a trade — a statewide
+  // platform serving every agency cannot also be bespoke to one, which is
+  // a sound reason rather than a shortcoming.
+  it("frames the in-house/statewide difference as a trade, not a failing", () => {
+    expect(html).toContain("When you need it to do something else");
+    expect(html).toContain("built and maintained inside ICJIA");
+    expect(html).toContain("serve every agency in Illinois rather than one");
+    expect(html).toContain("That is a reasonable trade");
   });
 });
 

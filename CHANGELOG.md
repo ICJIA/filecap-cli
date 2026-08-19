@@ -10,6 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.61.5] — 2026-08-19
+
+### Changed — the SiteImprove section makes it clearer nobody has to choose
+
+- The section now opens with **"You do not have to choose between the two"**
+  and says outright that nothing in it is a case against SiteImprove, that
+  each tool does some things better than the other, and that you should open
+  whichever answers the question in front of you. Staff read this page while
+  working with both; a comparison that reads as a turf argument gets
+  discounted along with everything else on the page.
+- **New row: "When you need it to do something else."** This audit is built
+  and maintained inside ICJIA, so a request from staff can become a feature —
+  and the fleet index now carries a list of ideas with a one-click way to say
+  which you want, so the row points there. The contrast is framed as a
+  **trade, not a failing**: SiteImprove is a statewide platform maintained by
+  an outside vendor, so its roadmap has to serve every agency in Illinois
+  rather than one. That is a sound reason a statewide tool cannot be bespoke,
+  and it is stated that way.
+- The "what it covers" note dropped "rather than waiting on a licence tier",
+  which was a dig dressed as a fact. It reads "a narrower scope than a
+  statewide platform, which is the point" instead.
+- The closing note adds that plenty of people use both in the same week, and
+  that a disagreement between the two scores means they are measuring
+  different things rather than one of them being wrong.
+- Tests extended: the section must say it is not a choice, must frame the
+  in-house/statewide difference as a trade, and the disparagement guard now
+  also fails on "licence tier" and "instead of SiteImprove".
+- An odd last row in the comparison grid spans both columns instead of
+  sitting stranded in half of one.
+
 ## [1.61.4] — 2026-08-19
 
 ### Changed — the home-page Help callout reads as an infographic
