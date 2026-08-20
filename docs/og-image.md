@@ -52,3 +52,26 @@ against ~114 KB quantised, with no visible banding in the gradients.
 Check the result at feed size before committing (`--force-device-scale-factor=0.42`
 gives 600 × 315). Everything except the small agency credit line has to stay
 legible there; that is the size most people will actually see it at.
+
+## Measure the URL pill, do not eyeball it
+
+The pill around `fleet.icjia.app` is a plain `<rect>` sized to hold a `<text>`
+whose width nothing in the file computes. Estimating it shipped a pill whose
+right padding was **−0.7px** against 28.4px on the left — the text overran the
+border while the left inset stayed put, and it read as an off-centre outline.
+
+After any change to the URL string, its font, or its size, inline the SVG into a
+page and measure it, then set the rect from the numbers:
+
+```js
+document.getElementById('host').innerHTML = await fetch('og.svg').then(r => r.text());
+const svg  = document.querySelector('#host svg');
+const icon = svg.querySelector('g[transform^="translate(110"]').getBBox(); // + 110 for absolute x
+const text = [...svg.querySelectorAll('text')]
+  .find(e => e.textContent === 'fleet.icjia.app').getBBox();
+```
+
+`width = (text.x + text.width) + (110 + icon.x - 84) - 84` gives a rect whose
+right padding matches its left. `getBBox()` needs the SVG in a rendered
+document — it returns zeros on a detached node, so park the host off-screen
+rather than hiding it with `display:none`.

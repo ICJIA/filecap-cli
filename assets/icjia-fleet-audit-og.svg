@@ -75,8 +75,13 @@
   <text x="84" y="376" font-size="23" fill="#9aa5b1">every web page across ICJIA&#8217;s websites &#8212; plus a</text>
   <text x="84" y="410" font-size="23" fill="#9aa5b1">downloadable file list for every site.</text>
 
-  <!-- URL pill -->
-  <rect x="84" y="462" width="252" height="52" rx="26" fill="#0e141d" stroke="#2a323d" stroke-width="1.5"/>
+  <!-- URL pill. The width is MEASURED, not eyeballed: getBBox() puts the link
+       glyph at 112.44-127.56 and the monospace text at 144-336.66, so 84 + 281
+       leaves 28.4px of padding on the left and 28.3px on the right. At the
+       original 252 the text overran the right edge by 0.7px while the left
+       still had its full inset, which read as an off-centre outline. Re-measure
+       (docs/og-image.md) before changing the text, the size, or the font. -->
+  <rect x="84" y="462" width="281" height="52" rx="26" fill="#0e141d" stroke="#2a323d" stroke-width="1.5"/>
   <g transform="translate(110, 478)" stroke="#58a6ff" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8.5 11.5a3.6 3.6 0 0 0 5.4.4l2.6-2.6a3.6 3.6 0 0 0-5.1-5.1l-1.5 1.5"/>
     <path d="M11.5 8.5a3.6 3.6 0 0 0-5.4-.4L3.5 10.7a3.6 3.6 0 0 0 5.1 5.1l1.5-1.5"/>

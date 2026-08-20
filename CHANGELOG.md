@@ -80,6 +80,11 @@ No number, count, score, or file changed — this is naming.
   recipe (headless Chrome rather than `rsvg-convert`, because the SVG uses a
   system font stack that librsvg resolves differently; `pngquant` because the
   raw render is 447 KB against 114 KB quantised).
+- The URL pill's width is **measured**, not estimated. The first render sized
+  the rect by eye and left −0.7px of padding on the right against 28.4px on the
+  left, so `fleet.icjia.app` overran its own border and the outline read as
+  off-centre. `getBBox()` puts the text at 144–336.66, so the rect is 84 + 281.
+  The doc carries the measuring snippet for the next time the string changes.
 
 ## [1.62.0] — 2026-08-19
 
