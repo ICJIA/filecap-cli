@@ -147,8 +147,8 @@ describe("generateSitesHtml", () => {
       const html = generateSitesHtml({ contentRoster: [auditedEntry], tools: [] });
       expect(html).toContain('class="roster-card-dl"');
       expect(html).toContain('href="dvfr.xlsx" download');
-      expect(html).toContain("File audit (.xlsx)");
-      expect(html).toContain('aria-label="Download the file audit spreadsheet for Domestic Violence Fatality Review (XLSX)"');
+      expect(html).toContain("File list (Excel)");
+      expect(html).toContain('aria-label="Download the file list for Domestic Violence Fatality Review (Excel)"');
     });
 
     it("keeps the card's stretched link pointed at the live site", () => {

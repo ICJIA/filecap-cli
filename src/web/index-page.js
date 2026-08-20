@@ -62,7 +62,7 @@ function renderLlmContextSection(llmContext) {
       <p class="llm-context-eyebrow">Optional · for AI models</p>
       <h2 id="llm-context-heading">For AI models</h2>
     </header>
-    <p class="llm-context-lead">If your office permits using AI tools like Claude, ChatGPT, Gemini, or Copilot, you can upload these two files to a chat session and ask questions about the audit. <strong>This is optional.</strong> The CSV spreadsheets above are the actionable files — that's the workflow staff use to mark which files should be removed. The two files in this section are <strong>read-only</strong> and exist for AI-assisted analysis.</p>
+    <p class="llm-context-lead">If your office permits using AI tools like Claude, ChatGPT, Gemini, or Copilot, you can upload these two files to a chat session and ask questions about the audit. <strong>This is optional.</strong> The file lists above are the actionable files — that's the workflow staff use to mark which files should be removed. The two files in this section are <strong>read-only</strong> and exist for AI-assisted analysis.</p>
 
     <p class="llm-context-future"><strong>Why this is here.</strong> State-agency policy on AI tool use is still evolving. Today, your office may or may not allow uploading files to AI chat tools — that's your call, governed by your office's data-handling rules. We're including these files because in 6–12 months, AI-assisted analysis of audits like this one is likely to be much more routine, and we'd rather have them in the bundle now than try to add them later. If you don't use AI tools, you can ignore this section entirely; nothing about the rest of the audit changes.</p>
 
@@ -70,7 +70,7 @@ function renderLlmContextSection(llmContext) {
       <a class="llm-context-file" href="${he(llmContext.ndjsonFilename)}" download>
         <span class="llm-context-file-name" role="heading" aria-level="3">${he(llmContext.ndjsonFilename)}</span>
         <span class="llm-context-file-meta">${he(ndjsonSize)} · the full data</span>
-        <span class="llm-context-file-desc">One JSON object per file across every site. Includes everything the spreadsheets do, plus the PDF / Word / Excel details the spreadsheets leave out (page counts, image-only flag, heading coverage, alt-text coverage, etc.).</span>
+        <span class="llm-context-file-desc">One JSON object per file across every site. Includes everything the file lists do, plus the PDF / Word / Excel details they leave out (page counts, image-only flag, heading coverage, alt-text coverage, etc.).</span>
       </a>
       <a class="llm-context-file" href="${he(llmContext.contextMdFilename)}" download>
         <span class="llm-context-file-name" role="heading" aria-level="3">${he(llmContext.contextMdFilename)}</span>
@@ -99,11 +99,11 @@ function renderMasterCsvSection(masterCsv) {
   const lastAudit = masterCsv.lastAuditAt ? fmtAuditDate(masterCsv.lastAuditAt) : "";
   return `
   <section class="section master-csv">
-    <h2>Master spreadsheet — every remediable file across every server</h2>
-    <p>If you'd rather skim a single workbook instead of per-site files, this combined XLSX has every <em>remediable</em> file (PDFs, DOCX, XLSX, PPTX, legacy Office) from every server above in one row-per-file table. Same columns as the per-site spreadsheets, plus a "Server" column at the front so you can tell which website each row came from. The workbook also has two empty columns — <strong>Delete?</strong> and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit. Put <code>X</code>, <code>YES</code>, or anything non-blank in the Delete? cell for any file you want removed. Non-remediable file types (images, archives, text, web) are excluded from downloads — they show up only in the HTML tables for completeness.</p>
+    <h2>Every website in one workbook</h2>
+    <p>If you'd rather skim a single file than open thirteen, this combined Excel workbook has every file that may need remediation (PDFs, DOCX, XLSX, PPTX, legacy Office) from every website above, in one row-per-file table. Same columns as the per-site file lists, plus a "Server" column at the front so you can tell which website each row came from. The workbook also has two empty columns — <strong>Delete?</strong> and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit. Put <code>X</code>, <code>YES</code>, or anything non-blank in the Delete? cell for any file you want removed. Non-remediable file types (images, archives, text, web) are excluded from downloads — they show up only in the HTML tables for completeness.</p>
     <p class="master-csv-download">
       <a class="cta-button" href="${he(masterCsv.filename)}" download>
-        Download <strong>${he(masterCsv.filename)}</strong>
+        Download every site&#39;s file list &mdash; <strong>${he(masterCsv.filename)}</strong>
       </a>
       <span class="master-csv-meta">${he(fileCount.toLocaleString())} files · ${he(humanBytes(byteCount))}</span>
     </p>
@@ -125,7 +125,7 @@ function renderScoresBySiteSection(scoresBySite) {
     <p>A one-row-per-site summary workbook: how many remediable files each site has, how many documents were scored, the average score, and the A–F grade distribution, with a fleet TOTAL row. Use it to see which sites carry the most accessibility risk without opening the full file list. Scores cover every machine-scoreable document — PDFs plus modern Word, Excel, and PowerPoint files (.docx/.xlsx/.pptx). Legacy Office files (.doc/.xls/.ppt) can't be machine-scored until they're re-saved in a modern format, so they appear with "N/A (legacy format)" instead of a score.</p>
     <p class="master-csv-download">
       <a class="cta-button" href="${he(scoresBySite.filename)}" download>
-        Download <strong>${he(scoresBySite.filename)}</strong>
+        Download the scores-by-site summary &mdash; <strong>${he(scoresBySite.filename)}</strong>
       </a>
       <span class="master-csv-meta">${he(siteCount.toLocaleString())} sites · ${he(humanBytes(byteCount))}</span>
     </p>
@@ -386,7 +386,7 @@ const TODO_IDEAS = [
     // nothing in src/ ever reads a returned workbook.
     paragraphs: [
       `The <a href="help.html">Help guide</a> ends by asking you to email your completed workbook to the audit team. After that, nothing on this site knows it happened &mdash; the decisions live in an inbox, and the only way to find out how far the fleet has got is to open twelve attachments and count.`,
-      `The audit could read those returned workbooks and show, per site, how many files have a decision recorded against them, how many are still blank, and the split between <strong>archive</strong>, <strong>remediate</strong>, and <strong>as-is</strong>. Your own numbers, back on the site you got the spreadsheet from.`,
+      `The audit could read those returned workbooks and show, per site, how many files have a decision recorded against them, how many are still blank, and the split between <strong>archive</strong>, <strong>remediate</strong>, and <strong>as-is</strong>. Your own numbers, back on the site you got the file list from.`,
     ],
     payoff: `&ldquo;which sites have come back, and what is still outstanding?&rdquo; becomes a number on this page instead of a search through email.`,
   },
@@ -405,7 +405,7 @@ const TODO_IDEAS = [
     // Grounded: every row already carries Score (col I) and Page
     // References (col E); ranking is arithmetic on data in the workbook.
     paragraphs: [
-      `A site with 430 files to review is the reason people put this off. The spreadsheet can be sorted by score, but the worst-scoring file might be a 2014 agenda nobody opens, while a mediocre one sits on your busiest page.`,
+      `A site with 430 files to review is the reason people put this off. The file list can be sorted by score, but the worst-scoring file might be a 2014 agenda nobody opens, while a mediocre one sits on your busiest page.`,
       `Each row already carries both numbers that matter: the accessibility score, and how many pages link to the file. Ranking on the two together would give every site a short, ordered <strong>start here</strong> list &mdash; the handful of files where fixing one thing helps the most people.`,
     ],
     payoff: `it turns &ldquo;review 430 files&rdquo; into &ldquo;start with these twenty&rdquo;, which is a task somebody can actually begin on a Tuesday afternoon.`,
@@ -884,7 +884,7 @@ export function renderCard(sr, { sortIndex = 0 } = {}) {
   ${techDetailsHtml}
   <div class="actions">
     <a href="${he(htmlFile)}" class="btn btn-primary">View detailed report &rarr;</a>
-    ${csvFile ? `<a href="${he(csvFile)}" class="btn btn-secondary" download>Download spreadsheet</a>` : ""}
+    ${csvFile ? `<a href="${he(csvFile)}" class="btn btn-secondary" download title="An Excel workbook listing this site&#39;s PDF, Word, Excel and PowerPoint files — one row per file, with a Notes column for your decision">Download this site&#39;s file list (Excel)</a>` : ""}
     ${scannedAt ? `<p class="csv-last-audit">Last audit: <strong>${he(fmtAuditDate(scannedAt))}</strong></p>` : ""}
   </div>
 </article>`;
@@ -1024,7 +1024,7 @@ export function generateIndexHtml({
           ? `<a class="by-type-link" href="${he(bucket.htmlFilename)}" aria-label="Open ${he(label)} detail page (${he(n.toLocaleString())} files)">${he(label)}<svg class="by-type-link-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>`
           : he(label);
         const numHtml = bucket?.csvFilename
-          ? `<a class="by-type-csv-link" href="${he(bucket.csvFilename)}" download aria-label="Download spreadsheet of ${he(label)} (${he(n.toLocaleString())} files) — opens audit.xlsx" title="Download XLSX — ${he(label)} (tab in audit.xlsx)">${he(n.toLocaleString())}</a>`
+          ? `<a class="by-type-csv-link" href="${he(bucket.csvFilename)}" download aria-label="Download the fleet-wide file list for ${he(label)} (${he(n.toLocaleString())} files) — opens audit.xlsx" title="Download XLSX — ${he(label)} (tab in audit.xlsx)">${he(n.toLocaleString())}</a>`
           : he(n.toLocaleString());
         return `<tr><td>${labelHtml}</td><td class="num">${numHtml}</td></tr>`;
       })
@@ -1083,7 +1083,7 @@ export function generateIndexHtml({
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Fleet-wide inventory of files that may need accessibility remediation across ICJIA's websites, with per-site detail, spreadsheets, and a live snapshot.">
+<meta name="description" content="Fleet-wide inventory of files that may need accessibility remediation across ICJIA's websites, with per-site detail, downloadable file lists, and a live snapshot.">
 <meta name="robots" content="noindex, nofollow">
 ${PLAUSIBLE_SNIPPET}
 ${ogImage ? `<meta property="og:type" content="website">
@@ -1203,7 +1203,7 @@ ${renderWhatsNewBanner()}
         <p class="fleet-hero-phrase"><strong>${he(fleetPhrase)}</strong></p>
       </div>
     </div>
-    <p class="fleet-hero-jump-row"><a class="fleet-hero-jump" href="#websites">Find your website <span aria-hidden="true">&darr;</span></a><span class="fleet-hero-jump-hint">Each site has its own card, report, and spreadsheet below.</span></p>${fleetRemediablePages > 0 ? `
+    <p class="fleet-hero-jump-row"><a class="fleet-hero-jump" href="#websites">Find your website <span aria-hidden="true">&darr;</span></a><span class="fleet-hero-jump-hint">Every site below has its own card, a detailed report, and a downloadable list of its files.</span></p>${fleetRemediablePages > 0 ? `
     <aside class="potential-callout" role="note">
       <p class="potential-callout-eyebrow">Snapshot as of <strong>${he(lastFleetScanLabel)}</strong> <span class="potential-callout-eyebrow-suffix">— last fleet audit</span></p>
       <p><strong>Potential workload — not a fixed commitment.</strong> Both the <strong>file counts</strong> and the <strong>document page counts</strong> shown here are a point-in-time view of the fleet. They <strong>will change</strong> as staff remove files, edit content, update sites, or publish new material. The fleet total (≈ ${he(fleetRemediablePages.toLocaleString())} document pages across ${he(fleetRemediable.toLocaleString())} files) is an inclusive estimate of <em>what a vendor could be quoted against today</em>, not what staff have committed to remediate. Treat the fleet total and the per-site numbers below as order-of-magnitude figures for planning — re-run the fleet audit before locking in any scope or budget number.</p>

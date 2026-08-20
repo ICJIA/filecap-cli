@@ -1182,20 +1182,20 @@ describe("writeHtml", () => {
   // v1.39.0 (D5) — the download button's label follows the href instead of
   // always claiming XLSX (standalone reports link the sibling .csv).
   describe("download button honesty (v1.39.0)", () => {
-    it("labels a .csv href 'Download CSV'", async () => {
+    it("labels a .csv href '… file list (CSV)'", async () => {
       const out = path.join(tmpDir, "dl-csv.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out, csvHref: "audit-file-list.csv" });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toContain("Download CSV");
-      expect(html).not.toContain("Download spreadsheet (XLSX)");
+      expect(html).toContain("Download this site&#39;s file list (CSV)");
+      expect(html).not.toContain("Download this site&#39;s file list (Excel)");
     });
 
-    it("labels an .xlsx href 'Download spreadsheet (XLSX)'", async () => {
+    it("labels an .xlsx href '… file list (Excel)'", async () => {
       const out = path.join(tmpDir, "dl-xlsx.html");
       await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: null, outputPath: out, csvHref: "audit.xlsx" });
       const html = await fs.readFile(out, "utf8");
-      expect(html).toContain("Download spreadsheet (XLSX)");
-      expect(html).not.toContain("Download CSV");
+      expect(html).toContain("Download this site&#39;s file list (Excel)");
+      expect(html).not.toContain("Download this site&#39;s file list (CSV)");
     });
 
     it("omits the download button entirely when csvHref is null (Interface Contract 6)", async () => {
@@ -1206,8 +1206,7 @@ describe("writeHtml", () => {
       // anchor/block must not.
       expect(html).not.toContain('<a class="report-csv-link"');
       expect(html).not.toContain('<div class="report-csv-block');
-      expect(html).not.toContain("Download CSV");
-      expect(html).not.toContain("Download spreadsheet (XLSX)");
+      expect(html).not.toContain("Download this site&#39;s file list");
     });
   });
 

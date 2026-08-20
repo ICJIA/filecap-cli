@@ -980,6 +980,13 @@ body {
 .dp-hero-download .report-csv-link {
   font-size: 0.95rem;
   padding: 0.55rem 1.15rem;
+  /* v1.62.1 — the label now names what the download IS ("this site's file
+     list") rather than its file format, which is a longer string than the
+     old "Download spreadsheet (XLSX)". Let it wrap on a phone instead of
+     overflowing the hero; the base rule's nowrap would push it off-screen. */
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
 }
 /* Mirror of .audit-tool-link styling on the index page so the affordance
    reads the same across surfaces. v1.7.28: font dropped to 0.8rem
@@ -2246,12 +2253,23 @@ ${(() => {
       <div class="dp-ring-pct">${heroPct}%<small>audit</small></div>
     </div>
   </div>
-  ${csvHref ? `<div class="report-csv-block dp-hero-download">
-    <a class="report-csv-link" href="${htmlEscape(csvHref)}" download>
-      <span aria-hidden="true">&#x2913;</span> ${/\.csv$/i.test(String(csvHref)) ? "Download CSV" : "Download spreadsheet (XLSX)"}
+  ${csvHref ? (() => {
+    // v1.62.1 — the button says what the download IS, not what format it is
+    // in. "Download spreadsheet" left every reader asking "a spreadsheet of
+    // what?", which is the one question a download button has to answer
+    // before it is clicked. Scope comes from isConsolidated: a per-site
+    // report hands over that site's file list, the fleet by-type pages hand
+    // over the shared audit.xlsx covering every site.
+    const scope = isConsolidated ? "every site&#39;s" : "this site&#39;s";
+    const fmt = /\.csv$/i.test(String(csvHref)) ? "CSV" : "Excel";
+    const tip = `One row per file: every PDF, Word, Excel and PowerPoint document ${isConsolidated ? "across the fleet" : "this site publishes"}, with a Notes column for your decision`;
+    return `<div class="report-csv-block dp-hero-download">
+    <a class="report-csv-link" href="${htmlEscape(csvHref)}" download title="${htmlEscape(tip)}">
+      <span aria-hidden="true">&#x2913;</span> Download ${scope} file list (${fmt})
     </a>
     ${heroDateFmt ? `<p class="report-csv-date">Last audit: <strong>${htmlEscape(heroDateFmt)}</strong></p>` : ""}
-  </div>` : ""}
+  </div>`;
+  })() : ""}
   ${fileA11yBannerHtml}
   <p class="dp-metaline"><strong>${heroTotal.toLocaleString()}</strong> file${heroTotal === 1 ? "" : "s"} &middot; <strong>${htmlEscape(humanizeBytes(totalBytes))}</strong>${heroDateFmt ? ` &middot; scanned <strong>${htmlEscape(heroDateFmt)}</strong>` : ""}</p>
   ${remediablePages > 0 ? `<p class="dp-snapshot-note"><strong>Snapshot as of ${htmlEscape(heroDateFmt || "the latest scan")}.</strong> These counts are a point-in-time view — they may change as files are added, edited, or removed from the site.</p>` : ""}

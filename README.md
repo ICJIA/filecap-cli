@@ -1,13 +1,13 @@
 <p align="center">
+  <img src="assets/icjia-fleet-audit-og.png" alt="ICJIA Fleet Audit — accessibility scoring for every document and every web page across ICJIA's websites, published at fleet.icjia.app. Two independent scores: file accessibility for PDF, Word, Excel and PowerPoint, and website accessibility for every page against WCAG 2.1 AA." width="900">
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg" alt="Node 20 or newer">
   <img src="https://img.shields.io/badge/tests-passing-success.svg" alt="Tests passing">
   <img src="https://img.shields.io/badge/WCAG-2.1%20AA-blueviolet.svg" alt="WCAG 2.1 AA">
   <img src="https://img.shields.io/badge/status-internal%20ICJIA%20tooling-orange.svg" alt="Internal ICJIA tooling">
-</p>
-
-<p align="center">
-  <img src="assets/icjia-fleet-audit-banner.png" alt="ICJIA Fleet Audit — fleet-wide file and website accessibility auditing, published at fleet.icjia.app" width="820">
 </p>
 
 ## Table of contents
@@ -121,9 +121,9 @@ To see the big picture without opening every file, download **`scores-by-site.xl
 
 **4. PII reassurance banner.** *"Zero Personally Identifying Information (PII) in this audit"* with side-by-side IN / NOT-IN lists. The companion `audit-fleet.ndjson` carries no PDF/DOCX `author` or `lastModifiedBy` fields, so the claim is strictly accurate.
 
-**5. Site cards.** One per audited ICJIA site, alphabetised by title. Each card carries the site's **two independent scores** — **File accessibility** (the average score of its scored documents, on a red/amber/green gauge, with a ▲/▼ trend chip vs. the previous audit) and **Website accessibility** (its axe page score) — plus a live/unreachable **status line** under the title; a CSS-only donut carrying both counts and the ≈-pages workload line (the two-up stat tiles retired in v1.62.0 — they repeated the donut's numbers); a coloured "For bulk file access" chip that opens an instructions modal with a direct contact line to **`christopher.schweda@illinois.gov`**; a `Download spreadsheet` (XLSX) button with `Last audit: <date>` caption; and a `File types & technical details` disclosure (per-type chips + size/scan line + copy-to-clipboard rows) (origin IPs and scan paths were removed at source in v1.21.2). The whole card is one click target to the per-site detail page.
+**5. Site cards.** One per audited ICJIA site, alphabetised by title. Each card carries the site's **two independent scores** — **File accessibility** (the average score of its scored documents, on a red/amber/green gauge, with a ▲/▼ trend chip vs. the previous audit) and **Website accessibility** (its axe page score) — plus a live/unreachable **status line** under the title; a CSS-only donut carrying both counts and the ≈-pages workload line (the two-up stat tiles retired in v1.62.0 — they repeated the donut's numbers); a coloured "For bulk file access" chip that opens an instructions modal with a direct contact line to **`christopher.schweda@illinois.gov`**; a `Download this site's file list (Excel)` button with `Last audit: <date>` caption; and a `File types & technical details` disclosure (per-type chips + size/scan line + copy-to-clipboard rows) (origin IPs and scan paths were removed at source in v1.21.2). The whole card is one click target to the per-site detail page.
 
-**6. Per-site detail pages.** The **file worklist leads** (v1.62.0 — it follows the hero directly; website accessibility comes after it, and the bulk-file-access instructions sit last). Two clearly-separated assessments, each with an icon lockup, a colored section bar, and an explainer that the two scopes are independent: **File accessibility** (green — every file the site publishes with its per-file score, sortable/searchable, a Page view toggle, paginators at both table ends, and the hero's green **Download spreadsheet (XLSX)** call-to-action) and **Website accessibility** (blue — page score + grade, severity and WCAG-level breakdowns with plain-language glosses, a needs-review count, a fixed/new issue trend, and a per-page table).
+**6. Per-site detail pages.** The **file worklist leads** (v1.62.0 — it follows the hero directly; website accessibility comes after it, and the bulk-file-access instructions sit last). Two clearly-separated assessments, each with an icon lockup, a colored section bar, and an explainer that the two scopes are independent: **File accessibility** (green — every file the site publishes with its per-file score, sortable/searchable, a Page view toggle, paginators at both table ends, and the hero's green **Download this site's file list (Excel)** call-to-action) and **Website accessibility** (blue — page score + grade, severity and WCAG-level breakdowns with plain-language glosses, a needs-review count, a fixed/new issue trend, and a per-page table).
 
 **7. Fleet-wide search — [/search](https://fleet.icjia.app/search).** Search every inventoried file by full or partial filename — typo-tolerant, separator-blind, and site-name aware — with category/site filter chips, sortable results, per-file audit-report links, a per-row explanation of *why* it matched, and an Excel download of the results. Tick rows across any number of searches to build a session-scoped **custom report** with its own XLSX download.
 

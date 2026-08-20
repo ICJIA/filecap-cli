@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"
+     font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+     role="img"
+     aria-label="ICJIA Fleet Audit — accessibility scoring for every document and every web page across ICJIA's websites, published at fleet.icjia.app. Two independent scores: file accessibility for PDF, Word, Excel and PowerPoint, and website accessibility for every page against WCAG 2.1 AA.">
+  <title>ICJIA Fleet Audit — fleet.icjia.app</title>
+
+  <defs>
+    <!-- Deep ink ground, lit very slightly from the top. Same register as the
+         app's #0d1117 canvas, pulled a shade darker so the panels lift off it. -->
+    <linearGradient id="ground" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0"   stop-color="#101722"/>
+      <stop offset="0.55" stop-color="#0a0e14"/>
+      <stop offset="1"   stop-color="#07090d"/>
+    </linearGradient>
+
+    <!-- The two scope hues bloom from the two halves they own: blue behind the
+         wordmark, green behind the file panel. Sub-10% so they read as light,
+         not as colour fields. -->
+    <radialGradient id="bloomBlue" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0"   stop-color="#4dabf7" stop-opacity="0.16"/>
+      <stop offset="0.6" stop-color="#4dabf7" stop-opacity="0.04"/>
+      <stop offset="1"   stop-color="#4dabf7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bloomGreen" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0"   stop-color="#3fb950" stop-opacity="0.13"/>
+      <stop offset="0.6" stop-color="#3fb950" stop-opacity="0.03"/>
+      <stop offset="1"   stop-color="#3fb950" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Quiet technical texture. Carried over from the old CLI banner, cooled
+         from amber to slate so it sits under the app's palette. -->
+    <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="17" cy="17" r="1" fill="#7d8fa8" opacity="0.055"/>
+    </pattern>
+
+    <radialGradient id="vignette" cx="0.42" cy="0.42" r="0.82">
+      <stop offset="0"    stop-color="#000000" stop-opacity="0"/>
+      <stop offset="0.62" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#000000" stop-opacity="0.55"/>
+    </radialGradient>
+
+    <!-- Panel face: a hair lighter at the top edge, like the app's site cards
+         (linear-gradient #18202b → #141a23). -->
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161f2b"/>
+      <stop offset="1" stop-color="#111823"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ── ground ────────────────────────────────────────────────────────── -->
+  <rect width="1200" height="630" fill="url(#ground)"/>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+  <ellipse cx="300" cy="230" rx="560" ry="380" fill="url(#bloomBlue)"/>
+  <ellipse cx="960" cy="300" rx="420" ry="330" fill="url(#bloomGreen)"/>
+  <rect width="1200" height="630" fill="url(#vignette)"/>
+
+  <!-- ── left column: the wordmark ─────────────────────────────────────── -->
+
+  <!-- The app's section device: a short amber rule above the mark. Repeated
+       here so the card and the site read as one thing. ICJIA gets its own
+       line at a size that survives a feed thumbnail — the agency name is the
+       half a reader has to recognise, and a two-tone single line would have
+       had to drop to 60px to fit the column. -->
+  <rect x="84" y="100" width="76" height="6" rx="3" fill="#ffb000"/>
+  <text x="84" y="158" font-size="42" font-weight="800" letter-spacing="4.5" fill="#ffb000">ICJIA</text>
+
+  <text x="84" y="244" font-size="78" font-weight="800" letter-spacing="-1.5" fill="#f0f6fc">Fleet Audit</text>
+
+  <!-- Two rules, two hues, in the proportion the product uses them: the file
+       scope is the bulk of the work, the website scope sits beside it. -->
+  <rect x="84" y="272" width="118" height="6" rx="3" fill="#3fb950"/>
+  <rect x="210" y="272" width="66"  height="6" rx="3" fill="#4dabf7"/>
+
+  <text x="84" y="342" font-size="23" fill="#9aa5b1">Accessibility scoring for every document and</text>
+  <text x="84" y="376" font-size="23" fill="#9aa5b1">every web page across ICJIA&#8217;s websites &#8212; plus a</text>
+  <text x="84" y="410" font-size="23" fill="#9aa5b1">downloadable file list for every site.</text>
+
+  <!-- URL pill -->
+  <rect x="84" y="462" width="252" height="52" rx="26" fill="#0e141d" stroke="#2a323d" stroke-width="1.5"/>
+  <g transform="translate(110, 478)" stroke="#58a6ff" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8.5 11.5a3.6 3.6 0 0 0 5.4.4l2.6-2.6a3.6 3.6 0 0 0-5.1-5.1l-1.5 1.5"/>
+    <path d="M11.5 8.5a3.6 3.6 0 0 0-5.4-.4L3.5 10.7a3.6 3.6 0 0 0 5.1 5.1l1.5-1.5"/>
+  </g>
+  <text x="144" y="496" font-size="21" font-weight="600" letter-spacing="0.2"
+        font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace"
+        fill="#58a6ff">fleet.icjia.app</text>
+
+  <text x="84" y="552" font-size="15" letter-spacing="0.4" fill="#5c6773">Illinois Criminal Justice Information Authority</text>
+
+  <!-- ── right column: the two scopes ──────────────────────────────────── -->
+
+  <!-- File accessibility — green, document glyph. Same lockup the per-site
+       reports lead with, so the card previews the actual page. -->
+  <g>
+    <rect x="684" y="150" width="432" height="132" rx="20" fill="url(#panel)" stroke="#232c38" stroke-width="1.5"/>
+    <path d="M684 170a20 20 0 0 1 20-20h2v132h-2a20 20 0 0 1-20-20z" fill="#3fb950"/>
+    <rect x="716" y="180" width="56" height="56" rx="15" fill="#3fb950" fill-opacity="0.13" stroke="#3fb950" stroke-opacity="0.34" stroke-width="1.5"/>
+    <g transform="translate(730, 194) scale(1.75)" fill="none" stroke="#3fb950" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 1.5h5.5L13 5v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1z"/>
+      <path d="M9.5 1.5V5H13"/>
+      <path d="M5.5 8.5h5M5.5 11h3.5"/>
+    </g>
+    <text x="792" y="203" font-size="20" font-weight="800" letter-spacing="1.4" fill="#3fb950">FILE ACCESSIBILITY</text>
+    <text x="792" y="231" font-size="17" fill="#8b949e">PDF &#183; Word &#183; Excel &#183; PowerPoint</text>
+  </g>
+
+  <!-- Website accessibility — blue, globe glyph. -->
+  <g>
+    <rect x="684" y="310" width="432" height="132" rx="20" fill="url(#panel)" stroke="#232c38" stroke-width="1.5"/>
+    <path d="M684 330a20 20 0 0 1 20-20h2v132h-2a20 20 0 0 1-20-20z" fill="#4dabf7"/>
+    <rect x="716" y="340" width="56" height="56" rx="15" fill="#4dabf7" fill-opacity="0.13" stroke="#4dabf7" stroke-opacity="0.34" stroke-width="1.5"/>
+    <g transform="translate(730, 354) scale(1.75)" fill="none" stroke="#4dabf7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="8" cy="8" r="6.5"/>
+      <path d="M1.5 8h13"/>
+      <path d="M8 1.5c1.9 1.8 2.9 4 2.9 6.5S9.9 12.7 8 14.5C6.1 12.7 5.1 10.5 5.1 8S6.1 3.3 8 1.5z"/>
+    </g>
+    <text x="792" y="363" font-size="20" font-weight="800" letter-spacing="1.4" fill="#4dabf7">WEBSITE ACCESSIBILITY</text>
+    <text x="792" y="391" font-size="17" fill="#8b949e">Every page &#183; WCAG 2.1 AA</text>
+  </g>
+
+  <!-- The one sentence the whole layout exists to make: the two are separate. -->
+  <text x="684" y="500" font-size="17" fill="#6e7c8c">Two independent scores. Never blended into one number.</text>
+</svg>

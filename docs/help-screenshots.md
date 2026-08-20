@@ -8,8 +8,8 @@ committed to the repo and copied verbatim into the bundle by `web-rollup`
 | File | Size | Shows |
 |---|---|---|
 | `step-find-site.png` | 420 × 660 | A site card on the fleet index, cropped to its identity: image, short code, name, URL, description, and the two number tiles. |
-| `step-download-card.png` | 420 × 206 | The bottom of a site card — the `View detailed report` and `Download spreadsheet` buttons with the `Last audit` caption. |
-| `step-download-report.png` | 900 × 600 | The top of a per-site report — headline count, the green `Download spreadsheet (XLSX)` button, and the File accessibility card. |
+| `step-download-card.png` | 420 × 206 | The bottom of a site card — the `View detailed report` and `Download this site's file list (Excel)` buttons with the `Last audit` caption. |
+| `step-download-report.png` | 900 × 600 | The top of a per-site report — headline count, the green `Download this site's file list (Excel)` button, and the File accessibility card. |
 
 **All three are the same site: Adult Redeploy Illinois (ARI).** That is not
 incidental. An earlier version shot the card from ARI and the report from
@@ -24,9 +24,11 @@ uses the same site's URL shape too.
 ## When to re-shoot
 
 Only when the thing pictured is redesigned: the site card's layout, its action
-buttons, or the per-site report's hero. A palette tweak is not worth 235 KB of
-churn. Everything else on `/help` — the column map, the decision cards, the
-example grid — is live HTML and updates itself.
+buttons, or the per-site report's hero. **A button's label counts** — v1.62.1
+renamed both download buttons and both shots had to be retaken, or the guide
+would have told readers to click something that no longer existed. A palette
+tweak is not worth 235 KB of churn. Everything else on `/help` — the column
+map, the decision cards, the example grid — is live HTML and updates itself.
 
 ## How they were made
 
@@ -41,6 +43,16 @@ viewport size.
    cd ~/filecap-audits/_web-rollup/<timestamp>/
    python3 -m http.server 8912 --bind 127.0.0.1
    ```
+
+   A published bundle shows the code as it was when that rollup ran, which is
+   wrong the moment you are re-shooting *because* the markup changed. To shoot
+   the current code without a fleet run, build the two fragments from the
+   source instead: `renderCard()` (`src/web/index-page.js`) plus `INDEX_CSS`
+   (`src/web/index-css.js`) gives the card, and `runReport()`
+   (`src/commands/report.js`) regenerates a real per-site report from the
+   cached inventory at `~/filecap-audits/<slug>/latest/inventory.audited.ndjson`
+   — no SSH, no rsync, real numbers. Extract its `<style>` and
+   `<header class="dp-hero">` into the harness below.
 
 2. **Extract the fragment and wrap it in a harness.** Pull the `<style>` block
    and the element you want out of the generated HTML, and write a minimal page

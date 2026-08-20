@@ -10,6 +10,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.62.1] — 2026-08-20
+
+### Fixed — the download buttons say what they hand over
+
+"Download spreadsheet" answered the wrong question. It named the file format
+and left the object unstated, and the first thing a non-technical reader asked
+was the obvious one: *a spreadsheet of what?* A download button has to answer
+that before it is clicked. The whole surface now uses **one** name for the
+artefact — *file list* — where it previously used four ("spreadsheet",
+"spreadsheet (XLSX)", "File audit (.xlsx)", and a bare filename).
+
+- **Both per-site download buttons now read `Download this site's file list
+  (Excel)`** — the card on the home page and the green button in each report's
+  hero. Identical labels on purpose: `/help` step 2 exists partly to explain
+  that the two buttons give you the same file, and two different labels were
+  half the reason it needed explaining. `(Excel)` rather than `(XLSX)`, which
+  is the audience's word for it. Each carries a `title` naming what is inside.
+- **The label is scope-aware.** `writeHtml` serves both per-site reports and
+  the fleet-wide by-type pages (`audit-pdfs.html` et al.), whose download is
+  the shared `audit.xlsx`; those now say `Download every site's file list
+  (Excel)` rather than claiming to be one site's. Driven by the existing
+  `isConsolidated` flag, so the CSV branch stays honest too.
+- **Home-page section CTAs stopped being filenames.** `Download audit.xlsx`
+  → `Download every site's file list — audit.xlsx`; same for the
+  scores-by-site workbook. The section heading `Master spreadsheet — every
+  remediable file across every server` is now `Every website in one workbook`
+  ("server" meant "website", and "remediable" is not a word a manager owes
+  anyone).
+- **`/sites` roster pill** matches: `File audit (.xlsx)` → `File list
+  (Excel)`, with the aria-label rewritten to suit.
+- **`/help` stopped overstating what the workbook holds.** Step 3 and the page
+  banner said the file lists "every file your website publishes"; the workbook
+  carries only the remediable buckets (PDF / DOCX / XLSX / PPTX / legacy
+  Office) plus the Pages tab — images, archives, text and web files are
+  excluded by `TYPE_BUCKETS`. Both now say *every PDF, Word, Excel and
+  PowerPoint file*, which is what is actually in there. Step 2's title, lede,
+  and both route panels track the new button labels.
+- **Two `/help` screenshots re-shot** (`step-download-card.png`,
+  `step-download-report.png`) against the same site, at the same dimensions,
+  so the pictures show the buttons the copy names. `docs/help-screenshots.md`
+  gains the rule that a label change is a re-shoot trigger, and a recipe for
+  shooting current code from the cached inventory without a fleet run.
+- **The detail-page button may now wrap.** The longer label would have
+  overflowed a phone under `.report-csv-link`'s `white-space: nowrap`; the
+  hero variant relaxes it with `text-wrap: balance`.
+
+No number, count, score, or file changed — this is naming.
+
+### Added — a designed social card, replacing a stale screenshot
+
+- **`assets/icjia-fleet-audit-og.svg`** — a hand-authored 1200 × 630 card in the
+  app's own visual language: the amber section rule, the `ICJIA` / `Fleet Audit`
+  lockup, and the two scope panels (green document glyph = file accessibility,
+  blue globe = website accessibility) lifted from the per-site report headers.
+  Deliberately carries **no numbers** — a score baked into a PNG is stale at the
+  next audit, and a social preview is where that costs the most.
+- Rendered to **`assets/icjia-fleet-audit-og.png`** and copied over
+  **`assets/og-overrides/icjia-fleet-audit.png`**, which is the bundle's own
+  `og:image` *and* the fleet-audit tooling card's thumbnail on `/sites`. The
+  file it replaced was a June 7 screenshot of the `/sites` page still showing
+  retired branding ("filecap site directory", "ICJIA PDF Audit Tool").
+- **The README's banner was a broken image.** The v1.59.3 branding retirement
+  renamed the reference to `assets/icjia-fleet-audit-banner.png` but never the
+  file, so the README had rendered a broken `<img>` since. It now points at the
+  new card, above the badge row. `assets/filecap-cli-banner.{png,svg}` is now
+  referenced by nothing but its own changelog entry.
+- **`docs/og-image.md`** — why the card looks the way it does, and the render
+  recipe (headless Chrome rather than `rsvg-convert`, because the SVG uses a
+  system font stack that librsvg resolves differently; `pngquant` because the
+  raw render is 447 KB against 114 KB quantised).
+
 ## [1.62.0] — 2026-08-19
 
 ### Changed — density pass: managers first, methodology second

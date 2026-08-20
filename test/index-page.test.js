@@ -113,7 +113,7 @@ describe("renderCard", () => {
   it("renders the CSV-download button as a separate <a download> inside .actions", () => {
     const html = renderCard(baseSr);
     expect(html).toMatch(
-      /<a href="dvfr-2026\.csv" class="btn btn-secondary" download>Download spreadsheet<\/a>/,
+      /<a href="dvfr-2026\.csv" class="btn btn-secondary" download title="[^"]*">Download this site&#39;s file list \(Excel\)<\/a>/,
     );
   });
 
@@ -645,13 +645,13 @@ describe("renderCard download link only when a workbook exists (v1.39.0)", () =>
   it("omits the download anchor when csvFile is null", () => {
     const html = renderCard({ ...baseSr, csvFile: null });
     expect(html).not.toContain("btn-secondary");
-    expect(html).not.toContain("Download spreadsheet");
+    expect(html).not.toContain("file list");
   });
 
   it("keeps the download anchor for a normal site (csvFile set)", () => {
     const html = renderCard(baseSr);
     expect(html).toMatch(
-      /<a href="dvfr-2026\.csv" class="btn btn-secondary" download>Download spreadsheet<\/a>/,
+      /<a href="dvfr-2026\.csv" class="btn btn-secondary" download title="[^"]*">Download this site&#39;s file list \(Excel\)<\/a>/,
     );
   });
 });

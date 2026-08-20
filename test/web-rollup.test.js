@@ -536,7 +536,9 @@ describe("runWebRollup", () => {
       // Title is the bucket label ("PDFs")
       expect(html).toMatch(/<h1 class="dp-title">PDFs<\/h1>/);
       // v1.20.0: download link in the sticky bar points to the shared workbook
-      expect(html).toMatch(/<a class="report-csv-link" href="audit\.xlsx" download>/);
+      expect(html).toMatch(/<a class="report-csv-link" href="audit\.xlsx" download title="[^"]*">/);
+      // Fleet-wide page: the label must not claim it is one site's list.
+      expect(html).toContain("Download every site&#39;s file list (Excel)");
       // Back link returns to the fleet index
       expect(html).toMatch(/<a class="report-back-link" href="index\.html">/);
       // Eyebrow says it's the across-the-fleet view, not a single site
@@ -1055,7 +1057,7 @@ describe("runWebRollup — master XLSX + duplicates", () => {
     await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase });
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
     expect(html).toMatch(/href="audit-file-list-master\.xlsx"/);
-    expect(html).toContain("Master spreadsheet");
+    expect(html).toContain("Every website in one workbook");
   });
 
   it("renders the duplicates section when two sites share a filename", async () => {

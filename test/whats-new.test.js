@@ -26,9 +26,9 @@ describe("WHATS_NEW data", () => {
   // v1.62.0 — newest entry announces the density/skimmability pass, and is
   // the first to carry a banner `summary` (the banner itself was one of the
   // density findings: ~200 words of wall-of-text at the top of the page).
-  it("leads with the 2026-08-19 easier-to-skim entry, with a short banner summary", () => {
+  it("leads with the 2026-08-20 download-label entry, with a short banner summary", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("easier-to-skim");
+    expect(e.id).toContain("download-buttons-say-what-they-give-you");
     expect(e.badge).toBe("Improved");
     expect(e.summary.length).toBeGreaterThan(0);
     // "At most two sentences" is the rule; ~350 chars is the tripwire.
@@ -39,10 +39,18 @@ describe("WHATS_NEW data", () => {
   it("the banner renders the summary, not the full text, with a read-more link", () => {
     const banner = renderWhatsNewBanner();
     // Compare escaped-safe fragments (the renderer HTML-escapes apostrophes).
-    expect(banner).toContain("This site is now easier to skim");
-    expect(banner).toContain("less scrolling to reach them");
-    expect(banner).not.toContain("A reader told us the site had grown dense");
+    expect(banner).toContain("The download buttons now say what they hand over");
+    expect(banner).toContain("guessing what is in it");
+    expect(banner).not.toContain("the first thing people asked was the obvious one");
     expect(banner).toContain(">Read the full update</a>");
+  });
+
+  // v1.62.0 — the density pass, now history.
+  it("keeps the 2026-08-19 easier-to-skim entry with its banner summary", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("easier-to-skim"));
+    expect(e).toBeTruthy();
+    expect(e.badge).toBe("Improved");
+    expect(e.summary).toContain("This site is now easier to skim");
   });
 
   // v1.61.0 — the /help launch entry, now history.

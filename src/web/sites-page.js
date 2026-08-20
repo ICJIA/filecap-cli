@@ -71,7 +71,7 @@ function renderRosterCard(entry) {
   ${desc ? `<p class="card-desc">${he(desc)}</p>` : ""}
   ${renderTechDetails({ site, header: entry.header })}
   ${csvFile ? `<div class="actions">
-    <a class="roster-card-dl" href="${he(csvFile)}" download aria-label="Download the file audit spreadsheet for ${fullName} (XLSX)" title="This site's file audit — every inventoried file, one row per file (opens in Excel/Numbers/Sheets)">${DOWNLOAD_ICON}<span>File audit (.xlsx)</span></a>
+    <a class="roster-card-dl" href="${he(csvFile)}" download aria-label="Download the file list for ${fullName} (Excel)" title="This site's file list — one row per PDF, Word, Excel and PowerPoint file (opens in Excel/Numbers/Sheets)">${DOWNLOAD_ICON}<span>File list (Excel)</span></a>
   </div>` : ""}
 </article>`;
 }
@@ -214,7 +214,7 @@ ${toolCards}
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Directory of every ICJIA content and tooling site — titles, live URLs, statuses, and roster spreadsheet downloads.">
+<meta name="description" content="Directory of every ICJIA content and tooling site — titles, live URLs, statuses, and per-site file-list downloads.">
 <meta name="robots" content="noindex, nofollow">
 ${PLAUSIBLE_SNIPPET}
 ${ogImage ? `<meta property="og:type" content="website">

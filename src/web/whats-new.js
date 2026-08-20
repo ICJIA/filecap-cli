@@ -47,6 +47,15 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "download-buttons-say-what-they-give-you-2026-08-20",
+    badge: "Improved",
+    summary: "The download buttons now say what they hand over: \u201cDownload this site\u2019s file list (Excel)\u201d instead of \u201cDownload spreadsheet\u201d. Same file, same click \u2014 it just no longer leaves you guessing what is in it.",
+    text: "Every download button on this site used to say \u201cDownload spreadsheet\u201d, and the first thing people asked was the obvious one: a spreadsheet of what? So the buttons now answer it before you click. On a website card and at the top of that site\u2019s report, the button reads \u201cDownload this site\u2019s file list (Excel)\u201d \u2014 the same file you were always getting, named for what it holds. The whole-fleet download says \u201cDownload every site\u2019s file list\u201d, and the section it sits in is now headed \u201cEvery website in one workbook\u201d rather than \u201cMaster spreadsheet\u201d. One name is used throughout, on the home page, on each report, on the site directory, and in the Help guide: your site\u2019s file list. The Help guide also stops overstating what is in it \u2014 the workbook holds every PDF, Word, Excel and PowerPoint file your site publishes, not literally every file on the server (images, archives and text files are left out, because nobody remediates them one at a time). Its screenshots were re-taken so the pictures match the buttons you will actually see. Nothing about the audit changed: same files, same scores, same numbers.",
+    linkText: "Open the Help guide",
+    linkHref: "help.html",
+    date: "August 20, 2026",
+  },
+  {
     id: "easier-to-skim-2026-08-19",
     badge: "Improved",
     summary: "This site is now easier to skim: your website's card sits right under the headline numbers, and each site's report leads with its file list. Same numbers, less scrolling to reach them.",

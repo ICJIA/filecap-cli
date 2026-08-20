@@ -2,7 +2,7 @@
 //
 // Why this page exists: readers landing on the bundle told us they did not
 // know where to begin. The task they are actually being asked to do has
-// exactly one shape — find your website, download its spreadsheet, open the
+// exactly one shape — find your website, download its file list, open the
 // two link columns to see what each file actually is and where it lives,
 // decide, and send it back — and nothing in the bundle said so.
 //
@@ -94,13 +94,13 @@ const SHOTS = {
     file: "step-download-card.png",
     width: 420,
     height: 206,
-    alt: "The bottom of a website card, showing a blue View detailed report button above an outlined Download spreadsheet button, with the line Last audit: Aug 17, 2026 beneath them.",
+    alt: "The bottom of a website card, showing a blue View detailed report button above an outlined Download this site's file list (Excel) button, with the line Last audit: Aug 17, 2026 beneath them.",
   },
   downloadReport: {
     file: "step-download-report.png",
     width: 900,
     height: 600,
-    alt: "The top of the site report for Adult Redeploy Illinois, showing 430 files may need audit work, a green Download spreadsheet (XLSX) button, the date of the last audit, and a file accessibility score of 69 out of 100.",
+    alt: "The top of the site report for Adult Redeploy Illinois, showing 430 files may need audit work, a green Download this site's file list (Excel) button, the date of the last audit, and a file accessibility score of 69 out of 100.",
   },
 };
 
@@ -188,7 +188,7 @@ const DECISIONS = [
 /** The five-beat summary rail under the hero. */
 const JOURNEY = [
   { n: "1", label: "Find your website", sub: "On the home page" },
-  { n: "2", label: "Download the spreadsheet", sub: "One click" },
+  { n: "2", label: "Download the file list", sub: "One click" },
   { n: "3", label: "See what is in it", sub: "Five columns matter" },
   { n: "4", label: "Decide on each file", sub: "Open the links and judge" },
   { n: "5", label: "Send it back", sub: "Email the file" },
@@ -294,9 +294,9 @@ function renderColumnMap() {
   return `<figure class="hp-colmap">
     <figcaption class="hp-colmap-cap">
       <span class="hp-colmap-cap-title">${titleCase(spellCount(WORKBOOK_COLUMNS.length))} columns. You use ${spellCount(used.length)}.</span>
-      <span class="hp-colmap-cap-sub">Every column across the top of the spreadsheet, drawn to scale. The narrow grey ones are reference data for the audit team &mdash; you can ignore all ${spellCount(dim.length)} of them.</span>
+      <span class="hp-colmap-cap-sub">Every column across the top of the workbook, drawn to scale. The narrow grey ones are reference data for the audit team &mdash; you can ignore all ${spellCount(dim.length)} of them.</span>
     </figcaption>
-    <div class="hp-colmap-strip" role="img" aria-label="${he(`The spreadsheet's ${spellCount(WORKBOOK_COLUMNS.length)} columns. ${titleCase(spellCount(used.length))} matter: ${used.map((c) => `${c.letter} ${c.label}`).join(", ")}. The other ${spellCount(dim.length)} — ${dim.map((c) => c.letter).join(", ")} — are reference data.`)}">
+    <div class="hp-colmap-strip" role="img" aria-label="${he(`The workbook's ${spellCount(WORKBOOK_COLUMNS.length)} columns. ${titleCase(spellCount(used.length))} matter: ${used.map((c) => `${c.letter} ${c.label}`).join(", ")}. The other ${spellCount(dim.length)} — ${dim.map((c) => c.letter).join(", ")} — are reference data.`)}">
       ${strip}
     </div>
     <ul class="hp-colkeys">
@@ -352,7 +352,7 @@ function renderExampleGrid() {
     )
     .join("\n      ");
   return `<figure class="hp-grid-wrap">
-    <figcaption class="hp-grid-cap">Three rows from the same site's spreadsheet, decided. The score and the page told the story; the Notes cell just records the outcome.</figcaption>
+    <figcaption class="hp-grid-cap">Three rows from the same site's file list, decided. The score and the page told the story; the Notes cell just records the outcome.</figcaption>
     <div class="hp-grid-scroll">
       <table class="hp-grid">
         <thead>
@@ -481,7 +481,7 @@ function renderVsSiteImprove(sitesPhrase) {
     },
     {
       q: "What you get out of it",
-      us: `A <strong>spreadsheet per site</strong>: one row per file, its score, a link to the file, the page it appears on, and an empty Notes column for your decision. It is the thing your unit works from and hands back.`,
+      us: `A <strong>file list per site</strong> &mdash; an Excel workbook with one row per document: its score, a link to the file, the page it appears on, and an empty Notes column for your decision. It is the thing your unit works from and hands back.`,
       note: `A dashboard tells you a score. This is a worklist you can sort, filter, split between colleagues, and mark up offline.`,
     },
     {
@@ -499,7 +499,7 @@ function renderVsSiteImprove(sitesPhrase) {
   return `<section class="hp-vs" aria-labelledby="hp-vs-heading">
     <h2 class="hp-vs-heading" id="hp-vs-heading">How this differs from SiteImprove</h2>
     <p class="hp-vs-lede"><strong>You do not have to choose between the two.</strong> ICJIA uses <strong>SiteImprove</strong> as well, this does not replace it, and nothing here is a case against it. They answer different questions, and each has things it does better than the other.</p>
-    <p class="hp-vs-lede">The short version: <strong>SiteImprove scans web pages. This audits the documents those pages publish</strong> &mdash; and hands you a spreadsheet to work from. Open whichever one answers the question in front of you.</p>
+    <p class="hp-vs-lede">The short version: <strong>SiteImprove scans web pages. This audits the documents those pages publish</strong> &mdash; and hands you a file list to work from. Open whichever one answers the question in front of you.</p>
     <div class="hp-vs-grid">
       ${rows.map((r) => `<div class="hp-vs-row">
         <p class="hp-vs-q">${he(r.q)}</p>
@@ -583,17 +583,17 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
 
   const step2 = renderStep({
     n: "2",
-    title: "Download the spreadsheet",
-    lede: `Two buttons do this, in two different places. They download <em>the same file</em> &mdash; use whichever you reach first. Both pictures below show the same site as step 1.`,
+    title: "Download your site's file list",
+    lede: `The file list is an Excel workbook &mdash; one row for every document your site publishes. Two buttons hand it over, in two different places. Both are labelled <strong>Download this site's file list</strong>, both give you <em>the same file</em>, so use whichever you reach first. Both pictures below show the same site as step 1.`,
     body: `<div class="hp-routes">
       <div class="hp-route">
         <p class="hp-route-tag">The quick way</p>
-        <p class="hp-route-text">Scroll to the bottom of your site's card and click <strong>Download spreadsheet</strong>. You never have to leave the home page.</p>
+        <p class="hp-route-text">Scroll to the bottom of your site's card and click <strong>Download this site's file list (Excel)</strong>. You never have to leave the home page.</p>
         ${renderShot(SHOTS.downloadCard, { caption: `At the bottom of every card.` })}
       </div>
       <div class="hp-route">
         <p class="hp-route-tag">From the site's report</p>
-        <p class="hp-route-text">Or click <strong>View detailed report</strong> first, to see the site's scores. The green <strong>Download spreadsheet (XLSX)</strong> button sits at the top of that page.</p>
+        <p class="hp-route-text">Or click <strong>View detailed report</strong> first, to see the site's scores. The same green button &mdash; <strong>Download this site's file list (Excel)</strong> &mdash; sits at the top of that page.</p>
         ${renderShot(SHOTS.downloadReport, { caption: `The same site's report page &mdash; the green button at the top gives you the identical file.` })}
       </div>
     </div>
@@ -617,12 +617,12 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
   const step3 = renderStep({
     n: "3",
     title: "See what is in it",
-    lede: `The spreadsheet lists every file your website publishes &mdash; <strong>what each file is called</strong>, and <strong>which page it appears on</strong>. That second one is the part people miss, and it is usually what makes a file recognisable.`,
+    lede: `One row per document your website publishes &mdash; every PDF, Word, Excel and PowerPoint file. Each row gives you <strong>what each file is called</strong>, and <strong>which page it appears on</strong>. That second one is the part people miss, and it is usually what makes a file recognisable.`,
     body: `${renderColumnMap()}
 
     <div class="hp-twoviews">
       <h3 class="hp-twoviews-title">The same files, two ways round</h3>
-      <p class="hp-twoviews-lede">Along the bottom of the spreadsheet are several tabs. They are not copies of each other.</p>
+      <p class="hp-twoviews-lede">Along the bottom of the workbook are several tabs &mdash; one for each kind of document, plus one for pages. They are not copies of each other.</p>
       <div class="hp-twoviews-grid">
         <div class="hp-view">
           <p class="hp-view-tag">Tabs named PDFs, DOCX, XLSX, PPTX</p>
@@ -654,7 +654,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
     ${renderExampleGrid()}
 
     <div class="hp-note">
-      <p><strong>Four practical things.</strong> Record your decision on every file tab, not just the first. Writing more than the outcome is welcome &mdash; put the word first, then your reasoning (<em>archive &mdash; superseded by the 2026 edition</em> reads perfectly well). Ignore the <strong>Delete?</strong> column next to Notes &mdash; it is an older column and the audit team works from Notes. And save as you go: the spreadsheet on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
+      <p><strong>Four practical things.</strong> Record your decision on every file tab, not just the first. Writing more than the outcome is welcome &mdash; put the word first, then your reasoning (<em>archive &mdash; superseded by the 2026 edition</em> reads perfectly well). Ignore the <strong>Delete?</strong> column next to Notes &mdash; it is an older column and the audit team works from Notes. And save as you go: the workbook on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
     </div>`,
   });
 
@@ -663,7 +663,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
     title: "Send it back",
     lede: `Send the completed site audit report, with your remediation determinations in it, to <a class="hp-handback-address" href="mailto:${he(HANDBACK.email)}">${he(HANDBACK.email)}</a>. That file becomes the audit record for your site &mdash; the evidence of what was decided, and when.`,
     body: `<div class="hp-note">
-      <p><strong>Attach the spreadsheet itself.</strong> Send the <code>.xlsx</code> file, not a screenshot of it and not the rows pasted into the message body. Keep your own copy as well.</p>
+      <p><strong>Attach the workbook itself.</strong> Send the <code>.xlsx</code> file you downloaded, not a screenshot of it and not the rows pasted into the message body. Keep your own copy as well.</p>
     </div>
     <div class="hp-note">
       <p><strong>Partly done is still worth sending.</strong> A report with the obvious rows decided and the rest blank is more useful than one that never arrives. Say in your email how far you got.</p>
@@ -715,7 +715,7 @@ ${PLAUSIBLE_SNIPPET}
   <div class="fleet-section-banner hp-banner" role="presentation">
     <p class="fleet-section-eyebrow">Help</p>
     <h1 class="fleet-section-headline">How to review your site&#39;s files</h1>
-    <p class="fleet-section-lede">Every ICJIA website has a spreadsheet listing every file it publishes &mdash; what each file is called, which page it appears on, and how accessible it is today. This page shows you how to get yours, and how to decide what happens to each file.</p>
+    <p class="fleet-section-lede">Every ICJIA website has a <strong>file list</strong>: an Excel workbook with one row for every PDF, Word, Excel and PowerPoint file the site publishes &mdash; what it is called, which page it appears on, and how accessible it is today. This page shows you how to get yours, and how to decide what happens to each file.</p>
     <ul class="hp-kit">
       <li><span class="hp-kit-k">You need</span> a web browser</li>
       <li><span class="hp-kit-k">and</span> Excel, Numbers, or Google Sheets</li>
@@ -726,7 +726,7 @@ ${PLAUSIBLE_SNIPPET}
   ${renderJourneyRail()}
 
   <div class="hp-reassure">
-    <p><strong>Nothing here is a test, and nothing you do on this website is recorded.</strong> You download a file, you write in it on your own computer, and you email it back. That spreadsheet is the record &mdash; there is no form on this site to fill in, and no way to lose your work by closing the page.</p>
+    <p><strong>Nothing here is a test, and nothing you do on this website is recorded.</strong> You download the file list, you write in it on your own computer, and you email it back. That workbook is the record &mdash; there is no form on this site to fill in, and no way to lose your work by closing the page.</p>
   </div>
 
   <ol class="hp-stepper">
@@ -1567,7 +1567,7 @@ export function renderHelpCallout() {
   <span class="hp-callout-body">
     <span class="hp-callout-eyebrow">Help</span>
     <span class="hp-callout-title">Confused about where to start? Follow this guide.</span>
-    <span class="hp-callout-text">It walks through finding your website, downloading its spreadsheet, and deciding what happens to each file. Five steps, about ten minutes. Nothing on the rest of this site depends on reading it.</span>
+    <span class="hp-callout-text">It walks through finding your website, downloading its file list, and deciding what happens to each file. Five steps, about ten minutes. Nothing on the rest of this site depends on reading it.</span>
   </span>
   <span class="hp-callout-go" aria-hidden="true">&rarr;</span>
 </a>`;

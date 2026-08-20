@@ -818,7 +818,12 @@ describe("csvFile only when a workbook was written (v1.39.0 E8)", () => {
     const files = await fs.readdir(outputDir);
     expect(files.some((f) => /^imgs-.*\.xlsx$/.test(f))).toBe(false);
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).not.toContain("Download spreadsheet");
+    // Anchor on the MARKUP, not the label text: the What's New banner and the
+    // roadmap prose both talk about the download in plain English, so a bare
+    // label string here would go red for the wrong reason the next time
+    // someone announces a copy change. (v1.55.0 hit exactly that trap with
+    // the old "Download spreadsheet" wording.)
+    expect(html).not.toMatch(/class="btn btn-secondary" download/);
     // The detail-report button is still there.
     expect(html).toContain("View detailed report");
   });
@@ -836,6 +841,6 @@ describe("csvFile only when a workbook was written (v1.39.0 E8)", () => {
     const files = await fs.readdir(outputDir);
     expect(files.some((f) => /^dvfr-.*\.xlsx$/.test(f))).toBe(true);
     const html = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
-    expect(html).toContain("Download spreadsheet");
+    expect(html).toMatch(/class="btn btn-secondary" download[^>]*>Download this site&#39;s file list \(Excel\)</);
   });
 });
