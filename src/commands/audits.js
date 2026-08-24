@@ -25,6 +25,7 @@ import { isScoreable } from "../scanner/category.js";
 import { fetchAuditScore } from "../audits/score-fetcher.js";
 import { fetchPageAuditScore } from "../audits/page-scorer.js";
 import { createRetryingJsonFetcher, formatThrottleSummary } from "../audits/retrying-fetcher.js";
+import { createLogger, writeErrorLog } from "../util/logger.js";
 
 const DEFAULT_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url";
 const DEFAULT_PAGE_AUDIT_ENDPOINT = "https://audit.icjia.app/api/audit-url-page";
@@ -90,6 +91,13 @@ export async function runAudits({
   pageTtlDays = 14, // pages change more than file content; shorter TTL
   skipPages = false,
   log = console.error,
+  // v1.63.0 structured error logging. When errorLogDir + runId are supplied,
+  // every audit failure is recorded with rich context and flushed to
+  // `errors-<runId>.ndjson` + `.csv` under errorLogDir (a LOCAL runs dir, never
+  // the deployed bundle) for debugging and for managers/auditors. Silent
+  // otherwise — the human `log()` lines are unchanged.
+  errorLogDir = null,
+  runId = null,
 }) {
   if (typeof inventoryPath !== "string" || inventoryPath.length === 0) {
     throw new Error("runAudits: inventoryPath is required");
@@ -111,12 +119,24 @@ export async function runAudits({
   // given file is publicUrlBase + path. The audit endpoint needs the full
   // URL, so we resolve here.
   let publicUrlBase = null;
+  let serverName = null;
   for (const r of records) {
     if (typeof r?.kind === "string" && r.kind.endsWith("-header")) {
       publicUrlBase = r?.metadata?.publicUrlBase ?? null;
+      serverName = r?.metadata?.serverName ?? null;
       break;
     }
   }
+
+  // Structured error collector for this run (records only — the human-readable
+  // `log()` lines below are unchanged). Scoped to the site so a fleet run's
+  // per-site logs name which site each failure belongs to.
+  const errorLog = createLogger({
+    scope: serverName ? `audits:${serverName}` : "audits",
+    minLevel: "error",
+    sink: () => {},
+    base: serverName ? { site: serverName } : {},
+  });
   // Normalise the optional pathPrefix to "/<segment>" (no trailing slash)
   // for clean concatenation. Empty when unset (default).
   const cleanPrefix = pathPrefix
@@ -195,6 +215,12 @@ export async function runAudits({
         // 5xx from server, fetcher swallowed and returned null
         entry.audit = { error: "server-unavailable" };
         errorCount++;
+        errorLog.error("audit endpoint unavailable (server 5xx)", {
+          event: "audit-unavailable",
+          file: entry.filename ?? entry.path,
+          url: entry.__auditUrl,
+          reason: "server-unavailable",
+        });
         return;
       }
       // v1.39.0: a 200 without a numeric score is a failed audit, not a
@@ -203,6 +229,11 @@ export async function runAudits({
       if (!Number.isFinite(result.score)) {
         entry.audit = { error: "no score in response" };
         errorCount++;
+        errorLog.error("audit returned no score", {
+          event: "audit-no-score",
+          file: entry.filename ?? entry.path,
+          url: entry.__auditUrl,
+        });
         log(`[audits] WARN: ${entry.filename ?? entry.path}: no score in response`);
         return;
       }
@@ -232,6 +263,13 @@ export async function runAudits({
     } catch (err) {
       entry.audit = { error: err?.message ?? String(err) };
       errorCount++;
+      errorLog.error("audit request failed", {
+        event: "audit-error",
+        file: entry.filename ?? entry.path,
+        url: entry.__auditUrl,
+        code: err?.code,
+        error: err,
+      });
       log(`[audits] WARN: ${entry.filename ?? entry.path}: ${err?.message ?? err}`);
     }
   });
@@ -305,6 +343,11 @@ export async function runAudits({
         if (result === null) {
           urlToResult.set(pageUrl, { error: "server-unavailable" });
           pagesErrorCount++;
+          errorLog.error("page audit unavailable (server 5xx)", {
+            event: "page-audit-unavailable",
+            url: pageUrl,
+            reason: "server-unavailable",
+          });
           return;
         }
         // v1.39.0: same rule as the PDF pass — a 200 without a numeric
@@ -312,6 +355,10 @@ export async function runAudits({
         if (!Number.isFinite(result.score)) {
           urlToResult.set(pageUrl, { error: "no score in response" });
           pagesErrorCount++;
+          errorLog.error("page audit returned no score", {
+            event: "page-audit-no-score",
+            url: pageUrl,
+          });
           log(`[audits] page-audit WARN: ${pageUrl}: no score in response`);
           return;
         }
@@ -336,6 +383,12 @@ export async function runAudits({
       } catch (err) {
         urlToResult.set(pageUrl, { error: err?.message ?? String(err) });
         pagesErrorCount++;
+        errorLog.error("page audit request failed", {
+          event: "page-audit-error",
+          url: pageUrl,
+          code: err?.code,
+          error: err,
+        });
         log(`[audits] page-audit WARN: ${pageUrl}: ${err?.message ?? err}`);
       }
     });
@@ -377,6 +430,22 @@ export async function runAudits({
   });
   if (throttleSummary) log(throttleSummary);
 
+  // Flush the structured error log for this run (local runs dir only). Failure
+  // to write it must never fail the audit run — it is a diagnostic artefact.
+  let errorLogResult = null;
+  if (errorLogDir && runId) {
+    try {
+      errorLogResult = await writeErrorLog(errorLog.records, { dir: errorLogDir, runId });
+      if (errorLogResult) {
+        log(
+          `[audits] wrote error log: ${errorLogResult.count} failure(s) → ${errorLogResult.csvPath}`,
+        );
+      }
+    } catch (err) {
+      log(`[audits] WARN: failed to write error log: ${err?.message ?? err}`);
+    }
+  }
+
   return {
     totalRecords: records.length,
     audited: auditedCount,
@@ -386,5 +455,7 @@ export async function runAudits({
     pagesCached: pagesCachedCount,
     pagesErrors: pagesErrorCount,
     throttle: httpFetcher.stats ?? null,
+    errorLog: errorLogResult,
+    errorRecords: errorLog.records,
   };
 }

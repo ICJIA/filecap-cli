@@ -515,3 +515,68 @@ describe("runAudits", () => {
     expect(pageAudit.incomplete.length).toBeGreaterThan(0);
   });
 });
+
+describe("runAudits — per-run error log (v1.63.0)", () => {
+  let tmpDir, invPath, outPath, cachePath, logDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "filecap-audits-elog-"));
+    invPath = path.join(tmpDir, "inventory.ndjson");
+    outPath = path.join(tmpDir, "inventory.audited.ndjson");
+    cachePath = path.join(tmpDir, "audit-cache.json");
+    logDir = path.join(tmpDir, "_runs");
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("writes an ndjson + csv error log naming each failed document, scoped to the site", async () => {
+    writeInventory(invPath, [pdfEntry()]);
+    const fetcher = async () => {
+      throw new Error("ECONNRESET socket hang up");
+    };
+    const result = await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher,
+      skipPages: true,
+      log: () => {},
+      errorLogDir: logDir,
+      runId: "20260824-120000Z",
+    });
+
+    expect(result.errorLog.count).toBe(1);
+
+    const csv = fs.readFileSync(path.join(logDir, "errors-20260824-120000Z.csv"), "utf8");
+    expect(csv.split("\n")[0]).toBe("ts,level,scope,event,site,url,httpStatus,code,message");
+    expect(csv).toContain("https://icjia-api.cloud/uploads/report.pdf");
+
+    const rec = JSON.parse(
+      fs.readFileSync(path.join(logDir, "errors-20260824-120000Z.ndjson"), "utf8").trim().split("\n")[0],
+    );
+    expect(rec.context.event).toBe("audit-error");
+    expect(rec.context.url).toBe("https://icjia-api.cloud/uploads/report.pdf");
+    expect(rec.scope).toContain("icjia-agency-prod");
+  });
+
+  it("writes no error log when every document audits cleanly", async () => {
+    writeInventory(invPath, [pdfEntry()]);
+    const fetcher = async () => ({ strict: { score: 90, grade: "A" }, reportUrl: "https://r/x", cached: false });
+    const result = await runAudits({
+      inventoryPath: invPath,
+      outputPath: outPath,
+      cachePath,
+      auditEndpoint: "https://audit.icjia.app/api/audit-url",
+      fetcher,
+      skipPages: true,
+      log: () => {},
+      errorLogDir: logDir,
+      runId: "20260824-120000Z",
+    });
+    expect(result.errorLog).toBeNull();
+    expect(fs.existsSync(path.join(logDir, "errors-20260824-120000Z.ndjson"))).toBe(false);
+  });
+});

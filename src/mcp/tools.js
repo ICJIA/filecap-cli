@@ -1,33 +1,50 @@
 import path from "node:path";
+import os from "node:os";
 import { runScan } from "../commands/scan.js";
 import { runRollup } from "../commands/rollup.js";
 import { runReport } from "../commands/report.js";
 import { runWebRollup } from "../commands/web-rollup.js";
 import { queryInventory } from "./query.js";
 
+// v1.63.0 (2026-08-24 audit): default-deny. When FILECAP_MCP_ALLOWED_PATHS is
+// unset the server confines all filesystem access to this base rather than
+// exposing the whole disk. Operators who need to scan elsewhere set the env
+// var explicitly.
+const DEFAULT_ALLOWED_ROOT = path.join(os.homedir(), "filecap-audits");
+
 /**
- * Check whether `p` is within one of the colon-separated paths in
- * FILECAP_MCP_ALLOWED_PATHS. Returns null if the env var is not set
- * (no restriction) or an error message string if the path is blocked.
+ * The list of allowed root directories: the colon-separated
+ * FILECAP_MCP_ALLOWED_PATHS entries, or the default audits base when the env
+ * var is unset or empty. Never returns an empty list — an empty allowlist
+ * would mean "allow everything", the exact posture this default-deny closes.
+ *
+ * @returns {string[]}
+ */
+function allowedRoots() {
+  const raw = process.env.FILECAP_MCP_ALLOWED_PATHS;
+  const configured = (raw ?? "")
+    .split(":")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return configured.length > 0 ? configured : [DEFAULT_ALLOWED_ROOT];
+}
+
+/**
+ * Check whether `p` is within one of the allowed roots. Returns null when the
+ * path is permitted, or an error message string when it is blocked.
  *
  * @param {string} p - resolved absolute path to check
  * @returns {string|null}
  */
 function checkAllowedPath(p) {
-  const allowedRaw = process.env.FILECAP_MCP_ALLOWED_PATHS;
-  if (!allowedRaw) return null; // no restriction
-  const allowed = allowedRaw
-    .split(":")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (allowed.length === 0) return null;
-  for (const rawRoot of allowed) {
+  const roots = allowedRoots();
+  for (const rawRoot of roots) {
     // v1.39.0: strip trailing slashes so "/srv/www/" allows "/srv/www"
     // itself (path.resolve on the argument side never keeps a trailing /).
     const root = rawRoot.replace(/\/+$/, "") || "/";
     if (p === root || p.startsWith(root === "/" ? "/" : root + "/")) return null;
   }
-  return `path "${p}" is not in allowed paths (FILECAP_MCP_ALLOWED_PATHS=${allowedRaw})`;
+  return `path "${p}" is not in allowed paths (${roots.join(", ")})`;
 }
 
 /**
@@ -47,20 +64,22 @@ function checkAllowedPaths(paths) {
 }
 
 /**
- * v1.40.0 — startup posture check. With FILECAP_MCP_ALLOWED_PATHS unset the
- * server exposes whole-filesystem read (scan/query any path) plus
- * arbitrary-path write (report/web-rollup output). That stays the default for
- * compatibility, but it should never be silent: runMcp() prints this to
- * stderr at startup. Returns null when an allowlist is configured.
+ * v1.40.0 / v1.63.0 — startup posture note. With FILECAP_MCP_ALLOWED_PATHS
+ * unset the server confines all filesystem access to the default audits base
+ * (default-deny, 2026-08-24 audit). That is a safe default, but it should not
+ * be silent — an operator who expected to scan elsewhere needs to know why a
+ * path was refused: runMcp() prints this to stderr at startup. Returns null
+ * when an explicit allowlist is configured.
  * @returns {string|null}
  */
 export function allowedPathsWarning() {
   const raw = process.env.FILECAP_MCP_ALLOWED_PATHS;
   if (raw && raw.split(":").map((s) => s.trim()).filter(Boolean).length > 0) return null;
   return (
-    "filecap mcp: FILECAP_MCP_ALLOWED_PATHS is not set — filesystem access is UNRESTRICTED " +
-    "(any readable path can be scanned/queried; outputs can be written anywhere). " +
-    "Set FILECAP_MCP_ALLOWED_PATHS=/path/one:/path/two to restrict."
+    "filecap mcp: FILECAP_MCP_ALLOWED_PATHS is not set — filesystem access is " +
+    `restricted to the default audits base ${DEFAULT_ALLOWED_ROOT} ` +
+    "(scan/query read and report/web-rollup write only under it). " +
+    "Set FILECAP_MCP_ALLOWED_PATHS=/path/one:/path/two to allow other locations."
   );
 }
 

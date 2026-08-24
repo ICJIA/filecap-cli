@@ -75,6 +75,15 @@ describe("fetchOgMeta", () => {
     expect(called).toBe(false);
     expect(r.image).toBe(null);
   });
+
+  it("refuses a private/metadata host without calling fetch (SSRF guard)", async () => {
+    let called = false;
+    const r = await fetchOgMeta("http://169.254.169.254/latest/meta-data/", {
+      fetchImpl: async () => { called = true; return { ok: true, text: async () => "" }; },
+    });
+    expect(called).toBe(false);
+    expect(r).toEqual({ image: null, title: null, description: null, reachable: false });
+  });
 });
 
 describe("fetchImageBytes", () => {
@@ -107,6 +116,15 @@ describe("fetchImageBytes", () => {
     const r = await fetchImageBytes("https://x/page", {
       fetchImpl: async () => res("text/html", new Uint8Array([1]).buffer),
     });
+    expect(r).toBe(null);
+  });
+
+  it("returns null for a private/metadata host without calling fetch (SSRF guard)", async () => {
+    let called = false;
+    const r = await fetchImageBytes("http://127.0.0.1:6379/og.png", {
+      fetchImpl: async () => { called = true; return res("image/png", new Uint8Array([1]).buffer); },
+    });
+    expect(called).toBe(false);
     expect(r).toBe(null);
   });
 });

@@ -331,6 +331,11 @@ program
     "page-audit cache TTL in days (default 14) — pages change more than file content",
     (v) => parseInt(v, 10),
   )
+  .option(
+    "--error-log-dir <dir>",
+    "where to write this run's error log (errors-<runId>.ndjson + .csv listing every document/page that failed to audit, for debugging and for managers/auditors). Default: ~/filecap-audits/_runs. Local only — never part of the deployed bundle.",
+  )
+  .option("--no-error-log", "do not write the per-run error log")
   .action(async (inventory, opts) => {
     try {
       // Privileged-tier credential for audit.icjia.app. Without it the run is
@@ -363,6 +368,19 @@ program
       } catch {
         // No sites.json or malformed — proceed with empty pathPrefix.
       }
+      // v1.63.0 — per-run error log. Commander sets opts.errorLog=false for
+      // --no-error-log; otherwise default the dir to ~/filecap-audits/_runs
+      // (a LOCAL runs dir, alongside the transcripts — never the bundle).
+      const runId = new Date()
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace("T", "-")
+        .replace(/\.\d{3}Z$/, "Z");
+      const errorLogDir =
+        opts.errorLog === false
+          ? null
+          : (opts.errorLogDir ?? path.join(os.homedir(), "filecap-audits", "_runs"));
+
       await runAudits({
         inventoryPath: inventory,
         outputPath: opts.output,
@@ -378,6 +396,9 @@ program
         pageAuditEndpoint: opts.pageAuditEndpoint,
         pageCachePath: opts.pageCachePath,
         pageTtlDays: opts.pageTtlDays ?? 14,
+        // v1.63.0 — structured error log for this run
+        errorLogDir,
+        runId,
       });
     } catch (err) {
       process.stderr.write(`filecap audits error: ${err.message}\n`);

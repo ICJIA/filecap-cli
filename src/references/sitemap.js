@@ -7,6 +7,7 @@
 // page list happens in src/report/pages.js (buildPageList).
 
 import { XMLParser } from "fast-xml-parser";
+import { safeFetch } from "../util/safe-fetch.js";
 
 const parser = new XMLParser();
 
@@ -54,17 +55,27 @@ export function parseSitemapXml(xml) {
  * unparseable body) resolves to an empty array — a missing or broken sitemap
  * must never break report generation.
  *
+ * The recursive sub-sitemap URLs come from the fetched (attacker-influenceable)
+ * XML body, so every fetch — the initial one included — goes through
+ * `safeFetch`, which refuses loopback/link-local/private/metadata hosts and
+ * does not chase redirects. A hostile `<loc>` pointing at 169.254.169.254 or
+ * 127.0.0.1 is thus never probed (2026-08-24 SSRF fix).
+ *
  * @param {string} sitemapUrl
  * @param {number} [depth] - recursion guard (internal)
+ * @param {object} [deps] - test seam; `{ fetchImpl }` is forwarded to safeFetch
  * @returns {Promise<string[]>}
  */
-export async function fetchSitemapUrls(sitemapUrl, depth = 0) {
+export async function fetchSitemapUrls(sitemapUrl, depth = 0, deps = {}) {
   if (typeof sitemapUrl !== "string" || sitemapUrl.length === 0 || depth > 2) {
     return [];
   }
   let xml;
   try {
-    const res = await fetch(sitemapUrl, { signal: AbortSignal.timeout(15000) });
+    const res = await safeFetch(sitemapUrl, {
+      ...deps,
+      signal: AbortSignal.timeout(15000),
+    });
     if (!res.ok) return [];
     xml = await res.text();
   } catch {
@@ -73,7 +84,7 @@ export async function fetchSitemapUrls(sitemapUrl, depth = 0) {
   const { pageUrls, subSitemaps } = parseSitemapXml(xml);
   let all = pageUrls.slice();
   for (const sub of subSitemaps) {
-    all = all.concat(await fetchSitemapUrls(sub, depth + 1));
+    all = all.concat(await fetchSitemapUrls(sub, depth + 1, deps));
   }
   return [...new Set(all)];
 }

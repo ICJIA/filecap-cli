@@ -13,17 +13,37 @@ describe("dispatchTool — filecap_scan path allowlist", () => {
     savedEnvHolder.val = undefined;
   });
 
-  it("allows scan when FILECAP_MCP_ALLOWED_PATHS is not set", async () => {
+  // v1.63.0 (2026-08-24 audit): default-deny. With FILECAP_MCP_ALLOWED_PATHS
+  // unset the server no longer exposes the whole filesystem — access is
+  // confined to the default audits base (~/filecap-audits).
+  it("blocks a scan outside the default audits base when FILECAP_MCP_ALLOWED_PATHS is not set", async () => {
     savedEnvHolder.val = process.env.FILECAP_MCP_ALLOWED_PATHS;
     delete process.env.FILECAP_MCP_ALLOWED_PATHS;
     const fs = await import("node:fs/promises");
     const nodePath = await import("node:path");
     const os = await import("node:os");
-    const tmpRoot = await fs.mkdtemp(nodePath.join(os.tmpdir(), "fc-allow-"));
+    const tmpRoot = await fs.mkdtemp(nodePath.join(os.tmpdir(), "fc-deny-"));
     const outPath = nodePath.join(tmpRoot, "scan.ndjson");
     const result = await dispatchTool("filecap_scan", { directory: tmpRoot, output: outPath });
-    expect(result.isError).toBeFalsy();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not in allowed paths/i);
     await fs.rm(tmpRoot, { recursive: true, force: true });
+  });
+
+  it("allows a path under the default audits base when FILECAP_MCP_ALLOWED_PATHS is not set", async () => {
+    savedEnvHolder.val = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+    const nodePath = await import("node:path");
+    const os = await import("node:os");
+    // A path under the base clears the gate, then the tool fails on the
+    // missing directory itself — proving the gate passed without writing into
+    // the operator's real audits tree.
+    const target = nodePath.join(os.homedir(), "filecap-audits", "fc-no-such-scan-dir-xyz");
+    const result = await dispatchTool("filecap_scan", {
+      directory: target,
+      output: nodePath.join(target, "scan.ndjson"),
+    });
+    expect(result.content[0].text).not.toMatch(/not in allowed paths/i);
   });
 
   it("rejects scan outside allowed paths when FILECAP_MCP_ALLOWED_PATHS is set", async () => {
@@ -166,6 +186,19 @@ describe("dispatchTool — allowlist covers every path argument (F6)", () => {
 });
 
 describe("dispatchTool — result payloads (F6)", () => {
+  // These exercise payload shaping over tmpdir paths; scope the default-deny
+  // allowlist (v1.63.0) to tmpdir so the gate isn't what's under test here.
+  let savedEnv;
+  beforeEach(async () => {
+    savedEnv = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    const os = await import("node:os");
+    process.env.FILECAP_MCP_ALLOWED_PATHS = os.tmpdir();
+  });
+  afterEach(() => {
+    if (savedEnv !== undefined) process.env.FILECAP_MCP_ALLOWED_PATHS = savedEnv;
+    else delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+  });
+
   it("scan result carries the absolute outputPath alongside exitCode", async () => {
     const fs = await import("node:fs/promises");
     const nodePath = await import("node:path");
@@ -227,6 +260,19 @@ describe("TOOL_DEFINITIONS", () => {
 });
 
 describe("dispatchTool", () => {
+  // The scan case below writes under tmpdir; scope the default-deny allowlist
+  // (v1.63.0) to tmpdir so it clears the gate.
+  let savedEnv;
+  beforeEach(async () => {
+    savedEnv = process.env.FILECAP_MCP_ALLOWED_PATHS;
+    const os = await import("node:os");
+    process.env.FILECAP_MCP_ALLOWED_PATHS = os.tmpdir();
+  });
+  afterEach(() => {
+    if (savedEnv !== undefined) process.env.FILECAP_MCP_ALLOWED_PATHS = savedEnv;
+    else delete process.env.FILECAP_MCP_ALLOWED_PATHS;
+  });
+
   it("rejects unknown tool names", async () => {
     const result = await dispatchTool("not_a_real_tool", {});
     expect(result.isError).toBe(true);
@@ -258,14 +304,15 @@ describe("dispatchTool", () => {
 });
 
 
-describe("unrestricted-filesystem warning (v1.40.0)", () => {
-  it("returns a warning when FILECAP_MCP_ALLOWED_PATHS is unset", async () => {
+describe("default-deny filesystem posture (v1.63.0)", () => {
+  it("warns that access is restricted to the default base when FILECAP_MCP_ALLOWED_PATHS is unset", async () => {
     const { allowedPathsWarning } = await import("../src/mcp/tools.js");
     const prev = process.env.FILECAP_MCP_ALLOWED_PATHS;
     delete process.env.FILECAP_MCP_ALLOWED_PATHS;
     try {
       const w = allowedPathsWarning();
-      expect(w).toMatch(/unrestricted/i);
+      expect(w).toMatch(/restricted|default/i);
+      expect(w).not.toMatch(/unrestricted/i);
       expect(w).toContain("FILECAP_MCP_ALLOWED_PATHS");
     } finally {
       if (prev !== undefined) process.env.FILECAP_MCP_ALLOWED_PATHS = prev;

@@ -28,7 +28,12 @@ afterEach(async () => {
 async function runMcpRequests(requests) {
   const cliPath = fileURLToPath(new URL("../bin/filecap.js", import.meta.url));
   return new Promise((resolve, reject) => {
-    const child = spawn("node", [cliPath, "mcp"], { stdio: ["pipe", "pipe", "pipe"] });
+    // Default-deny (v1.63.0): the server confines access to the audits base
+    // unless told otherwise. This integration scan targets tmpdir, so allow it.
+    const child = spawn("node", [cliPath, "mcp"], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, FILECAP_MCP_ALLOWED_PATHS: os.tmpdir() },
+    });
     const stdoutChunks = [];
     const stderrChunks = [];
     child.stdout.on("data", (d) => stdoutChunks.push(d));

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseSitemapXml, scopeSitemapUrlsToSite } from "../src/references/sitemap.js";
+import {
+  parseSitemapXml,
+  scopeSitemapUrlsToSite,
+  fetchSitemapUrls,
+} from "../src/references/sitemap.js";
 
 describe("parseSitemapXml", () => {
   it("extracts page URLs from a <urlset>", () => {
@@ -58,5 +62,33 @@ describe("scopeSitemapUrlsToSite", () => {
     const urls = ["https://x.gov/a", "https://x.gov/b"];
     expect(scopeSitemapUrlsToSite(urls, null)).toEqual(urls);
     expect(scopeSitemapUrlsToSite(urls, "not a url")).toEqual(urls);
+  });
+});
+
+describe("fetchSitemapUrls — SSRF guard", () => {
+  // A malicious/compromised fleet site can return a <sitemapindex> whose
+  // sub-sitemap <loc> points at an internal address; the recursive fetch must
+  // refuse it rather than probe cloud metadata / a local service.
+  it("does not fetch a sub-sitemap <loc> that targets a private/metadata address", async () => {
+    const requested = [];
+    const responses = {
+      "https://site.gov/sitemap.xml": `<sitemapindex>
+        <sitemap><loc>https://site.gov/sub-1.xml</loc></sitemap>
+        <sitemap><loc>http://169.254.169.254/latest/meta-data/</loc></sitemap>
+      </sitemapindex>`,
+      "https://site.gov/sub-1.xml": `<urlset><url><loc>https://site.gov/a</loc></url></urlset>`,
+    };
+    const fetchImpl = async (url) => {
+      requested.push(url);
+      const body = responses[url];
+      if (body === undefined) return { ok: false, text: async () => "" };
+      return { ok: true, text: async () => body };
+    };
+
+    const urls = await fetchSitemapUrls("https://site.gov/sitemap.xml", 0, { fetchImpl });
+
+    expect(urls).toContain("https://site.gov/a");
+    expect(requested).toContain("https://site.gov/sub-1.xml");
+    expect(requested).not.toContain("http://169.254.169.254/latest/meta-data/");
   });
 });

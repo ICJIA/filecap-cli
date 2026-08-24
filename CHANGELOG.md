@@ -10,6 +10,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.63.0] — 2026-08-24
+
+### Security — SSRF guard on scraped-URL fetches, MCP default-deny
+
+A red/blue review (`docs/security/audit-2026-08-24.md`) found one real bug and
+closed it, plus a defence-in-depth hardening.
+
+- **Server-side SSRF via scraped URLs — fixed.** The references pipeline fetched
+  two kinds of attacker-influenceable URL with no host guard: recursive
+  sub-sitemap `<loc>` values (`src/references/sitemap.js`) and `og:image` /
+  page URLs (`src/references/og-meta.js`). A malicious or compromised fleet
+  site could return a `<sitemapindex>` or `og:image` pointing at
+  `http://169.254.169.254/…` (cloud metadata), `http://127.0.0.1:6379/`, or a
+  private-LAN address, and the build-time run would fetch it. A new
+  `src/util/safe-fetch.js` refuses loopback/link-local/private/metadata hosts
+  and non-http(s) schemes, and fetches with `redirect: "manual"` so a redirect
+  can't chase the request into a private address. Both fetch sites now route
+  through it.
+- **MCP server default-deny.** `src/mcp/tools.js` previously exposed the whole
+  filesystem (read + write) to the tool caller when `FILECAP_MCP_ALLOWED_PATHS`
+  was unset. It now confines access to the default audits base
+  (`~/filecap-audits`) unless an allowlist is set explicitly. (The MCP server is
+  deprecated/unused, but the posture is corrected regardless.)
+
+### Added — structured logging + a local log viewer
+
+- **Per-run error logs for debugging and for managers/auditors.** `filecap
+  audits` now records every document/page that fails to audit with rich context
+  (site, file, URL, HTTP status, error code, message, stack) and writes
+  `errors-<runId>.ndjson` (full detail) + `errors-<runId>.csv` (a readable
+  subset) into `~/filecap-audits/_runs/` — **local only, never the deployed
+  bundle**, so it can't reintroduce the origin-infra exposure FC-2026-033
+  stripped. Secrets are redacted from every record (`src/util/logger.js`).
+  Opt out with `filecap audits --no-error-log`.
+- **`logs.sh`** — a local viewer for those logs, modeled on the
+  file-accessibility-audit repo's `logs.sh`: `./logs.sh` (recent failures),
+  `run [RUNID]`, `errors [RUNID]` (message + stack per fault), `grep`, `tail`
+  (follow the newest transcript), `list`, with `--table/--csv/--tsv/--md/--copy`
+  formats.
+
 ## [1.62.1] — 2026-08-20
 
 ### Fixed — the download buttons say what they hand over

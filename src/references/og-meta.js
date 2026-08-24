@@ -11,6 +11,8 @@
 // Everything here is best-effort and fully injectable: `fetchImpl` defaults to
 // the global fetch but tests pass a stub so the suite never hits the network.
 
+import { safeFetch } from "../util/safe-fetch.js";
+
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_MAX_IMAGE_BYTES = 5_000_000;
 const USER_AGENT = "filecap-og/1.0 (+https://github.com/ICJIA/icjia-fleet-audit)";
@@ -40,9 +42,11 @@ export async function fetchOgMeta(url, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchIm
   let html;
   let reachable = false;
   try {
-    const res = await fetchImpl(url, {
+    // safeFetch: refuse a scraped URL that points at a private/metadata host
+    // and never chase a redirect into one (redirect: "manual" internally).
+    const res = await safeFetch(url, {
+      fetchImpl,
       signal: controller.signal,
-      redirect: "follow",
       headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml,*/*" },
     });
     if (!res) return empty;
@@ -100,9 +104,9 @@ export async function fetchImageBytes(imageUrl, {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetchImpl(imageUrl, {
+    const res = await safeFetch(imageUrl, {
+      fetchImpl,
       signal: controller.signal,
-      redirect: "follow",
       headers: { "user-agent": USER_AGENT },
     });
     if (!res || !res.ok) return null;
