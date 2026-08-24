@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.63.3] — 2026-08-24
+
+### Fixed — the manual-deploy hints also need `--no-build`
+
+v1.63.1 added `--no-build` to the automated deploy path but left it out of the
+two places that show a hand-run command: the runtime remediation message
+printed when the Netlify CLI is missing (`web-rollup.js`), and the "Netlify CLI
+(scriptable)" snippet in the README. Both now include `--no-build`, so a manual
+`netlify deploy` on netlify-cli v26+ works instead of bailing to help.
+
 ## [1.63.2] — 2026-08-24
 
 ### Security — the four low residuals from the 2026-08-24 audit, closed

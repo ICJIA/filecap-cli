@@ -2432,7 +2432,7 @@ export async function runNetlifyDeploy({ output, deploySite, _spawn = spawn }) {
 
   const installHint =
     "To deploy automatically, install the Netlify CLI: `npm install -g netlify-cli`.\n" +
-    `Otherwise, you can manually run: cd ${output} && netlify deploy --prod --dir .\n`;
+    `Otherwise, you can manually run: cd ${output} && netlify deploy --prod --no-build --dir .\n`;
 
   return new Promise((resolve) => {
     // "error" (ENOENT) and "close" can both fire — first outcome wins.

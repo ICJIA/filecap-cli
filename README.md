@@ -1733,8 +1733,10 @@ node bin/filecap.js web-rollup --output ~/Desktop/icjia-fleet --password "your-s
 
 ```bash
 cd ~/Desktop/icjia-fleet
-netlify deploy --prod --dir .
+netlify deploy --prod --no-build --dir .
 ```
+
+(`--no-build` is required on netlify-cli v26+, which otherwise runs a build step before deploying — the bundle is already built.)
 
 Or include `--deploy` in `web-rollup` to combine build + deploy:
 
