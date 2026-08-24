@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.64.2] — 2026-08-24
+
+### Fixed — `logs.sh` friendly default (and it no longer talks to you)
+
+- Bare `./logs.sh` now prints a **summary** (how many error logs + transcripts
+  are on file, and where to look next) and exits 0. Previously it defaulted to
+  `recent`, which **died with an error** when no failures had been logged yet —
+  but "no audit failures" is the healthy case, not an error, and the run
+  transcripts were sitting right there. `recent`/`run` are likewise no longer an
+  error when empty.
+- The summary header used a bare `say`, which on macOS is `/usr/bin/say` (text-
+  to-speech) — so the script literally **spoke** the header aloud. `logs.sh` now
+  defines its own `say()` that prints. Also made the summary's file counting
+  glob-safe under `set -euo pipefail`.
+
 ## [1.64.1] — 2026-08-24
 
 ### Security — close FC-2026-035: no server filesystem paths in shipped output

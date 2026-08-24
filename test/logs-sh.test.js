@@ -89,3 +89,30 @@ describe("logs.sh", () => {
     expect(r.stderr).toMatch(/whole number/i);
   });
 });
+
+describe("logs.sh — friendly default when there are no failures", () => {
+  it("bare invocation shows a summary and exits 0 even with only transcripts (no error logs)", () => {
+    // a clean fleet logs no failures — that's the good case, not an error
+    fs.rmSync(path.join(logsDir, "errors-20260824-120000Z.csv"));
+    fs.rmSync(path.join(logsDir, "errors-20260824-130000Z.csv"));
+    fs.rmSync(path.join(logsDir, "errors-20260824-120000Z.ndjson"));
+    const r = run([]);
+    expect(r.status).toBe(0);
+    const all = r.stdout + r.stderr;
+    expect(all).toMatch(/transcript/i);
+    expect(all).toMatch(/no .*failure|failures/i);
+  });
+
+  it("bare invocation exits 0 and surfaces the failures when error logs exist", () => {
+    const r = run([]);
+    expect(r.status).toBe(0);
+    expect(r.stdout + r.stderr).toMatch(/x\.pdf|y\.pdf|failure/i);
+  });
+
+  it("explicit `recent` with no error logs is not an error (exit 0)", () => {
+    fs.rmSync(path.join(logsDir, "errors-20260824-120000Z.csv"));
+    fs.rmSync(path.join(logsDir, "errors-20260824-130000Z.csv"));
+    const r = run(["recent"]);
+    expect(r.status).toBe(0);
+  });
+});

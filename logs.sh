@@ -2,7 +2,8 @@
 # logs.sh — read this Mac's fleet-audit logs in a hurry.
 #
 # QUICK START
-#   ./logs.sh                        the 500 most recent audit failures, newest first (across runs)
+#   ./logs.sh                        a summary: how many error logs + transcripts are on file
+#   ./logs.sh recent                 the 500 most recent audit failures, newest first (across runs)
 #   ./logs.sh 200                    the 200 most recent failures
 #   ./logs.sh run 20260824-124619Z  one run's failures (leave the id off for the newest run)
 #   ./logs.sh errors                 the newest run's error detail (message + stack per fault)
@@ -57,12 +58,15 @@ AUDITS_BASE="${AUDITS_BASE:-$HOME/filecap-audits}"
 LOGS_DIR="${LOGS_DIR:-$AUDITS_BASE/_runs}"
 RECENT_DEFAULT=500  # rows shown by a bare ./logs.sh
 LIST_DEFAULT=15     # files shown by ./logs.sh list
-COMMANDS="recent run errors grep tail list help"
+COMMANDS="summary recent run errors grep tail list help"
 SELF="${BASH_SOURCE[0]:-$0}"
 
 # The help text IS the comment block above (so the two cannot drift apart).
 usage() { sed -n '2,/^set -euo/p' "$SELF" | sed '$d' | sed 's/^# \{0,1\}//'; }
 die() { echo "logs.sh: $*" >&2; exit 1; }
+# NB: define our own — a bare `say` is macOS text-to-speech (/usr/bin/say),
+# which would literally speak the header aloud instead of printing it.
+say() { printf '\n=== %s ===\n' "$*"; }
 
 is_count() { [[ "${1:-}" =~ ^[1-9][0-9]*$ ]]; }
 is_runid() { [[ "${1:-}" =~ ^[0-9]{8}-[0-9]{6}Z$ ]]; }
@@ -222,7 +226,12 @@ cmd_recent() {  # $1 count, $2 format
   [ -d "$LOGS_DIR" ] || die "no directory $LOGS_DIR — run ./run-full-audit.sh first"
   local f files=()
   for f in "$LOGS_DIR"/errors-*.csv; do [ -f "$f" ] && files+=("$f"); done
-  [ ${#files[@]} -gt 0 ] || die "no errors-<runId>.csv files in $LOGS_DIR yet — one is written per run only when a document fails to audit (./logs.sh list shows what is there)"
+  # "No failures" is a normal, healthy state (a clean run logs nothing), not an
+  # error — say so and exit 0 rather than dying.
+  if [ ${#files[@]} -eq 0 ]; then
+    echo "no audit failures logged yet in $LOGS_DIR — an error log is written only when a run has a document fail to audit (a clean run is the good case). ./logs.sh (no args) shows what is there." >&2
+    return 0
+  fi
   render "$2" "$n" "${files[@]}"
 }
 
@@ -279,6 +288,44 @@ cmd_tail() {
   tail -n 50 -F "$f"
 }
 
+# The default view (bare ./logs.sh): what's on file + where to look next. Never
+# an error — "no failures logged" is the healthy case.
+cmd_summary() {
+  say "ICJIA Fleet Audit — local logs"
+  printf '  %s\n\n' "$LOGS_DIR"
+  if [ ! -d "$LOGS_DIR" ]; then
+    printf '  No logs yet — run ./run-full-audit.sh (or ./run-site-scores.sh) first.\n'
+    return 0
+  fi
+  # Count via globs, not `ls` — an empty glob makes `ls` exit non-zero, which
+  # `set -euo pipefail` would turn into a hard exit. The newest-file lookups are
+  # guarded with `|| true` for the same reason.
+  local elogs=0 tlogs=0 newest_t="" newest_e="" f
+  for f in "$LOGS_DIR"/errors-*.ndjson; do [ -f "$f" ] && elogs=$((elogs + 1)); done
+  for f in "$LOGS_DIR"/*.log; do [ -f "$f" ] && tlogs=$((tlogs + 1)); done
+  newest_t=$(ls -1t "$LOGS_DIR"/*.log 2>/dev/null | sed -n '1p') || true
+  newest_e=$(newest_runid) || true
+  printf '  Audit error logs:  %s' "$elogs"
+  [ -n "$newest_e" ] && printf '   (newest run: %s)' "$newest_e"
+  printf '\n'
+  printf '  Run transcripts:   %s' "$tlogs"
+  [ -n "$newest_t" ] && printf '   (newest: %s)' "$(basename "$newest_t")"
+  printf '\n\n'
+  if [ "${elogs:-0}" -gt 0 ] 2>/dev/null; then
+    printf '  %s run(s) recorded audit failures:\n' "$elogs"
+    printf '    ./logs.sh recent      the most recent failures across runs\n'
+    printf '    ./logs.sh errors      the newest run failures, with stack traces\n'
+  else
+    printf '  No audit failures logged yet — an error log (errors-<runId>.csv/.ndjson) is written\n'
+    printf '  only when a run has a document fail to audit; the feature is new (v1.63.0), so past\n'
+    printf '  failures are not here, and a clean run logs nothing (the good case).\n'
+  fi
+  printf '\n  Also:\n'
+  printf '    ./logs.sh tail        follow the newest run transcript live\n'
+  printf '    ./logs.sh list        every log file\n'
+  printf '    ./logs.sh help        full help\n'
+}
+
 # --- dispatch -----------------------------------------------------------------------
 main() {
   local cmd="" copy=0 fmt="" positional=()
@@ -291,7 +338,7 @@ main() {
       *) positional+=("$a") ;;
     esac
   done
-  cmd="${positional[0]:-recent}"
+  cmd="${positional[0]:-summary}"
   positional=(${positional[@]+"${positional[@]:1}"})
   # Shortcuts: ./logs.sh 20260824-124619Z = run RUNID; ./logs.sh 200 = recent 200
   if is_runid "$cmd"; then
@@ -301,7 +348,7 @@ main() {
   fi
 
   case "$cmd" in
-    tail) ;;  # no sink: follows the file
+    summary|tail) ;;  # direct output, no sink
     recent|run|errors|grep|list) ;;
     *) die "unknown command '$cmd' — the commands are: $COMMANDS (./logs.sh help explains each)" ;;
   esac
@@ -314,6 +361,7 @@ main() {
 
   local out
   case "$cmd" in
+    summary) cmd_summary; return 0 ;;
     recent) out="$(cmd_recent "${positional[0]:-}" "$fmt")" ;;
     run)    out="$(cmd_run "${positional[0]:-}" "$fmt")" ;;
     errors) out="$(cmd_errors "${positional[0]:-}")" ;;
