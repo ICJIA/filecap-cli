@@ -2395,7 +2395,7 @@ export function deployOutcomeToExit({ requested, ok }) {
  * @param {Function} [args._spawn]  - injectable spawner (tests)
  * @returns {Promise<{ok: boolean, skipped?: boolean, reason?: string}>}
  */
-async function runNetlifyDeploy({ output, deploySite, _spawn = spawn }) {
+export async function runNetlifyDeploy({ output, deploySite, _spawn = spawn }) {
   // 1.7.36 — Honor FILECAP_NO_DEPLOY=1 so local builds / tests / quick
   // regenerations don't accidentally push to production when the user
   // has `webRollup.autoDeploy: true` in ~/.filecap/config.json. Loud
@@ -2416,7 +2416,11 @@ async function runNetlifyDeploy({ output, deploySite, _spawn = spawn }) {
       "────────────────────────────────────────────────────────────\n\n",
   );
 
-  const args = ["deploy", "--prod", "--dir", output];
+  // --no-build: the bundle is already built; netlify-cli v26 runs a build step
+  // before deploying unless told not to, and on a pre-built static --dir with no
+  // build config that step bails to the CLI's help text and nothing ships
+  // (verified against netlify-cli 26.x, 2026-08-24).
+  const args = ["deploy", "--prod", "--no-build", "--dir", output];
   // v1.22.0 — include the uptime function (when the bundle emitted one) so the
   // manual --dir deploy carries it.
   if (existsSync(path.join(output, "netlify", "functions"))) {

@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.63.1] — 2026-08-24
+
+### Fixed — deploy works on netlify-cli v26
+
+`netlify deploy` in netlify-cli v26 runs a build step before deploying unless
+`--no-build` is passed; on a pre-built static `--dir` with no build config that
+step bails to the CLI's help text and nothing ships. `runNetlifyDeploy` (the
+`webRollup.autoDeploy` path, and `run-full-audit.sh` / `run-site-update.sh`
+deploys) now passes `--no-build` — the bundle is always already built. Verified
+against netlify-cli 26.1.0. The function is now exported and unit-tested.
+
 ## [1.63.0] — 2026-08-24
 
 ### Security — SSRF guard on scraped-URL fetches, MCP default-deny
