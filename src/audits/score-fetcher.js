@@ -70,6 +70,10 @@ export async function fetchAuditScore({
   try {
     response = await fetcher(auditEndpoint, {
       method: "POST",
+      // FC-2026-040: don't follow a redirect off the audit endpoint — the
+      // bearer token must not travel to another origin. audit.icjia.app does
+      // not redirect; a 3xx surfaces as an error the run records.
+      redirect: "manual",
       headers,
       body: JSON.stringify(body),
     });

@@ -130,3 +130,19 @@ describe("renderSiteAccessibilitySection", () => {
     expect(html).toContain("75");
   });
 });
+
+// FC-2026-043 (2026-08-24 audit): the per-page score is interpolated into a
+// table cell; a non-numeric score from a malformed sidecar must be escaped,
+// not rendered as live HTML.
+describe("renderSiteAccessibilitySection — per-page score escaping (FC-2026-043)", () => {
+  it("escapes a non-numeric per-page score instead of emitting raw HTML", () => {
+    const html = renderSiteAccessibilitySection({
+      score: 90,
+      grade: "A",
+      coverage: { pagesInSet: 1, scored: 1 },
+      pages: [{ url: "https://x/a", score: "<img src=x onerror=alert(1)>", grade: "A", violationCount: 0, needsReview: 0 }],
+    });
+    expect(html).not.toContain("<img src=x onerror=alert(1)>");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+});

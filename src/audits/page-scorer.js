@@ -81,6 +81,9 @@ export async function fetchPageAuditScore({
   try {
     response = await fetcher(auditEndpoint, {
       method: "POST",
+      // FC-2026-040: same as the PDF scorer — don't follow a redirect off the
+      // audit endpoint with the bearer token attached.
+      redirect: "manual",
       headers,
       body: JSON.stringify(body),
     });

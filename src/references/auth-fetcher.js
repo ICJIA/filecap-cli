@@ -40,7 +40,11 @@ export function createAuthFetcher({
   function callWithToken(url, init, token) {
     const headers = { ...(init?.headers ?? {}) };
     if (token) headers.Authorization = `Bearer ${token}`;
-    return baseFetcher(url, { ...(init ?? {}), headers });
+    // FC-2026-040: don't follow redirects on a credentialed request — a 3xx to
+    // another origin must not carry the bearer token there (we don't rely on
+    // undici's cross-origin header stripping). The Strapi API endpoints don't
+    // redirect; a 3xx surfaces as a non-ok response the caller reports.
+    return baseFetcher(url, { ...(init ?? {}), redirect: "manual", headers });
   }
 
   async function tryLoginRefresh() {
@@ -52,6 +56,11 @@ export function createAuthFetcher({
     try {
       response = await baseFetcher(login.url, {
         method: "POST",
+        // FC-2026-041: never follow a redirect on the login POST — undici
+        // strips headers on a cross-origin redirect but NOT the request body,
+        // so a 307/308 could carry the cleartext identifier+password to an
+        // attacker origin. Refuse the redirect instead.
+        redirect: "manual",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           identifier: login.identifier,

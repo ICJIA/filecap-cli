@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.63.2] — 2026-08-24
+
+### Security — the four low residuals from the 2026-08-24 audit, closed
+
+All defence-in-depth; see `docs/security/audit-2026-08-24.md`.
+
+- **FC-2026-040 — no credential across a redirect.** The Strapi auth fetcher
+  (`callWithToken`) and both audit-API scorers (`score-fetcher.js`,
+  `page-scorer.js`) now POST with `redirect:"manual"`, so a bearer token can't
+  be forwarded to another origin on a 3xx (previously it relied on undici's
+  cross-origin header stripping).
+- **FC-2026-041 — no password across a redirect.** The `bearerLogin`
+  `/auth/local` refresh POST now uses `redirect:"manual"` — undici strips
+  headers on a cross-origin redirect but not the request body, so a 307/308
+  could otherwise carry the cleartext identifier+password to an attacker origin.
+- **FC-2026-042 — git URL validation.** `gitRepo` is now restricted to a
+  canonical `https://github.com/<owner>/<repo>` URL (`isValidGitRepoUrl`);
+  `cloneRepoShallow` refuses anything else before invoking git, closing git's
+  `ext::sh -c '…'` transport and leading-`-` option-injection vectors.
+- **FC-2026-043 — escape the website score.** The site score and per-page
+  scores in the detail page's Website-accessibility section are now escaped, so
+  a malformed audit sidecar renders as inert text rather than live HTML.
+
 ## [1.63.1] — 2026-08-24
 
 ### Fixed — deploy works on netlify-cli v26

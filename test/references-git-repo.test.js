@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   deriveContentUrl,
   extractMarkdownEntries,
+  cloneRepoShallow,
+  isValidGitRepoUrl,
 } from "../src/references/git-repo.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -247,5 +249,30 @@ const title = "Research";
       const entries = await extractMarkdownEntries(tmp, "https://x.gov");
       expect(entries).toEqual([]);
     });
+  });
+});
+
+// FC-2026-042 (2026-08-24 audit): a git URL is itself an execution vector
+// (git's ext:: transport runs arbitrary commands; a leading "-" is option
+// injection). The clone must refuse anything but an https://github.com/o/r URL.
+describe("isValidGitRepoUrl (FC-2026-042)", () => {
+  it("accepts canonical github https URLs (with or without .git)", () => {
+    expect(isValidGitRepoUrl("https://github.com/ICJIA/icjia-vpp-2025.git")).toBe(true);
+    expect(isValidGitRepoUrl("https://github.com/ICJIA/icjia-sfs-2024")).toBe(true);
+  });
+  it("rejects ext:: transport, ssh, option-injection, and host spoofing", () => {
+    expect(isValidGitRepoUrl("ext::sh -c 'id'")).toBe(false);
+    expect(isValidGitRepoUrl("git@github.com:ICJIA/x.git")).toBe(false);
+    expect(isValidGitRepoUrl("-oProxyCommand=evil")).toBe(false);
+    expect(isValidGitRepoUrl("https://github.com.evil.com/a/b")).toBe(false);
+    expect(isValidGitRepoUrl("https://github.com/../../etc/passwd")).toBe(false);
+    expect(isValidGitRepoUrl("http://github.com/a/b")).toBe(false); // not https
+  });
+});
+
+describe("cloneRepoShallow — validation (FC-2026-042)", () => {
+  it("throws for a non-github/non-https URL before ever invoking git", async () => {
+    await expect(cloneRepoShallow("ext::sh -c 'id > /tmp/pwned'")).rejects.toThrow(/github/i);
+    await expect(cloneRepoShallow("git@github.com:ICJIA/x.git")).rejects.toThrow(/github/i);
   });
 });

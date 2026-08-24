@@ -189,3 +189,36 @@ describe("createAuthFetcher", () => {
     expect(persisted).toBe("JWT-INITIAL");
   });
 });
+
+// FC-2026-040 / FC-2026-041 (2026-08-24 audit): the credentialed paths must
+// not follow a redirect, so undici can't be relied on to strip the bearer
+// token cross-origin and — crucially — a 307/308 can't carry the cleartext
+// login password to a different host.
+describe("createAuthFetcher — redirect guard", () => {
+  it("sends redirect:manual on the authenticated request (FC-2026-040)", async () => {
+    let seen = null;
+    const base = async (_url, init) => { seen = init; return { ok: 1 }; };
+    const fetcher = createAuthFetcher({ initialToken: "JWT", baseFetcher: base, persistToken: async () => {} });
+    await fetcher("https://cms.example/posts", { method: "GET" });
+    expect(seen.redirect).toBe("manual");
+  });
+
+  it("sends redirect:manual on the login POST so the password can't follow a 307/308 (FC-2026-041)", async () => {
+    const calls = [];
+    const base = async (url, init) => {
+      calls.push({ url, redirect: init?.redirect });
+      if (url.includes("/auth/local")) return { jwt: "JWT-NEW" };
+      if (init?.headers?.Authorization === "Bearer expired") throw new Error("HTTP 401 for " + url);
+      return { ok: 1 };
+    };
+    const fetcher = createAuthFetcher({
+      initialToken: "expired",
+      login: { url: "https://cms.example/auth/local", identifier: "u", password: "p" },
+      baseFetcher: base,
+      persistToken: async () => {},
+    });
+    await fetcher("https://cms.example/posts");
+    const login = calls.find((c) => c.url.includes("/auth/local"));
+    expect(login.redirect).toBe("manual");
+  });
+});

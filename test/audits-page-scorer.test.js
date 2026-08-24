@@ -226,3 +226,12 @@ describe("fetchPageAuditScore", () => {
     });
   });
 });
+
+describe("fetchPageAuditScore — redirect guard (FC-2026-040)", () => {
+  it("sends redirect:manual so the audit token can't be forwarded on a redirect", async () => {
+    let seen = null;
+    const fetcher = async (_url, init) => { seen = init; return { axe: { score: 90, grade: "A" }, reportUrl: "https://r/x" }; };
+    await fetchPageAuditScore({ pageUrl: "https://x/p", auditEndpoint: "https://audit.icjia.app/api/audit-url-page", bearerToken: "tok", fetcher });
+    expect(seen.redirect).toBe("manual");
+  });
+});

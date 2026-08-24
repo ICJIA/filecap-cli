@@ -150,13 +150,28 @@ async function* walkContentFiles(repoDir) {
 // Shallow-clone a git repository to a unique temp directory. Returns the
 // path. Caller is responsible for cleanup (via fs.rm(..., { recursive: true }))
 // — typically wrapped in a try/finally in the orchestrator.
+// FC-2026-042 (2026-08-24 audit): a git URL is itself an execution vector even
+// though execFileSync uses no shell — git's `ext::sh -c '…'` transport runs
+// arbitrary commands, and a value beginning with "-" is git option-injection.
+// Restrict gitRepo to a canonical https://github.com/<owner>/<repo> URL: that
+// can never start with "-", can't select the ext:: transport, and (the literal
+// `github.com/`) can't be spoofed by `github.com.evil.com`.
+export function isValidGitRepoUrl(url) {
+  return typeof url === "string" && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(\.git)?$/.test(url);
+}
+
 export async function cloneRepoShallow(gitUrl) {
   if (typeof gitUrl !== "string" || gitUrl.length === 0) {
     throw new Error("cloneRepoShallow: gitUrl is required");
   }
+  if (!isValidGitRepoUrl(gitUrl)) {
+    throw new Error(
+      `cloneRepoShallow: refusing to clone ${JSON.stringify(gitUrl)} — gitRepo must be an https://github.com/<owner>/<repo> URL (git's ext:: transport and leading-"-" values are execution/option-injection vectors)`,
+    );
+  }
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "filecap-gitrefs-"));
-  // execFileSync with no shell interpolation — gitUrl was schema-validated
-  // upstream (sites.json gitRepo field). --depth 1 is the standard
+  // execFileSync uses no shell, and gitUrl is validated by isValidGitRepoUrl
+  // above (canonical github https only). --depth 1 is the standard
   // shallow-clone pattern used elsewhere in filecap (audit-static.sh).
   execFileSync("git", ["clone", "--depth", "1", "--quiet", gitUrl, tmp], {
     stdio: ["ignore", "ignore", "pipe"],

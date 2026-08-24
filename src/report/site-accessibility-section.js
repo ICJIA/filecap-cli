@@ -41,7 +41,10 @@ export function renderSiteAccessibilitySection(siteAudit) {
       const link = safeUrl
         ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">report &rarr;</a>`
         : "";
-      return `<tr><td>${esc(p.url)}</td><td>${p.score ?? "—"}</td><td>${esc(p.grade ?? "")}</td><td>${(p.violationCount ?? 0).toLocaleString()}</td><td>${(p.needsReview ?? 0).toLocaleString()}</td><td>${link}</td></tr>`;
+      // FC-2026-043: escape the per-page score — it should be numeric (set by
+      // aggregate.js) but a malformed sidecar must render as inert text, not
+      // live HTML.
+      return `<tr><td>${esc(p.url)}</td><td>${esc(String(p.score ?? "—"))}</td><td>${esc(p.grade ?? "")}</td><td>${(p.violationCount ?? 0).toLocaleString()}</td><td>${(p.needsReview ?? 0).toLocaleString()}</td><td>${link}</td></tr>`;
     })
     .join("");
 
@@ -55,7 +58,7 @@ export function renderSiteAccessibilitySection(siteAudit) {
   </div>
   <p class="sa-independence"><strong>This is the website&#39;s score — not its documents&#39;.</strong> It measures the accessibility of this site&#39;s <strong>web pages</strong> and says nothing about the <strong>files</strong> it publishes. The PDFs and Office documents are audited separately and may score far worse — or better. The two are measured independently and <strong>do not correlate</strong>.</p>
   <div class="sa-headline">
-    <div class="sa-score"><span class="sa-num">${siteAudit.score}</span><span class="sa-grade">${esc(siteAudit.grade ?? "")}</span></div>
+    <div class="sa-score"><span class="sa-num">${esc(String(siteAudit.score))}</span><span class="sa-grade">${esc(siteAudit.grade ?? "")}</span></div>
     <p class="sa-coverage">Scored <strong>${(cov.scored ?? 0).toLocaleString()}</strong> of ${(cov.pagesInSet ?? 0).toLocaleString()} pages${cov.capped ? ` (${cov.capped.toLocaleString()} not yet reached this run)` : ""}${cov.errored ? `, ${cov.errored.toLocaleString()} errored` : ""}.</p>
   </div>
   ${trendHtml}
