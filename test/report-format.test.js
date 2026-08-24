@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { humanizeBytes, csvCell } from "../src/report/format.js";
+import { humanizeBytes, csvCell, safeAbsolutePath } from "../src/report/format.js";
 
 describe("humanizeBytes", () => {
   it("formats common sizes", () => {
@@ -69,5 +69,18 @@ describe("csvCell", () => {
       // and gets the apostrophe prefix.
       expect(csvCell('="hostile".pdf')).toBe(`"'=""hostile"".pdf"`);
     });
+  });
+});
+
+describe("safeAbsolutePath (FC-2026-035)", () => {
+  it("keeps an http(s) absolutePath (a git site's GitHub URL)", () => {
+    expect(safeAbsolutePath("https://github.com/ICJIA/x/tree/main/a.pdf")).toBe("https://github.com/ICJIA/x/tree/main/a.pdf");
+    expect(safeAbsolutePath("http://example.com/a")).toBe("http://example.com/a");
+  });
+  it("blanks a filesystem path (a Strapi/Forge server path) and nullish input", () => {
+    expect(safeAbsolutePath("/home/forge/agency.icjia-api.cloud/agency-api/public/uploads/x.pdf")).toBe("");
+    expect(safeAbsolutePath("/var/strapi/uploads/case.pdf")).toBe("");
+    expect(safeAbsolutePath(null)).toBe("");
+    expect(safeAbsolutePath(undefined)).toBe("");
   });
 });

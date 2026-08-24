@@ -10,7 +10,24 @@ import {
   writeDuplicatesCsv,
   deriveAccessKind,
   buildFleetFileIndex,
+  stripPiiFromEntry,
 } from "../src/commands/web-rollup.js";
+
+describe("stripPiiFromEntry — absolutePath redaction (FC-2026-035)", () => {
+  it("blanks a Strapi/Forge filesystem absolutePath before it reaches the consolidated NDJSON", () => {
+    const out = stripPiiFromEntry({ path: "x.pdf", absolutePath: "/home/forge/agency.icjia-api.cloud/agency-api/public/uploads/x.pdf" });
+    expect(out.absolutePath).toBe("");
+  });
+  it("keeps a git site's GitHub URL absolutePath (it's the functional source link)", () => {
+    const gh = "https://github.com/ICJIA/icjia-sfs-2024/tree/main/public/a.pdf";
+    expect(stripPiiFromEntry({ path: "a.pdf", absolutePath: gh }).absolutePath).toBe(gh);
+  });
+  it("does not mutate the original entry", () => {
+    const entry = { path: "x.pdf", absolutePath: "/home/forge/x/uploads/x.pdf" };
+    stripPiiFromEntry(entry);
+    expect(entry.absolutePath).toBe("/home/forge/x/uploads/x.pdf");
+  });
+});
 import { buildAliasMap } from "../src/references/cross-resolver.js";
 import { HELP_SCREENSHOTS } from "../src/web/help-page.js";
 

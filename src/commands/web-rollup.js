@@ -14,7 +14,7 @@ import { writeHtml } from "../report/html.js";
 import { parseCmsPageList, buildPageList, parsePageRefFiles, attachCrossSiteFiles, normPageUrl } from "../report/pages.js";
 import { buildAliasMap, canonicalizeForFleet, entryCanonicalUrl } from "../references/cross-resolver.js";
 import { buildPublicUrl } from "../report/csv.js";
-import { publicUrlFor } from "../report/format.js";
+import { publicUrlFor, safeAbsolutePath } from "../report/format.js";
 import { classifyOrphans } from "../report/orphans.js";
 import { writeOrphansHtml } from "../report/orphans-html.js";
 import { collectAuditErrors } from "../report/audit-errors.js";
@@ -248,15 +248,23 @@ export function normalizeStrapiFilename(filename) {
  * identifiers in every sample we've seen ("Microsoft Word",
  * "Adobe PDF Library", etc.) rather than people.
  */
-function stripPiiFromEntry(entry) {
-  if (!entry?.introspection) return entry;
-  const intro = entry.introspection;
+export function stripPiiFromEntry(entry) {
+  if (!entry) return entry;
   // Shallow-clone so the original (held in allEntries for cross-server
-  // duplicate detection elsewhere) is untouched. Build a new
-  // introspection object without the redacted keys.
-  // eslint-disable-next-line no-unused-vars
-  const { author, lastModifiedBy, ...keep } = intro;
-  return { ...entry, introspection: keep };
+  // duplicate detection elsewhere) is untouched.
+  const copy = { ...entry };
+  // FC-2026-035: drop the Strapi/Forge filesystem `absolutePath` (origin-infra
+  // recon); keep a git site's http(s) GitHub URL (the functional source link).
+  copy.absolutePath = safeAbsolutePath(copy.absolutePath);
+  // Document-metadata PII (author, lastModifiedBy) is stripped from
+  // introspection; the rest (page count, image-only, OCR flags, sizes, hashes,
+  // creator/producer software ids) is what makes the audit useful, so it stays.
+  if (copy.introspection) {
+    // eslint-disable-next-line no-unused-vars
+    const { author, lastModifiedBy, ...keep } = copy.introspection;
+    copy.introspection = keep;
+  }
+  return copy;
 }
 
 // Filenames that are always-duplicates by design and would clutter the

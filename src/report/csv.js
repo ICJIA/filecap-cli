@@ -1,4 +1,4 @@
-import { csvCell, boolToYesNo } from "./format.js";
+import { csvCell, boolToYesNo, safeAbsolutePath } from "./format.js";
 import { isScoreable, isUnscoreableDocument } from "../scanner/category.js";
 
 // CSV / HTML deliverable columns. Keeps only what a remediator needs to find
@@ -308,7 +308,8 @@ export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     entry.modifiedAt,
     scannedPath,
     entry.path,
-    entry.absolutePath,
+    // FC-2026-035: keep only a git GitHub URL; blank a Strapi/Forge server path.
+    safeAbsolutePath(entry.absolutePath),
     entry.filename,
     pageCount,
     entry.extension,

@@ -74,3 +74,19 @@ export function publicUrlFor(entry, publicUrlBase, pathPrefix) {
   if (/^https?:\/\//i.test(ap)) return ap.replace("/tree/", "/blob/");
   return "";
 }
+
+/**
+ * FC-2026-035 (2026-08-24 audit): keep an entry's `absolutePath` only when it is
+ * the functional http(s) URL — a git site's GitHub blob/tree URL. A filesystem
+ * path is the file's location on the source server: for Strapi/SSH scans a
+ * `/home/forge/…` path that is pure origin-infrastructure recon (the companion
+ * to the FC-2026-033 strip) and useless to a remediator, so it is blanked before
+ * it reaches any shipped output (the workbooks and the consolidated NDJSON).
+ *
+ * @param {*} absolutePath
+ * @returns {string} the URL when http(s), else ""
+ */
+export function safeAbsolutePath(absolutePath) {
+  const s = String(absolutePath ?? "");
+  return /^https?:\/\//i.test(s) ? s : "";
+}

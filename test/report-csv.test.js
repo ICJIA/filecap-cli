@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { writeCsv, CSV_COLUMNS } from "../src/report/csv.js";
+import { writeCsv, CSV_COLUMNS, buildRow } from "../src/report/csv.js";
 
 const baseHeader = {
   schemaVersion: 1,
@@ -599,5 +599,19 @@ describe("writeCsv Referenced column", () => {
     expect(csv).toContain(
       '"https://icjia.illinois.gov/grants/funding/2020-casa/\nhttps://icjia.illinois.gov/news/foo/"',
     );
+  });
+});
+
+describe("buildRow — absolutePath redaction (FC-2026-035)", () => {
+  const apIdx = CSV_COLUMNS.findIndex((c) => c.name === "absolutePath");
+  const sourceHeader = { metadata: { serverName: "demo", siteName: "demo", serverIp: "", scannedPath: "", publicUrlBase: "https://demo.test/" } };
+  it("blanks a Strapi/Forge filesystem absolutePath in the row", () => {
+    const row = buildRow({ entry: { path: "x.pdf", filename: "x.pdf", absolutePath: "/home/forge/agency.icjia-api.cloud/agency-api/public/uploads/x.pdf" }, sourceHeader, isConsolidated: false });
+    expect(row[apIdx]).toBe("");
+  });
+  it("keeps a git site's GitHub URL absolutePath in the row", () => {
+    const gh = "https://github.com/ICJIA/icjia-sfs-2024/tree/main/public/a.pdf";
+    const row = buildRow({ entry: { path: "a.pdf", filename: "a.pdf", absolutePath: gh }, sourceHeader, isConsolidated: false });
+    expect(row[apIdx]).toBe(gh);
   });
 });

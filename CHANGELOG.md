@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.64.1] — 2026-08-24
+
+### Security — close FC-2026-035: no server filesystem paths in shipped output
+
+The per-file `absolutePath` was the last origin-infrastructure detail left in
+the deployed bundle: for Strapi/SSH-scanned sites it's the `/home/forge/…` path
+on the source server (Forge layout, the `*.icjia-api.cloud` backend host, the
+Strapi directory structure), and it rode along in the workbooks' "Full file path
+on server" column and in `audit-fleet.ndjson` (~8,700 rows). For **git** sites
+the same field is the functional GitHub URL, so it couldn't be blanket-dropped.
+
+New `safeAbsolutePath` (in `report/format.js`) keeps only an `http(s)` value and
+blanks a filesystem path; it's applied in `buildRow` (every `.xlsx`) and
+`stripPiiFromEntry` (the consolidated NDJSON). Verified on rebuild: **8,743 → 0**
+`/home/forge` in `audit-fleet.ndjson`, **0** across every workbook, git GitHub
+URLs preserved. Completes the FC-2026-033 origin-strip; the bundle stays behind
+the Netlify Site Password regardless.
+
 ## [1.64.0] — 2026-08-24
 
 ### Changed — website-scoring page cap is now 250, and per-site configurable
