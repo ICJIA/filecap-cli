@@ -141,6 +141,11 @@ export const siteEntrySchema = z
     // https://<host>/static/<name>.pdf (vue-cli preserves the static/
     // segment; Nuxt collapses it). Leading slash is normalised on load.
     pathPrefix: z.string().optional(),
+    // v1.64.0 — per-site cap on how many not-yet-scored web pages `site-audit`
+    // fetches per run (website-accessibility scoring). Default 250; pin lower on
+    // very large sites (e.g. icjia-agency-prod = 150) so routine fleet runs stay
+    // bounded. A `--max-new-pages` CLI flag overrides this per run.
+    maxNewPages: z.number().int().positive().optional(),
     // v1.8.0: references discovery config. When present, `filecap references
     // <siteName>` knows how to fetch this site's CMS data, classify fields,
     // and resolve deployed page URLs from entry slugs.

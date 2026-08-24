@@ -233,3 +233,28 @@ describe("runSiteAudit", () => {
     expect(res.error).toMatch(/not found/);
   });
 });
+
+describe("runSiteAudit — per-site maxNewPages from sites.json", () => {
+  it("uses the site's configured maxNewPages when no explicit cap is passed", async () => {
+    fs.writeFileSync(sitesFile, JSON.stringify({ sites: [{ name: "demo", siteUrl: "https://demo.test/", maxNewPages: 1 }] }));
+    const res = await runSiteAudit({
+      siteName: "demo", sitesFile, auditsBase, pageCachePath: cachePath,
+      fetcher: fakeFetcher({}),
+      fetchSitemap: async () => ["https://demo.test/", "https://demo.test/about"],
+      log: () => {},
+    });
+    expect(res.scored).toBe(1);
+    expect(res.capped).toBe(1);
+  });
+
+  it("lets an explicit maxNewPages override the site's configured value", async () => {
+    fs.writeFileSync(sitesFile, JSON.stringify({ sites: [{ name: "demo", siteUrl: "https://demo.test/", maxNewPages: 1 }] }));
+    const res = await runSiteAudit({
+      siteName: "demo", sitesFile, auditsBase, pageCachePath: cachePath, maxNewPages: 5,
+      fetcher: fakeFetcher({}),
+      fetchSitemap: async () => ["https://demo.test/", "https://demo.test/about"],
+      log: () => {},
+    });
+    expect(res.capped).toBe(0);
+  });
+});

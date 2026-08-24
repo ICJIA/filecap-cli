@@ -414,7 +414,7 @@ program
   .option("--endpoint <url>", "override the page-audit endpoint", "https://audit.icjia.app/api/audit-url-page")
   .option("--sites-file <path>", "override saved-sites JSON path")
   .option("--audits-base <dir>", "override the ~/filecap-audits root")
-  .option("--max-new-pages <n>", "cap pages freshly fetched per run (default 150)", (v) => parseInt(v, 10))
+  .option("--max-new-pages <n>", "cap web pages freshly scored per run (default 250; per-site override via sites.json `maxNewPages`, e.g. icjia-agency-prod pins 150)", (v) => parseInt(v, 10))
   .option("--concurrency <n>", "concurrent page audits (default 2 — respects the 100/min IP cap)", (v) => parseInt(v, 10))
   .option("--ttl-days <n>", "page-cache freshness window in days (default 14)", (v) => parseInt(v, 10))
   .option("--force", "ignore cache; re-score every page")
@@ -427,7 +427,9 @@ program
         sitesFile: opts.sitesFile,
         auditsBase: opts.auditsBase,
         auditEndpoint: opts.endpoint,
-        maxNewPages: opts.maxNewPages ?? 150,
+        // Leave undefined when the flag is absent so runSiteAudit falls back to
+        // the site's sites.json `maxNewPages`, then the fleet default (250).
+        maxNewPages: opts.maxNewPages,
         concurrency: opts.concurrency ?? 2,
         ttlDays: opts.ttlDays ?? 14,
         force: opts.force === true,

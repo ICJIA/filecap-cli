@@ -20,7 +20,7 @@
 #    ./run-site-scores.sh                            # all sites, then build + deploy
 #    ./run-site-scores.sh --no-deploy                # build locally, do NOT deploy
 #    ./run-site-scores.sh --only icjia-agency-prod   # one site only
-#    ./run-site-scores.sh --max-new-pages 400        # raise per-run page cap (default 150)
+#    ./run-site-scores.sh --max-new-pages 400        # raise per-run page cap for ALL sites (default 250; icjia-agency-prod pins 150 in sites.json)
 #    ./run-site-scores.sh --help
 #
 #  Sites are scored sequentially (audit.icjia.app has a 100/min IP rate limit,

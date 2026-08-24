@@ -106,3 +106,16 @@ describe("toolEntrySchema (v1.21.0)", () => {
     expect(() => toolEntrySchema.parse(valid({ bogus: 1 }))).toThrow();
   });
 });
+
+describe("siteEntrySchema per-site page cap (maxNewPages)", () => {
+  const base = { name: "test-site", publicUrlBase: "https://api.example.com/uploads" };
+  it("accepts an optional positive-integer maxNewPages (and stays optional)", () => {
+    expect(() => siteEntrySchema.parse({ ...base, maxNewPages: 150 })).not.toThrow();
+    expect(() => siteEntrySchema.parse(base)).not.toThrow();
+  });
+  it("rejects a zero, negative, or fractional maxNewPages", () => {
+    expect(() => siteEntrySchema.parse({ ...base, maxNewPages: 0 })).toThrow();
+    expect(() => siteEntrySchema.parse({ ...base, maxNewPages: -10 })).toThrow();
+    expect(() => siteEntrySchema.parse({ ...base, maxNewPages: 1.5 })).toThrow();
+  });
+});

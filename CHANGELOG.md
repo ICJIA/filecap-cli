@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.64.0] — 2026-08-24
+
+### Changed — website-scoring page cap is now 250, and per-site configurable
+
+`site-audit`'s per-run cap on newly-scored web pages (`--max-new-pages`) now
+defaults to **250** (was 150), so ordinary-sized sites reach full
+website-accessibility coverage in fewer runs. Very large sites can pin a lower
+value in `sites.json` via a new optional **`maxNewPages`** field, so routine
+fleet runs stay bounded — `icjia-agency-prod` (~2,400 pages) is pinned to 150.
+
+Resolution order per run: an explicit `--max-new-pages` flag **>** the site's
+`sites.json` `maxNewPages` **>** the 250 default. So a deliberate deep pass of a
+big site is still just `filecap site-audit icjia-agency-prod --max-new-pages 3000`
+(or `./run-site-scores.sh --only icjia-agency-prod --max-new-pages 3000`).
+
+`maxNewPages` is validated by `siteEntrySchema` (optional positive integer).
+
 ## [1.63.3] — 2026-08-24
 
 ### Fixed — the manual-deploy hints also need `--no-build`

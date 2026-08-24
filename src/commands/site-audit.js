@@ -58,6 +58,13 @@ function readNewestRunsSidecar(auditsBase, siteName) {
   return null;
 }
 
+// v1.64.0 — default per-run cap on newly-scored (uncached) web pages. Raised
+// from 150 so ordinary-sized sites finish coverage in fewer runs; very large
+// sites pin a lower value in sites.json (`maxNewPages`) so routine fleet runs
+// stay bounded. Resolution order: explicit maxNewPages arg > site.maxNewPages
+// (sites.json) > this default.
+const DEFAULT_MAX_NEW_PAGES = 250;
+
 export async function runSiteAudit({
   siteName,
   sitesFile = process.env.FILECAP_SITES_FILE ?? DEFAULT_SITES_FILE,
@@ -66,7 +73,7 @@ export async function runSiteAudit({
   pageCachePath = DEFAULT_PAGE_CACHE_PATH,
   ttlDays = 14,
   concurrency = 2,
-  maxNewPages = 150,
+  maxNewPages, // undefined → fall back to site.maxNewPages, then DEFAULT_MAX_NEW_PAGES
   force = false,
   bearerToken,
   fetcher,
@@ -79,6 +86,11 @@ export async function runSiteAudit({
   }
   const site = loadSiteEntry(sitesFile, siteName);
   if (!site) return { siteName, error: `site "${siteName}" not found in ${sitesFile}` };
+
+  // Explicit arg (CLI --max-new-pages) wins; else the site's own cap; else the
+  // fleet default. (`??` so a deliberate 0 — "score no new pages" — is honored.)
+  const effectiveMaxNewPages =
+    maxNewPages ?? site.maxNewPages ?? DEFAULT_MAX_NEW_PAGES;
 
   const latestDir = path.join(auditsBase, siteName, "latest");
   let cmsNdjson = "";
@@ -101,8 +113,8 @@ export async function runSiteAudit({
     if (!force && isCacheEntryFresh(c, { now, ttlDays })) cachedResults.set(url, c);
     else toFetch.push(url);
   }
-  const capped = Math.max(0, toFetch.length - maxNewPages);
-  const fetchNow = toFetch.slice(0, maxNewPages);
+  const capped = Math.max(0, toFetch.length - effectiveMaxNewPages);
+  const fetchNow = toFetch.slice(0, effectiveMaxNewPages);
   log(`[site-audit] ${siteName}: ${cachedResults.size} cached, ${fetchNow.length} to fetch, ${capped} capped`);
 
   let errored = 0;
