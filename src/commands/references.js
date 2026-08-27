@@ -23,6 +23,7 @@ import * as strapiV4 from "../references/strapi-v4.js";
 import { runGitRepoReferences } from "../references/git-repo.js";
 import { createAuthFetcher } from "../references/auth-fetcher.js";
 import { buildFleetDomainSet, isFleetUrl } from "../references/domain-filter.js";
+import { resolvePageUrl } from "../references/page-route-resolver.js";
 import {
   loadSecrets,
   getSiteToken,
@@ -34,20 +35,6 @@ const STRATEGIES = {
   "strapi-v3": strapiV3,
   "strapi-v4": strapiV4,
 };
-
-// Build a deployed page URL from a content type + entry slug via the
-// contentTypeRoutes map. Supports a flat `route: "/grants/funding/:slug/"`
-// mapping for now. Returns null if the route is missing or the entry lacks
-// a usable slug. `slug` is read by the caller — v3 stores it flat on the
-// entry, v4 nests it under entry.attributes.
-function resolvePageUrl({ contentType, slug, siteFrontendUrl, contentTypeRoutes }) {
-  const route = contentTypeRoutes?.[contentType];
-  if (typeof route !== "string" || typeof slug !== "string") return null;
-  const filledPath = route.replace(":slug", encodeURIComponent(slug));
-  const base = (siteFrontendUrl ?? "").replace(/\/+$/, "");
-  if (!base) return null;
-  return `${base}${filledPath}`;
-}
 
 // Build a default fetcher around global fetch. The fetcher returns parsed
 // JSON. GraphQL POST bodies are passed through unchanged.
@@ -250,9 +237,13 @@ export async function runReferences({
         refsCfg.restApiBase,
       );
       const fleetUrls = allUrls.filter((u) => isFleetUrl(u, fleetDomainSet));
+      // v1.65.0 — the whole entry goes in, not just the slug: a route may
+      // interpolate any of the entry's fields (ARI meetings nest under a
+      // committee segment derived from `category`).
       const pageUrl = resolvePageUrl({
         contentType: singular,
-        slug,
+        entry,
+        isV4,
         siteFrontendUrl: refsCfg.siteFrontendUrl ?? siteConfig.siteUrl,
         contentTypeRoutes: refsCfg.contentTypeRoutes,
       });

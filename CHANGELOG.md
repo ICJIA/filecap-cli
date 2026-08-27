@@ -10,6 +10,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.65.0] — 2026-08-27
+
+### Fixed — CMS page references pointed at pages that do not exist
+
+`contentTypeRoutes` in sites.json could only describe a flat
+`"/news/:slug/"` route, and `resolvePageUrl` filled it with a single
+`String.replace(":slug", …)`. Every content type whose front end nests
+detail pages under a category segment therefore got a **confidently wrong**
+page URL — and the files on those pages went with it.
+
+ARI was the worst case. Its 101 meeting entries were routed to
+`/adultredeploy/news/<slug>/`; the real page is
+`/adultredeploy/about/meetings/<committee>/<slug>`. **94 of the 101 URLs
+were hard 404s**, carrying **199 agenda and minutes PDFs** with them, so in
+the shipped report the real meeting page showed *no files* while a phantom
+`/news/` row held the PDFs and every "Page 1" link on those file rows led to
+a 404. Across the fleet ~780 files sat on URLs absent from their site's
+sitemap.
+
+- **Routes may now be multi-segment.** A route is either the flat string
+  form (unchanged) or `{ route, segments }`, where every `:token` — `:slug`
+  is no longer special-cased — is interpolated from the entry's own fields,
+  dotted paths included (`:section.slug` reads a v3 relation). The optional
+  `segments` map translates a stored value into the segment the front end
+  actually renders (ARI stores `category: "regular"`, routes it as
+  `regular-oversight`). A token with no resolvable value yields `null`: a
+  missing page URL is recoverable downstream, a wrong one is not.
+- **Unpublished v3 entries no longer get a URL.** Strapi v3 has no
+  draft/publish system, so the v3 sites carry a plain `isPublished` boolean
+  the front end honours by not rendering a route. An explicit `false` now
+  resolves to `null` (35 entries fleet-wide). v4 needs no equivalent — its
+  REST API omits drafts unless asked for them.
+- **Routes corrected in sites.json**, each verified against the live site:
+  ARI `meeting`, `resource`, `page` (`:section.slug`), `biography`, and a
+  new `section` route; `ilfvcc` `page` → `/ifvcc/:slug/`; `dvfr` `page` →
+  `/:slug/`. Removed `infonet` `faq` and `i2i` `cohort`, which have no
+  detail pages at all and only manufactured 404s (infonet's page set was 79%
+  phantom).
+
+Verified end to end against the live sites: **1,745 of 1,747** resolved page
+URLs now return 200 (ARI alone went from 94 hard 404s to 1). The two
+stragglers are content issues for the site teams, not routing — one ARI
+outreach meeting and 38 ilfvcc posts are published in the CMS but pruned by
+the front end's build.
+
+### Added — sortable **Route** column on the per-site workbook's Pages tab
+
+The Pages tab listed page URLs flat, so finding "every meetings page" meant
+eyeballing the column. Each row now carries its **Route** — the page's
+site-relative parent path (`/about/meetings/regular-oversight/`) — right
+after **Page**. Sorting groups a section's pages together and the tab's
+existing autofilter turns each route into a one-click filter.
+
+Parent path rather than a fixed depth: a fixed two-segment rule reads well
+for nested sections but shatters flat ones — on ARI it would yield 320
+distinct routes (every `/news/<slug>` its own) instead of 24.
+
 ## [1.64.2] — 2026-08-24
 
 ### Fixed — `logs.sh` friendly default (and it no longer talks to you)

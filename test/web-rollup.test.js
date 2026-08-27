@@ -1720,7 +1720,9 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
     const headerRow = pages.getRow(1).values.slice(1);
     // v1.31.0 — "Files listed elsewhere" counts a page's linked files that
     // are listed under an earlier page (each file appears once per workbook).
-    expect(headerRow).toEqual(["Page", "Content type", "Source", "Files", "Files listed elsewhere", "File names", "File URLs", "Files on other sites"]);
+    // v1.65.0 — "Route" is the page's site-relative parent path, so sorting
+    // or filtering the tab groups a section's pages together.
+    expect(headerRow).toEqual(["Page", "Route", "Content type", "Source", "Files", "Files listed elsewhere", "File names", "File URLs", "Files on other sites"]);
 
     // Row 2: the file-linking page (sorted first).
     const aboutRow = pages.getRow(2);
@@ -1728,12 +1730,13 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
       text: "https://dvfr.example.gov/about",
       hyperlink: "https://dvfr.example.gov/about",
     });
-    expect(aboutRow.getCell(2).value).toBe("page");
-    expect(aboutRow.getCell(3).value).toBe("links files");
-    expect(aboutRow.getCell(4).value).toBe(1);
-    expect(aboutRow.getCell(5).value).toBe(0);
-    expect(aboutRow.getCell(6).value).toBe("doc.pdf");
-    expect(aboutRow.getCell(7).value).toBe("https://files.example.gov/uploads/doc.pdf");
+    expect(aboutRow.getCell(2).value).toBe("/");
+    expect(aboutRow.getCell(3).value).toBe("page");
+    expect(aboutRow.getCell(4).value).toBe("links files");
+    expect(aboutRow.getCell(5).value).toBe(1);
+    expect(aboutRow.getCell(6).value).toBe(0);
+    expect(aboutRow.getCell(7).value).toBe("doc.pdf");
+    expect(aboutRow.getCell(8).value).toBe("https://files.example.gov/uploads/doc.pdf");
 
     // Row 3: the cms page with no files.
     const faqRow = pages.getRow(3);
@@ -1741,10 +1744,66 @@ describe("runWebRollup — per-site Pages sheet (v1.29.0)", () => {
       text: "https://dvfr.example.gov/faqs/faq-1",
       hyperlink: "https://dvfr.example.gov/faqs/faq-1",
     });
-    expect(faqRow.getCell(3).value).toBe("cms");
-    expect(faqRow.getCell(4).value).toBe(0);
+    expect(faqRow.getCell(2).value).toBe("/faqs/");
+    expect(faqRow.getCell(4).value).toBe("cms");
     expect(faqRow.getCell(5).value).toBe(0);
-    expect(faqRow.getCell(6).value).toBeNull();
+    expect(faqRow.getCell(6).value).toBe(0);
+    expect(faqRow.getCell(7).value).toBeNull();
+  });
+
+  // v1.65.0
+  it("groups a nested section under one Route value", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    const latestDir = path.join(auditsBase, "ari", "latest");
+    await fs.mkdir(latestDir, { recursive: true });
+    const header = JSON.stringify({
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        serverName: "ari", hostname: "cms-02", serverIp: "10.0.0.2",
+        scannedPath: "/uploads", scannedAt: "2026-05-09T16:05:04.000Z",
+        publicUrlBase: "https://ari.example.gov/uploads",
+        filecapVersion: "1.1.1", nodeVersion: "v20.18.0",
+        options: { hash: true, introspect: false, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    });
+    const agenda = JSON.stringify({
+      path: "agenda.pdf", absolutePath: "/uploads/agenda.pdf", filename: "agenda.pdf",
+      extension: "pdf", category: "pdf", remediable: true, sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z", sha256: "aaa", flags: [],
+      references: [{ siteName: "ari", contentType: "meeting", entryId: 1, pageUrl: "https://x.gov/adultredeploy/about/meetings/regular-oversight/m-2026-3" }],
+    });
+    const footer = JSON.stringify({ kind: "filecap-inventory-footer", entryCount: 1, scannedAt: "2026-05-09T16:05:04.000Z" });
+    await fs.writeFile(path.join(latestDir, "inventory.cross-ref.ndjson"), [header, agenda, footer].join("\n") + "\n");
+    await fs.writeFile(path.join(latestDir, "inventory.ndjson"), [header, agenda, footer].join("\n") + "\n");
+    await fs.writeFile(
+      path.join(latestDir, "references-sidecar.ndjson"),
+      [
+        JSON.stringify({ siteName: "ari", contentType: "meeting", entryId: 1, slug: "m-2026-3", pageUrl: "https://x.gov/adultredeploy/about/meetings/regular-oversight/m-2026-3", referencedFiles: ["https://ari.example.gov/uploads/agenda.pdf"] }),
+        JSON.stringify({ siteName: "ari", contentType: "meeting", entryId: 2, slug: "m-2026-2", pageUrl: "https://x.gov/adultredeploy/about/meetings/regular-oversight/m-2026-2", referencedFiles: [] }),
+        JSON.stringify({ siteName: "ari", contentType: "post", entryId: 3, slug: "hello", pageUrl: "https://x.gov/adultredeploy/news/hello", referencedFiles: [] }),
+      ].join("\n") + "\n",
+    );
+
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await writeSitesJson(sitesFile, [
+      { name: "ari", siteName: "ARI", host: "10.0.0.2", user: "forge", remotePath: "/uploads", siteUrl: "https://x.gov/adultredeploy/" },
+    ]);
+    const outputDir = path.join(tmpDir, "out-ari");
+    const result = await runWebRollup({ output: outputDir, sitesFile, _auditsBase: auditsBase, noOg: true });
+    expect(result.exitCode).toBe(0);
+
+    const files = await fs.readdir(outputDir);
+    const wbName = files.find((f) => /^ari-.*\.xlsx$/.test(f));
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await fs.readFile(path.join(outputDir, wbName)));
+    const pages = wb.getWorksheet("Pages");
+
+    const routes = [];
+    pages.eachRow((row, n) => { if (n > 1) routes.push(row.getCell(2).value); });
+    // The site path prefix is stripped; both meetings share one route value.
+    expect(routes.filter((r) => r === "/about/meetings/regular-oversight/")).toHaveLength(2);
+    expect(routes).toContain("/news/");
   });
 });
 

@@ -28,6 +28,7 @@ import { generateNetlifyToml, generateNetlifyRedirects, generateNetlifyHeaders }
 import { generateUptimeFunction } from "../web/uptime-function.js";
 import { findUnscoredSites, unscoredGuardDecision, formatUnscoredWarning } from "../web/unscored-guard.js";
 import { estimateRemediablePages } from "../web/page-estimate.js";
+import { pageRoute } from "../report/page-route.js";
 import { darkModeCss } from "../web/styles.js";
 import { generateSitesHtml } from "../web/sites-page.js";
 import { generateWhatsNewHtml } from "../web/whats-new.js";
@@ -160,7 +161,23 @@ export const siteEntrySchema = z
         restApiBase: httpUrlSchema("restApiBase").optional(),
         siteFrontendUrl: z.string().optional(),
         sitemapUrl: z.string().optional(),
-        contentTypeRoutes: z.record(z.string()).optional(),
+        // v1.65.0 — a route is either the flat string form ("/news/:slug/")
+        // or the multi-segment object form, which interpolates any of the
+        // entry's fields and can translate a stored value into the segment
+        // the front end renders (ARI: category "regular" → "regular-oversight").
+        contentTypeRoutes: z
+          .record(
+            z.union([
+              z.string(),
+              z
+                .object({
+                  route: z.string(),
+                  segments: z.record(z.record(z.string())).optional(),
+                })
+                .strict(),
+            ]),
+          )
+          .optional(),
       })
       .strict()
       .refine(
@@ -1386,6 +1403,8 @@ export async function runWebRollup({
         const linksSomething = files.length > 0 || filesElsewhere > 0 || crossSite.length > 0;
         return {
           pageUrl: p.pageUrl,
+          // v1.65.0 — sortable section key; see src/report/page-route.js.
+          route: pageRoute(p.pageUrl, site.siteUrl),
           contentType: p.contentType || "",
           source: linksSomething ? "links files" : (p.fromSitemap ? "sitemap" : "cms"),
           fileCount: files.length,
@@ -1406,6 +1425,7 @@ export async function runWebRollup({
         name: "Pages",
         columns: [
           { key: "pageUrl", label: "Page", type: "url" },
+          { key: "route", label: "Route" },
           { key: "contentType", label: "Content type" },
           { key: "source", label: "Source" },
           { key: "fileCount", label: "Files", type: "number" },

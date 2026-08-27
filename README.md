@@ -545,7 +545,29 @@ web-rollup                      → CSV + HTML + Netlify bundle with Referenced 
 }
 ```
 
-`contentTypeRoutes` are derived empirically by sampling each site's `sitemap.xml`. `:slug` is filled in per entry; the result is the deployed page URL the Referenced column links to.
+`contentTypeRoutes` are derived empirically by sampling each site's `sitemap.xml`. Every `:token` is filled in from the entry's own fields; the result is the deployed page URL the Referenced column links to.
+
+**Multi-segment routes (v1.65.0).** A front end that nests detail pages under a category segment needs more than `:slug`, so a route may instead be an object:
+
+```json
+"contentTypeRoutes": {
+  "post": "/news/:slug/",
+  "meeting": {
+    "route": "/adultredeploy/about/meetings/:category/:slug",
+    "segments": {
+      "category": { "regular": "regular-oversight", "adHoc": "ad-hoc" }
+    }
+  },
+  "page": { "route": "/adultredeploy/:section.slug/:slug" }
+}
+```
+
+- Any `:token` is looked up on the entry — `:slug` is not special-cased. Dotted paths read a relation (`:section.slug`).
+- `segments` translates a stored value into the segment the front end actually renders (ARI stores `category: "regular"` but routes it as `regular-oversight`).
+- A token with no resolvable value yields `pageUrl: null` rather than a broken URL. The file keeps its reference record, so it is never mistaken for an orphan — it simply has no page to link to.
+- Strapi v3 entries flagged `isPublished: false` resolve to `null` too: the front end does not render a route for them. (v4 needs no equivalent — its REST API omits drafts by default.)
+
+Getting these wrong is expensive and silent. Before v1.65.0 ARI's meetings were routed to `/adultredeploy/news/:slug/`, 404ing for 94 of 101 entries and stranding 199 PDFs on pages that did not exist. Validate a route change against the site's live sitemap, not by eye.
 
 **Verified design (not speculative).** Before writing the extractor we probed the live `icjia.illinois.gov` SPA via Chrome devtools against the Strapi backend at `agency.icjia-api.cloud`:
 

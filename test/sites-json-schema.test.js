@@ -119,3 +119,60 @@ describe("siteEntrySchema per-site page cap (maxNewPages)", () => {
     expect(() => siteEntrySchema.parse({ ...base, maxNewPages: 1.5 })).toThrow();
   });
 });
+
+// v1.65.0 — contentTypeRoutes accepts a multi-segment object form alongside
+// the flat string form, so a front end that nests detail pages under a
+// category segment can be described accurately (ARI meetings).
+describe("siteEntrySchema contentTypeRoutes (v1.65.0 multi-segment routes)", () => {
+  it("accepts the flat string form", () => {
+    expect(() => siteEntrySchema.parse(validSite({
+      contentTypeRoutes: { post: "/news/:slug/" },
+    }))).not.toThrow();
+  });
+
+  it("accepts the object form with a segments map", () => {
+    expect(() => siteEntrySchema.parse(validSite({
+      contentTypeRoutes: {
+        meeting: {
+          route: "/about/meetings/:category/:slug",
+          segments: { category: { regular: "regular-oversight" } },
+        },
+      },
+    }))).not.toThrow();
+  });
+
+  it("accepts the object form without segments", () => {
+    expect(() => siteEntrySchema.parse(validSite({
+      contentTypeRoutes: { resource: { route: "/resources/:category/:slug" } },
+    }))).not.toThrow();
+  });
+
+  it("accepts both forms side by side", () => {
+    expect(() => siteEntrySchema.parse(validSite({
+      contentTypeRoutes: {
+        post: "/news/:slug/",
+        meeting: { route: "/about/meetings/:category/:slug" },
+      },
+    }))).not.toThrow();
+  });
+
+  it("rejects an object form missing `route`", () => {
+    expect(() => siteEntrySchema.parse(validSite({
+      contentTypeRoutes: { meeting: { segments: {} } },
+    }))).toThrow();
+  });
+
+  it("rejects a non-string segment mapping value", () => {
+    expect(() => siteEntrySchema.parse(validSite({
+      contentTypeRoutes: {
+        meeting: { route: "/m/:category/:slug", segments: { category: { regular: 7 } } },
+      },
+    }))).toThrow();
+  });
+
+  it("rejects an unknown key in the object form", () => {
+    expect(() => siteEntrySchema.parse(validSite({
+      contentTypeRoutes: { meeting: { route: "/m/:slug", bogus: true } },
+    }))).toThrow();
+  });
+});
