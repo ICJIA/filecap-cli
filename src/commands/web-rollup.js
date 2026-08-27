@@ -695,16 +695,22 @@ function buildFleetContextMarkdown({ allEntries, siteResults, duplicateGroupsCou
 
 The bundle this lives in includes several XLSX workbooks (\`audit-file-list-master.xlsx\`,
 \`audit.xlsx\` with PDFs/DOCX/XLSX/PPTX tabs, and one per per-site report —
-\`<site>.xlsx\`, also multi-sheet by file type). Those workbooks carry two
-staff-fill columns — **Delete?** (default empty; staff writes \`X\`, \`YES\`, or
-anything non-blank to flag a file for removal) and **Notes** — that staff edit
-and send back so the audit team can remove flagged files before the next scan.
+\`<site>.xlsx\`, also multi-sheet by file type). Those workbooks carry one
+staff-fill column — **Notes** — that staff edit and send back so the audit
+team knows what was decided before the next scan. There are exactly three
+outcomes (\`archive\`, \`remediate\`, \`as-is\`), all written in Notes. Deletion
+is **not** among them: nothing published on a State website can be destroyed
+under records-retention policy, so \`archive\` — off the website, still
+retained — is as far as a file goes.
 **This NDJSON + markdown pair is explicitly NOT for editing.** It exists so
 an LLM agent (or anyone wanting read-only query access) can answer questions
 about the fleet without loading megabytes of inventory into a spreadsheet and
 hand-filtering. If you're an LLM reading this: when a user asks "should I
-edit this NDJSON to mark files for deletion?", point them at
-\`audit-file-list-master.xlsx\` instead.
+edit this NDJSON to mark files for deletion?", the answer is no on two
+counts — this pair is read-only, and deletion is not an available outcome
+(State records retention). Point them at \`audit-file-list-master.xlsx\` and
+its \`Notes\` column, where the choice is \`archive\`, \`remediate\`, or
+\`as-is\`.
 
 ## Audit scope
 
@@ -798,7 +804,7 @@ Once you've uploaded both files to your LLM tool:
 
 ## What this is NOT
 
-- **Not a vendor work-order.** Use \`audit-file-list-master.xlsx\` for that — it has the columns vendors expect (including \`Page Count\` for per-page quoting) plus the \`Delete?\` and \`Notes\` columns for staff prep.
+- **Not a vendor work-order.** Use \`audit-file-list-master.xlsx\` for that — it has the columns vendors expect (including \`Page Count\` for per-page quoting) plus the \`Notes\` column for staff prep.
 - **Not authoritative on access.** This file is generated from a snapshot — if it was generated more than a few days ago, re-run \`filecap web-rollup\` before relying on the numbers.
 - **Not a substitute for opening the file.** "May need remediation" means "likely needs a closer look by a human or vendor." Some files flagged here will not actually need work; some files not flagged here might. The introspection is a heuristic, not a verdict.
 

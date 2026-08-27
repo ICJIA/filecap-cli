@@ -138,8 +138,7 @@ const WORKBOOK_COLUMNS = [
   { letter: "P", label: "File location (relative to source folder)" },
   { letter: "Q", label: "Full file path on server" },
   { letter: "R", label: "Content hash (SHA-256)" },
-  { letter: "S", label: "Delete?" },
-  { letter: "T", label: "Notes", role: "write", gloss: "Where you record what you decided." },
+  { letter: "S", label: "Notes", role: "write", gloss: "Where you record what you decided." },
 ];
 
 /** The three outcomes, in the order a reader should consider them. */
@@ -195,10 +194,10 @@ const JOURNEY = [
 ];
 
 // v1.62.0 — trimmed from twelve entries to six. A density review found
-// half the answers restated guidance the steps above already give (the
-// Delete? column, saving as you go, judging a file from its two links);
-// an answer that repeats the page is length without information. The six
-// that remain answer questions the steps genuinely don't.
+// half the answers restated guidance the steps above already give (saving
+// as you go, judging a file from its two links); an answer that repeats the
+// page is length without information. The six that remain answer questions
+// the steps genuinely don't.
 const FAQ = [
   {
     q: "I clicked Download and nothing happened.",
@@ -641,7 +640,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
   const step4 = renderStep({
     n: "4",
     title: "Open the links and decide",
-    lede: `This is the part only you can do. Open the file, open the page it sits on, and judge: does it still belong on the website, and if it does, does it need work? Then note which of <strong>three outcomes</strong> you reached.`,
+    lede: `This is the part only you can do. Open the file, open the page it sits on, and judge: does it still belong on the website, and if it does, does it need work? Then note which of <strong>three outcomes</strong> you reached. There are only three, and deletion is deliberately not among them &mdash; under State records-retention policy nothing published here can be destroyed. <strong>Archive</strong> is the furthest a file goes: off the website, still retained.`,
     body: `${renderJudgeLinks()}
 
     ${renderDecisionCards()}
@@ -654,7 +653,7 @@ export function generateHelpHtml({ generatedAt = "", siteCount = 0 } = {}) {
     ${renderExampleGrid()}
 
     <div class="hp-note">
-      <p><strong>Four practical things.</strong> Record your decision on every file tab, not just the first. Writing more than the outcome is welcome &mdash; put the word first, then your reasoning (<em>archive &mdash; superseded by the 2026 edition</em> reads perfectly well). Ignore the <strong>Delete?</strong> column next to Notes &mdash; it is an older column and the audit team works from Notes. And save as you go: the workbook on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
+      <p><strong>Three practical things.</strong> Record your decision on every file tab, not just the first. Writing more than the outcome is welcome &mdash; put the word first, then your reasoning (<em>archive &mdash; superseded by the 2026 edition</em> reads perfectly well). And save as you go: the workbook on your desktop is the only copy of your answers, because nothing you type is sent back to this website.</p>
     </div>`,
   });
 

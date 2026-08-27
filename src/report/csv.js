@@ -84,17 +84,18 @@ export const CSV_COLUMNS = [
   // action columns; display position per-format (XLSX_COLUMN_ORDER).
   { name: "auditScoreNum", label: "Score (0-100)" },
   { name: "auditGrade",    label: "Grade" },
-  // v1.7.16: CSV-only "action" columns that staff fills in. The HTML
-  // table view skips these (filtered by `csvOnly`) because the web view is
-  // informational — the actionable artefact is the CSV.
+  // v1.7.16: the CSV-only "action" column that staff fills in. The HTML
+  // table view skips it (filtered by `csvOnly`) because the web view is
+  // informational — the actionable artefact is the workbook.
   //
-  // v1.7.28: Delete? defaults to EMPTY instead of "No". CSV cannot carry
-  // data validation (no real Yes/No dropdown), and asking staff to set up
-  // validation manually in Excel/Sheets adds friction. Empty default lets
-  // staff type whatever feels natural — `X`, `YES`, `Y`, `delete`, ✔ — and
-  // the (future) delete-processor will treat any non-empty, non-"no" value
-  // as "flag for removal." More permissive, less prescriptive.
-  { name: "deleteFlag",   label: "Delete?", csvOnly: true, defaultValue: "" },
+  // v1.66.0: the sibling `Delete?` column was REMOVED. Nothing published on
+  // a state website can actually be deleted — records-retention policy — so
+  // a column inviting "mark this for deletion" offered an outcome that was
+  // never on the table, and reviewers read it as a fourth choice competing
+  // with the three real ones. The three real outcomes (archive, remediate,
+  // as-is) are all recorded here, in Notes. Nothing ever consumed
+  // deleteFlag: the "delete-processor" its old comment anticipated was
+  // never built.
   { name: "notes",        label: "Notes",   csvOnly: true, defaultValue: "" },
 ];
 
@@ -327,11 +328,9 @@ export function buildRow({ entry, sourceHeader, sourceMap, isConsolidated }) {
     remediationScore,
     auditScoreNum, // v1.43.0
     auditGrade,    // v1.43.0
-    // v1.7.16 csvOnly columns. The labels stay aligned with CSV_COLUMNS
-    // entries; defaults come from the column descriptor so a future column
-    // addition just needs the descriptor update. v1.7.28: deleteFlag
-    // default flipped from "No" → "" (see CSV_COLUMNS comment above).
-    CSV_COLUMNS.find((c) => c.name === "deleteFlag")?.defaultValue ?? "",
+    // v1.7.16 csvOnly column. The label stays aligned with the CSV_COLUMNS
+    // entry; the default comes from the column descriptor so a future column
+    // addition just needs the descriptor update.
     CSV_COLUMNS.find((c) => c.name === "notes")?.defaultValue ?? "",
   ];
 }

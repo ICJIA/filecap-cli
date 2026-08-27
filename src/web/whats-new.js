@@ -47,6 +47,15 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "no-more-delete-column-2026-08-27",
+    badge: "Improved",
+    summary: "The \u201cDelete?\u201d column is gone from every workbook. There are three things a file can be \u2014 archive, remediate, or as-is \u2014 and all three are recorded in Notes.",
+    text: "Every downloaded workbook used to carry a \u201cDelete?\u201d column sitting next to Notes, and it caused more confusion than it ever resolved. It read as a fourth choice competing with the three real ones, and it named an outcome that was never actually available: under State records-retention policy, nothing published on an ICJIA website can be destroyed. \u201cArchive\u201d \u2014 take it off the website, keep the file \u2014 is as far as any decision goes. So the column has been removed. There is now one column for your answers, Notes, and three words to start it with: archive, remediate, or as-is, followed by your reasoning (\u201carchive \u2014 superseded by the 2026 edition\u201d reads perfectly well). One thing to watch if you are mid-review: because a column came out, everything to its right shifted one letter left, so Notes is now column S rather than column T. Nothing you have already typed is lost, but a workbook you downloaded earlier will not line up column-for-column with a fresh one \u2014 if you are partway through, finish in the copy you already have and send that. The Help guide has been rewritten to match, and now says plainly why deletion is not one of the choices.",
+    linkText: "Open the Help guide",
+    linkHref: "help.html",
+    date: "August 27, 2026",
+  },
+  {
     id: "download-buttons-say-what-they-give-you-2026-08-20",
     badge: "Improved",
     summary: "The download buttons now say what they hand over: \u201cDownload this site\u2019s file list (Excel)\u201d instead of \u201cDownload spreadsheet\u201d. Same file, same click \u2014 it just no longer leaves you guessing what is in it.",

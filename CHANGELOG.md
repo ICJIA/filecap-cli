@@ -10,6 +10,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.66.0] — 2026-08-27
+
+### Changed — the `Delete?` column is gone; `Notes` carries every decision
+
+Every workbook and CSV carried a `Delete?` column next to `Notes`, empty by
+default, inviting staff to mark a file for removal. It described an outcome
+that was never available: **nothing published on a State website can be
+destroyed under records-retention policy.** `archive` — take it off the
+website, retain the file — is as far as any decision goes. Worse, sitting
+beside Notes it read as a *fourth* choice competing with the three real ones
+(`archive`, `remediate`, `as-is`), which is exactly the confusion the Help
+guide had been papering over since v1.61.0 with "ignore the Delete? column —
+the audit team works from Notes".
+
+- **Removed** `deleteFlag` from `CSV_COLUMNS` and `XLSX_COLUMN_ORDER`. CSV
+  goes 22 → 21 columns, XLSX 20 → 19. Nothing ever consumed the field — the
+  `process-deletions` subcommand its original comment anticipated was never
+  built — so there is no data path to migrate.
+- **`Notes` moves from column T to column S.** A workbook downloaded before
+  this release will not line up column-for-column with a fresh one. Nothing
+  already typed is lost; anyone partway through a review should finish in
+  the copy they have and send that. Called out in the What's New entry.
+- **Every help surface rewritten** to teach three outcomes and say *why*
+  there is no fourth: the Help guide (step 4 lede, the column map, the
+  practical-notes block, the FAQ comment), the home page (master-workbook
+  description and the AI-context reminder), the bundle's `README.md` for
+  LLM readers, this repo's README, and the dated manager-walkthrough doc.
+
+The Help guide's generated counts follow automatically — it now reads
+"Nineteen columns. You use five." and "ignore all fourteen of them".
+
 ## [1.65.0] — 2026-08-27
 
 ### Fixed — CMS page references pointed at pages that do not exist

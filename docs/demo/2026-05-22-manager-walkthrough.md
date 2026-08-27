@@ -8,6 +8,11 @@ data-driven, all clickable.
 The deliverable lives at **https://fleet.icjia.app** (Netlify
 Pro Site Password — request from IDS if you don't have it).
 
+> **Note (2026-08-27):** this is a dated script. The staff-fill columns were
+> reduced to `Notes` alone in v1.66.0 — the old `Delete?` column is gone,
+> because records-retention policy means no published file is ever deleted.
+> The three outcomes are `archive`, `remediate`, and `as-is`.
+
 ---
 
 ## The story you're telling
@@ -100,9 +105,9 @@ F-grade PDFs.
 
 Click **Download spreadsheet** in the page header.
 
-> "And the same data is in a CSV — same column order. The columns 16 and
-> 17 are `Delete?` and `Notes` for your team to fill in. Hand this to
-> your remediation vendor or use it as a worklist."
+> "And the same data is in a CSV — same column order. The last column is
+> `Notes`, for your team to fill in: `archive`, `remediate`, or `as-is`,
+> plus why. Hand this to your remediation vendor or use it as a worklist."
 
 ---
 
@@ -195,8 +200,8 @@ If a manager wants their own copy of the audit:
 1. Email them the Netlify URL + password (request both from IDS)
 2. They open it in any browser; nothing to install
 3. CSV download via the **Download spreadsheet** button on any page
-4. CSV opens in Excel / Sheets / Numbers; columns 16-17 are theirs
-   to fill in (`Delete?` and `Notes`)
+4. CSV opens in Excel / Sheets / Numbers; the last column (`Notes`) is
+   theirs to fill in
 5. They email the marked-up CSV back to IDS or hand it to a remediation
    vendor — same workflow either way
 

@@ -426,33 +426,39 @@ describe("writeCsv SHA-256 Excel text-formula wrapping", () => {
   });
 });
 
-describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
-  it("declares deleteFlag and notes as csvOnly columns at the end of CSV_COLUMNS", () => {
-    const last = CSV_COLUMNS.slice(-2);
-    expect(last[0].name).toBe("deleteFlag");
-    expect(last[0].label).toBe("Delete?");
-    expect(last[0].csvOnly).toBe(true);
-    expect(last[0].defaultValue).toBe("");
-    expect(last[1].name).toBe("notes");
-    expect(last[1].label).toBe("Notes");
-    expect(last[1].csvOnly).toBe(true);
-    expect(last[1].defaultValue).toBe("");
+describe("CSV-only action column (v1.66.0 — Notes only)", () => {
+  it("declares notes as the single csvOnly column, last in CSV_COLUMNS", () => {
+    const last = CSV_COLUMNS[CSV_COLUMNS.length - 1];
+    expect(last.name).toBe("notes");
+    expect(last.label).toBe("Notes");
+    expect(last.csvOnly).toBe(true);
+    expect(last.defaultValue).toBe("");
+    expect(CSV_COLUMNS.filter((c) => c.csvOnly)).toHaveLength(1);
   });
 
-  it("CSV header row includes the new Delete? and Notes labels", () => {
+  // v1.66.0 — the Delete? column is gone. Nothing on a state website can
+  // actually be deleted (records-retention policy), so a column inviting
+  // "mark this for deletion" described an outcome that was never available.
+  // The three real outcomes — archive, remediate, as-is — are all recorded
+  // in Notes.
+  it("no longer declares a deleteFlag column", () => {
+    expect(CSV_COLUMNS.find((c) => c.name === "deleteFlag")).toBeUndefined();
+    expect(CSV_COLUMNS.map((c) => c.label)).not.toContain("Delete?");
+  });
+
+  it("CSV header row carries Notes and not Delete?", () => {
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [], sources: null });
     const headerRow = csv.trim().split("\n")[0];
-    expect(headerRow).toContain("Delete?");
     expect(headerRow).toContain("Notes");
-    // 1.20.0: 19 columns total (was 18 in 1.10.2). Added Page Count after
-    // File name. 1.10.2 prior count: 15 file-descriptor + Page References +
-    // Audit Score + Delete? + Notes = 18. With Page Count: 19.
-    // 1.34.0: + Remediation Score = 20.
-    // 1.43.0: + Score (0-100) + Grade = 22.
-    expect(headerRow.split(",").length).toBe(22);
+    expect(headerRow).not.toContain("Delete?");
+    // 1.20.0: 19 columns (15 file-descriptor + Page References + Audit Score
+    // + Delete? + Notes = 18, plus Page Count = 19).
+    // 1.34.0: + Remediation Score = 20.  1.43.0: + Score (0-100) + Grade = 22.
+    // 1.66.0: - Delete? = 21.
+    expect(headerRow.split(",").length).toBe(21);
   });
 
-  it("CSV data rows default Delete? to empty (no dropdown in CSV) and Notes to empty string", () => {
+  it("CSV data rows default Notes to an empty string", () => {
     const entry = {
       path: "doc.pdf",
       absolutePath: "/uploads/doc.pdf",
@@ -467,7 +473,6 @@ describe("CSV-only action columns (v1.7.16 Delete? + Notes)", () => {
     const csv = writeCsv({ sourceHeader: baseHeader, entries: [entry], sources: null });
     const dataRow = csv.trim().split("\n")[1];
     const cells = dataRow.split(",");
-    expect(cells[colIndex("deleteFlag")]).toBe("");
     expect(cells[colIndex("notes")]).toBe("");
   });
 });
@@ -518,9 +523,8 @@ describe("writeCsv Referenced column", () => {
   it("declares a Referenced column immediately after Public URL", () => {
     const pubIdx = colIndex("publicUrl");
     const refIdx = colIndex("referenced");
-    const delIdx = colIndex("deleteFlag");
     expect(refIdx).toBe(pubIdx + 1);
-    expect(refIdx).toBeLessThan(delIdx);
+    expect(refIdx).toBeLessThan(colIndex("notes"));
   });
 
   it("uses the human label 'Page References'", () => {

@@ -81,7 +81,7 @@ describe("help page — structure", () => {
 });
 
 describe("help page — the column map tracks the real workbook", () => {
-  // The page tells readers "Notes is column T". If XLSX_COLUMN_ORDER ever
+  // The page tells readers "Notes is column S". If XLSX_COLUMN_ORDER ever
   // changes, that sentence becomes a wrong instruction, so the letters are
   // derived from the workbook here and compared.
   const letterFor = (name) => {
@@ -92,14 +92,23 @@ describe("help page — the column map tracks the real workbook", () => {
 
   it("puts Notes where the workbook puts it", () => {
     const notes = letterFor("notes");
-    expect(notes).toBe("T");
+    // v1.66.0 — Notes moved T -> S when the Delete? column was removed.
+    expect(notes).toBe("S");
     expect(html).toContain(`Column ${notes} &mdash; Notes`);
   });
 
-  it("puts Delete? immediately before Notes, and tells readers to skip it", () => {
-    expect(letterFor("deleteFlag")).toBe("S");
-    expect(html).toContain("Delete?");
-    expect(html).toMatch(/Ignore the <strong>Delete\?<\/strong> column/);
+  // v1.66.0 — the Delete? column is gone from the workbooks, so no help
+  // surface may still name it. Nothing on a state website can actually be
+  // deleted (records retention), which is why the guide explains the three
+  // real outcomes instead of offering a fourth that never existed.
+  it("does not mention a Delete? column anywhere", () => {
+    expect(XLSX_COLUMN_ORDER).not.toContain("deleteFlag");
+    expect(html).not.toContain("Delete?");
+  });
+
+  it("says why deletion is not one of the choices", () => {
+    expect(html).toMatch(/records[ -]retention/i);
+    expect(html).toMatch(/three/i);
   });
 
   it("names each read-column at its real letter", () => {
@@ -124,8 +133,9 @@ describe("help page — the column map tracks the real workbook", () => {
   it("draws one strip cell per workbook column", () => {
     const cells = html.match(/<span class="hp-col hp-col-\w+"/g) ?? [];
     expect(cells).toHaveLength(XLSX_COLUMN_ORDER.length);
-    expect(html).toContain("Twenty columns. You use five.");
-    expect(html).toContain("you can ignore all fifteen of them");
+    // v1.66.0 — Delete? removed: twenty columns -> nineteen, fifteen dim -> fourteen.
+    expect(html).toContain("Nineteen columns. You use five.");
+    expect(html).toContain("you can ignore all fourteen of them");
   });
 });
 

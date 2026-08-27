@@ -1508,7 +1508,7 @@ describe("writeHtml", () => {
   });
 
   describe("HTML view excludes csvOnly columns (v1.7.16)", () => {
-    it("does NOT render Delete? or Notes columns in the table — those are CSV-only", async () => {
+    it("does NOT render the Notes column in the table — it is CSV-only", async () => {
       const outputPath = path.join(tmpDir, "out.html");
       await writeHtml({
         sourceHeader: sampleHeader,
@@ -1517,10 +1517,10 @@ describe("writeHtml", () => {
         outputPath,
       });
       const html = await fs.readFile(outputPath, "utf8");
-      expect(html).not.toMatch(/<th[^>]*data-col="deleteFlag"/);
       expect(html).not.toMatch(/<th[^>]*data-col="notes"/);
-      expect(html).not.toMatch(/<col data-col="deleteFlag"/);
       expect(html).not.toMatch(/<col data-col="notes"/);
+      // v1.66.0 — Delete? was removed outright; it must not reappear.
+      expect(html).not.toContain("Delete?");
     });
   });
 

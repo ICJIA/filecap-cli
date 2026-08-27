@@ -192,7 +192,6 @@ export const XLSX_COLUMN_ORDER = [
   "path",
   "absolutePath",
   "sha256",
-  "deleteFlag",
   "notes",
 ];
 

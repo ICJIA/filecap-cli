@@ -62,7 +62,7 @@ function renderLlmContextSection(llmContext) {
       <p class="llm-context-eyebrow">Optional · for AI models</p>
       <h2 id="llm-context-heading">For AI models</h2>
     </header>
-    <p class="llm-context-lead">If your office permits using AI tools like Claude, ChatGPT, Gemini, or Copilot, you can upload these two files to a chat session and ask questions about the audit. <strong>This is optional.</strong> The file lists above are the actionable files — that's the workflow staff use to mark which files should be removed. The two files in this section are <strong>read-only</strong> and exist for AI-assisted analysis.</p>
+    <p class="llm-context-lead">If your office permits using AI tools like Claude, ChatGPT, Gemini, or Copilot, you can upload these two files to a chat session and ask questions about the audit. <strong>This is optional.</strong> The file lists above are the actionable files — that's the workflow staff use to record what should happen to each file. The two files in this section are <strong>read-only</strong> and exist for AI-assisted analysis.</p>
 
     <p class="llm-context-future"><strong>Why this is here.</strong> State-agency policy on AI tool use is still evolving. Today, your office may or may not allow uploading files to AI chat tools — that's your call, governed by your office's data-handling rules. We're including these files because in 6–12 months, AI-assisted analysis of audits like this one is likely to be much more routine, and we'd rather have them in the bundle now than try to add them later. If you don't use AI tools, you can ignore this section entirely; nothing about the rest of the audit changes.</p>
 
@@ -87,7 +87,7 @@ function renderLlmContextSection(llmContext) {
         <li><strong>Attach both files</strong> using the tool's file-upload button. Upload the <code>${he(llmContext.contextMdFilename)}</code> first so the AI reads the narrative + schema; then upload <code>${he(llmContext.ndjsonFilename)}</code> as the actual data.</li>
         <li><strong>Ask questions</strong> in plain English. Example starter prompts are inside <code>${he(llmContext.contextMdFilename)}</code>. The AI will read the data file and answer based on what's actually in your audit.</li>
       </ol>
-      <p class="llm-context-actionable-reminder"><strong>The XLSX workbooks are still the actionable files.</strong> If the AI suggests "let me mark these files for deletion," redirect it to <code>audit-file-list-master.xlsx</code> — that's where the <code>Delete?</code> and <code>Notes</code> columns live, and that's the file staff hands back to the audit team to actually remove flagged files. The AI files exist for asking and learning, not for changing.</p>
+      <p class="llm-context-actionable-reminder"><strong>The XLSX workbooks are still the actionable files.</strong> If the AI suggests "let me mark these files for deletion," two things are wrong with that: nothing published here can be deleted at all (State records-retention policy), and the AI files cannot record a decision. Redirect it to <code>audit-file-list-master.xlsx</code> — that's where the <code>Notes</code> column lives, and that's the file staff hands back to the audit team. The choices are <em>archive</em>, <em>remediate</em>, or <em>as-is</em>; the AI files exist for asking and learning, not for changing.</p>
     </details>
   </section>`;
 }
@@ -100,7 +100,7 @@ function renderMasterCsvSection(masterCsv) {
   return `
   <section class="section master-csv">
     <h2>Every website in one workbook</h2>
-    <p>If you'd rather skim a single file than open thirteen, this combined Excel workbook has every file that may need remediation (PDFs, DOCX, XLSX, PPTX, legacy Office) from every website above, in one row-per-file table. Same columns as the per-site file lists, plus a "Server" column at the front so you can tell which website each row came from. The workbook also has two empty columns — <strong>Delete?</strong> and <strong>Notes</strong> — for staff to mark which files should be removed and why before the next audit. Put <code>X</code>, <code>YES</code>, or anything non-blank in the Delete? cell for any file you want removed. Non-remediable file types (images, archives, text, web) are excluded from downloads — they show up only in the HTML tables for completeness.</p>
+    <p>If you'd rather skim a single file than open thirteen, this combined Excel workbook has every file that may need remediation (PDFs, DOCX, XLSX, PPTX, legacy Office) from every website above, in one row-per-file table. Same columns as the per-site file lists, plus a "Server" column at the front so you can tell which website each row came from. The workbook also has one empty column — <strong>Notes</strong> — for staff to record what should happen to each file before the next audit. Write <code>archive</code>, <code>remediate</code>, or <code>as-is</code>, and your reasoning after it. Those are the only three outcomes: nothing published on a State website can be deleted, so <em>archive</em> (off the website, still retained) is as far as a file goes. Non-remediable file types (images, archives, text, web) are excluded from downloads — they show up only in the HTML tables for completeness.</p>
     <p class="master-csv-download">
       <a class="cta-button" href="${he(masterCsv.filename)}" download>
         Download every site&#39;s file list &mdash; <strong>${he(masterCsv.filename)}</strong>
@@ -382,8 +382,9 @@ function renderDuplicatesSection(groups, _duplicatesCsv) {
 const TODO_IDEAS = [
   {
     title: "Closing the loop on the spreadsheets you send back",
-    // Grounded: `deleteFlag` and `notes` appear only in the XLSX writer —
-    // nothing in src/ ever reads a returned workbook.
+    // Grounded: `notes` appears only in the XLSX writer — nothing in src/
+    // ever reads a returned workbook. (Its old `deleteFlag` sibling was
+    // removed in v1.66.0; see src/report/csv.js.)
     paragraphs: [
       `The <a href="help.html">Help guide</a> ends by asking you to email your completed workbook to the audit team. After that, nothing on this site knows it happened &mdash; the decisions live in an inbox, and the only way to find out how far the fleet has got is to open twelve attachments and count.`,
       `The audit could read those returned workbooks and show, per site, how many files have a decision recorded against them, how many are still blank, and the split between <strong>archive</strong>, <strong>remediate</strong>, and <strong>as-is</strong>. Your own numbers, back on the site you got the file list from.`,
