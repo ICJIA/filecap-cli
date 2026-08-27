@@ -47,6 +47,15 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "archive-website-score-corrected-2026-08-27",
+    badge: "Corrected",
+    summary: "The Archive\u2019s website score has changed from 85 (B) to 42 (F). The old number was wrong \u2014 it was measuring PDFs and images instead of web pages. Nothing about the Archive got worse.",
+    text: "A website score is meant to describe a site\u2019s pages. The Archive is a file store, and its sitemap lists the files it holds \u2014 1,534 PDFs, 213 images, 182 spreadsheets, 149 zip files \u2014 alongside its handful of actual web pages. The scorer took that list at face value and opened every entry in a browser, so 712 of the 804 things it had scored as \u201cpages\u201d were documents and images. A PDF opened in a browser has almost no page structure for an accessibility checker to object to, so it scored well, and those easy scores pulled the site\u2019s average up to 85. The number looked reassuring and described almost nothing. The scorer now leaves files out of the page score and measures only the 30 real web pages the Archive publishes. Those pages score 42, an F, across 212 serious and 336 moderate issues \u2014 and that is now the whole picture, not a sample: all 30 of 30 pages are covered, where before it was 449 of 2,421. To be clear about what did and did not happen: nothing on the Archive changed, and no file went unexamined. Those PDFs and Office documents are still audited in full, on the file list, against a rubric built for documents \u2014 which is where a document\u2019s accessibility has always belonged. Only the website score changed, and it changed from a wrong answer to a right one.",
+    linkText: "Open the Help guide",
+    linkHref: "help.html",
+    date: "August 27, 2026",
+  },
+  {
     id: "no-more-delete-column-2026-08-27",
     badge: "Improved",
     summary: "The \u201cDelete?\u201d column is gone from every workbook. There are three things a file can be \u2014 archive, remediate, or as-is \u2014 and all three are recorded in Notes.",

@@ -28,30 +28,40 @@ describe("WHATS_NEW data", () => {
   // density findings: ~200 words of wall-of-text at the top of the page).
   it("leads with the 2026-08-20 download-label entry, with a short banner summary", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("no-more-delete-column");
-    expect(e.badge).toBe("Improved");
+    expect(e.id).toContain("archive-website-score-corrected");
+    expect(e.badge).toBe("Corrected");
     expect(e.summary.length).toBeGreaterThan(0);
     // "At most two sentences" is the rule; ~350 chars is the tripwire.
     expect(e.summary.length).toBeLessThan(350);
     expect(e.text.length).toBeGreaterThan(e.summary.length);
   });
 
-  // v1.66.0 — a column came out of every workbook, so the entry has to warn
-  // anyone mid-review that Notes moved from column T to column S.
-  it("tells readers the Notes column shifted, and why deletion is not an option", () => {
+  // v1.67.0 — a published site score moved 85 (B) -> 42 (F). The entry must
+  // say the site did not get worse, and that the documents are still audited.
+  it("explains the archive score correction without implying the site regressed", () => {
     const e = WHATS_NEW[0];
+    expect(e.text).toMatch(/still audited|audited in full/i);
+    expect(e.text).toMatch(/nothing on the Archive changed/i);
+    expect(e.summary).toMatch(/85|B/);
+    expect(e.summary).toMatch(/42|F/);
+  });
+
+  // v1.66.0 — a column came out of every workbook, so that entry warned
+  // anyone mid-review that Notes moved from column T to column S.
+  it("keeps the delete-column entry, with its column-shift warning", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("no-more-delete-column"));
+    expect(e).toBeTruthy();
     expect(e.text).toMatch(/column S/);
     expect(e.text).toMatch(/column T/);
     expect(e.text).toMatch(/records-retention/i);
-    expect(e.text).toMatch(/archive/i);
   });
 
   it("the banner renders the summary, not the full text, with a read-more link", () => {
     const banner = renderWhatsNewBanner();
     // Compare escaped-safe fragments (the renderer HTML-escapes apostrophes).
-    expect(banner).toContain("column is gone from every workbook");
-    expect(banner).toContain("recorded in Notes");
-    expect(banner).not.toContain("everything to its right shifted one letter left");
+    expect(banner).toContain("website score has changed");
+    expect(banner).toContain("measuring PDFs and images");
+    expect(banner).not.toContain("712 of the 804 things it had scored");
     expect(banner).toContain(">Read the full update</a>");
   });
 
@@ -151,7 +161,9 @@ describe("WHATS_NEW data", () => {
   // lesson: every count on the banner must add up against the hero it sits
   // above). Now history, second in the list.
   it("keeps the reconciled 2026-08-16 archive-scope entry as history", () => {
-    const e = WHATS_NEW.find((x) => x.id.includes("archive"));
+    // v1.67.0 — match the date too: the archive score-correction entry also
+    // starts with "archive" and would otherwise win this lookup.
+    const e = WHATS_NEW.find((x) => x.id.includes("archive") && x.id.includes("2026-08-16"));
     expect(e).toBeTruthy();
     expect(e.id).toContain("2026-08-16");
     expect(e.text).toContain("4,628");

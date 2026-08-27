@@ -100,8 +100,17 @@ export async function runSiteAudit({
     /* no sidecar — sitemap only */
   }
 
-  const { pageSet } = await resolveSitePageSet({ site, cmsNdjson, fetchSitemap });
+  const { pageSet, droppedFileUrls = [] } = await resolveSitePageSet({ site, cmsNdjson, fetchSitemap });
   log(`[site-audit] ${siteName}: ${pageSet.length} pages in set (sitemap ∪ CMS)`);
+  // v1.67.0 — never drop silently. A sitemap that lists a site's files makes
+  // this number large (archive: 2,158 of 2,421); those documents are scored
+  // by the `audits` stage instead, against a document rubric.
+  if (droppedFileUrls.length > 0) {
+    log(
+      `[site-audit] ${siteName}: excluded ${droppedFileUrls.length} file URL(s) ` +
+        `from the page set (not web pages — e.g. ${droppedFileUrls[0]})`,
+    );
+  }
 
   const cache = loadAuditCache({ cachePath: pageCachePath });
   const httpFetcher = fetcher ?? defaultJsonFetcher(log);

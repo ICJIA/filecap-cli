@@ -10,6 +10,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.67.0] — 2026-08-27
+
+### Fixed — the website score was scoring files as if they were pages
+
+A website-accessibility score is meant to describe a site's **pages**.
+`resolveSitePageSet` took `sitemap.xml` at face value, and the archive is a
+file store whose sitemap lists the files it holds. The page scorer was
+therefore pointing a headless browser at PDFs, JPEGs, spreadsheets and zip
+archives and running axe on them.
+
+Measured on archive-prod: **2,158 of its 2,421 "pages" were binary files
+(89%)** — 1,534 PDFs, 213 images, 182 spreadsheets, 149 zips, and 14
+`.DS_Store` files. **712 of the 804 URLs it had scored were documents, not
+pages.** A PDF rendered in a browser offers axe almost no page structure to
+object to, so it scored well, and those scores carried the site's average to
+**85 (B)** — a reassuring number that described almost nothing. The URLs that
+failed outright were the honest signal: `504 Page navigation timed out` on
+things like `fvccBROCHURE 9-17-14.pub`.
+
+- **New `src/site-audit/page-url-filter.js`** — `isPageUrl` keeps
+  directory-style URLs, extensionless slugs, and explicit page extensions
+  (`.html`, `.php`, `.aspx`, …); everything carrying a file extension is
+  dropped from the page set.
+- **Allowlist, deliberately.** A blocklist built from the scanner's
+  `EXTENSION_MAP` would have missed `.pub`, `.mdown`, `.msg` and
+  `.gitignore`, all present in the archive sitemap. Measured across every
+  fleet sitemap, the only URLs with a non-web extension in their last path
+  segment were archive-prod's 2,370 files — no site publishes a page whose
+  slug could be mistaken for a filename, so nothing real is at risk.
+- **Never drops silently.** `resolveSitePageSet` returns `droppedFileUrls`
+  and `site-audit` logs the count with an example, because a page quietly
+  missing from a score is worse than a file loudly failing.
+
+**Fleet impact: archive-prod only.** Every other site drops zero URLs
+(agency 2,453, ari 303, researchhub 316, ilfvcc 275, intranet 279 — all
+unchanged). Archive's page set goes **2,421 → 30**, all of them real `.html`
+pages, and coverage goes from a capped 449/2,421 sample to **30/30**.
+
+**Its score moves 85 (B) → 42 (F)** on 212 serious and 336 moderate issues.
+The site did not get worse; the old number was measuring the wrong things.
+The documents are untouched by this and still fully audited by the `audits`
+stage against a document rubric, which is where a document's accessibility
+belongs. A What's New entry says exactly that on the site, because a
+published score moving from B to F is the first thing a manager will ask
+about.
+
 ## [1.66.0] — 2026-08-27
 
 ### Changed — the `Delete?` column is gone; `Notes` carries every decision
