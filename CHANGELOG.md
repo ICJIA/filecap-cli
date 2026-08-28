@@ -10,6 +10,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.69.0] — 2026-08-28
+
+### Changed — the archive is out of the audit while its contents are in flux
+
+archive.icjia.cloud currently holds a mix of genuinely archived files and
+files still live on the sites they came from — the archive is being
+reorganized, and until that settles its numbers describe the reorganization,
+not accessibility. Per the 2026-08-28 decision it is **temporarily excluded
+from the published audit**: out of the fleet totals, out of the hero
+numbers, and off the Websites section — **11 audited sites, down from 12**,
+and the fleet file total drops by the archive's 2,421 files.
+
+- **New roster flag: `excluded: true` (+ optional `excludedReason`)** on a
+  sites.json entry, validated by `siteEntrySchema`. A flagged site is pulled
+  out of every audit surface — fleet totals, hero count, Websites cards, the
+  per-site report page, the search index, new a11y-history points, and the
+  fleet file index (so no cross-site chip links to a report page that no
+  longer exists; its files render like any other non-audited host's). The
+  roster entry and the scan cache stay intact: `run-site-update.sh` can
+  still refresh the archive, and deleting the flag brings the site back on
+  the next rollup. The `/sites` directory still lists it, reconciled by the
+  lede ("13 ICJIA content sites — 11 of them under file accessibility
+  audit") — the same treatment as a registered-but-never-scanned site.
+- Distinct from the CLI `--exclude-site` filter (per-invocation, and drops
+  the site from `/sites` too) and from `A11Y_SCORE_EXCLUDE_SLUGS`
+  (score-gauge-only, empty since v1.45.0 — unchanged).
+- The rollup log records the decision — `[web-rollup] excluding Archive
+  (excluded in sites.json: <reason>)` — and the run summary counts
+  `sitesExcluded` separately, so `sitesSkipped` keeps meaning "wanted but
+  no usable scan".
+- Announced in What's New (2026-08-28) as a scope change: the headline
+  numbers dropped because 2,421 files left the denominator — nothing was
+  fixed, removed, or deleted, and the archive returns when the
+  reorganization settles.
+
 ## [1.68.0] — 2026-08-27
 
 ### Added — sitemap-completeness check: which live pages the sitemap omits

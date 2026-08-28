@@ -147,6 +147,21 @@ export const siteEntrySchema = z
     // very large sites (e.g. icjia-agency-prod = 150) so routine fleet runs stay
     // bounded. A `--max-new-pages` CLI flag overrides this per run.
     maxNewPages: z.number().int().positive().optional(),
+    // v1.69.0 — pull this site out of the published audit while keeping its
+    // roster entry (and its scan cache) intact: no fleet totals, no hero
+    // count, no Websites card, no per-site report, no search-index rows, no
+    // a11y-history point, no fleet file-index entry (so no cross-site chip
+    // links to a report page that no longer exists). The /sites directory
+    // still lists the site as unaudited, and run-site-update.sh can still
+    // refresh its cache — deleting the flag brings the site back on the next
+    // rollup. Born for archive.icjia.cloud (2026-08-28), which mixes live and
+    // genuinely archived files while the archive is reorganized. Distinct
+    // from the CLI --exclude-site filter, which drops the site from the
+    // /sites directory too and lasts only for that one invocation.
+    excluded: z.boolean().optional(),
+    // Optional human-readable "why" — surfaced in the rollup log next to the
+    // exclusion so a future operator doesn't have to dig through git history.
+    excludedReason: z.string().optional(),
     // v1.8.0: references discovery config. When present, `filecap references
     // <siteName>` knows how to fetch this site's CMS data, classify fields,
     // and resolve deployed page URLs from entry slugs.
@@ -484,6 +499,11 @@ export async function buildFleetFileIndex(sites, auditsBase, aliasMap) {
   for (const site of sites ?? []) {
     const siteKey = site?.name;
     if (!siteKey) continue;
+    // v1.69.0 — a roster-excluded site gets no per-site report page, so an
+    // index entry would hand the Page view a detailHref to a page that does
+    // not exist. Leaving its files out instead makes them render like any
+    // other non-audited host's files (unresolved chip + hostname label).
+    if (site.excluded === true) continue;
     const latestInv = latestInventoryPath(auditsBase, siteKey);
     let header, entries;
     try {
@@ -1210,8 +1230,10 @@ export async function runWebRollup({
   // v1.38.0 — pre-pass: record each site's file-accessibility average into a
   // purge-exempt time series (<slug>/a11y-history.json as of v1.39.0) and
   // derive the "since last audit" trend. A point is appended only when the
-  // numbers change, so template-only rebuilds don't pad the series. The
-  // excluded archive and zero-scored sites are skipped (no displayable score).
+  // numbers change, so template-only rebuilds don't pad the series.
+  // Roster-excluded sites (v1.69.0), score-excluded slugs
+  // (A11Y_SCORE_EXCLUDE_SLUGS, empty since v1.45.0), and zero-scored sites
+  // are all skipped (nothing displayable to record).
   // Runs before the main loop so the trend can be handed to BOTH the detail
   // page and the card.
   const a11yNowIso = new Date().toISOString();
@@ -1220,6 +1242,10 @@ export async function runWebRollup({
   for (const site of sites) {
     const slug = site?.name;
     if (!slug) continue;
+    // v1.69.0 — a roster-excluded site contributes no history point: its
+    // series pauses while it is out of the audit instead of recording scores
+    // nobody publishes, and resumes cleanly when the flag is deleted.
+    if (site.excluded === true) continue;
     const inv = latestInventoryPath(auditsBase, slug);
     let summary;
     try {
@@ -1262,6 +1288,15 @@ export async function runWebRollup({
     const siteKey = site.name;
     if (!siteKey) {
       process.stderr.write(`WARN: skipping ${site.siteName ?? "(unnamed)"}: no server name configured\n`);
+      continue;
+    }
+    // v1.69.0 — deliberate roster exclusion (`excluded: true` in sites.json).
+    // Not a WARN: unlike a missing scan, this is an operator decision, logged
+    // with its reason so the smaller fleet count is self-explanatory. The
+    // site stays in `sites`, so the /sites directory below still lists it.
+    if (site.excluded === true) {
+      const why = site.excludedReason ? `: ${site.excludedReason}` : "";
+      process.stderr.write(`[web-rollup] excluding ${site.siteName ?? siteKey} (excluded in sites.json${why})\n`);
       continue;
     }
     const rawInv = path.join(auditsBase, siteKey, "latest", "inventory.ndjson");
@@ -2346,9 +2381,13 @@ export async function runWebRollup({
   // 9. Generate shared CSS
   await fs.writeFile(path.join(output, "assets", "style.css"), darkModeCss());
 
+  // v1.69.0 — roster-flagged exclusions are deliberate, so they get their own
+  // count; sitesSkipped keeps meaning "wanted but no usable scan".
+  const sitesExcluded = sites.filter((s) => s.excluded === true).length;
   const summary = {
     sitesIncluded: siteResults.length,
-    sitesSkipped: sites.length - siteResults.length,
+    sitesExcluded,
+    sitesSkipped: sites.length - siteResults.length - sitesExcluded,
     outputDir: output,
     passwordEnabled: !!password,
     clientGateEnabled: useClientGateForIndex,

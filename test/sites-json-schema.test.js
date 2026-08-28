@@ -120,6 +120,29 @@ describe("siteEntrySchema per-site page cap (maxNewPages)", () => {
   });
 });
 
+// v1.69.0 — a roster entry can carry `excluded: true` (plus an optional
+// human-readable `excludedReason`) to pull the site out of the published
+// audit — fleet totals, hero score, Websites section, per-site report —
+// while keeping the entry and its scan cache intact so the site can return
+// by deleting one line. The /sites directory still lists it as unaudited.
+describe("siteEntrySchema roster exclusion (v1.69.0 — excluded / excludedReason)", () => {
+  const base = { name: "archive-prod", publicUrlBase: "https://archive.example.com/files" };
+
+  it("accepts excluded: true with an excludedReason (both stay optional)", () => {
+    expect(() => siteEntrySchema.parse({ ...base, excluded: true, excludedReason: "content in flux" })).not.toThrow();
+    expect(() => siteEntrySchema.parse({ ...base, excluded: false })).not.toThrow();
+    expect(() => siteEntrySchema.parse(base)).not.toThrow();
+  });
+
+  it("rejects a non-boolean excluded", () => {
+    expect(() => siteEntrySchema.parse({ ...base, excluded: "yes" })).toThrow();
+  });
+
+  it("rejects a non-string excludedReason", () => {
+    expect(() => siteEntrySchema.parse({ ...base, excludedReason: 7 })).toThrow();
+  });
+});
+
 // v1.65.0 — contentTypeRoutes accepts a multi-segment object form alongside
 // the flat string form, so a front end that nests detail pages under a
 // category segment can be described accurately (ARI meetings).

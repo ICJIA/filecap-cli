@@ -16,8 +16,10 @@
 #
 #  ARCHIVE: moving excepted PDFs into archive.icjia.cloud changes its file count
 #  too, so updating a content site PROMPTS to also refresh the archive
-#  (default Y). The archive's accessibility score stays "N/A" (it is excluded);
-#  only its count moves.
+#  (default Y). Refreshing it only updates its cached inventory: as of v1.69.0
+#  the archive is roster-excluded (`excluded: true` in sites.json) while its
+#  contents are in flux, so it appears in no published numbers until that
+#  flag is deleted — keeping the cache fresh is what makes its return cheap.
 #
 #  USAGE
 #    ./run-site-update.sh i2i.illinois.gov                     # one site (+ archive prompt)

@@ -1907,3 +1907,154 @@ describe("cross-site (CMS-hosted) files in the Page view (v1.32.0)", () => {
     expect(found).toBe(true);
   });
 });
+
+// ── v1.69.0 — roster exclusion (`excluded: true` in sites.json) ───────────────
+// A flagged site is pulled out of every audit surface — fleet totals, the hero
+// count, the Websites section, per-site report pages, the search index, the
+// a11y-history series, the fleet file index — while its roster entry (and scan
+// cache) stays intact and the /sites directory still lists it as unaudited.
+// Born for archive.icjia.cloud, which mixes live and genuinely archived files
+// while the archive is reorganized ("in flux"); deleting the flag brings the
+// site back on the next rollup.
+describe("roster exclusion (v1.69.0 — excluded: true in sites.json)", () => {
+  /** Inventory whose one PDF carries a document score, so the a11y pre-pass
+   *  would append a history point for the site if it were not excluded. */
+  async function writeAuditedInventory(filePath, serverName) {
+    const header = JSON.stringify({
+      schemaVersion: 1,
+      kind: "filecap-inventory-header",
+      metadata: {
+        serverName,
+        hostname: "test.example.com",
+        serverIp: "10.0.0.1",
+        scannedPath: "/uploads",
+        scannedAt: "2026-05-09T16:05:04.000Z",
+        filecapVersion: "1.1.1",
+        nodeVersion: "v20.18.0",
+        options: { hash: true, introspect: false, maxIntrospectMb: 200, concurrency: 4 },
+      },
+    });
+    const entry = JSON.stringify({
+      path: "doc.pdf",
+      absolutePath: "/uploads/doc.pdf",
+      filename: "doc.pdf",
+      extension: "pdf",
+      category: "pdf",
+      remediable: true,
+      sizeBytes: 1024,
+      modifiedAt: "2024-01-01T00:00:00.000Z",
+      sha256: "a1b2c3",
+      flags: [],
+      audit: { score: 92, grade: "A" },
+    });
+    const footer = JSON.stringify({
+      kind: "filecap-inventory-footer",
+      entryCount: 1,
+      scannedAt: "2026-05-09T16:05:04.000Z",
+    });
+    await fs.writeFile(filePath, [header, entry, footer].join("\n") + "\n", "utf8");
+  }
+
+  /** Two sites, both with cached scans; the second is roster-excluded. */
+  async function buildExclusionFixture({ audited = false } = {}) {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    for (const s of ["keeper", "flux"]) {
+      const latestDir = path.join(auditsBase, s, "latest");
+      await fs.mkdir(latestDir, { recursive: true });
+      if (audited) {
+        await writeAuditedInventory(path.join(latestDir, "inventory.audited.ndjson"), s);
+      } else {
+        await writeInventory(path.join(latestDir, "inventory.ndjson"), { serverName: s });
+      }
+    }
+    const sitesFile = path.join(tmpDir, "sites.json");
+    await writeSitesJson(sitesFile, [
+      { name: "keeper", siteName: "Keeper", host: "1.2.3.4", user: "forge", remotePath: "/uploads" },
+      {
+        name: "flux", siteName: "FluxSite", host: "1.2.3.5", user: "forge", remotePath: "/uploads",
+        excluded: true, excludedReason: "mix of live and archived files",
+      },
+    ]);
+    return { auditsBase, sitesFile, outputDir: path.join(tmpDir, "output") };
+  }
+
+  async function runCapturingStderr(params) {
+    let stderrOutput = "";
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (s) => { stderrOutput += s; return true; };
+    try {
+      const result = await runWebRollup(params);
+      return { result, stderrOutput };
+    } finally {
+      process.stderr.write = origWrite;
+    }
+  }
+
+  it("excludes the flagged site, counts it separately from skips, and says why", async () => {
+    const { auditsBase, sitesFile, outputDir } = await buildExclusionFixture();
+    const { result, stderrOutput } = await runCapturingStderr({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary.sitesIncluded).toBe(1);
+    expect(result.summary.sitesExcluded).toBe(1);
+    expect(result.summary.sitesSkipped).toBe(0);
+    expect(stderrOutput).toMatch(/\[web-rollup\] excluding FluxSite \(excluded in sites\.json: mix of live and archived files\)/);
+  });
+
+  it("keeps the excluded site off every fleet surface: hero totals, Websites cards, per-site pages, search index", async () => {
+    const { auditsBase, sitesFile, outputDir } = await buildExclusionFixture();
+    const { result } = await runCapturingStderr({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+    expect(result.exitCode).toBe(0);
+
+    const indexHtml = await fs.readFile(path.join(outputDir, "index.html"), "utf8");
+    expect(indexHtml).not.toContain("FluxSite");
+    // 1 file, 1 site — the excluded site's file must not inflate the hero.
+    expect(indexHtml).toContain("out of <strong>1</strong> files scanned across 1 ICJIA website</p>");
+
+    const files = await fs.readdir(outputDir);
+    expect(files.some((f) => f.startsWith("keeper-") && f.endsWith(".html"))).toBe(true);
+    expect(files.some((f) => f.startsWith("fluxsite-"))).toBe(false);
+
+    const rawSearchIndex = await fs.readFile(path.join(outputDir, "search-index.json"), "utf8");
+    expect(rawSearchIndex).not.toContain("FluxSite");
+    expect(JSON.parse(rawSearchIndex).rows).toHaveLength(1);
+  });
+
+  it("still lists the excluded site on the /sites directory, reconciled by the lede", async () => {
+    const { auditsBase, sitesFile, outputDir } = await buildExclusionFixture();
+    await runCapturingStderr({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    const sitesHtml = await fs.readFile(path.join(outputDir, "sites.html"), "utf8");
+    expect(sitesHtml).toContain("FluxSite");
+    expect(sitesHtml).toContain("1 of them under file accessibility audit");
+  });
+
+  it("does not append to the excluded site's a11y-history series", async () => {
+    const { auditsBase, sitesFile, outputDir } = await buildExclusionFixture({ audited: true });
+    await runCapturingStderr({ output: outputDir, sitesFile, _auditsBase: auditsBase });
+
+    // The included site proves the pre-pass ran and wrote its point…
+    await expect(fs.stat(path.join(auditsBase, "keeper", "a11y-history.json"))).resolves.toBeTruthy();
+    // …and the excluded site got none.
+    await expect(fs.stat(path.join(auditsBase, "flux", "a11y-history.json"))).rejects.toThrow();
+  });
+
+  it("buildFleetFileIndex leaves the excluded site's files out, so nothing links to a report page that no longer exists", async () => {
+    const auditsBase = path.join(tmpDir, "filecap-audits");
+    for (const s of ["keeper", "flux"]) {
+      const latestDir = path.join(auditsBase, s, "latest");
+      await fs.mkdir(latestDir, { recursive: true });
+      await writeInventory(path.join(latestDir, "inventory.ndjson"), { serverName: s });
+    }
+    const sites = [
+      { name: "keeper", siteName: "Keeper", publicUrlBase: "https://keep.example.com/uploads" },
+      {
+        name: "flux", siteName: "FluxSite", publicUrlBase: "https://flux.example.com/uploads",
+        excluded: true, excludedReason: "mix of live and archived files",
+      },
+    ];
+    const index = await buildFleetFileIndex(sites, auditsBase, buildAliasMap({ sites }));
+    expect(index.size).toBe(1);
+    expect([...index.values()][0].siteLabel).toBe("Keeper");
+  });
+});

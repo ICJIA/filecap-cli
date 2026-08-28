@@ -47,6 +47,15 @@ const DISMISS_STORAGE_KEY = "fleet-audit:dismissed-whats-new";
  */
 export const WHATS_NEW = [
   {
+    id: "archive-out-of-the-audit-2026-08-28",
+    badge: "Scope change",
+    summary: "The Document Archive is temporarily out of the audit while its contents are reorganized, so the fleet numbers now describe the 11 audited websites. Nothing was deleted — the Archive and every file on it are unchanged, and it returns to the audit when the reorganization settles.",
+    text: "The ICJIA Document Archive (archive.icjia.cloud) is where files leave the websites without being destroyed: under State records-retention policy, nothing published on an ICJIA site is ever deleted, so a file taken off a website moves to the archive instead. Right now the archive is mid-reorganization — it holds a mix of files genuinely retired from the websites and files that are still live on the sites they came from — and while it is in that state, its numbers describe the reorganization more than they describe accessibility. So the archive has been set aside from the audit for now. Its 2,421 files are out of the fleet totals, its files no longer count toward the fleet’s remediation numbers, and its card is off the Websites list — the audit now covers 11 websites, and the headline numbers dropped the moment it left. That drop is this scope change, not files being fixed and not files being removed. Nothing happened to the archive itself: every file is still there, still served at the same addresses, and the site is still listed on the site directory. When the reorganization settles, the archive comes back into the audit the same way it left — as a scope change announced here.",
+    linkText: "See the site directory",
+    linkHref: "sites.html",
+    date: "August 28, 2026",
+  },
+  {
     id: "archive-website-score-corrected-2026-08-27",
     badge: "Corrected",
     summary: "The Archive\u2019s website score has changed from 85 (B) to 42 (F). The old number was wrong \u2014 it was measuring PDFs and images instead of web pages. Nothing about the Archive got worse.",

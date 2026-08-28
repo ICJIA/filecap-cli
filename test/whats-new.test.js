@@ -23,23 +23,34 @@ describe("WHATS_NEW data", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // v1.62.0 — newest entry announces the density/skimmability pass, and is
-  // the first to carry a banner `summary` (the banner itself was one of the
-  // density findings: ~200 words of wall-of-text at the top of the page).
-  it("leads with the 2026-08-20 download-label entry, with a short banner summary", () => {
+  // v1.69.0 — newest entry announces the archive leaving the audit's scope.
+  // The fleet totals visibly dropped (2,421 files left the denominator), so
+  // the entry must say that is a scope change, not remediation or deletion.
+  it("leads with the 2026-08-28 archive-scope entry, with a short banner summary", () => {
     const e = WHATS_NEW[0];
-    expect(e.id).toContain("archive-website-score-corrected");
-    expect(e.badge).toBe("Corrected");
+    expect(e.id).toContain("archive-out-of-the-audit");
+    expect(e.id).toContain("2026-08-28");
+    expect(e.badge).toBe("Scope change");
     expect(e.summary.length).toBeGreaterThan(0);
     // "At most two sentences" is the rule; ~350 chars is the tripwire.
     expect(e.summary.length).toBeLessThan(350);
     expect(e.text.length).toBeGreaterThan(e.summary.length);
   });
 
-  // v1.67.0 — a published site score moved 85 (B) -> 42 (F). The entry must
-  // say the site did not get worse, and that the documents are still audited.
-  it("explains the archive score correction without implying the site regressed", () => {
+  it("says nothing was deleted and the numbers moved because scope moved", () => {
     const e = WHATS_NEW[0];
+    expect(e.text).toMatch(/2,421/);
+    expect(e.text).toMatch(/11 websites/);
+    expect(e.text).toMatch(/[Nn]othing happened to the archive itself/);
+    expect(e.text).toMatch(/scope change, not/i);
+  });
+
+  // v1.67.0 — the 85 (B) -> 42 (F) score correction, now history. It must
+  // keep saying the site did not get worse and the documents stayed audited.
+  it("keeps the archive score-correction entry, still saying the site did not regress", () => {
+    const e = WHATS_NEW.find((x) => x.id.includes("archive-website-score-corrected"));
+    expect(e).toBeTruthy();
+    expect(e.badge).toBe("Corrected");
     expect(e.text).toMatch(/still audited|audited in full/i);
     expect(e.text).toMatch(/nothing on the Archive changed/i);
     expect(e.summary).toMatch(/85|B/);
@@ -59,9 +70,8 @@ describe("WHATS_NEW data", () => {
   it("the banner renders the summary, not the full text, with a read-more link", () => {
     const banner = renderWhatsNewBanner();
     // Compare escaped-safe fragments (the renderer HTML-escapes apostrophes).
-    expect(banner).toContain("website score has changed");
-    expect(banner).toContain("measuring PDFs and images");
-    expect(banner).not.toContain("712 of the 804 things it had scored");
+    expect(banner).toContain("temporarily out of the audit");
+    expect(banner).not.toContain("records-retention");
     expect(banner).toContain(">Read the full update</a>");
   });
 
