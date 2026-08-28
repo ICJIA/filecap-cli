@@ -48,7 +48,12 @@ export const CSV_COLUMNS = [
   //                                    strings are NOT clickable in .xlsx)
   //   unscoreable/non-document entries → "" (audits step doesn't touch them)
   { name: "auditScore",   label: "Audit Report" },
-  { name: "modifiedAt",   label: "Date published" },
+  // v1.70.0 — "Last updated", not "Date published": the value is the file's
+  // server mtime, which moves when a file is re-uploaded or remediated in
+  // place, so "published" read as first-publication — which this is not.
+  // (Git-type sites are the caveat: a clone resets mtimes, so their dates
+  // cluster at scan time. CMS sites — the vast majority — carry real dates.)
+  { name: "modifiedAt",   label: "Last updated" },
   { name: "scannedPath",  label: "Source folder on server" },
   { name: "path",         label: "File location (relative to source folder)" },
   { name: "absolutePath", label: "Full file path on server" },

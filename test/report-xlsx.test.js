@@ -137,21 +137,21 @@ describe("writeXlsx (single sheet)", () => {
 });
 
 describe("writeXlsx column order, sort, and hyperlinks (v1.20.0)", () => {
-  it("orders columns: Date published, File name, Page Count, Public URL, Page References, ...", async () => {
+  it("orders columns: Last updated, File name, Page Count, Public URL, Page References, ...", async () => {
     const out = path.join(tmpDir, "order.xlsx");
     await writeXlsx({ sourceHeader: baseHeader, entries: [pdfEntry], sources: null, outputPath: out });
     const wb = await load(out);
     const headerRow = wb.worksheets[0].getRow(1);
     const labels = [];
     headerRow.eachCell((cell) => labels.push(cell.value));
-    expect(labels[0]).toBe("Date published");
+    expect(labels[0]).toBe("Last updated");
     expect(labels[1]).toBe("File name");
     expect(labels[2]).toBe("Page Count");
     expect(labels[3]).toBe("Public URL");
     expect(labels[4]).toBe("Page References");
   });
 
-  it("sorts rows by Date published descending (newest first)", async () => {
+  it("sorts rows by Last updated descending (newest first)", async () => {
     const e2024 = { ...pdfEntry, path: "a.pdf", filename: "a.pdf", modifiedAt: "2024-01-01T00:00:00.000Z" };
     const e2026 = { ...pdfEntry, path: "b.pdf", filename: "b.pdf", modifiedAt: "2026-02-15T00:00:00.000Z" };
     const e2025 = { ...pdfEntry, path: "c.pdf", filename: "c.pdf", modifiedAt: "2025-06-01T00:00:00.000Z" };

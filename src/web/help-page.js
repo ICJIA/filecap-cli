@@ -120,7 +120,7 @@ export const HELP_SCREENSHOTS = Object.values(SHOTS).map((sh) => sh.file);
  * src/report/xlsx.js. test/web/help-page.test.js pins them to it.
  */
 const WORKBOOK_COLUMNS = [
-  { letter: "A", label: "Date published" },
+  { letter: "A", label: "Last updated" },
   { letter: "B", label: "File name", role: "read", gloss: "What the file is called." },
   { letter: "C", label: "Page Count" },
   { letter: "D", label: "Public URL", role: "read", gloss: "Click to open the actual file and see it for yourself." },

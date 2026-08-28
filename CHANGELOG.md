@@ -10,6 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.70.0] — 2026-08-28
+
+### Changed — the file date leads every table as "Last updated"
+
+Requested 2026-08-28: the per-file date should be one of the first columns
+so readers can sort newest/oldest at a glance. The data was already there —
+`modifiedAt`, the file's server mtime — but it sat in the **last** column of
+the web tables, labeled **"Date published"**.
+
+- **Web tables (every site report + the fleet master):** the date column now
+  leads — first column on the left, mirroring the workbook's column A. The
+  tables already default-sorted by this column descending (v1.20.0 behavior,
+  unchanged), so the visible order is the same; the column you sort by is
+  now the first thing you see.
+- **Renamed "Date published" → "Last updated"** everywhere (web tables, the
+  per-site/master workbooks, the CSV, the duplicates workbook + CSV, the
+  /help column map). The mtime moves when a file is re-uploaded or
+  remediated in place, so "published" read as first-publication — which
+  this data is not. Reverses the old "'Date published' not 'Last modified'"
+  test pin, deliberately.
+- **The XLSX workbooks did not change shape**: the date was already column A
+  and rows were already pre-sorted newest-first (v1.20.0) — only the header
+  text changed, and **no column letters moved** (Notes stays column S; the
+  v1.66.0 shift is not repeated).
+- Known caveat, now documented in the column comment and What's New: the
+  two git-type sites (VPP, SFS) get their mtimes reset by the clone, so
+  their dates cluster at refresh time. CMS sites carry each file's own date.
+
 ## [1.69.0] — 2026-08-28
 
 ### Changed — the archive is out of the audit while its contents are in flux

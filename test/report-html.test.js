@@ -128,7 +128,7 @@ describe("writeHtml", () => {
     expect(html).toContain('<th data-col="auditScore" scope="col" data-nosort>Audit Report</th>');
     expect(html).toContain('<th data-col="referenced" scope="col" data-nosort>Page References</th>');
     expect(html).toContain('<th data-col="duplicateOf" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Duplicate of</button></th>');
-    expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Date published</button></th>');
+    expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Last updated</button></th>');
     // Forensic columns are CSV-only — not rendered as HTML table columns.
     for (const col of ["serverName", "serverIp", "publicUrl", "scannedPath", "path", "absolutePath", "extension", "sizeBytes", "sha256"]) {
       expect(html).not.toMatch(new RegExp('<th data-col="' + col + '"'));
@@ -574,7 +574,7 @@ describe("writeHtml", () => {
       expect(html).toContain('<th data-col="referenced" scope="col" data-nosort>Page References</th>');
       expect(html).toContain('<th data-col="auditScore" scope="col" data-nosort>Audit Report</th>');
       expect(html).toContain('<th data-col="filename" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">File name</button></th>');
-      expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Date published</button></th>');
+      expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Last updated</button></th>');
     });
 
     it("skips wiring a click handler for data-nosort headers", async () => {
@@ -660,13 +660,20 @@ describe("writeHtml", () => {
     expect(html).toContain("dateColIdx");
   });
 
-  it("renders <th data-col='modifiedAt'> with label 'Date published'", async () => {
-    const out = path.join(tmpDir, "date-published-header.html");
+  it("renders <th data-col='modifiedAt'> FIRST, with label 'Last updated' (v1.70.0)", async () => {
+    const out = path.join(tmpDir, "last-updated-header.html");
     await writeHtml({ sourceHeader: sampleHeader, entries: sampleEntries, sources: [sampleHeader], outputPath: out });
     const html = await fs.readFile(out, "utf8");
     // v1.12.0: column-resize handles removed — the th is just label.
-    expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Date published</button></th>');
-    expect(html).not.toContain("Last modified");
+    expect(html).toContain('<th data-col="modifiedAt" scope="col" aria-sort="none"><button type="button" class="th-sort-btn">Last updated</button></th>');
+    expect(html).not.toContain("Date published");
+    // v1.70.0 — the date leads the table (mirroring the workbook's column A)
+    // so newest/oldest is the first thing a reader can scan and sort by.
+    const dateTh = html.indexOf('<th data-col="modifiedAt"');
+    const filenameTh = html.indexOf('<th data-col="filename"');
+    expect(dateTh).toBeGreaterThan(-1);
+    expect(filenameTh).toBeGreaterThan(-1);
+    expect(dateTh).toBeLessThan(filenameTh);
   });
 
   // ── Section 3: two-row chip filter ──────────────────────────────────────────

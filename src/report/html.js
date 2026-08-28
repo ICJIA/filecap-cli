@@ -600,6 +600,10 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
   // Consolidated multi-site reports prepend it so each row's site is identifiable.
   const HTML_TABLE_COLUMNS = [
     ...(isConsolidated ? [{ name: "siteName", label: "Website" }] : []),
+    // v1.70.0 — the date LEADS the table, mirroring the workbook's column A:
+    // newest/oldest is the first thing a reader scans and sorts by. (The
+    // table already default-sorts by this column, descending.)
+    { name: "modifiedAt",  label: "Last updated" },
     { name: "filename",    label: "File name" },
     // v1.20.0: Pages column. Right-aligned in CSS via td.col-pages. PDFs
     // render the integer; non-PDFs render blank.
@@ -615,7 +619,6 @@ export async function writeHtml({ sourceHeader, entries, sources, outputPath, ba
     { name: "auditScore",  label: "Audit Report", sortable: false },
     { name: "referenced",  label: "Page References", sortable: false },
     { name: "duplicateOf", label: "Duplicate of" },
-    { name: "modifiedAt",  label: "Date published" },
   ];
   const htmlColValueIdx = HTML_TABLE_COLUMNS.map((c) => valueIdxByName(c.name));
   const publicUrlVi = valueIdxByName("publicUrl");
@@ -2639,7 +2642,7 @@ ${renderSiteFooter({ generatedAt: fmtChicagoGeneratedAt(scannedAt) || scannedAt 
     });
   });
 
-  // ── default sort: by Date published, descending (most recent first) ──────────
+  // ── default sort: by Last updated, descending (most recent first) ────────────
   const dateColIdx = headers.findIndex(function (th) { return th.dataset.col === "modifiedAt"; });
   if (dateColIdx >= 0) {
     sortColIdx = dateColIdx;

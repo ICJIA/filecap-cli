@@ -55,6 +55,17 @@ export const WHATS_NEW = [
     linkHref: "sites.html",
     date: "August 28, 2026",
   },
+  // Same day as the archive scope change, deliberately second: the banner
+  // shows only entry[0], and the totals drop is the one nobody may miss.
+  {
+    id: "last-updated-column-leads-2026-08-28",
+    badge: "Improved",
+    summary: "Every file table now leads with a Last updated column — the date the file last changed on the server — so sorting newest-to-oldest is the first thing you can do. It was called “Date published” before; only the name and the position changed, not the data.",
+    text: "Every file list on this site — the tables on each website’s report and the downloadable workbooks — carries a date for each file: the day the file itself last changed on the server. Until now that date sat in the last column of the web tables under the name “Date published”, and both halves of that were wrong for how people use it. The name first: a file’s date moves whenever the file is replaced or fixed in place, so for a remediated PDF it is the day of the fix, not the day of first publication — the honest name is Last updated, and that is what the column is now called everywhere. Position second: the date now leads the web tables, first column on the left, where the workbooks have always kept it — and the tables were already sorted newest-first by default, so the order you see is unchanged; the date you sort by is simply the first thing you see. In the downloadable workbooks nothing moved: the date was already column A and just carries the new name, and every other column letter is exactly where it was — if you are mid-review with notes in column S, they are still in column S. One caveat worth knowing: for the two sites published from GitHub (VPP and Safe From the Start), the server’s copy is refreshed wholesale, so their dates cluster around the refresh rather than each file’s own history. For every CMS site, the date is the file’s own.",
+    linkText: "Open the Help guide",
+    linkHref: "help.html",
+    date: "August 28, 2026",
+  },
   {
     id: "archive-website-score-corrected-2026-08-27",
     badge: "Corrected",

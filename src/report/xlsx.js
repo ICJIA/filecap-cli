@@ -174,7 +174,7 @@ function normalizeCellValue(v, type) {
 // where it's linked from. Everything else slides right. CSV stays in its
 // historical column order — only XLSX presents this manager-friendly view.
 export const XLSX_COLUMN_ORDER = [
-  "modifiedAt",     // Date published (rows are also pre-sorted by this DESC)
+  "modifiedAt",     // Last updated (rows are also pre-sorted by this DESC)
   "filename",
   "pageCount",
   "publicUrl",      // hyperlinked
@@ -221,7 +221,7 @@ function writeSheetContents({ sheet, sourceHeader, entries, sources, totals }) {
   sheet.getRow(1).font = { bold: true };
   sheet.views = [{ state: "frozen", ySplit: 1 }];
 
-  // v1.20.0 — pre-sort rows by Date published descending (newest first). ISO
+  // v1.20.0 — pre-sort rows by Last updated descending (newest first). ISO
   // 8601 sorts lexicographically. Missing/empty modifiedAt sorts last.
   const sorted = [...entries].sort((a, b) => {
     const ma = a?.modifiedAt || "";

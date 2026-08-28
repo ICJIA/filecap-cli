@@ -45,6 +45,19 @@ describe("WHATS_NEW data", () => {
     expect(e.text).toMatch(/scope change, not/i);
   });
 
+  // v1.70.0 — the Last updated column move + rename. Same day as the archive
+  // scope change, deliberately SECOND: the banner shows only entry[0], and
+  // the headline-numbers drop is the announcement nobody may miss.
+  it("keeps the 2026-08-28 last-updated column entry in second position", () => {
+    const e = WHATS_NEW[1];
+    expect(e.id).toContain("last-updated-column");
+    expect(e.id).toContain("2026-08-28");
+    expect(e.badge).toBe("Improved");
+    expect(e.text).toMatch(/Last updated/);
+    expect(e.text).toMatch(/Date published/);
+    expect(e.text).toMatch(/no column (letters )?moved|column letters have not moved|nothing moved/i);
+  });
+
   // v1.67.0 — the 85 (B) -> 42 (F) score correction, now history. It must
   // keep saying the site did not get worse and the documents stayed audited.
   it("keeps the archive score-correction entry, still saying the site did not regress", () => {

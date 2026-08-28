@@ -80,16 +80,19 @@ describe("CSV_COLUMNS", () => {
     expect(CSV_COLUMNS[5].label).toBe("Audit Report");
   });
 
-  it("seventh column is modifiedAt with label Date published", () => {
+  it("seventh column is modifiedAt with label Last updated", () => {
     expect(CSV_COLUMNS[6].name).toBe("modifiedAt");
-    expect(CSV_COLUMNS[6].label).toBe("Date published");
+    expect(CSV_COLUMNS[6].label).toBe("Last updated");
   });
 
-  it("modifiedAt column label is 'Date published' not 'Last modified'", () => {
+  // v1.70.0 rename — the value is the file's server mtime, which moves when
+  // a file is re-uploaded or remediated in place, so the old "Date published"
+  // label overstated: it read as first-publication, which the data is not.
+  it("modifiedAt column label is 'Last updated' not 'Date published'", () => {
     const col = CSV_COLUMNS.find((c) => c.name === "modifiedAt");
     expect(col).toBeDefined();
-    expect(col.label).toBe("Date published");
-    expect(col.label).not.toBe("Last modified");
+    expect(col.label).toBe("Last updated");
+    expect(col.label).not.toBe("Date published");
   });
 
   it("does not include the remediable column (dropped in 1.4.1)", () => {
