@@ -16,6 +16,9 @@ import { fetchPageAuditScore } from "../audits/page-scorer.js";
 import { createRetryingJsonFetcher } from "../audits/retrying-fetcher.js";
 import { createLimiter } from "../util/concurrency.js";
 import { resolveSitePageSet } from "../site-audit/page-set.js";
+import { parseCmsPageList } from "../report/pages.js";
+import { findSitemapOmissions } from "../site-audit/sitemap-coverage.js";
+import { createPageProbe } from "../site-audit/page-probe.js";
 import { aggregateSite } from "../site-audit/aggregate.js";
 import { collectIssueKeys, collectIssueKeysByPage } from "../site-audit/issue-keys.js";
 import { readPriorSidecar, buildSidecar, writeSidecar } from "../site-audit/sidecar.js";
@@ -78,6 +81,11 @@ export async function runSiteAudit({
   bearerToken,
   fetcher,
   fetchSitemap, // injectable for tests; undefined → page-set uses the live fetch
+  // v1.68.0 — sitemap completeness. Only pages ABSENT from the sitemap are
+  // probed, so the cost tracks the problem rather than the site.
+  checkSitemap = true,
+  maxSitemapProbes = 300,
+  pageProbe, // injectable for tests
   now = new Date(),
   log = console.error,
 }) {
@@ -100,7 +108,7 @@ export async function runSiteAudit({
     /* no sidecar — sitemap only */
   }
 
-  const { pageSet, droppedFileUrls = [] } = await resolveSitePageSet({ site, cmsNdjson, fetchSitemap });
+  const { pageSet, sitemapUrls = [], droppedFileUrls = [] } = await resolveSitePageSet({ site, cmsNdjson, fetchSitemap });
   log(`[site-audit] ${siteName}: ${pageSet.length} pages in set (sitemap ∪ CMS)`);
   // v1.67.0 — never drop silently. A sitemap that lists a site's files makes
   // this number large (archive: 2,158 of 2,421); those documents are scored
@@ -110,6 +118,44 @@ export async function runSiteAudit({
       `[site-audit] ${siteName}: excluded ${droppedFileUrls.length} file URL(s) ` +
         `from the page set (not web pages — e.g. ${droppedFileUrls[0]})`,
     );
+  }
+
+  // v1.68.0 — which of the site's own live pages does its sitemap.xml omit?
+  // Classified, because most absences are deliberate: a 3xx means the page was
+  // retired on purpose and a noindex page is unlisted on purpose. Reporting
+  // those as gaps is how a hand-run version of this check produced two false
+  // alarms on 2026-08-27. Only an indexable 200 is a finding.
+  let sitemapCoverage = null;
+  if (checkSitemap) {
+    try {
+      const probe = pageProbe ?? createPageProbe();
+      const r = await findSitemapOmissions({
+        sitemapUrls,
+        cmsPageUrls: parseCmsPageList(cmsNdjson).map((c) => c.pageUrl),
+        probe,
+        maxProbes: maxSitemapProbes,
+      });
+      sitemapCoverage = {
+        omissions: r.omissions.map((o) => ({ url: o.url, status: o.status })),
+        counts: {
+          omission: r.omissions.length, broken: r.broken.length,
+          retired: r.retired.length, noindex: r.noindex.length,
+          unknown: r.unknown.length, probed: r.probed, skipped: r.skipped,
+        },
+      };
+      if (r.probed > 0) {
+        log(
+          `[site-audit] ${siteName}: sitemap check — ${r.omissions.length} page(s) live and ` +
+            `indexable but missing from sitemap.xml ` +
+            `(${r.retired.length} retired, ${r.noindex.length} noindex, ${r.broken.length} broken, ` +
+            `${r.unknown.length} unreachable; ${r.probed} probed` +
+            `${r.skipped > 0 ? `, ${r.skipped} over the cap` : ""})`,
+        );
+        for (const o of r.omissions.slice(0, 3)) log(`[site-audit] ${siteName}:   missing: ${o.url}`);
+      }
+    } catch (err) {
+      log(`[site-audit] ${siteName} WARN: sitemap check failed: ${err?.message ?? err}`);
+    }
   }
 
   const cache = loadAuditCache({ cachePath: pageCachePath });
@@ -184,7 +230,7 @@ export async function runSiteAudit({
   const sidecar = buildSidecar({
     siteName, auditedAt, endpoint: auditEndpoint,
     coverage: { pagesInSet: pageSet.length, scored: scoredPages.length, errored, capped },
-    aggregate, issueKeys, issueKeysByPage, prior,
+    aggregate, issueKeys, issueKeysByPage, prior, sitemapCoverage,
   });
   writeSidecar(sidecarPath, sidecar);
   log(`[site-audit] ${siteName}: score ${aggregate.score ?? "n/a"} (${aggregate.grade ?? "—"}), ${scoredPages.length}/${pageSet.length} pages → ${sidecarPath}`);

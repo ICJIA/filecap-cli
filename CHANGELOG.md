@@ -10,6 +10,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > tooling — run it from the GitHub repository, not from npm. Releases are still
 > tagged in git and documented below; they are no longer published to npm.
 
+## [1.68.0] — 2026-08-27
+
+### Added — sitemap-completeness check: which live pages the sitemap omits
+
+A hand-run comparison of "CMS pages vs sitemap.xml" on 2026-08-27 reported
+three sites as having sitemap gaps. **Two of the three were wrong**, and the
+way they were wrong is the whole design of this feature:
+
+- **ilfvcc** — `/counties/*` and `/circuits/*` return **301**. Those pages
+  were retired deliberately (SFY27: the detail pages carried outdated council
+  data; `/councils/` replaced them, commit `4eb0c21`). The comparison used
+  `curl -L`, which followed the redirect and reported the *target's* 200,
+  hiding 126 deliberate retirements as "missing pages".
+- **infonet** — `/tabs/*` return 200 but send **noindex**; they duplicate
+  content on `/screenshots/` and `/resources/` and are excluded on purpose.
+
+Only the legacy Research Hub's 47 pages were real. A checker that does not
+model those two cases produces mostly false alarms, and a report that is
+mostly false alarms gets ignored — so **classification is the feature**; the
+set difference is trivial.
+
+- **`src/site-audit/sitemap-coverage.js`** — pure, injectable probe.
+  Classifies each CMS page absent from the sitemap: `3xx → retired`,
+  `200 + noindex → noindex`, `4xx/5xx → broken`, `200 + indexable →
+  omission`, no status → `unknown`. Only `omission` is a finding; an
+  unreachable probe is never one.
+- **`src/site-audit/page-probe.js`** — one HTTP look per candidate.
+  **`redirect: "manual"` is the point of the module**: a probe that follows
+  redirects cannot tell a retired page from a missing one. Reads only enough
+  body to find a robots directive, and only for a 2xx.
+- **Wired into `site-audit`**, on by default. Only URLs *absent* from the
+  sitemap are probed, so cost tracks the problem, not the site (~220 URLs
+  fleet-wide). `--no-sitemap-check` skips it; `--max-sitemap-probes`
+  (default 300) bounds a misconfigured site, and whatever it drops is
+  reported as `skipped` rather than silently ignored. A failing probe never
+  fails the run.
+- Results land in the per-site sidecar as `sitemapCoverage` and in a one-line
+  log summary.
+
+Run against the live fleet, it reproduces the correct answers: **ilfvcc 0
+omissions** (126 classified retired, 40 broken), **infonet 1** (6 noindex
+correctly suppressed; the one hit is `/index`, a live indexable duplicate of
+`/`), **researchhub 47** (genuine). No new web-app surface — this writes to
+the sidecar and the log, and whether it deserves a page is a separate
+decision once the output has proved useful.
+
+### Fixed — a misleading comment in `safe-fetch.js`
+
+Its doc block claimed undici returns an *opaque* redirect (status 0, headers
+stripped) for `redirect: "manual"`. That is the browser behavior; under
+Node/undici the real 3xx comes back with its status and `Location` intact —
+which `page-probe.js` depends on. Behavior unchanged; the note was wrong and
+would have misled the next reader.
+
 ## [1.67.0] — 2026-08-27
 
 ### Fixed — the website score was scoring files as if they were pages

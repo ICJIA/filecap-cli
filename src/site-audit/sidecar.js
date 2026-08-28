@@ -88,7 +88,7 @@ function computeTrend({ prior, aggregate, issueKeys, issueKeysByPage }) {
   return { vsDate, fixed, new: introduced, stillOpen, coverageChanged };
 }
 
-export function buildSidecar({ siteName, auditedAt, endpoint, coverage, aggregate, issueKeys, issueKeysByPage = null, prior = null }) {
+export function buildSidecar({ siteName, auditedAt, endpoint, coverage, aggregate, issueKeys, issueKeysByPage = null, prior = null, sitemapCoverage = null }) {
   const trend = computeTrend({ prior, aggregate, issueKeys, issueKeysByPage });
   const history = Array.isArray(prior?.scoreHistory) ? prior.scoreHistory.slice() : [];
   history.push({ date: auditedAt, score: aggregate.score, outstandingTotal: aggregate.outstanding.total });
@@ -107,6 +107,9 @@ export function buildSidecar({ siteName, auditedAt, endpoint, coverage, aggregat
     // v1.39.0: per-page keys let the NEXT run diff only pages scored in
     // both runs. Omitted when the caller doesn't supply the map.
     ...(isPlainObject(issueKeysByPage) ? { issueKeysByPage } : {}),
+    // v1.68.0 — which live pages the site's sitemap.xml omits, already
+    // classified (retired / noindex / broken absences are not findings).
+    ...(isPlainObject(sitemapCoverage) ? { sitemapCoverage } : {}),
     scoreHistory: history.slice(-HISTORY_CAP),
     pages: aggregate.pages,
   };

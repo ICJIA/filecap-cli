@@ -418,6 +418,8 @@ program
   .option("--concurrency <n>", "concurrent page audits (default 2 — respects the 100/min IP cap)", (v) => parseInt(v, 10))
   .option("--ttl-days <n>", "page-cache freshness window in days (default 14)", (v) => parseInt(v, 10))
   .option("--force", "ignore cache; re-score every page")
+  .option("--no-sitemap-check", "skip the sitemap-completeness check (which pages the site's sitemap.xml omits)")
+  .option("--max-sitemap-probes <n>", "cap URLs probed by the sitemap check (default 300)", (v) => parseInt(v, 10))
   .action(async (siteName, opts) => {
     try {
       const bearerToken = resolveAuditToken();
@@ -433,6 +435,9 @@ program
         concurrency: opts.concurrency ?? 2,
         ttlDays: opts.ttlDays ?? 14,
         force: opts.force === true,
+        // commander maps --no-sitemap-check to opts.sitemapCheck === false
+        checkSitemap: opts.sitemapCheck !== false,
+        maxSitemapProbes: opts.maxSitemapProbes ?? 300,
         bearerToken,
       });
       if (res.error) {

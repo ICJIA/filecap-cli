@@ -111,9 +111,15 @@ export function assertSafeUrl(url) {
 /**
  * Fetch a scraped-derived URL with SSRF protection. Validates the host, then
  * fetches with `redirect: "manual"` so a redirect cannot carry the request
- * into a private address. The caller sees a 3xx as a non-ok response (undici
- * returns an opaque redirect) and treats it as unreachable, which is the
- * intended "don't chase redirects" behavior.
+ * into a private address.
+ *
+ * The caller sees a 3xx as a non-ok response and, for the scraping callers,
+ * treats it as unreachable — the intended "don't chase redirects" behavior.
+ * v1.68.0 correction: an earlier version of this note said undici returns an
+ * *opaque* redirect (status 0, headers stripped). It does not — that is the
+ * browser Fetch behavior. Under Node/undici the real 3xx comes back with its
+ * status and `Location` intact, which src/site-audit/page-probe.js depends on
+ * to tell a retired page (301) from one merely missing from a sitemap.
  *
  * @param {string} url
  * @param {object} [opts] - passed to fetchImpl as the init; `fetchImpl`

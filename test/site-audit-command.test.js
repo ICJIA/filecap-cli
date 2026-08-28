@@ -258,3 +258,84 @@ describe("runSiteAudit — per-site maxNewPages from sites.json", () => {
     expect(res.capped).toBe(0);
   });
 });
+
+// v1.68.0 — the sitemap-completeness check, wired into the command.
+describe("runSiteAudit — sitemap completeness (v1.68.0)", () => {
+  // A CMS sidecar naming three pages the sitemap does not list.
+  function writeCmsSidecar(urls) {
+    const dir = path.join(auditsBase, "demo", "latest");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "references-sidecar.ndjson"),
+      urls.map((u, i) => JSON.stringify({
+        siteName: "demo", contentType: "page", entryId: i, slug: `s${i}`,
+        pageUrl: u, referencedFiles: [],
+      })).join("\n") + "\n",
+    );
+  }
+
+  it("reports only the indexable 200 — not the retired, noindex or broken ones", async () => {
+    writeCmsSidecar([
+      "https://demo.test/",              // in the sitemap
+      "https://demo.test/retired/",      // 301 — deliberate
+      "https://demo.test/dupe/",         // 200 noindex — deliberate
+      "https://demo.test/gone/",         // 404 — a different problem
+      "https://demo.test/real/",         // 200 indexable — the finding
+    ]);
+    const probes = [];
+    const res = await runSiteAudit({
+      siteName: "demo", sitesFile, auditsBase, pageCachePath: cachePath,
+      fetcher: fakeFetcher({}),
+      fetchSitemap: async () => ["https://demo.test/"],
+      pageProbe: async (u) => {
+        probes.push(u);
+        if (u.includes("/retired/")) return { status: 301, location: "https://demo.test/" };
+        if (u.includes("/dupe/")) return { status: 200, indexable: false };
+        if (u.includes("/gone/")) return { status: 404 };
+        return { status: 200, indexable: true };
+      },
+      log: () => {},
+    });
+
+    const sidecar = JSON.parse(fs.readFileSync(res.sidecarPath, "utf8"));
+    expect(sidecar.sitemapCoverage.counts).toMatchObject({
+      omission: 1, retired: 1, noindex: 1, broken: 1, probed: 4,
+    });
+    expect(sidecar.sitemapCoverage.omissions).toEqual([
+      { url: "https://demo.test/real/", status: 200 },
+    ]);
+    // The page already in the sitemap is never probed.
+    expect(probes).not.toContain("https://demo.test/");
+  });
+
+  it("can be turned off", async () => {
+    writeCmsSidecar(["https://demo.test/never-probed/"]);
+    let called = false;
+    const res = await runSiteAudit({
+      siteName: "demo", sitesFile, auditsBase, pageCachePath: cachePath,
+      checkSitemap: false,
+      fetcher: fakeFetcher({}),
+      fetchSitemap: async () => ["https://demo.test/"],
+      pageProbe: async () => { called = true; return { status: 200, indexable: true }; },
+      log: () => {},
+    });
+    expect(called).toBe(false);
+    const sidecar = JSON.parse(fs.readFileSync(res.sidecarPath, "utf8"));
+    expect(sidecar.sitemapCoverage).toBeUndefined();
+  });
+
+  it("a failing probe never fails the run", async () => {
+    writeCmsSidecar(["https://demo.test/boom/"]);
+    const res = await runSiteAudit({
+      siteName: "demo", sitesFile, auditsBase, pageCachePath: cachePath,
+      fetcher: fakeFetcher({}),
+      fetchSitemap: async () => ["https://demo.test/"],
+      pageProbe: async () => { throw new Error("ECONNRESET"); },
+      log: () => {},
+    });
+    expect(res.score).toBeTypeOf("number");
+    const sidecar = JSON.parse(fs.readFileSync(res.sidecarPath, "utf8"));
+    expect(sidecar.sitemapCoverage.counts.unknown).toBe(1);
+    expect(sidecar.sitemapCoverage.counts.omission).toBe(0);
+  });
+});
